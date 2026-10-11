@@ -24,10 +24,14 @@ publishing organization, the operator's identity, and `github.io` links. The
 site is served only at [agentpaddock.ai](https://agentpaddock.ai).
 
 The pre-push mirror runs both scans with `--tracked-only`: they inspect
-Git-tracked working-tree files (including staged additions), excluding
-untracked local metadata. Tracked files in cache or build directories are
-still checked. Without that flag, the scans inspect the full tree outside
-their built-output and cache exclusions, including exports without Git.
+index blobs (including staged additions) and every commit reachable from HEAD,
+excluding untracked local metadata. Editing or deleting a local file, even in
+a later commit, cannot hide content in the history being published. Gitlinks
+are skipped because their content belongs to a separate repository. Tracked
+files in cache or build directories are still checked. Git reads retry known
+transient host failures up to three times with bounded backoff; permanent
+errors fail immediately. Without that flag, the scans inspect the full tree
+outside their built-output and cache exclusions, including exports without Git.
 
 A test may need a refused value on purpose, such as a URL with credentials that
 the code must reject. Mark that line with

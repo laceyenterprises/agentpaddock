@@ -6,6 +6,7 @@ scan refuses: it ships in the tree the scan gates.
 
 from __future__ import annotations
 
+import errno
 import json
 import shlex
 import subprocess
@@ -181,9 +182,166 @@ def test_mirror_scans_only_tracked_files(tmp_path, check_name):
     assert result.returncode == 1
     assert b"__pycache__/" in result.stdout
 
-    # A missing tracked file is a read error, never a clean scan.
+    # Deleting a local file cannot hide its staged blob.
     (tmp_path / "__pycache__" / "local metadata\nfile.pyc").unlink()
-    assert run_scan(command).returncode == 2
+    assert run_scan(command).returncode == 1
+
+
+def _commit(root, message):
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            message,
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+
+@pytest.mark.parametrize("script", ["publication_scan.py", "internal_note_guard.py"])
+@pytest.mark.parametrize("cleanup", ["edit", "delete", "stage", "commit"])
+def test_committed_content_cannot_be_hidden(tmp_path, script, cleanup):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, capture_output=True)
+    path = tmp_path / "tracked\tfile\n.bin"
+    payload = "gh" + "p_" + "Q" * 40 + "\nReviewer " + "verdict: approve\n"
+    path.write_bytes(b"\x00\xff" + payload.encode())
+    subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
+    _commit(tmp_path, "fixture")
+    if cleanup == "delete":
+        path.unlink()
+    else:
+        path.write_text("clean\n")
+    if cleanup in {"stage", "commit"}:
+        subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
+    if cleanup == "commit":
+        _commit(tmp_path, "clean fixture")
+    result = subprocess.run(
+        ["python3", str(MODULE_ROOT / "scripts" / script), str(tmp_path), "--tracked-only"],
+        capture_output=True,
+        timeout=10,
+    )
+    assert result.returncode == 1, result.stderr
+    assert b"tracked" in result.stdout
+    assert payload.encode() not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("initialized", [False, True])
+def test_tracked_scans_skip_gitlinks(tmp_path, initialized):
+    import internal_note_guard as guard
+
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, capture_output=True)
+    (tmp_path / "README.md").write_text("clean\n")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
+    _commit(tmp_path, "fixture")
+    oid = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"]).strip()
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            "160000",
+            oid.decode(),
+            "tools/child",
+        ],
+        check=True,
+    )
+    _commit(tmp_path, "gitlink fixture")
+    if initialized:
+        child = tmp_path / "tools" / "child"
+        subprocess.run(["git", "init", "-q", str(child)], check=True, capture_output=True)
+        (child / "private.txt").write_text("gh" + "p_" + "Q" * 40 + "\nReviewer " + "verdict: ok")
+    assert [p.name for p in scan.iter_files(tmp_path, tracked_only=True)] == ["README.md"]
+    assert scan.main([str(tmp_path), "--tracked-only"]) == 0
+    assert guard.main([str(tmp_path), "--tracked-only"]) == 0
+
+
+@pytest.mark.parametrize("failure", ["stderr", "spawn", "timeout"])
+@pytest.mark.parametrize("recover", [False, True])
+def test_git_transient_retries_are_bounded(monkeypatch, tmp_path, failure, recover):
+    attempts, delays = [], []
+    exceptions = {
+        "stderr": subprocess.CalledProcessError(
+            128, ["git"], stderr=b"resource temporarily unavailable"
+        ),
+        "spawn": OSError(errno.EAGAIN, "resource temporarily unavailable"),
+        "timeout": subprocess.TimeoutExpired(["git"], 30),
+    }
+
+    def run(command, **kwargs):
+        attempts.append((command, kwargs))
+        if not recover or len(attempts) < 3:
+            raise exceptions[failure]
+        return subprocess.CompletedProcess(command, 0, stdout=b"ok")
+
+    monkeypatch.setattr(scan.subprocess, "run", run)
+    monkeypatch.setattr(scan.time, "sleep", delays.append)
+    if recover:
+        assert scan._git(tmp_path, "ls-files") == b"ok"
+    else:
+        with pytest.raises(type(exceptions[failure])):
+            scan._git(tmp_path, "ls-files")
+    assert len(attempts) == 3
+    assert attempts[0] == attempts[1] == attempts[2]
+    assert attempts[0][1]["timeout"] == 30
+    assert delays == [0.25, 0.5]
+
+
+@pytest.mark.parametrize("script", ["publication_scan", "internal_note_guard"])
+@pytest.mark.parametrize("failure", ["permanent", "transient"])
+def test_git_failures_return_read_error(monkeypatch, tmp_path, script, failure):
+    import internal_note_guard as guard
+
+    calls, delays = [], []
+
+    def run(command, **kwargs):
+        calls.append(command)
+        stderr = b"not a git repository" if failure == "permanent" else b"temporary failure"
+        raise subprocess.CalledProcessError(128, command, stderr=stderr)
+
+    monkeypatch.setattr(scan.subprocess, "run", run)
+    monkeypatch.setattr(scan.time, "sleep", delays.append)
+    module = scan if script == "publication_scan" else guard
+    assert module.main([str(tmp_path), "--tracked-only"]) == 2
+    assert len(calls) == (1 if failure == "permanent" else 3)
+    assert delays == ([] if failure == "permanent" else [0.25, 0.5])
+
+
+@pytest.mark.parametrize("failure", ["missing", "header", "size", "content"])
+def test_unreadable_git_blob_fails_closed(monkeypatch, tmp_path, failure):
+    import internal_note_guard as guard
+
+    oid = b"a" * 40
+
+    def git(root, *args, input=None):
+        if args[0] == "ls-files":
+            return b"100644 " + oid + b" 0\tfile.txt\0"
+        if args[0] == "rev-parse":
+            raise subprocess.CalledProcessError(1, ["git"])
+        assert args == ("cat-file", "--batch")
+        assert input == oid + b"\n"
+        return {
+            "missing": oid + b" missing\n",
+            "header": oid,
+            "size": oid + b" blob unknown\n",
+            "content": oid + b" blob 10\nshort\n",
+        }[failure]
+
+    monkeypatch.setattr(scan, "_git", git)
+    assert scan.main([str(tmp_path), "--tracked-only"]) == 2
+    assert guard.main([str(tmp_path), "--tracked-only"]) == 2
 
 
 @pytest.mark.parametrize("script", ["publication_scan.py", "internal_note_guard.py"])

@@ -13,8 +13,9 @@ exemptions.
 
     python3 scripts/internal_note_guard.py [ROOT] [--tracked-only]
 
-The pre-push mirror uses ``--tracked-only`` to scan Git-tracked working-tree
-files, including staged additions, without reading local untracked metadata.
+The pre-push mirror uses ``--tracked-only`` to scan index blobs and every
+commit reachable from HEAD, without reading local untracked metadata. Local
+edits and deletions cannot hide committed content. Gitlinks are not file blobs.
 The default full-tree mode also works on exports without Git metadata.
 
 Exit status: 0 clean, 1 findings, 2 usage or read error. Stdlib only.
@@ -29,7 +30,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from publication_scan import iter_files
+from publication_scan import iter_file_contents
 
 #: ``(rule, regex)`` over file content.
 MARKERS: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
@@ -77,12 +78,12 @@ def check_text(text: str, path: str = "<text>") -> list[Finding]:
 
 def check_tree(root: Path, *, tracked_only: bool = False) -> list[Finding]:
     findings: list[Finding] = []
-    for path in iter_files(root, tracked_only=tracked_only):
+    for path, content in iter_file_contents(root, tracked_only=tracked_only):
         relative = path.relative_to(root).as_posix()
         findings.extend(
             Finding(relative, 0, rule) for rule, regex in ARTIFACT_NAMES if regex.match(path.name)
         )
-        text = path.read_bytes().decode("utf-8", errors="replace")
+        text = content.decode("utf-8", errors="replace")
         findings.extend(check_text(text, relative))
     return findings
 
@@ -90,14 +91,16 @@ def check_tree(root: Path, *, tracked_only: bool = False) -> list[Finding]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("root", nargs="?", type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument("--tracked-only", action="store_true", help="scan only Git-tracked files")
+    parser.add_argument(
+        "--tracked-only", action="store_true", help="scan index and HEAD-history blobs"
+    )
     args = parser.parse_args(argv)
     if not args.root.is_dir():
         print(f"internal-note guard: {args.root} is not a directory", file=sys.stderr)
         return 2
     try:
         findings = check_tree(args.root, tracked_only=args.tracked_only)
-    except (OSError, subprocess.CalledProcessError) as exc:
+    except (OSError, subprocess.SubprocessError) as exc:
         print(f"internal-note guard: {exc}", file=sys.stderr)
         return 2
     for finding in findings:
