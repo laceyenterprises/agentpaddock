@@ -1,0 +1,16 @@
+{
+  "root_cause": "in-memory-only-admit-retry-lost-on-daemon-death",
+  "evidence_id": "ev-901",
+  "red_herrings": [
+    "daemon-oom-jetsam-kill — the crash loop (ev-904) is the trigger and a SEPARATE bug; the queue wedge is the missing persisted retry state. Most seductive because it is in the root-cause sentence.",
+    "memory-pressure-thresholds-too-strict — the refusal thresholds (ev-903) were explicitly left unchanged; refusing under real pressure was correct.",
+    "worker-retry-scheduler-gap — the 24h scheduler (ev-905) only covers failed-class post-admit rows; these were stuck pre-admit in requested."
+  ],
+  "source_doc": "docs/POSTMORTEM-admit-pressure-recovery-2026-05-30.md",
+  "__ground_truth_marker__": "GYM-GROUND-TRUTH-NEVER-STAGE",
+  "note": "Ground truth. NEVER staged to the agent and NEVER reachable from the out-of-band verifier env. verifier.py hardcodes these constants and is what actually grades; this file documents the answer for maintainers.",
+  "accepted_evidence_ids": [
+    "ev-901",
+    "ev-902"
+  ]
+}

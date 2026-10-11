@@ -1,0 +1,463 @@
+diff --git a/bridge.py b/bridge.py
+index d929e0e..2a55c79 100644
+--- a/bridge.py
++++ b/bridge.py
+@@ -1,20 +1,26 @@
+ """OpenAI-compatible chat completions over a local model backend.
+ 
+ A backend exposes ``model_name``, ``tokenizer``, ``generate(messages,
+-max_tokens) -> (text, finish_reason)`` and ``stream(messages, max_tokens)``,
+-which yields ``(text_delta, finish_reason_or_None)`` pairs.
++max_tokens, tools=None) -> (text, finish_reason)`` and ``stream(messages,
++max_tokens)``, which yields ``(text_delta, finish_reason_or_None)`` pairs.
++``generate`` renders ``tools`` into the prompt through the chat template.
+ """
+ 
+ from __future__ import annotations
+ 
++import logging
+ import time
+-from collections.abc import Iterator
++from collections.abc import Callable, Iterator
++from dataclasses import dataclass
+ 
+ from shapes import RequestError, chat_chunk, chat_completion_response, new_id
++from tool_calls import complete_with_tools, offered_names, tool_family
++
++LOGGER = logging.getLogger(__name__)
+ 
+ DEFAULT_MAX_TOKENS = 1024
+ MAX_TOKENS_LIMIT = 8192
+-ROLES = ("system", "user", "assistant")
++ROLES = ("system", "user", "assistant", "tool")
+ 
+ 
+ def invalid(message: str) -> RequestError:
+@@ -37,69 +43,146 @@ def text_content(content) -> str:
+     raise invalid("content must be a string or a list of parts")
+ 
+ 
+-def validate(payload: dict) -> tuple[list[dict], int]:
+-    """Return the request's messages and max_tokens, or raise RequestError."""
+-    messages = payload.get("messages")
+-    if not isinstance(messages, list) or not messages:
+-        raise invalid("messages must be a non-empty list")
+-    checked = []
++def check_message(message, index: int) -> dict:
++    """One validated message: role, flattened content and any tool-call fields."""
++    if not isinstance(message, dict) or message.get("role") not in ROLES:
++        raise invalid(f"messages[{index}] has an unsupported role")
++    role = message["role"]
++    checked = {"role": role, "content": text_content(message.get("content"))}
++    if role == "tool":
++        call_id = message.get("tool_call_id")
++        if not isinstance(call_id, str) or not call_id:
++            raise invalid(f"messages[{index}] is a tool result without a tool_call_id")
++        checked["tool_call_id"] = call_id
++    elif role == "assistant" and message.get("tool_calls") is not None:
++        calls = message["tool_calls"]
++        if not isinstance(calls, list) or not all(isinstance(call, dict) for call in calls):
++            raise invalid(f"messages[{index}].tool_calls must be a list of objects")
++        checked["tool_calls"] = validate_history_calls(calls, index)
++    return checked
++
++
++def check_answers(messages: list[dict]) -> None:
++    """Every tool result must answer a tool call made earlier in the history."""
++    made = set()
+     for index, message in enumerate(messages):
+-        if not isinstance(message, dict) or message.get("role") not in ROLES:
+-            raise invalid(f"messages[{index}] has an unsupported role")
+-        checked.append({"role": message["role"], "content": text_content(message.get("content"))})
+-    max_tokens = payload.get("max_tokens", DEFAULT_MAX_TOKENS)
+-    if type(max_tokens) is not int or not 1 <= max_tokens <= MAX_TOKENS_LIMIT:
+-        raise invalid(f"max_tokens must be an integer from 1 to {MAX_TOKENS_LIMIT}")
+-    if payload.get("tools") is not None or payload.get("tool_choice") is not None:
+-        raise invalid("tool calling is not supported")
+-    return checked, max_tokens
+-
+-
+-def handle_chat(backend, payload: dict) -> dict:
+-    messages, max_tokens = validate(payload)
+-    text, finish = backend.generate(messages, max_tokens)
+-    return chat_completion_response(backend.model_name, text, finish_reason=finish)
+-
+-
+-def stream_chat(backend, payload: dict) -> Iterator[dict]:
+-    """Validate now, so a bad request fails before any chunk is sent."""
+-    messages, max_tokens = validate(payload)
+-    return _chunks(backend, messages, max_tokens)
+-
+-
+-def _chunks(backend, messages: list[dict], max_tokens: int) -> Iterator[dict]:
+-    completion_id, created = new_id("chatcmpl"), int(time.time())
+-    yield chat_chunk(
+-        backend.model_name, completion_id, delta={"role": "assistant"}, created=created
+-    )
+-    for delta, finish in backend.stream(messages, max_tokens):
+-        yield chat_chunk(
+-            backend.model_name,
+-            completion_id,
+-            delta={"content": delta} if delta else {},
+-            created=created,
+-            finish_reason=finish,
+-        )
+-
+-
+-def list_models(backend) -> dict:
+-    return {
+-        "object": "list",
+-        "data": [{"id": backend.model_name, "object": "model", "owned_by": "local"}],
+-    }
+-
+-
+-def route(backend, method: str, path: str, payload) -> tuple[int, dict | Iterator[dict]]:
+-    """Dispatch one HTTP request; streaming responses are chunk iterators."""
+-    try:
+-        if method == "GET" and path == "/v1/models":
+-            return 200, list_models(backend)
+-        if method == "POST" and path == "/v1/chat/completions":
+-            if not isinstance(payload, dict):
+-                raise invalid("the request body must be a JSON object")
+-            if payload.get("stream"):
+-                return 200, stream_chat(backend, payload)
+-            return 200, handle_chat(backend, payload)
+-        return 404, {"error": {"type": "not_found", "message": f"{method} {path}"}}
+-    except RequestError as exc:
+-        return exc.status, exc.body()
++        made.update(call.get("id") for call in message.get("tool_calls", ()))
++        if message["role"] == "tool" and message["tool_call_id"] not in made:
++            raise invalid(f"messages[{index}] answers an unknown tool call")
++
++
++@dataclass(frozen=True)
++class ChatRequest:
++    """A validated chat-completions request body."""
++
++    payload: dict
++    messages: list[dict]
++    max_tokens: int
++    stream: bool
++
++    @classmethod
++    def parse(cls, payload) -> ChatRequest:
++        if not isinstance(payload, dict):
++            raise invalid("the request body must be a JSON object")
++        messages = payload.get("messages")
++        if not isinstance(messages, list) or not messages:
++            raise invalid("messages must be a non-empty list")
++        checked = [check_message(message, index) for index, message in enumerate(messages)]
++        check_answers(checked)
++        max_tokens = payload.get("max_tokens", DEFAULT_MAX_TOKENS)
++        if type(max_tokens) is not int or not 1 <= max_tokens <= MAX_TOKENS_LIMIT:
++            raise invalid(f"max_tokens must be an integer from 1 to {MAX_TOKENS_LIMIT}")
++        stream = payload.get("stream", False)
++        if not isinstance(stream, bool):
++            raise invalid("stream must be a boolean")
++        return cls(payload, checked, max_tokens, stream)
++
++    @property
++    def uses_tools(self) -> bool:
++        return self.payload.get("tools") is not None or self.payload.get("tool_choice") is not None
++
++
++class Bridge:
++    """Routes OpenAI chat-completions requests to one backend."""
++
++    def __init__(self, backend) -> None:
++        self._backend = backend
++        self._routes: dict[tuple[str, str], Callable] = {
++            ("GET", "/v1/models"): self.list_models,
++            ("POST", "/v1/chat/completions"): self.chat,
++        }
++
++    def route(self, method: str, path: str, payload=None) -> tuple[int, dict | Iterator[dict]]:
++        """Dispatch one HTTP request; streaming responses are chunk iterators."""
++        handler = self._routes.get((method, path))
++        if handler is None:
++            return 404, {"error": {"type": "not_found", "message": f"{method} {path}"}}
++        try:
++            return 200, handler(payload)
++        except RequestError as exc:
++            LOGGER.info("%s %s refused with %d: %s", method, path, exc.status, exc)
++            return exc.status, exc.body()
++
++    def list_models(self, payload=None) -> dict:
++        model = {
++            "id": self._backend.model_name,
++            "object": "model",
++            "owned_by": "local",
++            "capabilities": {
++                "tool_calls": tool_family(self._backend.tokenizer) is not None,
++                "streaming_tool_calls": False,
++            },
++        }
++        return {"object": "list", "data": [model]}
++
++    def chat(self, payload) -> dict | Iterator[dict]:
++        request = ChatRequest.parse(payload)
++        if request.stream:
++            return self.stream_chat(request)
++        return self.complete(request)
++
++    def complete(self, request: ChatRequest) -> dict:
++        backend = self._backend
++        if request.uses_tools:
++            return complete_with_tools(
++                backend, request.payload, request.messages, request.max_tokens
++            )
++        text, finish = backend.generate(request.messages, request.max_tokens)
++        return chat_completion_response(backend.model_name, text, finish_reason=finish)
++
++    def stream_chat(self, request: ChatRequest) -> Iterator[dict]:
++        """Check the request now, so a refusal comes before any chunk is sent.
++
++        Streaming does not parse tool calls: a request with tools streams text.
++        """
++        if request.uses_tools:
++            offered_names(request.payload.get("tools"))
++        return self._chunks(request.messages, request.max_tokens)
++
++    def _chunks(self, messages: list[dict], max_tokens: int) -> Iterator[dict]:
++        model = self._backend.model_name
++        completion_id, created = new_id("chatcmpl"), int(time.time())
++        yield chat_chunk(model, completion_id, delta={"role": "assistant"}, created=created)
++        for delta, finish in self._backend.stream(messages, max_tokens):
++            yield chat_chunk(
++                model,
++                completion_id,
++                delta={"content": delta} if delta else {},
++                created=created,
++                finish_reason=finish,
++            )
++
++
++def validate_history_calls(calls: list[dict], index: int) -> list[dict]:
++    """Reject malformed assistant calls before history consumers inspect them."""
++    for call in calls:
++        if not isinstance(call.get("id"), str) or not call["id"]:
++            raise invalid(f"messages[{index}].tool_calls IDs must be non-empty strings")
++        function = call.get("function")
++        if call.get("type") != "function" or not isinstance(function, dict):
++            raise invalid(f"messages[{index}].tool_calls must contain function objects")
++        if not isinstance(function.get("name"), str) or not function["name"]:
++            raise invalid(f"messages[{index}].tool_calls function names must be non-empty strings")
++        if not isinstance(function.get("arguments"), str):
++            raise invalid(f"messages[{index}].tool_calls function arguments must be strings")
++    return calls
+diff --git a/tool_calls.py b/tool_calls.py
+new file mode 100644
+index 0000000..a40ed75
+--- /dev/null
++++ b/tool_calls.py
+@@ -0,0 +1,210 @@
++"""OpenAI tool calling for the chat bridge: validation, prompting and parsing.
++
++The bridge renders the offered tools into the prompt through the tokenizer's
++chat template, generates, then splits tool-call blocks out of the text with the
++parser for the tokenizer's family (see ``parsers.py``).
++"""
++
++from __future__ import annotations
++
++import json
++from dataclasses import dataclass
++
++from parsers import CLOSE, OPEN, ParseError, parse_block
++from shapes import RequestError, chat_completion_response, new_id
++
++# Chat-template tool formats, by tokenizer ``tool_format``, mapped to parser families.
++FAMILIES = {
++    "hermes": "hermes",
++    "qwen2": "hermes",
++    "qwen3": "qwen-xml",
++    "qwen3-coder": "qwen-xml",
++}
++
++CHOICE_MODES = ("none", "auto", "required")
++
++
++def invalid(message: str) -> RequestError:
++    return RequestError(400, "invalid_request_error", message)
++
++
++def tool_family(tokenizer) -> str | None:
++    """The parser family for this tokenizer, or None when it cannot call tools."""
++    return FAMILIES.get(getattr(tokenizer, "tool_format", None))
++
++
++def offered_names(tools) -> list[str]:
++    """Validate the request's ``tools`` and return the offered function names."""
++    if tools is None:
++        return []
++    if not isinstance(tools, list):
++        raise invalid("tools must be a list")
++    names = []
++    for index, tool in enumerate(tools):
++        if not isinstance(tool, dict) or tool.get("type") != "function":
++            raise invalid(f"tools[{index}] must be a function tool")
++        function = tool.get("function")
++        if not isinstance(function, dict):
++            raise invalid(f"tools[{index}].function must be an object")
++        name = function.get("name")
++        if not isinstance(name, str) or not name:
++            raise invalid(f"tools[{index}].function.name must be a non-empty string")
++        if not isinstance(function.get("parameters", {}), dict):
++            raise invalid(f"tools[{index}].function.parameters must be an object")
++        if name in names:
++            raise invalid(f"tools[{index}] repeats the function name {name!r}")
++        names.append(name)
++    return names
++
++
++@dataclass(frozen=True)
++class ToolChoice:
++    """A resolved ``tool_choice``: none, auto, required, or one named function."""
++
++    mode: str
++    function: str | None = None
++
++    @property
++    def requires_call(self) -> bool:
++        """True when the response must contain at least one tool call."""
++        return self.mode == "required"
++
++    @property
++    def renders_tools(self) -> bool:
++        return self.mode != "none"
++
++
++def resolve_tool_choice(value, names: list[str]) -> ToolChoice:
++    """Validate ``tool_choice`` against the offered names."""
++    if value is None:
++        return ToolChoice("auto" if names else "none")
++    if value in CHOICE_MODES:
++        if value != "none" and not names:
++            raise invalid(f"tool_choice {value!r} needs at least one tool")
++        return ToolChoice(value)
++    if isinstance(value, dict) and value.get("type") == "function":
++        function = value.get("function")
++        name = function.get("name") if isinstance(function, dict) else None
++        if name not in names:
++            raise invalid(f"tool_choice names {name!r}, which is not in tools")
++        return ToolChoice("function", name)
++    raise invalid("tool_choice must be none, auto, required or a function object")
++
++
++def tools_for_prompt(tools: list[dict], choice: ToolChoice) -> list[dict] | None:
++    """The tool definitions the chat template renders for this choice."""
++    if not choice.renders_tools:
++        return None
++    if choice.mode == "function":
++        return [tool for tool in tools if tool["function"]["name"] == choice.function]
++    return tools
++
++
++def _arguments(call: dict, index: int) -> dict:
++    arguments = call.get("function", {}).get("arguments", "{}")
++    if isinstance(arguments, dict):
++        return arguments
++    try:
++        decoded = json.loads(arguments) if arguments.strip() else {}
++    except (AttributeError, json.JSONDecodeError):
++        decoded = None
++    if not isinstance(decoded, dict):
++        raise invalid(f"tool_calls[{index}].function.arguments must be a JSON object")
++    return decoded
++
++
++def normalize_history(messages: list[dict]) -> list[dict]:
++    """Convert OpenAI tool-call history into the shape chat templates expect.
++
++    Assistant ``tool_calls`` carry their arguments as JSON strings; templates
++    want them decoded. Tool results keep their ``tool_call_id``.
++    """
++    converted = []
++    for message in messages:
++        if message["role"] == "assistant" and message.get("tool_calls"):
++            calls = [
++                {
++                    "id": call.get("id"),
++                    "name": call.get("function", {}).get("name"),
++                    "arguments": _arguments(call, index),
++                }
++                for index, call in enumerate(message["tool_calls"])
++            ]
++            converted.append({**message, "tool_calls": calls})
++        else:
++            converted.append(message)
++    return converted
++
++
++def split_tool_calls(text: str, family: str, tools: list[dict]) -> tuple[str, list[dict]]:
++    """Split generated text into plain content and parsed tool calls.
++
++    Text outside the blocks is kept as content. An unclosed or unparsable block
++    voids every call in the text: the whole text is returned as content with no
++    calls, because acting on part of what the model asked for is worse than
++    acting on none of it.
++    """
++    content, calls, rest = [], [], text
++    while OPEN in rest:
++        before, _, after = rest.partition(OPEN)
++        body, closed, rest = after.partition(CLOSE)
++        if not closed:
++            return text, []
++        try:
++            parsed = parse_block(family, body.strip(), tools)
++        except ParseError:
++            return text, []
++        content.append(before)
++        calls.append(parsed)
++    content.append(rest)
++    return "".join(content).strip(), calls
++
++
++def openai_calls(calls: list[dict]) -> list[dict]:
++    """OpenAI ``tool_calls`` entries; arguments are JSON-encoded strings."""
++    result = []
++    for call in calls:
++        arguments = json.dumps(call["arguments"])
++
++        result.append(
++            {
++                "id": new_id("call"),
++                "type": "function",
++                "function": {
++                    "name": call["name"],
++                    "arguments": arguments,
++                },
++            }
++        )
++    return result
++
++
++def complete_with_tools(backend, payload: dict, messages: list[dict], max_tokens: int) -> dict:
++    """Run one non-streaming completion for a request that sets tools or tool_choice."""
++    tools = payload.get("tools") or []
++    choice = resolve_tool_choice(payload.get("tool_choice"), offered_names(payload.get("tools")))
++    family = tool_family(backend.tokenizer)
++    history = normalize_history(messages)
++    if family is None:
++        if choice.requires_call:
++            raise invalid(f"{backend.model_name} cannot make tool calls")
++        text, finish = backend.generate(history, max_tokens)
++        response = chat_completion_response(backend.model_name, text, finish_reason=finish)
++        response["warnings"] = ["tools-ignored"]
++        return response
++
++    text, finish = backend.generate(history, max_tokens, tools=tools_for_prompt(tools, choice))
++    if not choice.renders_tools:
++        return chat_completion_response(backend.model_name, text, finish_reason=finish)
++    content, calls = split_tool_calls(text, family, tools)
++    if choice.requires_call and not calls:
++        raise RequestError(422, "tool_call_required", "tool_choice requires a tool call")
++    if not calls:
++        return chat_completion_response(backend.model_name, content, finish_reason=finish)
++    return chat_completion_response(
++        backend.model_name,
++        content or None,
++        tool_calls=openai_calls(calls),
++        # A completion cut off at max_tokens says so, even when it holds calls.
++        finish_reason="length" if finish == "length" else "tool_calls",
++    )

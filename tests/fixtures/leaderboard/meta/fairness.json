@@ -1,0 +1,23 @@
+{
+  "audits": [
+    {
+      "date": "2026-01-02",
+      "harness": "alpha-cli",
+      "notes": "Fixture audit.",
+      "status": "passed"
+    },
+    {
+      "date": null,
+      "harness": "beta-cli",
+      "notes": "Fixture pending audit.",
+      "status": "pending"
+    }
+  ],
+  "checklist": [
+    {
+      "check": "Vendor-default tools.",
+      "id": "tools"
+    }
+  ],
+  "schema": "paddock-fairness/v1"
+}

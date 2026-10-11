@@ -1,0 +1,43 @@
+diff --git a/retention.py b/retention.py
+--- a/retention.py
++++ b/retention.py
+@@ -1,15 +1,32 @@
+-def select_workers(workers):
+-    selected = []
++from dataclasses import dataclass
++
++
++@dataclass(frozen=True)
++class SweepPlan:
++    ready: tuple
++    deferred: tuple
++
++
++def plan_sweep(workers):
++    ready = []
++    deferred = []
+     for worker in workers:
+-        if worker["terminal"]:
+-            selected.append(worker)
+-    return selected
++        if not worker["terminal"]:
++            continue
++        # Unsaved work is retained for a later operator decision.
++        target = deferred if worker["dirty"] else ready
++        target.append(worker)
++    return SweepPlan(tuple(ready), tuple(deferred))
+ 
+ 
+ def sweep(workers, archive, remove):
++    plan = plan_sweep(workers)
++    archived = []
++    for worker in plan.ready:
++        archive(worker)
++        archived.append(worker)
+     removed = []
+-    for worker in select_workers(workers):
+-        archive(worker)
++    for worker in archived:
+         remove(worker)
+         removed.append(worker["id"])
+     return removed

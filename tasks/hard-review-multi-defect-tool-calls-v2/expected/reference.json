@@ -1,0 +1,28 @@
+{
+  "findings": [
+    {
+      "file": "tool_calls.py",
+      "line_start": 199,
+      "line_end": 199,
+      "blocking": true,
+      "category": "security",
+      "summary": "parse_block only decodes syntax and returns whatever function name the model wrote (parsers.py), and nothing here checks it against the offered tools, so a call to an unoffered function, or under a named choice to a different function, reaches the client as an executable tool call."
+    },
+    {
+      "file": "tool_calls.py",
+      "line_start": 68,
+      "line_end": 70,
+      "blocking": true,
+      "category": "api-contract",
+      "summary": "requires_call is true only for required, so a named tool_choice accepts a plain-text answer with no call and, on a tokenizer without a tool format, falls through to tools-ignored instead of 400."
+    },
+    {
+      "file": "bridge.py",
+      "line_start": 158,
+      "line_end": 159,
+      "blocking": true,
+      "category": "api-contract",
+      "summary": "The streaming branch validates tools but never resolves tool_choice, so a streaming request with required or a named function streams text with 200 instead of the promised 400 (and an unknown named function is not rejected either)."
+    }
+  ]
+}

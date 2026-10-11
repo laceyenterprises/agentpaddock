@@ -1,0 +1,8 @@
+[
+  {
+    "call": "import target\nresult=target.total([2, 3, 4])",
+    "expected": {
+      "ok": 9
+    }
+  }
+]

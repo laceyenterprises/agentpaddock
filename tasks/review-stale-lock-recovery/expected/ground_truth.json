@@ -1,0 +1,28 @@
+{
+  "marker": "GYM-GROUND-TRUTH-NEVER-STAGE",
+  "defects": [
+    {
+      "file": "file-lock.mjs",
+      "line_start": 29,
+      "line_end": 29,
+      "expected_category": "concurrency"
+    }
+  ],
+  "tolerated": [
+    {
+      "file": "file-lock.mjs",
+      "line_start": 23,
+      "line_end": 27
+    }
+  ],
+  "slack": 3,
+  "max_false_blocking": 1,
+  "clean_control": false,
+  "read_files": [
+    "file-lock.mjs"
+  ],
+  "provenance": {
+    "kind": "real-derived",
+    "source": "derived from a private review"
+  }
+}

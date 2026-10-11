@@ -1,0 +1,6 @@
+- **Campaign sends reach the same person twice**
+  - **File:** `contacts.py`
+  - **Lines:** `dedupe` (~9-20)
+  - **Problem:** `dedupe` compares the raw `email` strings, but its docstring promises that two addresses are the same when they match ignoring case and surrounding whitespace. The CRM import writes `Ann@Example.com` while the signup form writes `ann@example.com`, so both records survive and `mailer.recipients` sends the campaign to Ann twice.
+  - **Why it matters:** Every duplicate send counts against the sender reputation budget, and a second unsubscribe link for the same person confuses the suppression list.
+  - **Recommended fix:** Compare a normalized key in `dedupe`, as the docstring says, without changing the records that are returned. Add a regression test in `test_regression.py` that fails on the current code and passes once the fix is in.

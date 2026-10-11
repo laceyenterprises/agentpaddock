@@ -1,0 +1,469 @@
+diff --git a/db.py b/db.py
+new file mode 100644
+--- /dev/null
++++ b/db.py
+@@ -0,0 +1,80 @@
++"""Thin sqlite3 wrapper: one autocommit connection, explicit transactions, typed errors."""
++
++from __future__ import annotations
++
++import contextlib
++import sqlite3
++from collections.abc import Iterator
++from pathlib import Path
++
++
++class StoreError(Exception):
++    """A job-store operation failed."""
++
++
++class BusyError(StoreError):
++    """The database stayed locked past the busy timeout; the caller may retry."""
++
++
++def _translate(error: sqlite3.Error) -> StoreError:
++    """Map a driver error onto the store's error types.
++
++    Every sqlite3 error raised through ``Database.execute`` leaves as a
++    StoreError; lock timeouts ("database is locked", "database table is
++    locked") become BusyError.
++    """
++    message = str(error)
++    if isinstance(error, sqlite3.OperationalError) and "locked" in message:
++        return BusyError(message)
++    return StoreError(message)
++
++
++class Database:
++    """Autocommit connection; group writes with ``transaction()``."""
++
++    def __init__(self, path: str | Path, *, busy_timeout: float = 5.0) -> None:
++        self.path = Path(path)
++        self._busy_timeout = busy_timeout
++        self._conn = self._open(f"file:{self.path}")
++
++    def _open(self, uri: str) -> sqlite3.Connection:
++        conn = sqlite3.connect(uri, uri=True, timeout=self._busy_timeout, isolation_level=None)
++        conn.row_factory = sqlite3.Row
++        conn.execute("PRAGMA foreign_keys = ON")
++        return conn
++
++    def close(self) -> None:
++        self._conn.close()
++
++    def execute(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
++        try:
++            return self._conn.execute(sql, params)
++        except sqlite3.Error as error:
++            raise _translate(error) from error
++
++    @contextlib.contextmanager
++    def transaction(self) -> Iterator[Database]:
++        """Run the block in one write transaction.
++
++        ``BEGIN IMMEDIATE`` takes SQLite's write lock before the block runs, so
++        a second writer waits (up to the busy timeout) at its own BEGIN. Reads
++        and writes inside the block are therefore serialised against every
++        other writer.
++        """
++        self.execute("BEGIN IMMEDIATE")
++        try:
++            yield self
++            self.execute("COMMIT")
++        except BaseException:
++            if self._conn.in_transaction:
++                self._conn.execute("ROLLBACK")
++            raise
++
++    @contextlib.contextmanager
++    def readonly(self) -> Iterator[sqlite3.Connection]:
++        """A separate read-only connection for reports; it never takes the write lock."""
++        conn = self._open(f"file:{self.path}?mode=ro")
++        try:
++            yield conn
++        finally:
++            conn.close()
+diff --git a/jobs.py b/jobs.py
+--- a/jobs.py
++++ b/jobs.py
+@@ -1,33 +1,45 @@
+-"""Durable job queue: workers claim queued jobs and report results."""
++"""Durable job queue: workers lease queued jobs and report results."""
+ 
+ from __future__ import annotations
+ 
+ import json
+-import sqlite3
+ import time
+ from dataclasses import dataclass
+ 
+-SCHEMA = """
+-CREATE TABLE IF NOT EXISTS jobs (
+-    id INTEGER PRIMARY KEY,
+-    kind TEXT NOT NULL,
+-    payload TEXT NOT NULL,
+-    state TEXT NOT NULL DEFAULT 'queued',
+-    worker TEXT,
+-    attempts INTEGER NOT NULL DEFAULT 0,
+-    result TEXT,
+-    enqueued_at REAL NOT NULL,
+-    claimed_at REAL,
+-    finished_at REAL
+-);
+-CREATE INDEX IF NOT EXISTS jobs_state ON jobs (state, id);
+-"""
+-
++from db import Database, StoreError
++
++SCHEMA = (
++    """
++    CREATE TABLE IF NOT EXISTS jobs (
++        id INTEGER PRIMARY KEY,
++        kind TEXT NOT NULL,
++        payload TEXT NOT NULL,
++        state TEXT NOT NULL DEFAULT 'queued',
++        attempts INTEGER NOT NULL DEFAULT 0,
++        result TEXT,
++        enqueued_at REAL NOT NULL,
++        finished_at REAL
++    )
++    """,
++    """
++    CREATE TABLE IF NOT EXISTS leases (
++        job_id INTEGER PRIMARY KEY REFERENCES jobs (id),
++        holder TEXT NOT NULL,
++        expires_at REAL NOT NULL
++    )
++    """,
++    "CREATE INDEX IF NOT EXISTS jobs_state ON jobs (state, id)",
++    "CREATE INDEX IF NOT EXISTS leases_expiry ON leases (expires_at)",
++)
++
++DEFAULT_LEASE_SECONDS = 60.0
++# A job is attempted at most this many times. ``attempts`` counts claims and is
++# incremented when the job is claimed, so it already includes the current one.
+ MAX_ATTEMPTS = 3
+ 
+ 
+-class QueueError(Exception):
+-    """A queue operation failed."""
++class LeaseLost(StoreError):
++    """The caller does not hold the job's lease (it expired or was never granted)."""
+ 
+ 
+ @dataclass(frozen=True)
+@@ -36,89 +48,145 @@ class Job:
+     kind: str
+     payload: dict
+     state: str
+-    worker: str | None
+     attempts: int
++    result: dict | None
+ 
+-
+-class JobQueue:
+-    def __init__(self, path: str) -> None:
+-        self._conn = sqlite3.connect(path, timeout=5.0)
+-        self._conn.row_factory = sqlite3.Row
+-        self._conn.executescript(SCHEMA)
+-
+-    def close(self) -> None:
+-        self._conn.close()
+-
+-    def _job(self, row: sqlite3.Row) -> Job:
+-        return Job(
++    @classmethod
++    def from_row(cls, row) -> Job:
++        return cls(
+             id=row["id"],
+             kind=row["kind"],
+             payload=json.loads(row["payload"]),
+             state=row["state"],
+-            worker=row["worker"],
+             attempts=row["attempts"],
++            result=None if row["result"] is None else json.loads(row["result"]),
+         )
+ 
+-    def enqueue(self, kind: str, payload: dict) -> int:
+-        with self._conn:
+-            cursor = self._conn.execute(
+-                "INSERT INTO jobs (kind, payload, enqueued_at) VALUES (?, ?, ?)",
+-                (kind, json.dumps(payload, sort_keys=True), time.time()),
+-            )
+-        return cursor.lastrowid
++
++class QueryMixin:
++    """Row helpers shared by the queue mixins. Requires ``self.db``."""
++
++    db: Database
++
++    def _one(self, sql: str, params: tuple = ()):
++        return self.db.execute(sql, params).fetchone()
++
++    def _all(self, sql: str, params: tuple = ()):
++        return self.db.execute(sql, params).fetchall()
+ 
+     def get(self, job_id: int) -> Job | None:
+-        row = self._conn.execute(
+-            "SELECT id, kind, payload, state, worker, attempts FROM jobs WHERE id = ?",
+-            (job_id,),
+-        ).fetchone()
+-        return None if row is None else self._job(row)
+-
+-    def claim(self, worker: str) -> Job | None:
+-        """Mark the oldest queued job running under ``worker``."""
+-        row = self._conn.execute(
+-            "SELECT id FROM jobs WHERE state = 'queued' ORDER BY id LIMIT 1"
+-        ).fetchone()
+-        if row is None:
+-            return None
+-        with self._conn:
+-            self._conn.execute(
+-                "UPDATE jobs SET state = 'running', worker = ?, claimed_at = ?,"
+-                " attempts = attempts + 1 WHERE id = ?",
+-                (worker, time.time(), row["id"]),
++        row = self._one("SELECT * FROM jobs WHERE id = ?", (job_id,))
++        return None if row is None else Job.from_row(row)
++
++    def counts(self) -> dict[str, int]:
++        rows = self._all("SELECT state, COUNT(*) AS n FROM jobs GROUP BY state")
++        return {row["state"]: row["n"] for row in rows}
++
++
++class LeaseMixin:
++    """Lease bookkeeping. JobQueue composes it with QueryMixin, which supplies _one and _all."""
++
++    db: Database
++
++    def holder_of(self, job_id: int) -> str | None:
++        row = self._one("SELECT holder FROM leases WHERE job_id = ?", (job_id,))
++        return None if row is None else row["holder"]
++
++    def _require_holder(self, job_id: int, holder: str) -> None:
++        current = self.holder_of(job_id)
++        if current != holder:
++            raise LeaseLost(f"job {job_id} is leased to {current!r}, not {holder!r}")
++
++    def renew(
++        self,
++        job_id: int,
++        holder: str,
++        *,
++        now: float | None = None,
++        seconds: float = DEFAULT_LEASE_SECONDS,
++    ) -> float:
++        """Extend ``holder``'s lease on ``job_id``; raise LeaseLost if it is gone."""
++        now = time.time() if now is None else now
++        expires_at = now + seconds
++        cursor = self.db.execute(
++            "UPDATE leases SET expires_at = ? WHERE job_id = ?",
++            (expires_at, job_id),
++        )
++        if cursor.rowcount != 1:
++            raise LeaseLost(f"job {job_id} has no lease")
++        return expires_at
++
++    def expired_leases(self, now: float) -> list[tuple[int, str]]:
++        rows = self._all(
++            "SELECT job_id, holder FROM leases WHERE expires_at <= ? ORDER BY job_id",
++            (now,),
++        )
++        return [(row["job_id"], row["holder"]) for row in rows]
++
++
++class JobQueue(QueryMixin, LeaseMixin):
++    def __init__(self, db: Database) -> None:
++        self.db = db
++        for statement in SCHEMA:
++            self.db.execute(statement)
++
++    def enqueue(self, kind: str, payload: dict, *, now: float | None = None) -> int:
++        now = time.time() if now is None else now
++        cursor = self.db.execute(
++            "INSERT INTO jobs (kind, payload, enqueued_at) VALUES (?, ?, ?)",
++            (kind, json.dumps(payload, sort_keys=True), now),
++        )
++        return cursor.lastrowid
++
++    def claim(
++        self,
++        holder: str,
++        *,
++        now: float | None = None,
++        seconds: float = DEFAULT_LEASE_SECONDS,
++    ) -> Job | None:
++        """Lease the oldest queued job to ``holder`` for ``seconds``."""
++        now = time.time() if now is None else now
++        with self.db.transaction():
++            row = self._one("SELECT id FROM jobs WHERE state = 'queued' ORDER BY id LIMIT 1")
++            if row is None:
++                return None
++            self.db.execute(
++                "UPDATE jobs SET state = 'running', attempts = attempts + 1 WHERE id = ?",
++                (row["id"],),
++            )
++            self.db.execute(
++                "INSERT INTO leases (job_id, holder, expires_at) VALUES (?, ?, ?)",
++                (row["id"], holder, now + seconds),
+             )
+         return self.get(row["id"])
+ 
+-    def complete(self, job_id: int, result: dict) -> None:
+-        with self._conn:
+-            self._conn.execute(
++    def complete(self, job_id: int, holder: str, result: dict, *, now: float | None = None) -> None:
++        """Record ``result`` and drop ``holder``'s lease."""
++        now = time.time() if now is None else now
++        with self.db.transaction():
++            self._require_holder(job_id, holder)
++            self.db.execute(
+                 "UPDATE jobs SET state = 'done', result = ?, finished_at = ? WHERE id = ?",
+-                (json.dumps(result, sort_keys=True), time.time(), job_id),
++                (json.dumps(result, sort_keys=True), now, job_id),
+             )
+-
+-    def fail(self, job_id: int, error: str) -> None:
++            self.db.execute("DELETE FROM leases WHERE job_id = ?", (job_id,))
++
++    def fail(self, job_id: int, holder: str, error: str, *, now: float | None = None) -> str:
++        """End a failed attempt: requeue the job, or mark it dead once attempts are spent."""
++        now = time.time() if now is None else now
++        with self.db.transaction():
++            self._require_holder(job_id, holder)
++            state = self._release(job_id, {"error": error}, now=now)
++        return state
++
++    def _release(self, job_id: int, result: dict, *, now: float) -> str:
++        """Drop the lease and requeue or kill the job. Call inside a transaction."""
+         job = self.get(job_id)
+-        if job is None:
+-            raise QueueError(f"unknown job {job_id}")
+         state = "dead" if job.attempts >= MAX_ATTEMPTS else "queued"
+-        with self._conn:
+-            self._conn.execute(
+-                "UPDATE jobs SET state = ?, worker = NULL, result = ? WHERE id = ?",
+-                (state, json.dumps({"error": error}), job_id),
+-            )
+-
+-    def stuck(self, older_than: float) -> list[Job]:
+-        """Running jobs claimed before ``older_than``; the operator requeues them by hand."""
+-        rows = self._conn.execute(
+-            "SELECT id, kind, payload, state, worker, attempts FROM jobs"
+-            " WHERE state = 'running' AND claimed_at < ? ORDER BY id",
+-            (older_than,),
+-        ).fetchall()
+-        return [self._job(row) for row in rows]
+-
+-    def requeue(self, job_id: int) -> None:
+-        with self._conn:
+-            self._conn.execute(
+-                "UPDATE jobs SET state = 'queued', worker = NULL WHERE id = ? AND state = 'running'",
+-                (job_id,),
+-            )
++        self.db.execute(
++            "UPDATE jobs SET state = ?, result = ?, finished_at = ? WHERE id = ?",
++            (state, json.dumps(result, sort_keys=True), now if state == "dead" else None, job_id),
++        )
++        self.db.execute("DELETE FROM leases WHERE job_id = ?", (job_id,))
++        return state
+diff --git a/sweeper.py b/sweeper.py
+new file mode 100644
+--- /dev/null
++++ b/sweeper.py
+@@ -0,0 +1,96 @@
++"""Lease sweeper: requeue jobs whose holder stopped renewing."""
++
++from __future__ import annotations
++
++import argparse
++import json
++import logging
++import sys
++import time
++
++from db import BusyError, Database
++from jobs import JobQueue
++
++LOGGER = logging.getLogger(__name__)
++
++SWEEP_INTERVAL_SECONDS = 15.0
++BUSY_BACKOFF_SECONDS = 0.05
++
++
++def _sweep_once(queue: JobQueue, now: float) -> dict[str, list[int]]:
++    swept: dict[str, list[int]] = {"queued": [], "dead": []}
++    with queue.db.transaction():
++        for job_id, holder in queue.expired_leases(now):
++            state = queue._release(job_id, {"error": f"lease expired (holder {holder})"}, now=now)
++            swept[state].append(job_id)
++    return swept
++
++
++def sweep(queue: JobQueue, *, now: float | None = None, retries: int = 3) -> dict[str, list[int]]:
++    """Release every expired lease; retry a sweep that hits a busy database."""
++    if retries < 1:
++        raise ValueError("retries must be at least 1")
++    now = time.monotonic() if now is None else now
++    for attempt in range(retries):
++        try:
++            swept = _sweep_once(queue, now)
++            break
++        except BusyError:
++            if attempt == retries - 1:
++                raise
++            LOGGER.warning("sweeper.busy attempt=%d", attempt + 1)
++            time.sleep(BUSY_BACKOFF_SECONDS * (attempt + 1))
++    for job_id in swept["dead"]:
++        LOGGER.error("sweeper.job_dead job_id=%d", job_id)
++    return swept
++
++
++def status_report(db: Database) -> dict[str, object]:
++    """Queue and lease counts from a read-only connection."""
++    with db.readonly() as conn:
++        states = {
++            row["state"]: row["n"]
++            for row in conn.execute("SELECT state, COUNT(*) AS n FROM jobs GROUP BY state")
++        }
++        leased = conn.execute("SELECT COUNT(*) AS n FROM leases").fetchone()["n"]
++    return {"states": states, "leased": leased}
++
++
++def run_forever(queue: JobQueue, *, interval: float = SWEEP_INTERVAL_SECONDS) -> None:
++    while True:
++        try:
++            swept = sweep(queue)
++        except BusyError:
++            LOGGER.exception("sweeper.gave_up")
++        else:
++            if swept["queued"] or swept["dead"]:
++                LOGGER.info("sweeper.swept %s", json.dumps(swept, sort_keys=True))
++        time.sleep(interval)
++
++
++def main(argv: list[str] | None = None) -> int:
++    parser = argparse.ArgumentParser(prog="job-sweeper")
++    parser.add_argument("--db", required=True, help="job-store SQLite database")
++    parser.add_argument("--once", action="store_true", help="sweep once and print the result")
++    parser.add_argument("--status", action="store_true", help="print queue and lease counts")
++    args = parser.parse_args(argv)
++    db = Database(args.db)
++    try:
++        if args.status:
++            print(json.dumps(status_report(db), sort_keys=True))
++            return 0
++        queue = JobQueue(db)
++        if args.once:
++            print(json.dumps(sweep(queue), sort_keys=True))
++            return 0
++        run_forever(queue)
++    except KeyboardInterrupt:
++        print("job-sweeper: interrupted", file=sys.stderr)
++        return 130
++    finally:
++        db.close()
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())

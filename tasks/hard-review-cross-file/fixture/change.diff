@@ -1,0 +1,66 @@
+diff --git a/registry.py b/registry.py
+--- a/registry.py
++++ b/registry.py
+@@ -44,9 +44,9 @@ class Registry:
+     def names(self) -> list[str]:
+         return sorted(self._entries)
+ 
+-    def find_entry(self, name: str) -> Entry:
+-        """Return the entry called ``name``; raise KeyError when there is none."""
+-        return self._entries[name]
++    def find_entry(self, name: str) -> Entry | None:
++        """Return the entry called ``name``, or None when there is none."""
++        return self._entries.get(name)
+ 
+     def create_entry(self, name: str, settings: dict[str, object]) -> Entry:
+         if name in self._entries:
+@@ -57,20 +57,18 @@ class Registry:
+         return entry
+ 
+     def update_settings(self, name: str, settings: dict[str, object]) -> Entry:
+-        try:
+-            entry = self.find_entry(name)
+-        except KeyError:
+-            raise RegistryError(f"no entry {name!r}") from None
++        entry = self.find_entry(name)
++        if entry is None:
++            raise RegistryError(f"no entry {name!r}")
+         entry.settings = dict(settings)
+         entry.touch()
+         return entry
+ 
+     def rename(self, old: str, new: str) -> Entry:
+-        try:
+-            entry = self.find_entry(old)
+-        except KeyError:
+-            raise RegistryError(f"no entry {old!r}") from None
+-        if new in self._entries:
++        entry = self.find_entry(old)
++        if entry is None:
++            raise RegistryError(f"no entry {old!r}")
++        if self.find_entry(new) is not None:
+             raise RegistryError(f"entry {new!r} already exists")
+         del self._entries[old]
+         entry.name = new
+@@ -80,17 +78,12 @@ class Registry:
+ 
+     def remove(self, name: str) -> bool:
+         """Remove ``name``; return False when it was already absent."""
+-        try:
+-            del self._entries[name]
+-        except KeyError:
+-            return False
+-        return True
++        return self._entries.pop(name, None) is not None
+ 
+     def tag(self, name: str, tag: str) -> None:
+-        try:
+-            entry = self.find_entry(name)
+-        except KeyError:
+-            raise RegistryError(f"no entry {name!r}") from None
++        entry = self.find_entry(name)
++        if entry is None:
++            raise RegistryError(f"no entry {name!r}")
+         if tag not in entry.tags:
+             entry.tags.append(tag)
+             entry.touch()

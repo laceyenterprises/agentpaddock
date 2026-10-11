@@ -1,0 +1,15 @@
+{
+  "editable": [
+    "directory.py",
+    "reconcile.py"
+  ],
+  "files": [
+    "backend.py",
+    "directory.py",
+    "settings.py",
+    "plugins.py",
+    "reconcile.py",
+    "test_visible.py",
+    "finding.md"
+  ]
+}

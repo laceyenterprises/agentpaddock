@@ -1,0 +1,21 @@
+{
+  "marker": "GYM-GROUND-TRUTH-NEVER-STAGE",
+  "defects": [
+    {
+      "file": "publisher.py",
+      "line_start": 2,
+      "line_end": 2,
+      "expected_category": "correctness"
+    }
+  ],
+  "tolerated": [],
+  "slack": 3,
+  "max_false_blocking": 1,
+  "clean_control": false,
+  "read_files": [
+    "publisher.py"
+  ],
+  "provenance": {
+    "kind": "synthetic"
+  }
+}

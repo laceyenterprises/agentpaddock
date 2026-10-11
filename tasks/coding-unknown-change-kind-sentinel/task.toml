@@ -1,0 +1,25 @@
+# Drawn from a real merged regression (PR #6180): `resolve_change_kind` returned
+# its own "unknown" sentinel, persisted it, then rejected that value when replayed
+# as explicit input during DAG reconcile. Merged steps became unreconcilable.
+
+id = "coding-unknown-change-kind-sentinel"
+task_version = 1
+title = "The resolver rejects its own terminal value"
+suite = "coding"
+persona = "claude-code"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage the change-kind resolver and reconcile symptom."
+
+[result_schema]
+defect_line = { type = "integer", required = true, description = "1-indexed line in change_kind.py that rejects the replayed sentinel" }
+sentinel_handling = { type = "enum", required = true, enum = ["fall-through", "return-declared", "raise", "drop-explicit"] }
+invalid_explicit_still_errors = { type = "boolean", required = true, description = "whether truly invalid explicit values should still be rejected" }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "The answer must treat the resolver's own terminal sentinel as not-declared while preserving errors for invalid kinds."

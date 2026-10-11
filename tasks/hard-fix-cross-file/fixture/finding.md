@@ -1,0 +1,6 @@
+- **A directory outage deactivates every account**
+  - **File:** `directory.py`
+  - **Lines:** `lookup` (~1-9)
+  - **Problem:** `lookup` catches every exception and returns None, so `backend.Unavailable` reads as "no such user". During last night's 02:00 directory outage the nightly `sweep.sweep` deactivated 4,100 active accounts.
+  - **Why it matters:** Deactivation revokes sessions and tokens; restoring the accounts took the on-call most of the night.
+  - **Recommended fix:** Return None from `lookup` only for `backend.NotFound` and let other directory errors propagate, as its docstring says. Make sure the nightly sweep still behaves as documented.

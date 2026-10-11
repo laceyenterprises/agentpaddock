@@ -1,0 +1,7 @@
+{
+  "profile": "batch",
+  "template_limit": 12,
+  "fix": "copy-dict",
+  "original_first_tags": 1,
+  "fixed_template_tags": 2
+}

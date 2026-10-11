@@ -1,0 +1,22 @@
+{
+  "marker": "GYM-GROUND-TRUTH-NEVER-STAGE",
+  "defects": [
+    {
+      "file": "progress_journal.py",
+      "line_start": 12,
+      "line_end": 16,
+      "expected_category": "error-handling"
+    }
+  ],
+  "tolerated": [],
+  "slack": 3,
+  "max_false_blocking": 1,
+  "clean_control": false,
+  "read_files": [
+    "progress_journal.py"
+  ],
+  "provenance": {
+    "kind": "real-derived",
+    "source": "derived from a private review"
+  }
+}

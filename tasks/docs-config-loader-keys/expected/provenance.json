@@ -1,0 +1,8 @@
+{
+  "kind": "real-derived",
+  "before": "1b7cb6084d911b02b54b220b1cbf8b534584f90f",
+  "docs_fix": "109537e89ca9d313a5f6b93c593c426ee673021d",
+  "doc": "projects/cfg/LOADER-CONTRACT.md",
+  "code": "platform/agent-os-config/src/agent_os_config/schema_v1/misc.py",
+  "note": "Trimmed enum row; parent schema already supports plan as default. Enum constant copied from schema_v1/core.py at the same revision."
+}

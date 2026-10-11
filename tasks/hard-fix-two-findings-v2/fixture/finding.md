@@ -1,0 +1,13 @@
+- **A client that retries while limited stays locked out**
+  - **File:** `limiter.py`
+  - **Lines:** `Limiter.allow` (~16-22)
+  - **Problem:** `allow` appends `now_ms` before it checks the limit, so rejected requests count against the window too. A client that retries while limited keeps pushing its own window forward and is never admitted, although the docstring says only admitted requests count.
+  - **Why it matters:** One burst turns into a lockout for every client with a retry loop; support saw a batch importer rejected for twenty minutes straight.
+  - **Recommended fix:** Record a request only when it is admitted, and compute the wait from the oldest admitted request, as the docstring says.
+
+- **Retry-After is sent in milliseconds**
+  - **File:** `headers.py`
+  - **Lines:** `rejection_headers` (~1-3)
+  - **Problem:** `rejection_headers` puts the limiter's wait, which is in milliseconds, straight into `Retry-After`, but `Retry-After` is a number of seconds. A client told to wait 800 ms by `proxy.handle` sleeps for 800 seconds.
+  - **Why it matters:** Every rejected SDK call stalls the user for minutes instead of under a second.
+  - **Recommended fix:** Convert the wait to whole seconds before sending it: `str(wait_ms // 1000)`.

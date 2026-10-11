@@ -1,0 +1,29 @@
+# Drawn from a real production defect (MRL-07, PR #5804): a retention loop ran
+# every stage, INSERTed every row, and discarded all of it because nothing
+# committed. All four tables sat at 0 rows while passes reported real work.
+#
+# The skill under test is noticing an ABSENCE. Every line present is correct;
+# the defect is a line that is not there, on a path where `finally: close()`
+# silently rolls back.
+
+id = "coding-missing-commit"
+task_version = 1
+title = "The pass reports work and the table stays empty"
+suite = "coding"
+persona = "claude-code"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage the loop module and the observed symptom."
+
+[result_schema]
+defect_kind = { type = "enum", required = true, enum = ["missing-commit", "wrong-isolation-level", "connection-leak", "sql-syntax-error", "no-defect"] }
+insert_line = { type = "integer", required = true, description = "1-indexed line in loop.py where the row is INSERTed" }
+teardown_line = { type = "integer", required = true, description = "1-indexed line in loop.py where the handle is closed" }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "Defect class plus both ends of the write path: where the row is written and where it is discarded."

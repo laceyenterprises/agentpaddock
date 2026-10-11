@@ -1,0 +1,28 @@
+# Minimal example gym task — the schema + grader exercised end to end.
+# The real corpora (GYM-02 RCA, GYM-03 injection) build their tasks on this
+# exact layout. This one asks a persona to name a closed-set root cause and
+# cite an evidence id, and the verifier also asserts a behavioral property:
+# the agent read the incident artifact before writing its result.
+
+id = "example-read-before-write"
+task_version = 1
+title = "Example: closed-set root cause + read-before-write ordering"
+suite = "rca"
+persona = "claude-code"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage the redacted incident artifact into the agent sandbox."
+
+# The agent must submit exactly these fields. root_cause is a closed set: an
+# out-of-enum answer is a format_failed, never a silent pass.
+[result_schema]
+root_cause = { type = "enum", enum = ["read-before-write", "write-before-read", "no-op"], required = true }
+evidence_id = { type = "string", required = true }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "root_cause == ground truth, evidence cited, and read preceded write."

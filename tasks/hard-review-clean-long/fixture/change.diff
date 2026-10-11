@@ -1,0 +1,492 @@
+diff --git a/alerts.py b/alerts.py
+new file mode 100644
+--- /dev/null
++++ b/alerts.py
+@@ -0,0 +1,57 @@
++"""Alert records shared by the notifier and the quiet-hours digest."""
++
++from __future__ import annotations
++
++import time
++from dataclasses import dataclass
++
++# Ordered from least to most severe.
++SEVERITIES = ("info", "warning", "critical")
++SEVERITY_RANK = {severity: rank for rank, severity in enumerate(SEVERITIES)}
++
++
++class AlertError(ValueError):
++    """An alert is malformed."""
++
++
++@dataclass(frozen=True)
++class Alert:
++    source: str
++    key: str
++    severity: str
++    text: str
++    raised_at: float
++
++    def __post_init__(self) -> None:
++        if self.severity not in SEVERITIES:
++            raise AlertError(f"unknown severity {self.severity!r}")
++        if not self.source or not self.key:
++            raise AlertError("alerts need a source and a key")
++
++    @property
++    def critical(self) -> bool:
++        return self.severity == "critical"
++
++    def to_record(self) -> dict[str, object]:
++        return {
++            "source": self.source,
++            "key": self.key,
++            "severity": self.severity,
++            "text": self.text,
++            "raised_at": self.raised_at,
++        }
++
++    @classmethod
++    def from_record(cls, record: dict[str, object]) -> Alert:
++        return cls(
++            source=str(record["source"]),
++            key=str(record["key"]),
++            severity=str(record["severity"]),
++            text=str(record["text"]),
++            raised_at=float(record["raised_at"]),
++        )
++
++
++def format_alert(alert: Alert) -> str:
++    stamp = time.strftime("%H:%M:%S", time.gmtime(alert.raised_at))
++    return f"[{alert.severity}] {alert.source}/{alert.key} {stamp}Z: {alert.text}"
+diff --git a/digest.py b/digest.py
+new file mode 100644
+--- /dev/null
++++ b/digest.py
+@@ -0,0 +1,98 @@
++"""The quiet-hours digest: alerts held back for one summary message."""
++
++from __future__ import annotations
++
++import contextlib
++import json
++import os
++import tempfile
++from collections import Counter
++from collections.abc import Callable
++from pathlib import Path
++
++from alerts import SEVERITIES, SEVERITY_RANK, Alert
++
++# The digest lists at most this many alerts; the rest are counted.
++MAX_LISTED = 20
++
++
++class Digest:
++    """Alerts held during quiet hours, persisted so a restart does not lose them.
++
++    The state file is replaced atomically on every change. ``tempfile.mkstemp``
++    creates the replacement 0600 and ``os.replace`` keeps that mode, so the
++    file stays operator-only.
++    """
++
++    def __init__(self, path: Path) -> None:
++        self.path = path
++        self._pending: list[Alert] = self._load()
++
++    def __len__(self) -> int:
++        return len(self._pending)
++
++    def _load(self) -> list[Alert]:
++        try:
++            state = json.loads(self.path.read_text())
++        except FileNotFoundError:
++            return []
++        return [Alert.from_record(record) for record in state["pending"]]
++
++    def _save(self) -> None:
++        self.path.parent.mkdir(parents=True, exist_ok=True)
++        fd, temp = tempfile.mkstemp(dir=self.path.parent, prefix=".digest-")
++        try:
++            with os.fdopen(fd, "w") as handle:
++                json.dump(
++                    {"pending": [alert.to_record() for alert in self._pending]},
++                    handle,
++                    indent=2,
++                    sort_keys=True,
++                )
++                handle.flush()
++                os.fsync(handle.fileno())
++            os.replace(temp, self.path)
++        except BaseException:
++            with contextlib.suppress(FileNotFoundError):
++                os.unlink(temp)
++            raise
++
++    def add(self, alert: Alert) -> None:
++        self._pending.append(alert)
++        self._save()
++
++    def render(self) -> str:
++        """The digest text: counts by severity, then alerts most severe first, oldest first."""
++        counts = Counter(alert.severity for alert in self._pending)
++        ordered = sorted(
++            self._pending,
++            key=lambda alert: (-SEVERITY_RANK[alert.severity], alert.raised_at),
++        )
++        lines = [f"Quiet-hours digest: {len(ordered)} alerts held"]
++        lines.append(
++            ", ".join(
++                f"{counts[severity]} {severity}"
++                for severity in reversed(SEVERITIES)
++                if counts[severity]
++            )
++        )
++        for alert in ordered[:MAX_LISTED]:
++            lines.append(f"- [{alert.severity}] {alert.source}/{alert.key}: {alert.text}")
++        hidden = len(ordered) - MAX_LISTED
++        if hidden > 0:
++            lines.append(f"... and {hidden} more")
++        return "\n".join(lines)
++
++    def flush(self, send: Callable[[str], None]) -> int:
++        """Send the digest, then clear it; return how many alerts it held.
++
++        The pending list is cleared only after ``send`` returns, so a failed
++        send keeps every held alert for the next attempt.
++        """
++        if not self._pending:
++            return 0
++        send(self.render())
++        flushed = len(self._pending)
++        self._pending = []
++        self._save()
++        return flushed
+diff --git a/notify.py b/notify.py
+--- a/notify.py
++++ b/notify.py
+@@ -1,74 +1,104 @@
+-"""Alert notifications: deliver each alert to the operator as it arrives."""
++"""Alert notifications: deduplicate, rate-limit, and hold non-critical alerts in quiet hours."""
+ 
+ from __future__ import annotations
+ 
++import hashlib
+ import logging
+ import time
++from collections import deque
+ from collections.abc import Callable
+-from dataclasses import dataclass
++from datetime import datetime, timezone
++from pathlib import Path
+ 
+-LOGGER = logging.getLogger(__name__)
++from alerts import Alert, format_alert
++from digest import Digest
++from quiet_hours import QuietHours
+ 
+-SEVERITIES = ("info", "warning", "critical")
++LOGGER = logging.getLogger(__name__)
+ 
+ Send = Callable[[str], None]
+ 
++# An alert identical to one sent or held within this many seconds is suppressed.
++DEDUPE_SECONDS = 600
++RATE_LIMIT_PER_MINUTE = 20
++DIGEST_FILE = "quiet-hours-digest.json"
+ 
+-class AlertError(ValueError):
+-    """An alert is malformed."""
+-
+-
+-@dataclass(frozen=True)
+-class Alert:
+-    source: str
+-    key: str
+-    severity: str
+-    text: str
+-    raised_at: float
+-
+-    def __post_init__(self) -> None:
+-        if self.severity not in SEVERITIES:
+-            raise AlertError(f"unknown severity {self.severity!r}")
+-        if not self.source or not self.key:
+-            raise AlertError("alerts need a source and a key")
+ 
+-
+-def format_alert(alert: Alert) -> str:
+-    stamp = time.strftime("%H:%M:%S", time.gmtime(alert.raised_at))
+-    return f"[{alert.severity}] {alert.source}/{alert.key} {stamp}Z: {alert.text}"
++def dedupe_key(alert: Alert) -> str:
++    """Identity of an alert for deduplication: its source, key and text."""
++    material = "\0".join((alert.source, alert.key, alert.text))
++    return hashlib.sha1(material.encode()).hexdigest()
+ 
+ 
+ class Notifier:
+-    """Send every alert immediately, up to a per-minute limit."""
+-
+-    def __init__(self, send: Send, *, rate_limit_per_minute: int = 20, clock=time.time) -> None:
++    """Route alerts: send, hold for the quiet-hours digest, suppress or drop.
++
++    Critical alerts are always sent at once: quiet hours and the rate limit
++    never apply to them. Duplicates are suppressed at every severity.
++    """
++
++    def __init__(
++        self,
++        send: Send,
++        digest: Digest,
++        quiet: QuietHours | None,
++        *,
++        rate_limit_per_minute: int = RATE_LIMIT_PER_MINUTE,
++        clock: Callable[[], float] = time.time,
++    ) -> None:
+         self._send = send
++        self._digest = digest
++        self._quiet = quiet
+         self._rate_limit = rate_limit_per_minute
+         self._clock = clock
+-        self._window_start = clock()
+-        self._sent_in_window = 0
++        self._sent_at: deque[float] = deque()
++        self._last_seen: dict[str, float] = {}
+         self.dropped = 0
+ 
++    def in_quiet_hours(self, now: float) -> bool:
++        if self._quiet is None:
++            return False
++        return self._quiet.contains(datetime.fromtimestamp(now, tz=timezone.utc))
++
++    def _duplicate(self, key: str, now: float) -> bool:
++        last = self._last_seen.get(key)
++        return last is not None and now - last < DEDUPE_SECONDS
++
+     def _rate_limited(self, now: float) -> bool:
+-        if now - self._window_start >= 60:
+-            self._window_start = now
+-            self._sent_in_window = 0
+-        return self._sent_in_window >= self._rate_limit
++        """Sliding one-minute window over non-critical sends."""
++        while self._sent_at and now - self._sent_at[0] >= 60:
++            self._sent_at.popleft()
++        return len(self._sent_at) >= self._rate_limit
+ 
+     def notify(self, alert: Alert) -> str:
+-        """Deliver ``alert``; return "sent" or "dropped"."""
++        """Route ``alert``; return "sent", "held", "duplicate" or "dropped"."""
+         now = self._clock()
++        key = dedupe_key(alert)
++        if self._duplicate(key, now):
++            return "duplicate"
++        if alert.critical:
++            self._deliver(alert)
++            self._last_seen[key] = now
++            return "sent"
++        if self.in_quiet_hours(now):
++            self._digest.add(alert)
++            self._last_seen[key] = now
++            return "held"
+         if self._rate_limited(now):
+             self.dropped += 1
+             LOGGER.warning("notify.rate_limited source=%s key=%s", alert.source, alert.key)
+             return "dropped"
++        self._deliver(alert)
++        self._sent_at.append(now)
++        self._last_seen[key] = now
++        return "sent"
++
++    def _deliver(self, alert: Alert) -> None:
+         try:
+             self._send(format_alert(alert))
+         except Exception:
+             LOGGER.exception("notify.send_failed source=%s key=%s", alert.source, alert.key)
+             raise
+-        self._sent_in_window += 1
+-        return "sent"
+ 
+     def notify_many(self, alerts: list[Alert]) -> dict[str, int]:
+         outcomes: dict[str, int] = {}
+@@ -76,3 +106,24 @@ class Notifier:
+             outcome = self.notify(alert)
+             outcomes[outcome] = outcomes.get(outcome, 0) + 1
+         return outcomes
++
++    def tick(self) -> int:
++        """Send the held digest once quiet hours are over; return how many alerts it held."""
++        now = self._clock()
++        if self.in_quiet_hours(now) or not len(self._digest):
++            return 0
++        return self._digest.flush(self._send)
++
++    def forget_expired(self) -> int:
++        """Drop dedupe entries older than the dedupe window; return how many were dropped."""
++        now = self._clock()
++        expired = [key for key, seen in self._last_seen.items() if now - seen >= DEDUPE_SECONDS]
++        for key in expired:
++            del self._last_seen[key]
++        return len(expired)
++
++
++def build_notifier(send: Send, state_dir: Path, window: str, zone: str) -> Notifier:
++    """Wire a Notifier from operator settings (quiet-hours window and IANA zone)."""
++    digest = Digest(state_dir / DIGEST_FILE)
++    return Notifier(send, digest, QuietHours.parse(window, zone))
+diff --git a/notifyctl.py b/notifyctl.py
+new file mode 100644
+--- /dev/null
++++ b/notifyctl.py
+@@ -0,0 +1,86 @@
++"""notifyctl: inspect the notifier's quiet hours and held digest."""
++
++from __future__ import annotations
++
++import argparse
++import json
++import sys
++from datetime import datetime, timezone
++from pathlib import Path
++
++from alerts import SEVERITIES, Alert, AlertError, format_alert
++from digest import Digest
++from notify import DIGEST_FILE, dedupe_key
++from quiet_hours import QuietHours, QuietHoursError
++
++
++def _digest(state_dir: Path) -> Digest:
++    return Digest(state_dir / DIGEST_FILE)
++
++
++def cmd_status(args: argparse.Namespace) -> int:
++    """Print the quiet-hours window, whether it is active now, and the held count."""
++    quiet = QuietHours.parse(args.quiet_hours, args.zone)
++    now = datetime.now(timezone.utc)
++    status = {
++        "quiet_hours": None if quiet is None else quiet.describe(),
++        "in_quiet_hours": quiet is not None and quiet.contains(now),
++        "held": len(_digest(args.state_dir)),
++    }
++    print(json.dumps(status, sort_keys=True))
++    return 0
++
++
++def cmd_preview(args: argparse.Namespace) -> int:
++    """Print the digest that would be sent when quiet hours end. Sends nothing."""
++    digest = _digest(args.state_dir)
++    print(digest.render() if len(digest) else "digest is empty")
++    return 0
++
++
++def cmd_check(args: argparse.Namespace) -> int:
++    """Validate an alert and print how it would be formatted and deduplicated."""
++    try:
++        alert = Alert(args.source, args.key, args.severity, args.text, args.raised_at)
++    except AlertError as error:
++        print(f"notifyctl: {error}", file=sys.stderr)
++        return 2
++    print(format_alert(alert))
++    print(f"dedupe key {dedupe_key(alert)}")
++    return 0
++
++
++def parser() -> argparse.ArgumentParser:
++    root = argparse.ArgumentParser(prog="notifyctl")
++    root.add_argument("--state-dir", type=Path, required=True, help="notifier state directory")
++    commands = root.add_subparsers(dest="command", required=True)
++
++    status = commands.add_parser("status", help="quiet hours and held-alert count")
++    status.add_argument("--quiet-hours", default="", help="HH:MM-HH:MM, empty to disable")
++    status.add_argument("--zone", default="UTC", help="IANA time zone for quiet hours")
++    status.set_defaults(handler=cmd_status)
++
++    preview = commands.add_parser("preview", help="print the held digest")
++    preview.set_defaults(handler=cmd_preview)
++
++    check = commands.add_parser("check", help="validate and format one alert")
++    check.add_argument("--source", required=True)
++    check.add_argument("--key", required=True)
++    check.add_argument("--severity", choices=SEVERITIES, required=True)
++    check.add_argument("--text", required=True)
++    check.add_argument("--raised-at", type=float, default=0.0)
++    check.set_defaults(handler=cmd_check)
++    return root
++
++
++def main(argv: list[str] | None = None) -> int:
++    args = parser().parse_args(argv)
++    try:
++        return args.handler(args)
++    except QuietHoursError as error:
++        print(f"notifyctl: {error}", file=sys.stderr)
++        return 2
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/quiet_hours.py b/quiet_hours.py
+new file mode 100644
+--- /dev/null
++++ b/quiet_hours.py
+@@ -0,0 +1,61 @@
++"""Quiet hours: a daily local-time window in which only critical alerts are sent."""
++
++from __future__ import annotations
++
++import re
++from dataclasses import dataclass
++from datetime import datetime, time
++from zoneinfo import ZoneInfo
++
++_WINDOW = re.compile(r"^(\d{2}):(\d{2})-(\d{2}):(\d{2})$")
++
++
++class QuietHoursError(ValueError):
++    """The quiet-hours setting is malformed."""
++
++
++def _clock(hour: str, minute: str) -> time:
++    h, m = int(hour), int(minute)
++    if h > 23 or m > 59:
++        raise QuietHoursError(f"invalid clock time {hour}:{minute}")
++    return time(h, m)
++
++
++@dataclass(frozen=True)
++class QuietHours:
++    """A half-open local-time window [start, end) in ``zone``."""
++
++    start: time
++    end: time
++    zone: ZoneInfo
++
++    @classmethod
++    def parse(cls, window: str, zone: str) -> QuietHours | None:
++        """Parse ``HH:MM-HH:MM`` in the IANA ``zone``; an empty window disables quiet hours."""
++        window = window.strip()
++        if not window:
++            return None
++        match = _WINDOW.match(window)
++        if match is None:
++            raise QuietHoursError(f"quiet hours must be HH:MM-HH:MM, got {window!r}")
++        start = _clock(*match.group(1, 2))
++        end = _clock(*match.group(3, 4))
++        if start == end:
++            raise QuietHoursError("quiet hours start and end must differ")
++        return cls(start, end, ZoneInfo(zone))
++
++    def contains(self, moment: datetime) -> bool:
++        """True when the timezone-aware ``moment`` falls inside the window.
++
++        ``moment`` may be in any zone; it is converted to the window's zone
++        first. A window whose start is later than its end wraps midnight.
++        """
++        if moment.tzinfo is None:
++            raise QuietHoursError("contains() needs a timezone-aware datetime")
++        local = moment.astimezone(self.zone).time()
++        if self.start < self.end:
++            return self.start <= local < self.end
++        return local >= self.start or local < self.end
++
++    def describe(self) -> str:
++        return f"{self.start:%H:%M}-{self.end:%H:%M} {self.zone.key}"

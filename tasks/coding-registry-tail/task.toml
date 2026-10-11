@@ -1,0 +1,23 @@
+id = "coding-registry-tail"
+task_version = 1
+title = "Discriminates long-file reading, late rebinding and snapshots"
+suite = "coding"
+persona = "claude-code"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage self-contained synthetic code and deterministic replay."
+
+[result_schema]
+profile = { type = "string" }
+template_limit = { type = "integer" }
+fix = { type = "enum", enum = ["copy-dict", "copy-tags-list", "clear-tags-after-return", "use-default-limit"] }
+original_first_tags = { type = "integer" }
+fixed_template_tags = { type = "integer" }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "All diagnosis and counterexample fields graded independently with MEG-05 sub-checks."

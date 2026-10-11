@@ -1,0 +1,19 @@
+# Source PR/review: synthetic; authored hard-review fixture for HRX-02.
+id = "hard-review-multi-defect-tool-calls-v2"
+task_version = 1
+title = "Tool calls v2: OpenAI tool calling for the local chat bridge"
+suite = "hard-review"
+persona = "codex"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage reviewed code, diff and PR context only."
+
+[result_schema]
+findings = { type = "list", required = true, max_items = 32, items = { file = { type = "string", required = true }, line_start = { type = "integer", required = true }, line_end = { type = "integer", required = true }, blocking = { type = "boolean", required = true }, summary = { type = "string", required = true }, category = { type = "enum", enum = ["correctness", "concurrency", "data-loss", "security", "error-handling", "resource-leak", "api-contract", "test-gap", "docs"], required = true } } }
+
+[verifier]
+entrypoint = "verifier.py"

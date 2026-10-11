@@ -1,0 +1,27 @@
+diff --git a/progress_journal.py b/progress_journal.py
+--- a/progress_journal.py
++++ b/progress_journal.py
+@@ -0,0 +1,23 @@
++import json
++from pathlib import Path
++
++JOURNAL_VERSION = 2
++
++
++class ProgressJournal:
++    def __init__(self, root: Path):
++        self.path = root / "progress"
++        self.files = {}
++        for path in sorted((self.path / "files").glob("*.json")):
++            payload = json.loads(path.read_text())
++            if payload.get("version") == JOURNAL_VERSION:
++                self.files[payload["path_key"]] = payload["checkpoint"]
++        try:
++            self.identities = json.loads((self.path / "identities.json").read_text())
++        except FileNotFoundError:
++            self.identities = {}
++        # Raise on bad bytes: silently dropping progress could resume at a stale offset.
++        self.bytes_ingested = 0
++        self.pending = set()
++        self.skipped_unchanged = 0
++        self.skipped_duplicates = 0

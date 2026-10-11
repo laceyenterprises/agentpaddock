@@ -1,0 +1,42 @@
+[
+  {
+    "call": "import contacts\nrecords=[{'id':1,'email':'Ann@Example.com'},{'id':2,'email':'ann@example.com '},{'id':3,'email':' ANN@example.COM'},{'id':4,'email':'bob@example.com'},{'id':5,'email':'Bob@Example.com\\t'}]\nresult=[record['id'] for record in contacts.dedupe(records)]\n",
+    "expected": {
+      "ok": [
+        1,
+        4
+      ]
+    }
+  },
+  {
+    "call": "import contacts, copy\nrecords=[{'id':1},{'id':2,'email':'Cy@Example.com'},{'id':3},{'id':4,'email':'dee@example.com'},{'id':5,'email':'cy@example.com'}]\nbefore=copy.deepcopy(records)\nkept=contacts.dedupe(records)\nresult=[[record['id'] for record in kept],[record.get('email') for record in kept],all(any(record is item for item in records) for record in kept),records==before,contacts.dedupe([])]\n",
+    "expected": {
+      "ok": [
+        [
+          1,
+          2,
+          3,
+          4
+        ],
+        [
+          null,
+          "Cy@Example.com",
+          null,
+          "dee@example.com"
+        ],
+        true,
+        true,
+        []
+      ]
+    }
+  },
+  {
+    "call": "import mailer\nrecords=[{'email':' Eve@Example.com'},{'name':'no address'},{'email':'eve@example.com'},{'email':'frank@example.com'},{'email':'FRANK@EXAMPLE.COM '}]\nresult=mailer.recipients(records)\n",
+    "expected": {
+      "ok": [
+        " Eve@Example.com",
+        "frank@example.com"
+      ]
+    }
+  }
+]

@@ -1,0 +1,5 @@
+{
+  "root_cause": "read-before-write",
+  "evidence_id": "run-42",
+  "note": "Ground truth. NEVER staged to the agent and NEVER reachable from the out-of-band verifier env. The trusted verifier hardcodes these constants; this file documents the corpus pattern GYM-02/03 follow."
+}

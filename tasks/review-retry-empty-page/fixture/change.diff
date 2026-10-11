@@ -1,0 +1,15 @@
+diff --git a/reader.py b/reader.py
+--- a/reader.py
++++ b/reader.py
+@@ -3,7 +3,10 @@
+ 
+ 
+ def read_page(client, cursor):
+-    return client.fetch(cursor)
++    try:
++        return client.fetch(cursor)
++    except TemporaryUnavailable:
++        return []
+ 
+ 
+ def drain(client, store):

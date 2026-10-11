@@ -1,0 +1,11 @@
+{
+  "editable": [
+    "target.py"
+  ],
+  "files": [
+    "target.py",
+    "support.py",
+    "test_visible.py",
+    "finding.md"
+  ]
+}

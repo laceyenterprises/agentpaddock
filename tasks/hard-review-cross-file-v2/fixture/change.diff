@@ -1,0 +1,169 @@
+diff --git a/registry.py b/registry.py
+index 53dd4e1..8190eb7 100644
+--- a/registry.py
++++ b/registry.py
+@@ -1,7 +1,12 @@
+-"""A registry of named entries, persisted as one JSON file."""
++"""A registry of named entries, persisted as one JSON file.
++
++Every change is published on the event bus as ``entry.<action>`` with a snapshot
++of the entry (see ``Entry.snapshot``); updates also carry the prior snapshot.
++"""
+ 
+ from __future__ import annotations
+ 
++import copy
+ import json
+ from dataclasses import dataclass, field
+ from pathlib import Path
+@@ -19,6 +24,14 @@ class Entry:
+     settings: dict = field(default_factory=dict)
+     tags: set[str] = field(default_factory=set)
+ 
++    def snapshot(self) -> dict:
++        """A JSON-ready copy of this entry that later changes to it do not affect."""
++        return {
++            "name": self.name,
++            "settings": copy.deepcopy(self.settings),
++            "tags": sorted(self.tags),
++        }
++
+ 
+ class Registry:
+     def __init__(self, path: Path, bus: EventBus | None = None) -> None:
+@@ -42,9 +55,14 @@ class Registry:
+         }
+         self._path.write_text(json.dumps(raw, indent=2, sort_keys=True), encoding="utf-8")
+ 
+-    def _emit(self, kind: str, entry: Entry) -> None:
+-        if self._bus is not None:
+-            self._bus.publish(kind, entry)
++    def _emit(self, kind: str, entry: Entry, *, before: dict | None = None) -> None:
++        """Publish a snapshot of ``entry``, plus its prior snapshot for an update."""
++        if self._bus is None:
++            return
++        payload = entry.snapshot()
++        if before is not None:
++            payload["before"] = before
++        self._bus.publish(kind, payload)
+ 
+     def get(self, name: str) -> Entry | None:
+         return self._entries.get(name)
+@@ -55,7 +73,7 @@ class Registry:
+     def create(self, name: str, settings: dict, tags=()) -> Entry:
+         if name in self._entries:
+             raise RegistryError(f"{name} already exists")
+-        entry = Entry(name, dict(settings), set(tags))
++        entry = Entry(name, copy.deepcopy(settings), set(tags))
+         self._entries[name] = entry
+         self._save()
+         self._emit("entry.created", entry)
+@@ -65,18 +83,32 @@ class Registry:
+         entry = self._entries.get(name)
+         if entry is None:
+             raise RegistryError(f"no entry named {name}")
+-        entry.settings.update(settings)
+-        self._save()
+-        self._emit("entry.updated", entry)
+-        return entry
++        before = entry.snapshot()
++        entry.settings.update(copy.deepcopy(settings))
++        return self._changed(entry, before)
+ 
+     def tag(self, name: str, *tags: str) -> Entry:
+         entry = self._entries.get(name)
+         if entry is None:
+             raise RegistryError(f"no entry named {name}")
++        before = entry.snapshot()
+         entry.tags.update(tags)
++        return self._changed(entry, before)
++
++    def untag(self, name: str, *tags: str) -> Entry:
++        entry = self._entries.get(name)
++        if entry is None:
++            raise RegistryError(f"no entry named {name}")
++        before = entry.snapshot()
++        entry.tags.difference_update(tags)
++        return self._changed(entry, before)
++
++    def _changed(self, entry: Entry, before: dict) -> Entry:
++        """Save and publish an update; an update that changed nothing publishes nothing."""
++        if entry.snapshot() == before:
++            return entry
+         self._save()
+-        self._emit("entry.updated", entry)
++        self._emit("entry.updated", entry, before=before)
+         return entry
+ 
+     def remove(self, name: str) -> Entry:
+diff --git a/webhooks.py b/webhooks.py
+index 285add8..1d9fb33 100644
+--- a/webhooks.py
++++ b/webhooks.py
+@@ -1,12 +1,23 @@
+-"""Posts registry changes to the configured HTTP endpoints."""
++"""Posts registry changes to the configured HTTP endpoints.
++
++Changes are queued when they are published and posted by ``flush``, which the
++single-threaded service calls from its main loop between requests, so a slow
++endpoint never holds up a registry change. Each queued body is built from the change's snapshot.
++"""
+ 
+ from __future__ import annotations
+ 
+ import json
++import logging
+ import urllib.request
++from collections import deque
++
++LOGGER = logging.getLogger(__name__)
+ 
+ # Set at startup from the deployment's webhook configuration.
+ ENDPOINTS: list[str] = []
++# Bodies waiting to be posted, oldest first: (url, body).
++PENDING: deque[tuple[str, dict]] = deque()
+ 
+ 
+ def post_json(url: str, body: dict) -> None:
+@@ -20,12 +31,33 @@ def post_json(url: str, body: dict) -> None:
+         response.read()
+ 
+ 
+-def deliver_change(kind: str, entry, *, post=post_json) -> None:
+-    body = {
+-        "event": kind,
+-        "name": entry.name,
+-        "settings": entry.settings,
+-        "tags": sorted(entry.tags),
+-    }
++def deliver_change(kind: str, change: dict) -> None:
++    """Queue one body per endpoint for the change snapshot ``change``."""
++    body = {"event": kind, **change}
+     for url in ENDPOINTS:
+-        post(url, body)
++        PENDING.append((url, body))
++
++
++def flush(*, post=post_json, limit: int = 100) -> int:
++    """Post up to ``limit`` queued bodies, oldest first; return how many were sent.
++
++    After a failure, that endpoint's remaining bodies stay queued in order for the
++    next flush, so each endpoint receives changes in the order they happened and
++    one unreachable endpoint does not hold up the others.
++    """
++    sent, kept, failed = 0, [], set()
++    while PENDING and sent < limit:
++        url, body = PENDING.popleft()
++        if url in failed:
++            kept.append((url, body))
++            continue
++        try:
++            post(url, body)
++        except OSError as exc:
++            LOGGER.warning("webhook %s failed, will retry: %s", url, exc)
++            failed.add(url)
++            kept.append((url, body))
++            continue
++        sent += 1
++    PENDING.extendleft(reversed(kept))
++    return sent

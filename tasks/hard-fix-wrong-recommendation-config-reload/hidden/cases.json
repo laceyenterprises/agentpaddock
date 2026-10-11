@@ -1,0 +1,42 @@
+[
+  {
+    "call": "import config, daemon, tempfile\nfrom pathlib import Path\nroot = Path(tempfile.mkdtemp())\ndef write(name, data):\n    path = root / name\n    path.write_bytes(data)\n    return path\ngood = write('good.json', b'{\"merge_enabled\": false, \"max_workers\": 2}')\nbad = write('bad.json', b'{\"merge_enabled\": false,}')\nstate = daemon.reload({'config': dict(config.DEFAULTS), 'degraded': None}, bad)\nresult = sorted(state)\n",
+    "expected": {
+      "ok": [
+        "config",
+        "degraded"
+      ]
+    }
+  },
+  {
+    "call": "import config, daemon, tempfile\nfrom pathlib import Path\nroot = Path(tempfile.mkdtemp())\ndef write(name, data):\n    path = root / name\n    path.write_bytes(data)\n    return path\ngood = write('good.json', b'{\"merge_enabled\": false, \"max_workers\": 2}')\nbad = write('bad.json', b'{\"merge_enabled\": false,}')\nstate = daemon.reload({'config': dict(config.DEFAULTS), 'degraded': None}, good)\nstate = daemon.reload(state, bad)\nresult = [state['config'], bool(state['degraded'])]\n",
+    "expected": {
+      "ok": [
+        {
+          "merge_enabled": false,
+          "max_workers": 2,
+          "region": "us-east"
+        },
+        true
+      ]
+    }
+  },
+  {
+    "call": "import config, daemon, tempfile\nfrom pathlib import Path\nroot = Path(tempfile.mkdtemp())\ndef write(name, data):\n    path = root / name\n    path.write_bytes(data)\n    return path\ngood = write('good.json', b'{\"merge_enabled\": false, \"max_workers\": 2}')\nbad = write('bad.json', b'{\"merge_enabled\": false,}')\noutcomes = []\nfor data in [b'[]', b'{\"merge_enabled\": false, \"max_wrokers\": 2}', b'{\"max_workers\": \"8\"}', b'{\"max_workers\": true}', b'\\xff\\xfe', b'']:\n    try:\n        outcomes.append(['returned', config.load_overrides(write('shape.json', data))])\n    except config.ConfigError:\n        outcomes.append('ConfigError')\n    except Exception as exc:\n        outcomes.append(type(exc).__name__)\nstate = {'config': dict(config.DEFAULTS), 'degraded': 'previous error'}\nstate = daemon.reload(state, write('fixed.json', b'{\"region\": \"eu-west\"}'))\nresult = [outcomes, config.load_overrides(root / 'absent.json'), state['config']['region'], state['degraded']]\n",
+    "expected": {
+      "ok": [
+        [
+          "ConfigError",
+          "ConfigError",
+          "ConfigError",
+          "ConfigError",
+          "ConfigError",
+          "ConfigError"
+        ],
+        {},
+        "eu-west",
+        null
+      ]
+    }
+  }
+]

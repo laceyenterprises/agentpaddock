@@ -1,0 +1,36 @@
+{
+  "findings": [
+    {
+      "file": "dispatcher.py",
+      "line_start": 24,
+      "line_end": 24,
+      "blocking": true,
+      "category": "correctness",
+      "summary": "attempts counts earlier failures, so the fifth failed attempt sees 4 and is released; messages are attempted six times, not five."
+    },
+    {
+      "file": "dispatcher.py",
+      "line_start": 54,
+      "line_end": 61,
+      "blocking": true,
+      "category": "error-handling",
+      "summary": "PermanentFailure subclasses DeliveryError, so the DeliveryError clause catches it first; rejected 4xx messages are retried to exhaustion and the PermanentFailure branch is unreachable."
+    },
+    {
+      "file": "store.py",
+      "line_start": 48,
+      "line_end": 58,
+      "blocking": true,
+      "category": "concurrency",
+      "summary": "claim_batch selects pending rows and then updates them by id without re-checking state in one transaction, so two dispatchers can claim and deliver the same message."
+    },
+    {
+      "file": "store.py",
+      "line_start": 76,
+      "line_end": 76,
+      "blocking": true,
+      "category": "data-loss",
+      "summary": "dead_letter deletes the row instead of setting state dead with the error, so dead letters are lost and dead_letters and replay never find them."
+    }
+  ]
+}

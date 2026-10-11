@@ -1,0 +1,14 @@
+# GYM-04 CLI/suite fixture task (sibling of mini-pass). The fake source hands it
+# a result the verifier rejects, so a suite run yields a mixed passed/failed
+# summary without any real worker.
+id = "mini-fail"
+task_version = 1
+suite = "rca"
+persona = "claude-code"
+
+[result_schema]
+answer = { type = "enum", enum = ["ok", "bad"], required = true }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "answer == ok"

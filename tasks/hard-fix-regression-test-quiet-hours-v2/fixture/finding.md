@@ -1,0 +1,6 @@
+- **Overnight deploy freezes do not hold back releases**
+  - **File:** `freeze.py`
+  - **Lines:** `in_freeze` (~1-7)
+  - **Problem:** `in_freeze` tests `start <= now < end`. That is never true for a window that spans midnight, which the docstring explicitly allows. Payments freezes from 22:00 to 06:00, and a release went out at 23:30 last night through `deployer.may_deploy`.
+  - **Why it matters:** The freeze exists so that nothing but hotfixes ships while the payments on-call is asleep. Every team with an overnight window ships all night.
+  - **Recommended fix:** Treat any window whose end is not after its start as spanning midnight: such a window holds `now` when `now >= start or now < end`. Add a regression test in `test_regression.py` that fails on the current code and passes once the fix is in.

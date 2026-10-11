@@ -1,0 +1,6 @@
+- **Overnight quiet hours never hold back a page**
+  - **File:** `quiet.py`
+  - **Lines:** `in_quiet_hours` (~1-8)
+  - **Problem:** `in_quiet_hours` tests `start <= now < end`. That is never true for a window that spans midnight, which the docstring explicitly allows. The on-call policy is `quiet_start=22:00`, `quiet_end=06:00`, and a warning at 23:30 paged the secondary last night through `router.should_page`.
+  - **Why it matters:** Quiet hours exist so that non-critical alerts wait for the morning. Every team with an overnight window gets paged for warnings all night.
+  - **Recommended fix:** Handle windows that span midnight in `in_quiet_hours`, keeping the documented behaviour for ordinary windows and for `start == end`. Add a regression test in `test_regression.py` that fails on the current code and passes once the fix is in.

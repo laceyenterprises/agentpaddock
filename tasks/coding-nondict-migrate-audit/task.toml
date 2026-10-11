@@ -1,0 +1,26 @@
+# Drawn from a real merged regression (PR #6244): main-catchup guarded the
+# post-FF migration failure path for non-dict payloads, then immediately called
+# `.get()` on the same payload before the audit hook. A `None` payload made the
+# deploy pass fail after the fast-forward had already applied.
+
+id = "coding-nondict-migrate-audit"
+task_version = 1
+title = "A harmless migration payload fails the pass"
+suite = "coding"
+persona = "claude-code"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage the post-FF migration excerpt and observed exception."
+
+[result_schema]
+defect_line = { type = "integer", required = true, description = "1-indexed line in daemon_excerpt.py that raises for a non-dict payload" }
+guard_needed = { type = "boolean", required = true, description = "whether the audit branch needs an isinstance(payload, dict) guard" }
+non_dict_action = { type = "enum", required = true, enum = ["skip-audit", "audit-anyway", "raise-failure", "coerce-empty-dict"] }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "The answer must identify the bare `.get()` call and preserve non-dict payload tolerance by skipping the audit."

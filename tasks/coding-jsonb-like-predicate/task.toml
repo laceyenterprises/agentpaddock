@@ -1,0 +1,30 @@
+# Drawn from a real production defect (WRR-01, PR #5807): a candidate query
+# filtered a jsonb column with LIKE. It parsed, passed review, and shipped —
+# and could not run against Postgres. It never threw only because the
+# surrounding WHERE matched zero rows, so the subquery was never evaluated.
+#
+# The skill under test is reading a query against the SCHEMA rather than
+# against its own plausibility. A model that answers from SQL familiarity says
+# this is fine.
+
+id = "coding-jsonb-like-predicate"
+task_version = 1
+title = "Find the predicate that cannot run on Postgres"
+suite = "coding"
+persona = "claude-code"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage the query module and the schema it runs against."
+
+[result_schema]
+defect_line = { type = "integer", required = true, description = "1-indexed line of the offending predicate in query.sql" }
+defect_kind = { type = "enum", required = true, enum = ["type-mismatch", "missing-index", "sql-injection", "n-plus-one", "no-defect"] }
+offending_column = { type = "string", required = true, description = "the column whose type makes the predicate invalid" }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "Line, defect class, and column must match; the agent must read the schema, not only the query."

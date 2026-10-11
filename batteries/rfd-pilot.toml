@@ -1,0 +1,21 @@
+id = "rfd-pilot"
+levels = ["high"]
+suites = ["review", "fix", "docs"]
+repetitions = 3
+seed = 20261004
+
+[families.codex]
+worker_class = "codex"
+models = ["gpt-6-sol", "gpt-6-astra"]
+
+[families.claude]
+worker_class = "claude-code"
+models = ["claude-opus-5-5", "claude-sonnet-5-5"]
+
+[budget]
+max_in_flight = 2
+max_cells = 216
+max_total_tokens = 0 # Operator must set a budget before a real run.
+min_weekly_remaining_pct = 50
+quota_reading_max_age_minutes = 60
+window = "22:00-07:00"

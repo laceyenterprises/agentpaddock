@@ -1,0 +1,26 @@
+# Drawn from a real merged regression (PR #6228): a commit subject ended with a
+# PR-looking suffix whose number was actually an issue. The post-merge sweep
+# treated GitHub's "not a PullRequest" response as retryable and held the cursor
+# forever.
+
+id = "coding-pr-not-found-terminal"
+task_version = 1
+title = "A PR-looking issue number holds the cursor"
+suite = "coding"
+persona = "claude-code"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage the PR body fetch classifier and sweep symptom."
+
+[result_schema]
+defect_line = { type = "integer", required = true, description = "1-indexed line in batch_activation.py whose classification keeps the cursor held" }
+terminal_status = { type = "enum", required = true, enum = ["skipped", "failed", "blocked", "dispatched"] }
+retryable = { type = "boolean", required = true, description = "whether this GitHub response should hold for retry" }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "The answer must classify a no-PullRequest GitHub response as terminal skipped, not retryable failed."

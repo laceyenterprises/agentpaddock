@@ -1,0 +1,12 @@
+# Fixture: a verifier that TRIES to escape its ephemeral env. Used by the
+# isolation test to prove the out-of-band env exposes only BENCH_RESULT +
+# BENCH_TOOLCALLS and cannot reach expected/ or the backend.
+id = "isolation-probe"
+task_version = 1
+suite = "rca"
+
+[result_schema]
+answer = { type = "string", required = true }
+
+[verifier]
+entrypoint = "verifier.py"

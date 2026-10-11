@@ -1,0 +1,25 @@
+# Drawn from a real merged regression (PR #6242): two self-healing consumers
+# parsed the old session-ledger schema error wording but missed the newer
+# "behind Alembic head" wording emitted on the actual behind-head path.
+
+id = "coding-schema-behind-wording"
+task_version = 1
+title = "The self-heal parser misses the live wording"
+suite = "coding"
+persona = "claude-code"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage the schema-head parser and observed message."
+
+[result_schema]
+defect_line = { type = "integer", required = true, description = "1-indexed line in schema_parser.py containing the too-narrow pattern" }
+missing_wording = { type = "string", required = true, description = "the wording variant the regex fails to match" }
+recoverable = { type = "boolean", required = true, description = "whether the behind-head message should still take the self-heal path" }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "The answer must identify that the regex matches only 'not at Alembic head' and must also parse 'behind Alembic head'."

@@ -1,0 +1,15 @@
+{
+  "established": true,
+  "generated_at": "2026-08-24T23:19:36+00:00",
+  "schema": "gym-baseline/v1",
+  "slices": {
+    "coding-jsonb-like-predicate": null,
+    "coding-missing-commit": null,
+    "coding-pipefail-silent-exit": null
+  },
+  "verdicts": {
+    "coding-jsonb-like-predicate": "passed",
+    "coding-missing-commit": "passed",
+    "coding-pipefail-silent-exit": "passed"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "currency": "USD",
+  "date": "2026-01-02",
+  "models": {
+    "acme/coder-large": {
+      "as_of": "2026-01-01",
+      "cache": 0.2,
+      "input": 2.0,
+      "note": null,
+      "output": 10.0,
+      "reference": "https://example.com/acme/pricing",
+      "source": "published-rate"
+    },
+    "bolt/coder-small": {
+      "as_of": "2026-01-01",
+      "cache": 1.0,
+      "input": 1.0,
+      "note": null,
+      "output": 4.0,
+      "reference": "Fixture invoice reconciliation",
+      "source": "provider-invoice-reconciled"
+    },
+    "local/coder-tiny": {
+      "as_of": "2026-01-01",
+      "cache": null,
+      "input": null,
+      "note": null,
+      "output": null,
+      "reference": "Self-hosted fixture model",
+      "source": "unknown"
+    }
+  },
+  "note": "Fixture price table.",
+  "schema": "paddock-price-table/v1",
+  "unit": "usd_per_million_tokens"
+}

@@ -1,0 +1,26 @@
+# MEG-08 codex-only pilot (operator, 2026-10-03: "Codex cells now", Claude
+# later). A trim of meg-pilot.toml: the claude family removed and the same seed,
+# levels, suites and budget kept. One addition: gpt-6.1-sol, the governed codex
+# default. The report compares every row against the governed incumbent
+# (matrix_report.incumbents), so a battery without it leaves every codex
+# comparison "unavailable". meg-pilot.toml is unchanged because the stopped
+# 2026-09-30 run is bound to its digest.
+id = "meg-pilot-codex"
+levels = ["low", "medium", "high", "xhigh"]
+suites = ["coding", "rca"]
+exclude_tasks = ["example-read-before-write"]
+repetitions = 3
+seed = 20260929
+
+[families.codex]
+worker_class = "codex"
+models = ["gpt-6.1-sol", "gpt-6-sol", "gpt-6-astra", "gpt-6-luna",
+          "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]
+
+[budget]
+max_in_flight = 2
+max_cells = 1700
+max_total_tokens = 0            # 0 = operator must set one before a real run
+min_weekly_remaining_pct = 50
+quota_reading_max_age_minutes = 60
+window = "22:00-07:00"          # host local time; --ignore-window overrides

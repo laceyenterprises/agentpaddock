@@ -1,0 +1,12 @@
+{
+  "findings": [
+    {
+      "file": "digest.py",
+      "line_start": 96,
+      "line_end": 97,
+      "blocking": false,
+      "category": "data-loss",
+      "summary": "A crash between send and save re-sends the digest on restart. pr.md accepts this at-least-once window; noting it for the operator runbook."
+    }
+  ]
+}

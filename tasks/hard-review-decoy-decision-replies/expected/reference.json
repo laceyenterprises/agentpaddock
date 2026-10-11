@@ -1,0 +1,20 @@
+{
+  "findings": [
+    {
+      "file": "replies.py",
+      "line_start": 71,
+      "line_end": 75,
+      "blocking": true,
+      "category": "concurrency",
+      "summary": "reply() reads the decision and checks dispatched() before taking the reply lock and never re-checks under it. An operator reply racing the reconcile tick waits on the lock, then dispatches the answer a second time."
+    },
+    {
+      "file": "reconcile.py",
+      "line_start": 62,
+      "line_end": 63,
+      "blocking": true,
+      "category": "correctness",
+      "summary": "page_deadlines skips every threshold once the decision has any receipt, so only the 15-minute page is ever sent; the 60- and 240-minute pages never fire."
+    }
+  ]
+}

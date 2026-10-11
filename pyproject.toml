@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+# The distribution is agentpaddock: on PyPI the name `paddock` belongs to an
+# unrelated project. The product and its command are still Paddock / paddock.
+name = "agentpaddock"
+version = "0.1.0"
+description = "Paddock: an open leaderboard for model x harness combinations on coding-agent tasks"
+readme = "README.md"
+requires-python = ">=3.11"
+# The GYM harness core (schema, tool-call extractor, out-of-band verifier
+# runtime, outcome resolution, grader) is pure stdlib on purpose: verifiers run
+# in a scrubbed ephemeral env and the unit suite must grade synthetic
+# trajectories with no worker pool or session ledger installed. The real
+# dispatch/ledger seam (gym.ledger / gym.dispatch) imports session_ledger and
+# cwp_dispatch lazily and resolves them the way budget_enforcement.py does, so
+# they are not build-time dependencies here.
+dependencies = []
+
+[project.urls]
+Homepage = "https://agentpaddock.ai"
+Repository = "https://github.com/laceyenterprises/agentpaddock"
+
+[project.scripts]
+paddock = "gym.cli:console_main"
+
+# Runner host plugins (PDK-01, gym.hosts) register under the `paddock.hosts`
+# entry-point group from their own distribution. This one declares none: the
+# standalone Docker runner needs no plugin, and the Agent OS host stays in
+# Agent OS, which runs the gym from PYTHONPATH and is found through
+# gym.hosts.IN_TREE_HOSTS.
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8,<10",
+  "PyYAML>=6",
+  "ruff==0.15.20",
+]
+
+[tool.setuptools]
+package-dir = {"" = "lib/python"}
+
+[tool.setuptools.packages.find]
+where = ["lib/python"]
+include = ["gym*"]

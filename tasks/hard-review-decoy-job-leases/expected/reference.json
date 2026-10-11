@@ -1,0 +1,20 @@
+{
+  "findings": [
+    {
+      "file": "jobs.py",
+      "line_start": 111,
+      "line_end": 114,
+      "blocking": true,
+      "category": "concurrency",
+      "summary": "renew updates the lease by job_id without checking holder. After the sweeper releases A's expired lease and B claims the job, A's heartbeat renews B's lease and A keeps running: the job runs under two holders."
+    },
+    {
+      "file": "sweeper.py",
+      "line_start": 33,
+      "line_end": 33,
+      "blocking": true,
+      "category": "correctness",
+      "summary": "sweep defaults now to time.monotonic(), but expires_at is wall-clock time.time(). Monotonic seconds are far smaller, so no lease ever looks expired and dead workers' jobs are never requeued."
+    }
+  ]
+}

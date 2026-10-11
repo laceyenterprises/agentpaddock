@@ -1,0 +1,130 @@
+{
+  "marker": "GYM-GROUND-TRUTH-NEVER-STAGE",
+  "defects": [
+    {
+      "any_of": [
+        {
+          "file": "dispatcher.py",
+          "line_start": 121,
+          "line_end": 124
+        },
+        {
+          "file": "sender.py",
+          "line_start": 20,
+          "line_end": 20
+        }
+      ],
+      "expected_category": "error-handling"
+    },
+    {
+      "file": "store.py",
+      "line_start": 90,
+      "line_end": 104,
+      "expected_category": "concurrency"
+    },
+    {
+      "file": "store.py",
+      "line_start": 148,
+      "line_end": 154,
+      "expected_category": "correctness"
+    },
+    {
+      "file": "store.py",
+      "line_start": 208,
+      "line_end": 214,
+      "expected_category": "data-loss"
+    }
+  ],
+  "tolerated": [],
+  "slack": 3,
+  "max_false_blocking": 1,
+  "clean_control": false,
+  "read_files": [
+    "backoff.py",
+    "cli.py",
+    "db.py",
+    "dispatcher.py",
+    "sender.py",
+    "store.py"
+  ],
+  "min_recall": 1.0,
+  "decoys": [
+    {
+      "file": "dispatcher.py",
+      "line_start": 145,
+      "line_end": 147
+    },
+    {
+      "file": "dispatcher.py",
+      "line_start": 148,
+      "line_end": 148
+    },
+    {
+      "file": "dispatcher.py",
+      "line_start": 108,
+      "line_end": 112
+    },
+    {
+      "file": "store.py",
+      "line_start": 175,
+      "line_end": 185
+    },
+    {
+      "file": "store.py",
+      "line_start": 188,
+      "line_end": 193
+    }
+  ],
+  "max_decoy_blocking": 0,
+  "obvious_defect": 3,
+  "context_defect": {
+    "defect": 0,
+    "file": "sender.py"
+  },
+  "decoy_claims": [
+    {
+      "file": "dispatcher.py",
+      "line_start": 145,
+      "line_end": 145,
+      "category": "correctness",
+      "source": "generic",
+      "summary": "attempts >= MAX_ATTEMPTS dead-letters a message after its fourth failure; the comparison should be >."
+    },
+    {
+      "file": "dispatcher.py",
+      "line_start": 148,
+      "line_end": 148,
+      "category": "correctness",
+      "source": "generic",
+      "summary": "backoff.delay is given the attempt count, so the first retry already waits twice the base delay; it should be delay(attempts - 1)."
+    },
+    {
+      "file": "dispatcher.py",
+      "line_start": 110,
+      "line_end": 111,
+      "category": "error-handling",
+      "source": "generic",
+      "summary": "The broad except Exception in run_forever hides failures and leaves the failed batch's claims stuck forever."
+    },
+    {
+      "file": "store.py",
+      "line_start": 176,
+      "line_end": 179,
+      "category": "concurrency",
+      "source": "generic",
+      "summary": "replay reads the state and then updates it, so two operators replaying at once can both requeue the same dead letter."
+    },
+    {
+      "file": "store.py",
+      "line_start": 190,
+      "line_end": 191,
+      "category": "data-loss",
+      "source": "generic",
+      "summary": "discard hard-deletes dead letters, permanently losing the failed payloads."
+    }
+  ],
+  "provenance": {
+    "kind": "synthetic",
+    "reworks": "hard-review-multi-defect-outbox"
+  }
+}

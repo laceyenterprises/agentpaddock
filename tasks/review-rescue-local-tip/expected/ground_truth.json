@@ -1,0 +1,22 @@
+{
+  "marker": "GYM-GROUND-TRUTH-NEVER-STAGE",
+  "defects": [
+    {
+      "file": "provision.sh",
+      "line_start": 57,
+      "line_end": 61,
+      "expected_category": "data-loss"
+    }
+  ],
+  "tolerated": [],
+  "slack": 3,
+  "max_false_blocking": 1,
+  "clean_control": false,
+  "read_files": [
+    "provision.sh"
+  ],
+  "provenance": {
+    "kind": "real-derived",
+    "source": "derived from a private review"
+  }
+}

@@ -1,0 +1,23 @@
+id = "coding-generation-fence"
+task_version = 1
+title = "Discriminates async ordering and generation ownership"
+suite = "coding"
+persona = "claude-code"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage self-contained synthetic code and deterministic replay."
+
+[result_schema]
+fix = { type = "enum", enum = ["pending-empty", "generation-equals-current", "generation-in-pending", "cancel-older-only"] }
+original_wrong_schedules = { type = "integer" }
+original_trace = { type = "string" }
+fixed_trace = { type = "string" }
+fixed_wrong_schedules = { type = "integer" }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "All diagnosis and counterexample fields graded independently with MEG-05 sub-checks."

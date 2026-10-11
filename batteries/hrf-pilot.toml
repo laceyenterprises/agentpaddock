@@ -1,0 +1,34 @@
+id = "hrf-pilot"
+levels = ["high"]
+suites = ["hard-review", "hard-fix"]
+# The pilot stays the six HRF tasks per suite (144 cells); HRX-05 calibrates
+# the reworked -v2 tasks separately.
+exclude_tasks = [
+  "hard-review-cross-file-v2",
+  "hard-review-multi-defect-outbox-v2",
+  "hard-review-multi-defect-tool-calls-v2",
+  "hard-fix-cross-file-v2",
+  "hard-fix-regression-test-dedupe-v2",
+  "hard-fix-regression-test-quiet-hours-v2",
+  "hard-fix-two-findings-v2",
+  "hard-fix-wrong-recommendation-retry-charge-v2",
+]
+repetitions = 3
+seed = 20261006
+
+# gpt-6.1-sol and claude-opus-5-5 are the strong combos HRF-07 calibrates on.
+[families.codex]
+worker_class = "codex"
+models = ["gpt-6.1-sol", "gpt-6-astra"]
+
+[families.claude]
+worker_class = "claude-code"
+models = ["claude-opus-5-5", "claude-sonnet-5-5"]
+
+[budget]
+max_in_flight = 2
+max_cells = 144
+max_total_tokens = 0 # Operator must set a budget before a real run.
+min_weekly_remaining_pct = 50
+quota_reading_max_age_minutes = 60
+window = "22:00-07:00"

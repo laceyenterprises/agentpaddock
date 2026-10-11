@@ -1,0 +1,38 @@
+{
+  "marker": "GYM-GROUND-TRUTH-NEVER-STAGE",
+  "defects": [
+    {
+      "any_of": [
+        {
+          "file": "registry.py",
+          "line_start": 58,
+          "line_end": 65
+        },
+        {
+          "file": "audit.py",
+          "line_start": 12,
+          "line_end": 20
+        }
+      ],
+      "expected_category": "api-contract"
+    }
+  ],
+  "tolerated": [],
+  "slack": 3,
+  "max_false_blocking": 1,
+  "clean_control": false,
+  "read_files": [
+    "audit.py",
+    "events.py",
+    "registry.py",
+    "webhooks.py",
+    "wiring.py"
+  ],
+  "contract_file": "registry.py",
+  "caller_file": "audit.py",
+  "indirection_file": "wiring.py",
+  "provenance": {
+    "kind": "synthetic",
+    "reworks": "hard-review-cross-file"
+  }
+}

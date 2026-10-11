@@ -1,0 +1,37 @@
+[
+  {
+    "call": "import redact\ntext = 'deploy ghp-AAAA1111bbbb failed; retry with sk-ZZZZ9999yyyy or sk-QQQQ7777rrrr'\nresult = redact.redact(text)\n",
+    "expected": {
+      "ok": "deploy [REDACTED] failed; retry with [REDACTED] or [REDACTED]"
+    }
+  },
+  {
+    "call": "import pager\ndef fits(message, limit):\n    out = pager.truncate(message, limit)\n    size = len(out.encode('utf-8'))\n    if len(message.encode('utf-8')) <= limit:\n        return out == message\n    kept = out[:-1]\n    longer = message[: len(kept) + 1] + '…'\n    return (\n        size <= limit and out.endswith('…') and message.startswith(kept)\n        and len(longer.encode('utf-8')) > limit\n    )\nsamples = [('x' * 200, 160), ('x' * 160, 160), ('x' * 158, 160), ('é' * 100, 160), ('é' * 80, 160), ('ok 🔥' * 40, 61), ('ab€' * 20, 10), ('日本語のアラート', 12), ('abc', 3), ('abcd', 3)]\nresult = [fits(message, limit) for message, limit in samples]\n",
+    "expected": {
+      "ok": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  },
+  {
+    "call": "import pager\nalert = {'severity': 'critical', 'summary': 'token ghp-AAAA1111bbbb and key sk-ZZZZ9999yyyy leaked in build log — rotate now ' + 'é' * 60}\npage = pager.format_page(alert, limit=80)\nresult = [len(page.encode('utf-8')) <= 80, 'ghp-' in page, 'sk-' in page, page.count('[REDACTED]'), page.endswith('…')]\n",
+    "expected": {
+      "ok": [
+        true,
+        false,
+        false,
+        2,
+        true
+      ]
+    }
+  }
+]

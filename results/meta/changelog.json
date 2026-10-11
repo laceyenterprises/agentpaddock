@@ -1,0 +1,117 @@
+{
+  "entries": [
+    {
+      "boundary": "codex x moonshot/kimi-k3 rows before the fix and the post-fix rerun carry different harness config hashes and are never pooled. Other harness and route combinations were unaffected.",
+      "date": "2026-09-29",
+      "excludes": null,
+      "id": "KIMIEMPTY-01",
+      "kind": "harness",
+      "summary": "Kimi K3 on Moonshot answered some tool calls with empty text; codex echoed the empty turn back and Moonshot refused the next request, so most codex workers on that route crashed. The model proxy now drops empty assistant text before the request reaches Moonshot."
+    },
+    {
+      "boundary": "That run is superseded and not imported. Every local row in results/ ran after all three fixes.",
+      "date": "2026-09-30",
+      "excludes": null,
+      "id": "OMBPARSE-01",
+      "kind": "infrastructure",
+      "summary": "The local model backend did not parse Qwen3-Coder-Next tool calls (with OMBTOK-01 and OMBPASS-01, the same day). The first local run submitted nothing on every task."
+    },
+    {
+      "boundary": "Claude non-Opus rows count only after this fix; earlier rows carry excludedBecause pre-CCMODEL-01.",
+      "date": "2026-10-04",
+      "excludes": "pre-CCMODEL-01",
+      "id": "CCMODEL-01",
+      "kind": "harness",
+      "summary": "The claude-code harness ignored the requested model, so early Sonnet and Haiku rows actually ran Opus."
+    },
+    {
+      "boundary": "Superseded by GYMAGY-02, which is the gate for Gemini rows.",
+      "date": "2026-10-04",
+      "excludes": null,
+      "id": "GYMAGY-01",
+      "kind": "harness",
+      "summary": "Antigravity (Gemini) tool calls were not collected, so read-evidence checks could not see them."
+    },
+    {
+      "boundary": "Docs rows graded before the fix carry excludedBecause pre-GYMDOCS-01 and are not scored.",
+      "date": "2026-10-04",
+      "excludes": "pre-GYMDOCS-01",
+      "id": "GYMDOCS-01",
+      "kind": "grading",
+      "summary": "Docs fact checks required a fact's terms to co-occur on a single line; they now match within bounded sections."
+    },
+    {
+      "boundary": "Gemini rows on read-evidence suites (review, coding, injection) count only after this fix; earlier rows carry excludedBecause pre-GYMAGY-02.",
+      "date": "2026-10-05",
+      "excludes": "pre-GYMAGY-02",
+      "id": "GYMAGY-02",
+      "kind": "grading",
+      "summary": "Antigravity tool calls were collected but not recognised as reads; they are now normalised to the gym's tool-call shapes."
+    },
+    {
+      "boundary": "Rows of fix-corrupt-refresh-checkpoint before the fix carry excludedBecause pre-RFDFIX-01; before it, no combination could pass the task.",
+      "date": "2026-10-05",
+      "excludes": "pre-RFDFIX-01",
+      "id": "RFDFIX-01",
+      "kind": "task",
+      "summary": "fix-corrupt-refresh-checkpoint's agent-visible finding contradicted its hidden contract: it recommended quarantining on any read error, while a hidden case required read errors to propagate. A fixture-contract line now states the contract."
+    },
+    {
+      "boundary": "Runs it voided are infrastructure failures, not model results: they carry an infra: excludedBecause tag or were never exported by the source.",
+      "date": "2026-10-06",
+      "excludes": null,
+      "id": "GYMSKEW-02",
+      "kind": "infrastructure",
+      "summary": "A deploy landing in the middle of a run mixed two gym-library versions in one run. A run now pins one library version."
+    },
+    {
+      "boundary": "Proxy cost estimates are never a leaderboard source. Costs are recomputed from measured tokens at the dated price table.",
+      "date": "2026-10-06",
+      "excludes": null,
+      "id": "LITELLMPRICE-01",
+      "kind": "pricing",
+      "summary": "The model proxy billed Fireworks cached input at the full input rate (about 3x) and under-billed Together."
+    },
+    {
+      "boundary": "opencode rows before this date are kept as published, but a failed opencode row before it may be a capture failure rather than a model failure: a pass needs captured read evidence.",
+      "date": "2026-10-06",
+      "excludes": null,
+      "id": "OCEXPORT-01",
+      "kind": "harness",
+      "summary": "opencode's tool-call export was read through a pipe truncated at 64 KiB, so long sessions lost read evidence. It is now captured through files."
+    },
+    {
+      "boundary": "No row in the results store was ever priced at that rate: every zai/glm-5.2 row imported up to 2026-10-10 has cost unknown, because its tokens were not measured.",
+      "date": "2026-10-07",
+      "excludes": null,
+      "id": "ZAIPRICE-01",
+      "kind": "pricing",
+      "summary": "glm-5.2 cache reads were priced at the full input rate, on the reading that Z.ai billed them that way. That reading came from fitting a single rate to a single billing total, which cannot establish a rate, and the provider's published cache rate contradicts it. Retracted on 2026-10-10 (ZAIPRICE-02)."
+    },
+    {
+      "boundary": "The -v2 tasks are different tasks, not new versions of the originals, so their rows are never pooled with the original tasks' rows.",
+      "date": "2026-10-10",
+      "excludes": null,
+      "id": "HRX-01",
+      "kind": "task",
+      "summary": "The hard-fix rework added regression-test and wrong-fix variants as new tasks with a -v2 suffix in their id."
+    },
+    {
+      "boundary": "Imported rows of those tasks stay at task_version 1. Results compare only within one task version, so version 2 rows form their own boards.",
+      "date": "2026-10-10",
+      "excludes": null,
+      "id": "PDK-03",
+      "kind": "task",
+      "summary": "Seven tasks derived from a private review were scrubbed for publication and moved to task_version 2: fix-corrupt-refresh-checkpoint, fix-rescue-local-tip, fix-stale-lock-recovery, review-corrupt-refresh-checkpoint, review-rescue-local-tip, review-stale-lock-recovery and hard-review-multi-defect-tool-calls."
+    },
+    {
+      "boundary": "zai/glm-5.2 is priced published-rate from the 2026-10-10 price table on. It becomes provider-invoice-reconciled only after a day-by-day reconciliation against the provider's invoice.",
+      "date": "2026-10-10",
+      "excludes": null,
+      "id": "ZAIPRICE-02",
+      "kind": "pricing",
+      "summary": "glm-5.2 cache reads are priced at Z.ai's published $0.26 per million again. The provider's charges for the period were higher than the recorded tokens cost even at the full input rate, so no cache rate explains them; the proxy's records omit failed and abandoned calls, which a provider may still bill."
+    }
+  ],
+  "schema": "paddock-changelog/v1"
+}

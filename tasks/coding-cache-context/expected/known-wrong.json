@@ -1,0 +1,7 @@
+{
+  "fix": "tenant-wire-revision",
+  "original": "17,17,17,17",
+  "tenant_only": "17,29,41,17",
+  "fixed_third": 17,
+  "fixed_entries": 2
+}

@@ -1,0 +1,41 @@
+## Summary
+
+Paraphrased for the gym corpus from a private review; reviewer identity, links, commit IDs and source paths are omitted.
+The tool-call path can return calls to functions the request never offered, can complete a turn that ignored `tool_choice`, and lets streaming tool requests succeed without any tool-call events.
+
+## Blocking issues
+
+- **Returned calls are not limited to the offered functions**
+  - **File:** `tool_calls.py`
+  - **Lines:** 60-71
+  - **Problem:** The parsed call's `name` is checked only for being a string. The installed parser receives `tools` but ignores it, so if a request offers only `read_file` and the model writes a well-formed call to `delete_file`, the response carries `delete_file`.
+  - **Why it matters:** A caller that dispatches calls by name can run a function it never offered for this turn; stricter callers simply fail the turn.
+  - **Recommended fix:** Drop or reject any parsed call whose name is not among the request's functions before building `tool_calls`.
+- **A required or named tool_choice is never enforced**
+  - **File:** `tool_calls.py`
+  - **Lines:** 116-140
+  - **Problem:** Only `tool_choice == "none"` has its own branch. With `"required"` or a named function and an answer that contains no tool block, `calls` is empty and the function returns an ordinary answer that finishes with `stop`.
+  - **Why it matters:** A caller that asked for a mandatory tool step receives a turn that looks complete even though the step never happened.
+  - **Recommended fix:** Resolve the choice up front, check the parsed calls against it, and return an error for choices the backend cannot satisfy.
+- **Streaming requests skip the tool path entirely**
+  - **File:** `server_supervisor.py`
+  - **Lines:** 80-81 and 161-162
+  - **Problem:** Tool requests are routed only inside `chat_completions`, but `handle_chat` hands `"stream": true` requests to `_handle_chat_stream` first. That path emits plain content deltas and a final `stop` chunk, so a streamed request that demands a tool call gets the raw block text instead.
+  - **Why it matters:** A client that streams gets a normal-looking response with no sign that the tool call it required never ran.
+  - **Recommended fix:** Emit streamed tool-call deltas, or refuse streaming requests that demand a tool call until that exists.
+
+## Non-blocking issues
+
+- **Some parser failures escape the text fallback**
+  - **File:** `tool_calls.py`
+  - **Lines:** 77-79
+  - **Problem:** The except tuple leaves out `SyntaxError`, which at least one available parser raises for malformed object arguments.
+  - **Recommended fix:** Catch the parser's real malformed-output exceptions and add a test with a malformed argument.
+- **Module documentation is out of date**
+  - **File:** module walkthrough (not staged)
+  - **Problem:** The walkthrough still describes only the plain generation path.
+  - **Recommended fix:** Document the tool path and its supported request modes.
+
+## Verdict
+
+Request changes: three blocking issues.

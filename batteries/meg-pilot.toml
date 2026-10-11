@@ -1,0 +1,25 @@
+id = "meg-pilot"
+levels = ["low", "medium", "high", "xhigh"]
+suites = ["coding", "rca"]
+exclude_tasks = ["example-read-before-write"]
+repetitions = 3
+seed = 20260929
+
+[families.codex]
+worker_class = "codex"
+models = ["gpt-6-sol", "gpt-6-astra", "gpt-6-luna",
+          "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]
+
+[families.claude]
+worker_class = "claude-code"
+models = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-sonnet-5", "claude-haiku-4-5"]
+# Sonnet 5.5 is account-verified and allowlisted/broker-entitled (2026-10-03).
+# Claude Code currently assumes 200k context because its catalog lacks this id.
+
+[budget]
+max_in_flight = 2
+max_cells = 1700
+max_total_tokens = 0            # 0 = operator must set one before a real run
+min_weekly_remaining_pct = 50
+quota_reading_max_age_minutes = 60
+window = "22:00-07:00"          # host local time; --ignore-window overrides

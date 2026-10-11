@@ -1,0 +1,36 @@
+[
+  {
+    "call": "import target\nfrom support import FakeFS\nf=FakeFS(replace_at=1)\nr=target.recover(f,'lock',30)\nresult=[bool(r),f.owner]",
+    "expected": {
+      "ok": [
+        false,
+        "live"
+      ]
+    }
+  },
+  {
+    "call": "import target\nfrom support import FakeFS\nf=FakeFS(replace_at=2)\ntarget.recover(f,'lock',30)\nresult='live' in f.removed",
+    "expected": {
+      "ok": false
+    }
+  },
+  {
+    "call": "import target\nfrom support import FakeFS\nresult=[]\nfor now in (30,10,15):\n f=FakeFS(); r=target.recover(f,'lock',now); result.append([bool(r),f.owner])",
+    "expected": {
+      "ok": [
+        [
+          true,
+          null
+        ],
+        [
+          false,
+          "orphan"
+        ],
+        [
+          false,
+          "orphan"
+        ]
+      ]
+    }
+  }
+]

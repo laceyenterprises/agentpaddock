@@ -1,0 +1,7 @@
+{
+  "fix": "generation-equals-current",
+  "original_wrong_schedules": 4,
+  "original_trace": "null,null,20",
+  "fixed_trace": "30,30,30",
+  "fixed_wrong_schedules": 0
+}

@@ -1,0 +1,49 @@
+[
+  {
+    "call": "import billing, gateway, settlement\nclass Fake:\n    def __init__(self, script):\n        self.script, self.charges, self.keys, self.calls = list(script), {}, {}, 0\n    def create_charge(self, order_id, amount_cents, idempotency_key=None):\n        self.calls += 1\n        step = self.script.pop(0) if self.script else 'ok'\n        if step == 'lost':\n            raise gateway.GatewayTimeout(order_id)\n        if idempotency_key is not None and idempotency_key in self.keys:\n            charge_id = self.keys[idempotency_key]\n        else:\n            charge_id = 'ch_%d' % (len(self.charges) + 1)\n            self.charges[charge_id] = (order_id, amount_cents)\n            if idempotency_key is not None:\n                self.keys[idempotency_key] = charge_id\n        if step == 'late':\n            raise gateway.GatewayTimeout(order_id)\n        return charge_id\ng = Fake(['lost'])\nfirst = settlement.settle(g, {'id': 'o-1', 'amount_cents': 1250})\nsecond = settlement.settle(g, {'id': 'o-2', 'amount_cents': 900})\nresult = [first['status'], first['charge_id'], second['status'], second['charge_id'], sorted(g.charges.values())]\n",
+    "expected": {
+      "ok": [
+        "charged",
+        "ch_1",
+        "charged",
+        "ch_2",
+        [
+          [
+            "o-1",
+            1250
+          ],
+          [
+            "o-2",
+            900
+          ]
+        ]
+      ]
+    }
+  },
+  {
+    "call": "import billing, gateway, settlement\nclass Fake:\n    def __init__(self, script):\n        self.script, self.charges, self.keys, self.calls = list(script), {}, {}, 0\n    def create_charge(self, order_id, amount_cents, idempotency_key=None):\n        self.calls += 1\n        step = self.script.pop(0) if self.script else 'ok'\n        if step == 'lost':\n            raise gateway.GatewayTimeout(order_id)\n        if idempotency_key is not None and idempotency_key in self.keys:\n            charge_id = self.keys[idempotency_key]\n        else:\n            charge_id = 'ch_%d' % (len(self.charges) + 1)\n            self.charges[charge_id] = (order_id, amount_cents)\n            if idempotency_key is not None:\n                self.keys[idempotency_key] = charge_id\n        if step == 'late':\n            raise gateway.GatewayTimeout(order_id)\n        return charge_id\ng = Fake(['late'])\norder = settlement.settle(g, {'id': 'o-7', 'amount_cents': 4000})\nresult = [order['status'], order['charge_id'], list(g.charges.values())]\n",
+    "expected": {
+      "ok": [
+        "charged",
+        "ch_1",
+        [
+          [
+            "o-7",
+            4000
+          ]
+        ]
+      ]
+    }
+  },
+  {
+    "call": "import billing, gateway, settlement\nclass Fake:\n    def __init__(self, script):\n        self.script, self.charges, self.keys, self.calls = list(script), {}, {}, 0\n    def create_charge(self, order_id, amount_cents, idempotency_key=None):\n        self.calls += 1\n        step = self.script.pop(0) if self.script else 'ok'\n        if step == 'lost':\n            raise gateway.GatewayTimeout(order_id)\n        if idempotency_key is not None and idempotency_key in self.keys:\n            charge_id = self.keys[idempotency_key]\n        else:\n            charge_id = 'ch_%d' % (len(self.charges) + 1)\n            self.charges[charge_id] = (order_id, amount_cents)\n            if idempotency_key is not None:\n                self.keys[idempotency_key] = charge_id\n        if step == 'late':\n            raise gateway.GatewayTimeout(order_id)\n        return charge_id\ng = Fake(['late', 'lost', 'lost', 'lost', 'lost'])\norder = settlement.settle(g, {'id': 'o-9', 'amount_cents': 300})\nresult = [order['status'], 'charge_id' in order, 1 < g.calls <= 3, len(g.charges)]\n",
+    "expected": {
+      "ok": [
+        "unknown",
+        false,
+        true,
+        1
+      ]
+    }
+  }
+]

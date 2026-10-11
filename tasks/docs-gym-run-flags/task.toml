@@ -1,0 +1,20 @@
+id = "docs-gym-run-flags"
+task_version = 1
+title = "Document gym-run-flags"
+suite = "docs"
+persona = "codex"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+
+[capture]
+files = ["guide.md"]
+
+[result_schema]
+done = { type = "boolean" }
+
+[verifier]
+entrypoint = "verifier.py"

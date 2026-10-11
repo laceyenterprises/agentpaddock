@@ -1,0 +1,130 @@
+{
+  "marker": "GYM-GROUND-TRUTH-NEVER-STAGE",
+  "defects": [
+    {
+      "any_of": [
+        {
+          "file": "tool_calls.py",
+          "line_start": 154,
+          "line_end": 158
+        },
+        {
+          "file": "tool_calls.py",
+          "line_start": 174,
+          "line_end": 174
+        },
+        {
+          "file": "tool_calls.py",
+          "line_start": 199,
+          "line_end": 199
+        }
+      ],
+      "expected_category": "security"
+    },
+    {
+      "any_of": [
+        {
+          "file": "tool_calls.py",
+          "line_start": 68,
+          "line_end": 70
+        },
+        {
+          "file": "tool_calls.py",
+          "line_start": 189,
+          "line_end": 190
+        },
+        {
+          "file": "tool_calls.py",
+          "line_start": 200,
+          "line_end": 201
+        }
+      ],
+      "expected_category": "api-contract"
+    },
+    {
+      "file": "bridge.py",
+      "line_start": 158,
+      "line_end": 159,
+      "expected_category": "api-contract"
+    }
+  ],
+  "tolerated": [],
+  "slack": 3,
+  "max_false_blocking": 1,
+  "clean_control": false,
+  "read_files": [
+    "bridge.py",
+    "parsers.py",
+    "shapes.py",
+    "tool_calls.py"
+  ],
+  "min_recall": 1.0,
+  "decoys": [
+    {
+      "file": "tool_calls.py",
+      "line_start": 79,
+      "line_end": 80
+    },
+    {
+      "file": "tool_calls.py",
+      "line_start": 98,
+      "line_end": 99
+    },
+    {
+      "file": "tool_calls.py",
+      "line_start": 167,
+      "line_end": 167
+    },
+    {
+      "file": "tool_calls.py",
+      "line_start": 208,
+      "line_end": 209
+    }
+  ],
+  "max_decoy_blocking": 0,
+  "obvious_defect": 2,
+  "context_defect": {
+    "defect": 0,
+    "file": "parsers.py"
+  },
+  "decoy_claims": [
+    {
+      "file": "tool_calls.py",
+      "line_start": 80,
+      "line_end": 80,
+      "category": "api-contract",
+      "source": "generic",
+      "summary": "With tool_choice omitted the bridge defaults to auto whenever tools are present; it should default to none so the model only calls tools on request."
+    },
+    {
+      "file": "tool_calls.py",
+      "line_start": 99,
+      "line_end": 99,
+      "category": "api-contract",
+      "source": "generic",
+      "summary": "A named tool_choice renders only that function into the prompt, hiding the other offered tools from the model."
+    },
+    {
+      "file": "tool_calls.py",
+      "line_start": 167,
+      "line_end": 167,
+      "category": "correctness",
+      "source": "generic",
+      "summary": "json.dumps double-encodes arguments that the parser already returned as a JSON string."
+    },
+    {
+      "file": "tool_calls.py",
+      "line_start": 209,
+      "line_end": 209,
+      "category": "api-contract",
+      "source": "generic",
+      "summary": "finish_reason must be tool_calls whenever the message carries tool_calls; reporting length breaks OpenAI clients."
+    }
+  ],
+  "provenance": {
+    "kind": "synthetic",
+    "reworks": "hard-review-multi-defect-tool-calls",
+    "defect_themes_from": "PR 7393"
+  },
+  "enforce_category": true
+}

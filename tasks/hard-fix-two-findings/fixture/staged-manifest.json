@@ -1,0 +1,12 @@
+{
+  "editable": [
+    "redact.py",
+    "pager.py"
+  ],
+  "files": [
+    "redact.py",
+    "pager.py",
+    "test_visible.py",
+    "finding.md"
+  ]
+}

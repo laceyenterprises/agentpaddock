@@ -1,0 +1,12 @@
+{
+  "findings": [
+    {
+      "file": "file-lock.mjs",
+      "line_start": 29,
+      "line_end": 29,
+      "blocking": true,
+      "category": "concurrency",
+      "summary": "Waiters that saw the same stale lock can each delete it, so a late waiter removes a lock another waiter has just acquired."
+    }
+  ]
+}

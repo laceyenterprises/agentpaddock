@@ -1,0 +1,25 @@
+## Summary
+
+Paraphrased for the gym corpus from a private review; reviewer identity, links and source paths are omitted.
+The change adds a cross-process file lock around registry updates, with recovery for locks left by crashed holders.
+
+## Blocking issues
+
+- **Two waiters can both break the same stale lock**
+  - **File:** `file-lock.mjs`
+  - **Lines:** 24-29
+  - **Problem:** Recovery reads the lock's age with `statSync` and deletes the path later with `rmSync`. Every waiter polling a crashed holder's lock sees the same old `mtimeMs` and decides the lock is stale. If waiter A deletes it and takes a new lock with `openSync(lockPath, "wx")` before waiter B reaches its `rmSync`, B deletes A's live lock and then takes one of its own.
+  - **Why it matters:** Mutual exclusion fails exactly during crash recovery. A and B both run the critical section at once, which brings back the lost-update problem the lock exists to prevent.
+  - **Recommended fix:** Make breaking a stale lock an atomic compare-and-remove that deletes the file only while it is still the one judged stale. Prefer a kernel advisory lock released when its holder exits, using a permanent inode that is never unlinked. Otherwise use an actual atomic identity-checked removal primitive; a second stat or rename alone cannot establish that the path still names the observed stale lock.
+
+## Non-blocking issues
+
+- **A failed stat is treated as a stale lock**
+  - **File:** `file-lock.mjs`
+  - **Lines:** 22-29
+  - **Problem:** Only `ENOENT` is handled; any other stat error leaves the age at infinity, so the lock is deleted even when a live holder owns it.
+  - **Recommended fix:** Rethrow stat errors other than `ENOENT`.
+
+## Verdict
+
+Request changes: recovery can admit two holders at once.

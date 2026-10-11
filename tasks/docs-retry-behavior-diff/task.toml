@@ -1,0 +1,20 @@
+id = "docs-retry-behavior-diff"
+task_version = 1
+title = "Document retry-behavior-diff"
+suite = "docs"
+persona = "codex"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+
+[capture]
+files = ["guide.md"]
+
+[result_schema]
+done = { type = "boolean" }
+
+[verifier]
+entrypoint = "verifier.py"

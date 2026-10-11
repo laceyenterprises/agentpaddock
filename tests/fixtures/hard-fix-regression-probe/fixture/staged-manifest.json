@@ -1,0 +1,12 @@
+{
+  "editable": [
+    "target.py",
+    "rules.py",
+    "test_regression.py"
+  ],
+  "files": [
+    "target.py",
+    "rules.py",
+    "test_regression.py"
+  ]
+}

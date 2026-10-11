@@ -1,0 +1,14 @@
+# GYM-04 CLI/suite fixture task. Trivial closed-set schema so a fake dispatch
+# can drive a whole suite run without a real worker. Not part of the shipped
+# corpus — lives under tests/fixtures/.
+id = "mini-pass"
+task_version = 1
+suite = "rca"
+persona = "claude-code"
+
+[result_schema]
+answer = { type = "enum", enum = ["ok", "bad"], required = true }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "answer == ok"

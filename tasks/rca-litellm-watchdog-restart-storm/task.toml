@@ -1,0 +1,43 @@
+# GYM-02 RCA task, seeded from a real incident.
+#
+# Source incident doc: docs/POSTMORTEM-litellm-watchdog-restart-storm-2026-06-01.md
+#   (litellm-watchdog probe storm -> 8h restart loop -> hard reset.)
+#   Scaffolded via scripts/rca_from_postmortem.py, then filled in.
+#
+# The incident: the watchdog's local_log_probe matched the BARE substring
+# "query-engine", which appears in Prisma's HEALTHY startup banner
+# ("Successfully spawned query-engine <SHA>"). One match in 75s flips the probe
+# to ERROR (LOCAL_LOG_FAIL_THRESHOLD=1) and force-recreates the whole stack; each
+# recreate regenerates the banner -> self-sustaining ~90s loop for 8.7h. The
+# responders' wrong theories (raise the fail threshold like #1146; blame orphan
+# containers; blame Docker VM memory) are the planted red herrings.
+
+id = "rca-litellm-watchdog-restart-storm"
+task_version = 1
+title = "RCA: litellm-watchdog probe storm (2026-06-01 SEV-1)"
+suite = "rca"
+persona = "claude-code"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage the redacted watchdog log + probe-config excerpt."
+
+# Closed set. The true root cause is the over-broad substring match on a healthy
+# banner; the other three are real distractors from the incident (the #1146
+# threshold-raise reflex, the orphan-container symptom, and the Docker VM memory
+# symptom).
+[result_schema]
+root_cause = { type = "enum", enum = [
+  "probe-substring-matches-healthy-banner",
+  "fail-threshold-too-low",
+  "force-recreate-orphan-pileup",
+  "docker-vm-memory-exhaustion",
+], required = true }
+evidence_id = { type = "string", required = false }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "root_cause == over-broad banner match AND evidence cites ev-801 (the healthy-banner match line)."

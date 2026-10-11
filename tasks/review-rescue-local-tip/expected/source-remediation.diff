@@ -1,0 +1,18 @@
+diff --git a/provision.sh b/provision.sh
+--- a/provision.sh
++++ b/provision.sh
+@@ -54,11 +54,11 @@ PYEOF
+ }
+ 
+ provision_branch_override() {
+-    if git -C "$REPO_PATH" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
++    if git -C "$REPO_PATH" show-ref --verify --quiet "refs/heads/$BRANCH"; then
++      EXISTING_BRANCH_STARTPOINT="$BRANCH"
++    elif git -C "$REPO_PATH" ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+       fetch_origin_branch "$REPO_PATH" "$BRANCH" "branch override"
+       EXISTING_BRANCH_STARTPOINT="origin/$BRANCH"
+-    elif git -C "$REPO_PATH" show-ref --verify --quiet "refs/heads/$BRANCH"; then
+-      EXISTING_BRANCH_STARTPOINT="$BRANCH"
+     else
+       die "branch '$BRANCH' is neither local nor on origin; not creating a new branch"
+     fi

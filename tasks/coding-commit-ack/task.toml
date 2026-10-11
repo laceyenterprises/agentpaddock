@@ -1,0 +1,23 @@
+id = "coding-commit-ack"
+task_version = 1
+title = "Discriminates real transaction cause from a one-line retry patch"
+suite = "coding"
+persona = "claude-code"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage self-contained synthetic code and deterministic replay."
+
+[result_schema]
+fix = { type = "enum", enum = ["retry-more", "mark-before-commit", "check-receipt-only", "atomic-receipt-and-apply"] }
+original_balance = { type = "integer" }
+reorder_balance = { type = "integer" }
+fixed_balance = { type = "integer" }
+fixed_receipts = { type = "integer" }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "All diagnosis and counterexample fields graded independently with MEG-05 sub-checks."

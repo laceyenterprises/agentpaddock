@@ -1,0 +1,12 @@
+{
+  "findings": [
+    {
+      "file": "sync.py",
+      "line_start": 26,
+      "line_end": 32,
+      "blocking": true,
+      "category": "api-contract",
+      "summary": "sync still relies on KeyError to detect a missing entry; with the None return it never creates new entries and fails on entry.settings for the first new name."
+    }
+  ]
+}

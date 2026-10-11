@@ -1,0 +1,31 @@
+[
+  {
+    "call": "import target\nl={'b':'unpublished'}\nr=target.provision(l,{'b':'published'},'b','main')\nresult=[r,l]",
+    "expected": {
+      "ok": [
+        "unpublished",
+        {
+          "b": "unpublished"
+        }
+      ]
+    }
+  },
+  {
+    "call": "import target\nresult=target.provision({'b':'local'},{},'b','main')",
+    "expected": {
+      "ok": "local"
+    }
+  },
+  {
+    "call": "import target\nl={}\na=target.provision(l,{'b':'remote'},'b','main'); b=target.provision({}, {}, 'new','main')\nresult=[a,l,b]",
+    "expected": {
+      "ok": [
+        "remote",
+        {
+          "b": "remote"
+        },
+        "main"
+      ]
+    }
+  }
+]

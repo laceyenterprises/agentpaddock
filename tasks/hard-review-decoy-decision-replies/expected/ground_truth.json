@@ -1,0 +1,133 @@
+{
+  "marker": "GYM-GROUND-TRUTH-NEVER-STAGE",
+  "defects": [
+    {
+      "file": "replies.py",
+      "line_start": 71,
+      "line_end": 75,
+      "expected_category": "concurrency"
+    },
+    {
+      "file": "reconcile.py",
+      "line_start": 62,
+      "line_end": 63,
+      "expected_category": "correctness"
+    }
+  ],
+  "tolerated": [],
+  "slack": 3,
+  "max_false_blocking": 1,
+  "clean_control": false,
+  "read_files": [
+    "decisions.py",
+    "reconcile.py",
+    "replies.py"
+  ],
+  "decoys": [
+    {
+      "file": "reconcile.py",
+      "line_start": 28,
+      "line_end": 30
+    },
+    {
+      "file": "replies.py",
+      "line_start": 100,
+      "line_end": 105
+    },
+    {
+      "file": "replies.py",
+      "line_start": 123,
+      "line_end": 125
+    },
+    {
+      "file": "decisions.py",
+      "line_start": 59,
+      "line_end": 60
+    },
+    {
+      "file": "decisions.py",
+      "line_start": 12,
+      "line_end": 13
+    },
+    {
+      "file": "decisions.py",
+      "line_start": 120,
+      "line_end": 125
+    },
+    {
+      "file": "decisions.py",
+      "line_start": 166,
+      "line_end": 182
+    }
+  ],
+  "max_decoy_blocking": 0,
+  "decoy_claims": [
+    {
+      "file": "reconcile.py",
+      "line_start": 30,
+      "line_end": 30,
+      "category": "concurrency",
+      "source": "PR 7695",
+      "summary": "Passing _lock_held=True bypasses the reply lock; reply() should take the lock itself."
+    },
+    {
+      "file": "replies.py",
+      "line_start": 101,
+      "line_end": 101,
+      "category": "data-loss",
+      "source": "PR 7704",
+      "summary": "existing or {...} discards the new receipt on a retry; the record should be rebuilt."
+    },
+    {
+      "file": "replies.py",
+      "line_start": 123,
+      "line_end": 123,
+      "category": "security",
+      "source": "PR 7674",
+      "summary": "A pre-existing diagnostics log keeps its old mode because os.open's mode only applies on creation."
+    },
+    {
+      "file": "decisions.py",
+      "line_start": 60,
+      "line_end": 60,
+      "category": "correctness",
+      "source": "PR 7864",
+      "summary": "vars() fails on a frozen dataclass; use dataclasses.asdict."
+    },
+    {
+      "file": "decisions.py",
+      "line_start": 13,
+      "line_end": 13,
+      "category": "correctness",
+      "source": "PR 7546",
+      "summary": "TERMINAL_STATUSES mixes the canceled and cancelled spellings; one is a typo."
+    },
+    {
+      "file": "decisions.py",
+      "line_start": 123,
+      "line_end": 123,
+      "category": "data-loss",
+      "source": "PR 7615",
+      "summary": "record_dispatch never commits, so the dispatch row is lost and the answer is redelivered."
+    },
+    {
+      "file": "decisions.py",
+      "line_start": 170,
+      "line_end": 171,
+      "category": "security",
+      "source": "generic",
+      "summary": "prune_terminal builds SQL with f-strings, an injection risk."
+    }
+  ],
+  "provenance": {
+    "kind": "synthetic",
+    "decoy_sources": [
+      "PR 7695",
+      "PR 7704",
+      "PR 7674",
+      "PR 7864",
+      "PR 7546",
+      "PR 7615"
+    ]
+  }
+}

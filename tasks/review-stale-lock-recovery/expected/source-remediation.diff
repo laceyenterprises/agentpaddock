@@ -1,0 +1,63 @@
+diff --git a/file-lock.mjs b/file-lock.mjs
+--- a/file-lock.mjs
++++ b/file-lock.mjs
+@@ -1,33 +1,25 @@
+-import { openSync, mkdirSync, statSync, rmSync } from "node:fs";
++import { closeSync, openSync, mkdirSync } from "node:fs";
++import { flockSync } from "fs-ext";
+ import { dirname } from "node:path";
+ function sleepSync(ms) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); }
+ 
+-const LOCK_STALE_MS = 15_000;
+ const LOCK_RETRY_MS = 5;
+ const LOCK_TIMEOUT_MS = 5_000;
+ 
+-// sleepSync blocks the thread on purpose: every caller of this module is
+-// synchronous, so the wait between retries must be synchronous too.
++// All callers keep this inode permanently and release via close, never unlink.
++// A process crash releases the kernel lock; mtime is not ownership evidence.
+ function acquireFileLock(path, { now = () => Date.now() } = {}) {
+   const lockPath = `${path}.lock`;
+   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+   const deadline = now() + LOCK_TIMEOUT_MS;
+-  for (;;) {
+-    try {
+-      return { fd: openSync(lockPath, "wx", 0o600), lockPath };
+-    } catch (error) {
+-      if (error?.code !== "EEXIST") throw error;
+-      // Reclaim a lock left by a holder that crashed while holding it; otherwise
+-      // one crash would block every later caller on this host.
+-      let ageMs = Number.POSITIVE_INFINITY;
++  const fd = openSync(lockPath, "a", 0o600);
++  try {
++    for (;;) {
+       try {
+-        ageMs = now() - statSync(lockPath).mtimeMs;
+-      } catch (statError) {
+-        if (statError?.code === "ENOENT") continue; // already gone; try again
+-      }
+-      if (ageMs > LOCK_STALE_MS) {
+-        rmSync(lockPath, { force: true });
+-        continue;
++        flockSync(fd, "exnb");
++        return { fd, lockPath };
++      } catch (error) {
++        if (error?.code !== "EAGAIN" && error?.code !== "EWOULDBLOCK") throw error;
+       }
+       if (now() > deadline) {
+         throw new Error(
+@@ -36,5 +28,14 @@
+       }
+       sleepSync(LOCK_RETRY_MS);
+     }
++  } catch (error) {
++    closeSync(fd);
++    throw error;
+   }
+ }
++
++// Replace every caller's close-and-unlink release with this function.
++// Closing releases only this descriptor's ownership; the path stays intact.
++function releaseFileLock(lock) {
++  closeSync(lock.fd);
++}

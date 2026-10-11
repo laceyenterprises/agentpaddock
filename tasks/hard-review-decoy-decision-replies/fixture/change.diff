@@ -1,0 +1,434 @@
+diff --git a/decisions.py b/decisions.py
+new file mode 100644
+--- /dev/null
++++ b/decisions.py
+@@ -0,0 +1,183 @@
++"""Operator decisions: raised by workers, answered by operators, paged when overdue."""
++
++from __future__ import annotations
++
++import json
++import sqlite3
++import time
++from dataclasses import dataclass
++
++OPEN_STATUS = "open"
++ANSWERED_STATUS = "answered"
++# Rows written before DEC-02 carry the legacy writer's "cancelled" spelling.
++TERMINAL_STATUSES = frozenset({"answered", "canceled", "cancelled", "expired"})
++
++SCHEMA = """
++CREATE TABLE IF NOT EXISTS decisions (
++    id TEXT PRIMARY KEY,
++    worker TEXT NOT NULL,
++    question TEXT NOT NULL,
++    status TEXT NOT NULL,
++    raised_at REAL NOT NULL,
++    answered_at REAL,
++    answer TEXT
++);
++CREATE TABLE IF NOT EXISTS dispatches (
++    decision_id TEXT PRIMARY KEY REFERENCES decisions (id),
++    receipt TEXT NOT NULL,
++    dispatched_at REAL NOT NULL
++);
++CREATE TABLE IF NOT EXISTS page_outbox (
++    id INTEGER PRIMARY KEY,
++    decision_id TEXT NOT NULL REFERENCES decisions (id),
++    threshold_minutes INTEGER NOT NULL,
++    text TEXT NOT NULL,
++    queued_at REAL NOT NULL,
++    sent_at REAL
++);
++"""
++
++
++class DecisionError(Exception):
++    """A decision operation is invalid for the decision's current state."""
++
++
++@dataclass(frozen=True)
++class Decision:
++    id: str
++    worker: str
++    question: str
++    status: str
++    raised_at: float
++    answered_at: float | None
++    answer: str | None
++
++    @property
++    def terminal(self) -> bool:
++        return self.status in TERMINAL_STATUSES
++
++    def to_json(self) -> str:
++        return json.dumps(vars(self), sort_keys=True)
++
++
++class DecisionStore:
++    """SQLite-backed decisions. Each write commits before the method returns."""
++
++    def __init__(self, path: str) -> None:
++        self._conn = sqlite3.connect(path, timeout=30)
++        self._conn.row_factory = sqlite3.Row
++        self._conn.executescript(SCHEMA)
++
++    def close(self) -> None:
++        self._conn.close()
++
++    def _decision(self, row: sqlite3.Row | None) -> Decision | None:
++        return None if row is None else Decision(**dict(row))
++
++    def raise_decision(
++        self, decision_id: str, worker: str, question: str, *, now: float | None = None
++    ) -> Decision:
++        raised_at = time.time() if now is None else now
++        with self._conn:
++            self._conn.execute(
++                "INSERT INTO decisions (id, worker, question, status, raised_at)"
++                " VALUES (?, ?, ?, ?, ?)",
++                (decision_id, worker, question, OPEN_STATUS, raised_at),
++            )
++        return self.get(decision_id)
++
++    def get(self, decision_id: str) -> Decision | None:
++        row = self._conn.execute("SELECT * FROM decisions WHERE id = ?", (decision_id,)).fetchone()
++        return self._decision(row)
++
++    def open_decisions(self) -> list[Decision]:
++        rows = self._conn.execute(
++            "SELECT * FROM decisions WHERE status = ? ORDER BY raised_at, id", (OPEN_STATUS,)
++        ).fetchall()
++        return [self._decision(row) for row in rows]
++
++    def answered_undispatched(self) -> list[Decision]:
++        """Answered decisions whose answer never reached the worker."""
++        rows = self._conn.execute(
++            "SELECT d.* FROM decisions AS d"
++            " LEFT JOIN dispatches AS x ON x.decision_id = d.id"
++            " WHERE d.status = ? AND x.decision_id IS NULL"
++            " ORDER BY d.answered_at, d.id",
++            (ANSWERED_STATUS,),
++        ).fetchall()
++        return [self._decision(row) for row in rows]
++
++    def record_answer(self, decision_id: str, answer: str, *, now: float) -> bool:
++        """Mark an open decision answered; return False when it was not open."""
++        with self._conn:
++            cursor = self._conn.execute(
++                "UPDATE decisions SET status = ?, answer = ?, answered_at = ?"
++                " WHERE id = ? AND status = ?",
++                (ANSWERED_STATUS, answer, now, decision_id, OPEN_STATUS),
++            )
++        return cursor.rowcount == 1
++
++    def record_dispatch(self, decision_id: str, receipt: str, *, now: float) -> None:
++        with self._conn:
++            self._conn.execute(
++                "INSERT INTO dispatches (decision_id, receipt, dispatched_at) VALUES (?, ?, ?)",
++                (decision_id, receipt, now),
++            )
++
++    def dispatched(self, decision_id: str) -> str | None:
++        """The dispatch receipt for ``decision_id``, or None if never dispatched."""
++        row = self._conn.execute(
++            "SELECT receipt FROM dispatches WHERE decision_id = ?", (decision_id,)
++        ).fetchone()
++        return None if row is None else row["receipt"]
++
++    def cancel(self, decision_id: str, *, now: float) -> bool:
++        """Cancel an open decision; return False when it was not open."""
++        with self._conn:
++            cursor = self._conn.execute(
++                "UPDATE decisions SET status = 'canceled', answered_at = ?"
++                " WHERE id = ? AND status = ?",
++                (now, decision_id, OPEN_STATUS),
++            )
++        return cursor.rowcount == 1
++
++    def enqueue_page(
++        self, decision_id: str, threshold_minutes: int, text: str, *, now: float
++    ) -> int:
++        """Queue an operator page and return its outbox id."""
++        with self._conn:
++            cursor = self._conn.execute(
++                "INSERT INTO page_outbox (decision_id, threshold_minutes, text, queued_at)"
++                " VALUES (?, ?, ?, ?)",
++                (decision_id, threshold_minutes, text, now),
++            )
++        return cursor.lastrowid
++
++    def pages(self, decision_id: str) -> list[int]:
++        """Thresholds already queued for ``decision_id``, in queue order."""
++        rows = self._conn.execute(
++            "SELECT threshold_minutes FROM page_outbox WHERE decision_id = ? ORDER BY id",
++            (decision_id,),
++        ).fetchall()
++        return [row["threshold_minutes"] for row in rows]
++
++    def prune_terminal(self, *, older_than: float) -> int:
++        """Delete terminal decisions (and their dispatch rows) answered before ``older_than``."""
++        statuses = sorted(TERMINAL_STATUSES)
++        marks = ", ".join("?" for _ in statuses)
++        with self._conn:
++            self._conn.execute(
++                f"DELETE FROM dispatches WHERE decision_id IN"
++                f" (SELECT id FROM decisions WHERE status IN ({marks}) AND answered_at < ?)",
++                (*statuses, older_than),
++            )
++            self._conn.execute(
++                f"DELETE FROM page_outbox WHERE decision_id IN"
++                f" (SELECT id FROM decisions WHERE status IN ({marks}) AND answered_at < ?)",
++                (*statuses, older_than),
++            )
++            cursor = self._conn.execute(
++                f"DELETE FROM decisions WHERE status IN ({marks}) AND answered_at < ?",
++                (*statuses, older_than),
++            )
++        return cursor.rowcount
+diff --git a/reconcile.py b/reconcile.py
+new file mode 100644
+--- /dev/null
++++ b/reconcile.py
+@@ -0,0 +1,110 @@
++"""Periodic decision upkeep: replay lost dispatches and page overdue decisions."""
++
++from __future__ import annotations
++
++import argparse
++import json
++import logging
++import os
++import sys
++import time
++from pathlib import Path
++
++from decisions import DecisionStore
++from replies import Dispatch, locked, reply
++
++LOGGER = logging.getLogger(__name__)
++
++# An open decision pages the operator once at each of these ages.
++PAGE_THRESHOLDS_MINUTES = (15, 60, 240)
++
++
++def reconcile_answered(
++    store: DecisionStore, root: Path, dispatch: Dispatch, *, now: float
++) -> list[str]:
++    """Dispatch answers that were recorded while the dispatcher was down."""
++    replayed = []
++    for decision in store.answered_undispatched():
++        with locked(root, decision.id):
++            # reply() would take this same lock; pass that it is held.
++            reply(store, root, decision.id, decision.answer, dispatch, now=now, _lock_held=True)
++        replayed.append(decision.id)
++    return replayed
++
++
++def _load_receipts(path: Path) -> dict[str, list[int]]:
++    if not path.exists():
++        return {}
++    return json.loads(path.read_text())
++
++
++def _save_receipts(path: Path, receipts: dict[str, list[int]]) -> None:
++    temp = path.with_suffix(".tmp")
++    temp.write_text(json.dumps(receipts, sort_keys=True))
++    os.replace(temp, path)
++
++
++def page_deadlines(
++    store: DecisionStore, receipts_path: Path, *, now: float
++) -> list[tuple[str, int]]:
++    """Page each open decision once for every threshold its age has crossed.
++
++    The receipt for a page is written only after enqueue_page returns, so a
++    failed enqueue is retried on the next tick rather than suppressed.
++    """
++    receipts = _load_receipts(receipts_path)
++    paged = []
++    for decision in store.open_decisions():
++        age_minutes = (now - decision.raised_at) / 60
++        for threshold in PAGE_THRESHOLDS_MINUTES:
++            if age_minutes < threshold:
++                break
++            if decision.id in receipts:
++                continue
++            text = f"Decision {decision.id} from {decision.worker} open {int(age_minutes)}m: {decision.question}"
++            store.enqueue_page(decision.id, threshold, text, now=now)
++            receipts.setdefault(decision.id, []).append(threshold)
++            _save_receipts(receipts_path, receipts)
++            paged.append((decision.id, threshold))
++    return paged
++
++
++def tick(store: DecisionStore, root: Path, dispatch: Dispatch, *, now: float) -> dict[str, int]:
++    """One reconcile pass. A failed replay is logged and retried next tick."""
++    try:
++        replayed = reconcile_answered(store, root, dispatch, now=now)
++    except Exception:
++        LOGGER.exception("decisions.replay_failed")
++        replayed = []
++    paged = page_deadlines(store, root / "decisions" / "page-receipts.json", now=now)
++    return {"replayed": len(replayed), "paged": len(paged)}
++
++
++def _print_dispatch(worker: str, answer: str) -> str:
++    """Dry-run dispatcher: print the answer instead of delivering it."""
++    print(f"would dispatch to {worker}: {answer}")
++    return f"dry-run:{worker}"
++
++
++def main(argv: list[str] | None = None) -> int:
++    parser = argparse.ArgumentParser(prog="decisions-reconcile")
++    parser.add_argument("--db", required=True, help="decisions SQLite database")
++    parser.add_argument("--root", required=True, type=Path, help="HQ state root")
++    parser.add_argument("--dry-run", action="store_true", help="print instead of dispatching")
++    parser.add_argument("--now", type=float, default=None, help="override the clock (tests)")
++    args = parser.parse_args(argv)
++    if not args.dry_run:
++        print("decisions-reconcile: live dispatch runs inside the HQ daemon", file=sys.stderr)
++        return 2
++    store = DecisionStore(args.db)
++    try:
++        now = time.time() if args.now is None else args.now
++        counts = tick(store, args.root, _print_dispatch, now=now)
++    finally:
++        store.close()
++    print(json.dumps(counts, sort_keys=True))
++    return 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/replies.py b/replies.py
+new file mode 100644
+--- /dev/null
++++ b/replies.py
+@@ -0,0 +1,126 @@
++"""Answer decisions and dispatch each answer to its worker exactly once."""
++
++from __future__ import annotations
++
++import contextlib
++import fcntl
++import json
++import os
++import tempfile
++import time
++from collections.abc import Callable, Iterator
++from pathlib import Path
++
++from decisions import (
++    ANSWERED_STATUS,
++    OPEN_STATUS,
++    Decision,
++    DecisionError,
++    DecisionStore,
++)
++
++# dispatch(worker, answer) delivers the answer and returns a delivery receipt.
++Dispatch = Callable[[str, str], str]
++
++
++def lock_path(root: Path, decision_id: str) -> Path:
++    return root / "decisions" / f"{decision_id}.reply.lock"
++
++
++def record_path(root: Path, decision_id: str) -> Path:
++    return root / "decisions" / f"{decision_id}.answer.json"
++
++
++def diagnostic_path(root: Path) -> Path:
++    return root / "decisions" / "reply-diagnostics.log"
++
++
++@contextlib.contextmanager
++def locked(root: Path, decision_id: str) -> Iterator[None]:
++    """Hold the decision's reply lock (an exclusive flock on its .reply.lock file).
++
++    flock locks belong to the open file, so a second ``locked`` on the same
++    decision blocks, even in the same process.
++    """
++    path = lock_path(root, decision_id)
++    path.parent.mkdir(parents=True, exist_ok=True)
++    with open(path, "a") as handle:
++        fcntl.flock(handle, fcntl.LOCK_EX)
++        try:
++            yield
++        finally:
++            fcntl.flock(handle, fcntl.LOCK_UN)
++
++
++def reply(
++    store: DecisionStore,
++    root: Path,
++    decision_id: str,
++    answer: str,
++    dispatch: Dispatch,
++    *,
++    now: float | None = None,
++    _lock_held: bool = False,
++) -> dict[str, object]:
++    """Answer ``decision_id`` and dispatch the answer; return the answer record.
++
++    Replying again to a dispatched decision returns its existing record.
++    ``_lock_held`` is for callers that already hold ``locked(root, decision_id)``.
++    """
++    now = time.time() if now is None else now
++    decision = store.get(decision_id)
++    if decision is None:
++        raise DecisionError(f"unknown decision {decision_id!r}")
++    if store.dispatched(decision_id) is not None:
++        return load_answer_record(root, decision_id)
++    guard = contextlib.nullcontext() if _lock_held else locked(root, decision_id)
++    with guard:
++        if decision.status == OPEN_STATUS:
++            store.record_answer(decision_id, answer, now=now)
++        elif decision.status == ANSWERED_STATUS:
++            # Replaying an undispatched answer sends the recorded text.
++            answer = decision.answer
++        else:
++            raise DecisionError(f"decision {decision_id!r} is {decision.status}")
++        receipt = dispatch(decision.worker, answer)
++        store.record_dispatch(decision_id, receipt, now=now)
++        _log_diagnostic(root, f"dispatched {decision_id} receipt={receipt}")
++        return _write_answer_record(root, store.get(decision_id), receipt, now=now)
++
++
++def load_answer_record(root: Path, decision_id: str) -> dict[str, object]:
++    return json.loads(record_path(root, decision_id).read_text())
++
++
++def _write_answer_record(
++    root: Path, decision: Decision, receipt: str, *, now: float
++) -> dict[str, object]:
++    """Atomically write the answer record, keeping the first one on a retry."""
++    path = record_path(root, decision.id)
++    existing = json.loads(path.read_text()) if path.exists() else None
++    record = existing or {
++        "decision": json.loads(decision.to_json()),
++        "receipt": receipt,
++        "recorded_at": now,
++    }
++    fd, temp = tempfile.mkstemp(dir=path.parent, prefix=".answer-")
++    try:
++        with os.fdopen(fd, "w") as handle:
++            json.dump(record, handle, indent=2, sort_keys=True)
++            handle.flush()
++            os.fsync(handle.fileno())
++        os.replace(temp, path)
++    except BaseException:
++        with contextlib.suppress(FileNotFoundError):
++            os.unlink(temp)
++        raise
++    return record
++
++
++def _log_diagnostic(root: Path, line: str) -> None:
++    """Append one line to the operator-only diagnostics log."""
++    path = diagnostic_path(root)
++    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
++    with os.fdopen(fd, "a") as stream:
++        os.fchmod(stream.fileno(), 0o600)
++        stream.write(f"{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())} {line}\n")

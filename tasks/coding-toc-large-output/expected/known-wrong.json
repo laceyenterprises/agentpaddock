@@ -1,0 +1,5 @@
+{
+  "status": "fixed",
+  "regressing_commit_subject": "catalog: refresh batch 40",
+  "failure_marker": "route-pine-001"
+}

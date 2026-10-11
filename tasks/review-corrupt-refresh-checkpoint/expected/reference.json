@@ -1,0 +1,12 @@
+{
+  "findings": [
+    {
+      "file": "progress_journal.py",
+      "line_start": 12,
+      "line_end": 16,
+      "blocking": true,
+      "category": "error-handling",
+      "summary": "A truncated checkpoint or identity index makes the constructor raise on every restart, so no refresh work can run."
+    }
+  ]
+}

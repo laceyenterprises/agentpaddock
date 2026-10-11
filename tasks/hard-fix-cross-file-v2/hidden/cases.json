@@ -1,0 +1,48 @@
+[
+  {
+    "call": "import backend\nclass Directory:\n    def __init__(self, users, down=()):\n        self.users, self.down, self.asked = users, set(down), []\n    def get_user(self, user):\n        self.asked.append(user)\n        if user in self.down:\n            raise backend.Unavailable(user)\n        if user not in self.users:\n            raise backend.NotFound(user)\n        return self.users[user]\nimport directory\nresult = directory.lookup(Directory({}, down=['ann']), 'ann')\n",
+    "expected": {
+      "raised": "backend.Unavailable"
+    }
+  },
+  {
+    "call": "import backend\nclass Directory:\n    def __init__(self, users, down=()):\n        self.users, self.down, self.asked = users, set(down), []\n    def get_user(self, user):\n        self.asked.append(user)\n        if user in self.down:\n            raise backend.Unavailable(user)\n        if user not in self.users:\n            raise backend.NotFound(user)\n        return self.users[user]\nimport directory\nclient = Directory({'ann': {'name': 'Ann'}})\nresult = [directory.lookup(client, 'ann'), directory.lookup(client, 'bob')]\n",
+    "expected": {
+      "ok": [
+        {
+          "name": "Ann"
+        },
+        null
+      ]
+    }
+  },
+  {
+    "call": "import backend\nclass Directory:\n    def __init__(self, users, down=()):\n        self.users, self.down, self.asked = users, set(down), []\n    def get_user(self, user):\n        self.asked.append(user)\n        if user in self.down:\n            raise backend.Unavailable(user)\n        if user not in self.users:\n            raise backend.NotFound(user)\n        return self.users[user]\nimport reconcile\nclient = Directory({'ann': {}, 'cy': {}}, down=['bob', 'dee'])\nreport = reconcile.reconcile(client, ['ann', 'bob', 'cy', 'dee', 'eve', 'fay'])\nresult = [report, client.asked]\n",
+    "expected": {
+      "ok": [
+        {
+          "deactivated": [
+            "eve",
+            "fay"
+          ],
+          "kept": [
+            "ann",
+            "cy"
+          ],
+          "skipped": [
+            "bob",
+            "dee"
+          ]
+        },
+        [
+          "ann",
+          "bob",
+          "cy",
+          "dee",
+          "eve",
+          "fay"
+        ]
+      ]
+    }
+  }
+]

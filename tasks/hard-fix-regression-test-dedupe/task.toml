@@ -1,0 +1,32 @@
+# Synthetic (HRF-05): regression-test task. The fix is small; the graded part is
+# a test that tells the full contract from a partial fix it never sees.
+id = "hard-fix-regression-test-dedupe"
+task_version = 1
+title = "Duplicate campaign recipients, with a regression test"
+suite = "hard-fix"
+persona = "codex"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage pre-fix code, reviewer finding, visible smoke tests and the test placeholder."
+
+[result_schema]
+done = { type = "boolean", required = true }
+
+[capture]
+files = ["contacts.py", "mailer.py", "test_regression.py", "test_visible.py", "finding.md", "staged-manifest.json"]
+
+[hidden_tests]
+entrypoint = "hidden/cases.json"
+expected_tests = 3
+timeout_seconds = 20
+
+[regression_test]
+path = "test_regression.py"
+timeout_seconds = 20
+
+[verifier]
+entrypoint = "verifier.py"

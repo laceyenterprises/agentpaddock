@@ -1,0 +1,22 @@
+# HRF-01 fixture: a synthetic hard-fix task. Not part of the shipped corpus —
+# lives under tests/fixtures/ so the fix-family parity tests can prove a
+# hard-fix task gets every safeguard a fix task gets.
+id = "hard-fix-probe"
+task_version = 1
+title = "Synthetic hard-fix parity probe"
+suite = "hard-fix"
+persona = "codex"
+
+[result_schema]
+done = { type = "boolean", required = true }
+
+[capture]
+files = ["target.py", "staged-manifest.json"]
+
+[hidden_tests]
+entrypoint = "hidden/cases.json"
+expected_tests = 1
+timeout_seconds = 20
+
+[verifier]
+entrypoint = "verifier.py"

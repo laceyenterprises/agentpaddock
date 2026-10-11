@@ -1,0 +1,34 @@
+# Synthetic (HRX-03): regression-test task. The graded part is a test that tells
+# the full contract from an incomplete fix and from a plausible fix that breaks
+# a contract the freeze policy documents.
+id = "hard-fix-regression-test-quiet-hours-v2"
+task_version = 1
+title = "Overnight deploy freezes, with a contract-pinning regression test"
+suite = "hard-fix"
+persona = "codex"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage pre-fix code, reviewer finding, the deploy gate and policy, visible smoke tests and the test placeholder."
+
+[result_schema]
+done = { type = "boolean", required = true }
+
+[capture]
+files = ["freeze.py", "deployer.py", "policy.py", "test_regression.py", "test_visible.py", "finding.md", "staged-manifest.json"]
+
+[hidden_tests]
+entrypoint = "hidden/cases.json"
+expected_tests = 3
+timeout_seconds = 20
+
+[regression_test]
+path = "test_regression.py"
+timeout_seconds = 20
+must_fail_variants = ["plausible-wrong"]
+
+[verifier]
+entrypoint = "verifier.py"

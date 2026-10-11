@@ -1,0 +1,58 @@
+[
+  {
+    "call": "import subscribers\nrows=[{'id':1,'email':'Ann@Example.com'},{'id':2,'email':'ann@example.com '},{'id':3,'email':' ANN@example.COM'},{'id':4,'email':'bob@example.com'},{'id':5,'email':'Bob@Example.com\\t'}]\nresult=[row['id'] for row in subscribers.unique(rows)]\n",
+    "expected": {
+      "ok": [
+        1,
+        4
+      ]
+    }
+  },
+  {
+    "call": "import subscribers, copy\nrows=[{'id':1},{'id':2,'email':'Cy@Example.com'},{'id':3},{'id':4,'email':'dee@example.com'},{'id':5,'email':'cy@example.com'}]\nbefore=copy.deepcopy(rows)\nkept=subscribers.unique(rows)\nresult=[[row['id'] for row in kept],[row.get('email') for row in kept],all(any(row is item for item in rows) for row in kept),rows==before,subscribers.unique([])]\n",
+    "expected": {
+      "ok": [
+        [
+          1,
+          2,
+          3,
+          4
+        ],
+        [
+          null,
+          "Cy@Example.com",
+          null,
+          "dee@example.com"
+        ],
+        true,
+        true,
+        []
+      ]
+    }
+  },
+  {
+    "call": "import newsletter, copy\nrows=[{'email':' Eve@Example.com'},{'name':'no address'},{'email':'eve@example.com'},{'email':'frank@example.com'},{'email':'FRANK@EXAMPLE.COM '}]\nbefore=copy.deepcopy(rows)\nresult=[newsletter.send_list(rows),rows==before]\n",
+    "expected": {
+      "ok": [
+        [
+          " Eve@Example.com",
+          "frank@example.com"
+        ],
+        true
+      ]
+    }
+  },
+  {
+    "call": "import subscribers, newsletter, copy\nrow={'email':' Ann@Example.com '}\nrows=[row,row]\nbefore=copy.deepcopy(rows)\nkept=subscribers.unique(rows)\nresult=[len(kept),kept[0] is row,newsletter.send_list(rows),rows==before]\n",
+    "expected": {
+      "ok": [
+        1,
+        true,
+        [
+          " Ann@Example.com "
+        ],
+        true
+      ]
+    }
+  }
+]

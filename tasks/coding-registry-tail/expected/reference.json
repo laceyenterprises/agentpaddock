@@ -1,0 +1,7 @@
+{
+  "profile": "tail",
+  "template_limit": 34,
+  "fix": "copy-tags-list",
+  "original_first_tags": 2,
+  "fixed_template_tags": 0
+}

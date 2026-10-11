@@ -1,0 +1,31 @@
+# Drawn from a real production defect (FSA-04, PR #5797): reordering a probe
+# so it checked for backups before demanding credentials exposed a latent
+# `set -o pipefail` interaction. The script exited 1 with EMPTY stdout and
+# stderr — no message at all — because a `find` over a missing directory failed
+# inside a pipeline.
+#
+# The skill under test is reasoning about shell option semantics rather than
+# reading the happy path. The failing construct looks defensive: it already
+# redirects stderr to /dev/null.
+
+id = "coding-pipefail-silent-exit"
+task_version = 1
+title = "The script exits 1 and prints nothing"
+suite = "coding"
+persona = "claude-code"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage the probe script and the observed symptom."
+
+[result_schema]
+defect_line = { type = "integer", required = true, description = "1-indexed line in probe.sh that terminates the script" }
+shell_option = { type = "enum", required = true, enum = ["pipefail", "errexit", "nounset", "noclobber", "xtrace"] }
+suppressed_by_2devnull = { type = "boolean", required = true, description = "does the existing 2>/dev/null prevent this failure?" }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "The terminating line, the responsible shell option, and whether 2>/dev/null defends against it."

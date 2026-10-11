@@ -1,0 +1,8 @@
+{
+  "kind": "real-derived",
+  "before": "5331356dc9d0a453cf89df551b67f65ee5b35de0",
+  "docs_fix": "fb0ec49eea5386af1d74e3b64f48524a431e41a1",
+  "doc": "modules/adversarial-eval-gym/README.md",
+  "code": "modules/adversarial-eval-gym/lib/python/gym/cli.py",
+  "note": "Trimmed CLI section; missing reasoning-level/cohort facts before docs-only fix."
+}

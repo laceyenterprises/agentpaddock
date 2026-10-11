@@ -1,0 +1,61 @@
+diff --git a/progress_journal.py b/progress_journal.py
+--- a/progress_journal.py
++++ b/progress_journal.py
+@@ -1,4 +1,6 @@
+ import json
++import logging
++import time
+ from pathlib import Path
+ 
+ JOURNAL_VERSION = 2
+@@ -8,16 +10,46 @@
+     def __init__(self, root: Path):
+         self.path = root / "progress"
+         self.files = {}
++        self.quarantined = []
+         for path in sorted((self.path / "files").glob("*.json")):
+-            payload = json.loads(path.read_text())
+-            if payload.get("version") == JOURNAL_VERSION:
++            try:
++                payload = json.loads(path.read_text(encoding="utf-8"))
++                if not isinstance(payload, dict) or not isinstance(payload.get("checkpoint"), dict):
++                    raise ValueError("checkpoint file must hold an object with a checkpoint")
++                if payload.get("version") != JOURNAL_VERSION:
++                    raise ValueError("unsupported checkpoint version")
++                if not isinstance(payload.get("path_key"), str):
++                    raise ValueError("checkpoint path_key must be a string")
+                 self.files[payload["path_key"]] = payload["checkpoint"]
++            except FileNotFoundError:
++                continue
++            except (ValueError, TypeError) as exc:
++                self._quarantine(path, exc)
++                continue
++        identity_path = self.path / "identities.json"
+         try:
+-            self.identities = json.loads((self.path / "identities.json").read_text())
++            self.identities = json.loads(identity_path.read_text(encoding="utf-8"))
++            if not isinstance(self.identities, dict):
++                raise ValueError("identity index must be a JSON object")
+         except FileNotFoundError:
+             self.identities = {}
+-        # Raise on bad bytes: silently dropping progress could resume at a stale offset.
++        except (ValueError, TypeError) as exc:
++            self._quarantine(identity_path, exc)
++            # Rebuild the index from the checkpoints that survived the load.
++            self.identities = {
++                checkpoint["identity"]: key
++                for key, checkpoint in self.files.items()
++                if isinstance(checkpoint.get("identity"), str)
++            }
++        # A quarantined source has no checkpoint, so the next pass resets and re-reads it.
+         self.bytes_ingested = 0
+         self.pending = set()
+         self.skipped_unchanged = 0
+         self.skipped_duplicates = 0
++
++    def _quarantine(self, path, exc):
++        """Move a damaged file aside so later passes start that source from zero."""
++        target = path.with_name(f"{path.name}.corrupt-{int(time.time())}")
++        path.replace(target)
++        self.quarantined.append(target)
++        logging.error("quarantined damaged progress file %s: %s", path.name, exc)

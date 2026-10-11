@@ -1,0 +1,10 @@
+diff --git a/publisher.py b/publisher.py
+--- a/publisher.py
++++ b/publisher.py
+@@ -1,5 +1,5 @@
+ def publish(store, account, payload):
++    receipt = store.send(account, payload)
+     if not store.is_enabled(account):
+         raise PermissionError(account)
+-    receipt = store.send(account, payload)
+     return receipt

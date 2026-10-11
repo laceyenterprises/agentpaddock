@@ -1,0 +1,53 @@
+[
+  {
+    "call": "import target\nt={'tags':['base'],'limit':3}\nr=target.configure(t,'a')\nresult=[t,r]",
+    "expected": {
+      "ok": [
+        {
+          "tags": [
+            "base"
+          ],
+          "limit": 3
+        },
+        {
+          "tags": [
+            "base",
+            "a"
+          ],
+          "limit": 3
+        }
+      ]
+    }
+  },
+  {
+    "call": "import target\nt={'tags':[],'limit':3}\na=target.configure(t,'a'); b=target.configure(t,'b')\nresult=[a,b]",
+    "expected": {
+      "ok": [
+        {
+          "tags": [
+            "a"
+          ],
+          "limit": 3
+        },
+        {
+          "tags": [
+            "b"
+          ],
+          "limit": 3
+        }
+      ]
+    }
+  },
+  {
+    "call": "import target\nresult=target.configure({'tags':['base'],'limit':7},'x')",
+    "expected": {
+      "ok": {
+        "tags": [
+          "base",
+          "x"
+        ],
+        "limit": 7
+      }
+    }
+  }
+]

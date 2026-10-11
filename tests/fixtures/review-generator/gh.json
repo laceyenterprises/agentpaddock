@@ -1,0 +1,77 @@
+{
+  "repos/example-org/example-repo/pulls/123": {
+    "merged_at": "2026-09-01T12:00:00Z",
+    "title": "Example retention fix"
+  },
+  "repos/example-org/example-repo/pulls/123/reviews": [
+    [
+      {
+        "id": 42,
+        "commit_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "submitted_at": "2026-09-01T10:00:00Z",
+        "body": "## Summary\nAn operator-owned auth blocker is still open.\n\n## Blocking issues\n- **Approval provenance bypasses actor validation**\n  - **Category:** auth\n  - **File:** `src/follow-up-merge-agent.mjs`\n  - **Lines:** `201-229`\n  - **Problem:** The override path trusts label presence without verifying the approval actor identity.\n  - **Recommended fix:** Require attributable approval provenance before honoring `operator-approved`.\n\n## Non-blocking issues\n- None.\n\n## Suggested fixes\n- Preserve the classifier contract asserted by this fixture.\n\n## Verdict\nRequest changes\n",
+        "user": {
+          "login": "lacey-codex-reviewer[bot]"
+        }
+      }
+    ],
+    [
+      {
+        "id": 43,
+        "commit_id": "cccccccccccccccccccccccccccccccccccccccc",
+        "submitted_at": "2026-09-01T11:00:00Z",
+        "body": "## Blocking issues\n- None.",
+        "user": {
+          "login": "lacey-codex-reviewer[bot]"
+        }
+      }
+    ]
+  ],
+  "repos/example-org/example-repo/pulls/123/commits": [
+    [
+      {
+        "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "parents": [
+          {
+            "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "parents": [
+          {
+            "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        ]
+      }
+    ]
+  ],
+  "repos/example-org/example-repo/commits/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {
+    "parents": [
+      {
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ]
+  },
+  "repos/example-org/example-repo/compare/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {
+    "status": "ahead",
+    "files": [
+      {
+        "filename": "src/store.py",
+        "patch": "@@ -10 +10 @@\n- persist(commit)\n+ drop(commit)"
+      }
+    ]
+  },
+  "repos/example-org/example-repo/compare/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb...cccccccccccccccccccccccccccccccccccccccc": {
+    "status": "ahead",
+    "files": [
+      {
+        "filename": "src/store.py",
+        "patch": "@@ -10 +10 @@\n- drop(commit)\n+ persist(commit)"
+      }
+    ]
+  }
+}

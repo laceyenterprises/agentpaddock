@@ -1,0 +1,55 @@
+[
+  {
+    "call": "import quiet\nfrom datetime import time\ntimes=[time(22,0),time(23,30),time(0,0),time(2,15),time(5,59),time(6,0),time(12,0),time(21,59)]\nresult=[quiet.in_quiet_hours(now,time(22,0),time(6,0)) for now in times]\n",
+    "expected": {
+      "ok": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  {
+    "call": "import quiet\nfrom datetime import time\nday=[quiet.in_quiet_hours(now,time(9,0),time(17,0)) for now in (time(8,59),time(9,0),time(12,0),time(16,59),time(17,0))]\ntimes=[time(0,0),time(3,0),time(8,0),time(12,0),time(23,59)]\nnone=[quiet.in_quiet_hours(now,edge,edge) for edge in (time(0,0),time(8,0)) for now in times]\nresult=[day,none]\n",
+    "expected": {
+      "ok": [
+        [
+          false,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      ]
+    }
+  },
+  {
+    "call": "import router\nfrom datetime import datetime, time\nnight={'quiet_start':time(22,0),'quiet_end':time(6,0)}\nnever={'quiet_start':time(7,0),'quiet_end':time(7,0)}\nwarning,critical={'severity':'warning'},{'severity':'critical'}\nresult=[router.should_page(warning,night,datetime(2026,10,6,2,0)),router.should_page(warning,night,datetime(2026,10,6,23,30)),router.should_page(critical,night,datetime(2026,10,6,2,0)),router.should_page(warning,night,datetime(2026,10,6,12,0)),router.should_page(warning,never,datetime(2026,10,6,3,0))]\n",
+    "expected": {
+      "ok": [
+        false,
+        false,
+        true,
+        true,
+        true
+      ]
+    }
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "kind": "real-derived",
+  "before": "ace3d1adeb3ffa1bcb4199543f0c73e6befe550f",
+  "docs_fix": "295b0d7e3304f207e1c53c25515b3c0a3f3781bb",
+  "doc": "modules/adversarial-eval-gym/lib/python/gym/suite.py verdicts docstring",
+  "code": "modules/adversarial-eval-gym/lib/python/gym/suite.py",
+  "note": "Trimmed pre-fix code and stale docstring. Baseline helper from baseline.py at same revision. Runtime implementation unchanged by docs-only fix."
+}

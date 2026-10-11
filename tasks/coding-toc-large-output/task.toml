@@ -1,0 +1,27 @@
+# TOC-05: the tool-output-compression seam only acts on command output
+# (`git`, `pytest`, ...). Staged-file reads never reach it, so the A/B needs a
+# task whose correct path runs the eligible command classes.
+
+id = "coding-toc-large-output"
+task_version = 1
+title = "Find the regressing commit and fix the failing test"
+suite = "coding"
+persona = "claude-code"
+required_large_output_commands = ["git", "pytest"]
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage a long patch history and 401 verbose tests with a buried failure marker."
+
+[result_schema]
+status = { type = "enum", required = true, enum = ["fixed", "failed"] }
+regressing_commit_subject = { type = "string", required = true, description = "Exact subject of the commit that broke greet()" }
+
+failure_marker = { type = "string", required = true, description = "Diagnostic marker from the failing traceback" }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "Regressing commit named from git history, pytest run before and after the fix, and test.py left untouched."

@@ -1,0 +1,12 @@
+{
+  "findings": [
+    {
+      "file": "reader.py",
+      "line_start": 8,
+      "line_end": 9,
+      "blocking": true,
+      "category": "error-handling",
+      "summary": "Returning an empty page for a transient error advances the durable cursor and skips unread data."
+    }
+  ]
+}

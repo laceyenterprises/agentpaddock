@@ -1,0 +1,12 @@
+{
+  "root_cause": "probe-substring-matches-healthy-banner",
+  "evidence_id": "ev-801",
+  "red_herrings": [
+    "fail-threshold-too-low — the #1146 DB_FAIL_THRESHOLD 1->3 reflex (ev-803); raising it only delays the loop because each recreate regenerates the banner.",
+    "force-recreate-orphan-pileup — the orphan DB containers (ev-805) are an amplifier/symptom, not the driver.",
+    "docker-vm-memory-exhaustion — the JetsamEvent (ev-804) is a downstream consequence of ~390 recreate cycles; the host was force-powered off, not panicked."
+  ],
+  "source_doc": "docs/POSTMORTEM-litellm-watchdog-restart-storm-2026-06-01.md",
+  "__ground_truth_marker__": "GYM-GROUND-TRUTH-NEVER-STAGE",
+  "note": "Ground truth. NEVER staged to the agent and NEVER reachable from the out-of-band verifier env. verifier.py hardcodes these constants and is what actually grades; this file documents the answer for maintainers."
+}

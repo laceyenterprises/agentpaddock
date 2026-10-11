@@ -1,0 +1,27 @@
+# Synthetic seeded defect
+id = "fix-retry-empty-page"
+task_version = 1
+title = "Temporary fetch failure is mistaken for an empty page"
+suite = "fix"
+persona = "codex"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage pre-fix code, reviewer finding and visible smoke tests."
+
+[result_schema]
+done = { type = "boolean", required = true }
+
+[capture]
+files = ["target.py", "support.py", "test_visible.py", "finding.md", "staged-manifest.json"]
+
+[hidden_tests]
+entrypoint = "hidden/cases.json"
+expected_tests = 3
+timeout_seconds = 20
+
+[verifier]
+entrypoint = "verifier.py"

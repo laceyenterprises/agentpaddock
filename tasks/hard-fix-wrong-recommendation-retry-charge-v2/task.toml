@@ -1,0 +1,29 @@
+# Synthetic (HRX-03): wrong-recommendation task. The finding's recommended
+# idempotency key is per order; plans.py charges an order more than once and
+# gateway.py says a repeated key returns the first charge.
+id = "hard-fix-wrong-recommendation-retry-charge-v2"
+task_version = 1
+title = "Retry a timed-out installment charge without skipping or doubling it"
+suite = "hard-fix"
+persona = "codex"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage pre-fix code, reviewer finding, gateway contract, the installment caller and visible smoke tests."
+
+[result_schema]
+done = { type = "boolean", required = true }
+
+[capture]
+files = ["billing.py", "gateway.py", "plans.py", "test_visible.py", "finding.md", "staged-manifest.json"]
+
+[hidden_tests]
+entrypoint = "hidden/cases.json"
+expected_tests = 3
+timeout_seconds = 20
+
+[verifier]
+entrypoint = "verifier.py"

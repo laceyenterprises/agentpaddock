@@ -1,0 +1,12 @@
+{
+  "findings": [
+    {
+      "file": "audit.py",
+      "line_start": 17,
+      "line_end": 19,
+      "blocking": true,
+      "category": "api-contract",
+      "summary": "wiring.py subscribes audit:record_change to entry.* alongside the webhook, and record_change still reads entry.name, .settings and .tags. With dict snapshots it raises AttributeError, which EventBus.publish logs and swallows, so the compliance audit trail silently stops recording every change."
+    }
+  ]
+}

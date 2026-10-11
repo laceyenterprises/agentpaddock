@@ -1,0 +1,6 @@
+- **One gateway timeout strands the order in manual reconciliation**
+  - **File:** `billing.py`
+  - **Lines:** `charge` (~1-7)
+  - **Problem:** `charge` makes a single `create_charge` call. When the gateway times out, `settlement.settle` marks the order `unknown` and it waits for the next morning's reconciliation. At peak about 2% of orders hit a transient timeout that a second attempt would have cleared.
+  - **Why it matters:** Customers see "payment pending" for hours and support handles the tickets by hand.
+  - **Recommended fix:** Retry `create_charge` when it raises `GatewayTimeout`, making at most 3 attempts in total, and re-raise the last `GatewayTimeout` if every attempt times out.

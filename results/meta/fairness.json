@@ -1,0 +1,73 @@
+{
+  "audits": [
+    {
+      "date": null,
+      "harness": "antigravity",
+      "notes": "Audit against vendor defaults not yet signed off (SPEC R8, PDK-09).",
+      "status": "pending"
+    },
+    {
+      "date": null,
+      "harness": "claude-code",
+      "notes": "Audit against vendor defaults not yet signed off (SPEC R8, PDK-09).",
+      "status": "pending"
+    },
+    {
+      "date": null,
+      "harness": "codex",
+      "notes": "Audit against vendor defaults not yet signed off (SPEC R8, PDK-09).",
+      "status": "pending"
+    },
+    {
+      "date": null,
+      "harness": "opencode",
+      "notes": "Audit against vendor defaults not yet signed off (SPEC R8, PDK-09).",
+      "status": "pending"
+    },
+    {
+      "date": null,
+      "harness": "pi",
+      "notes": "Audit against vendor defaults not yet signed off (SPEC R8, PDK-09).",
+      "status": "pending"
+    }
+  ],
+  "checklist": [
+    {
+      "check": "The harness exposes its vendor-default tool set: no tool removed, none added, and native web access left at the vendor default and recorded.",
+      "id": "tools"
+    },
+    {
+      "check": "The harness runs in its vendor's non-interactive mode with equivalent authority; the sandbox boundary is the container, the same for every harness.",
+      "id": "permissions"
+    },
+    {
+      "check": "The model the harness actually ran, read from its own telemetry, is the one recorded (CCMODEL-01).",
+      "id": "model"
+    },
+    {
+      "check": "The reasoning or effort level is recorded, and is the vendor default or the same named level across compared rows.",
+      "id": "reasoning"
+    },
+    {
+      "check": "Every harness gets the same task prompt and no harness-specific instructions beyond its vendor default system prompt.",
+      "id": "prompt"
+    },
+    {
+      "check": "Wall-clock timeout, container CPU and memory, and turn or token limits are the same for every harness, or the vendor default and recorded.",
+      "id": "limits"
+    },
+    {
+      "check": "The harness's tool-call record is captured whole, never truncated, so a read-evidence check cannot fail on capture (OCEXPORT-01).",
+      "id": "telemetry"
+    },
+    {
+      "check": "When a model is reached through a proxy or gateway, any request rewriting it does is part of the recorded configuration (KIMIEMPTY-01).",
+      "id": "transport"
+    },
+    {
+      "check": "Harness CLI version and configuration hash are recorded with every result.",
+      "id": "provenance"
+    }
+  ],
+  "schema": "paddock-fairness/v1"
+}

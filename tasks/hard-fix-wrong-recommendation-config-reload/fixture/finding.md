@@ -1,0 +1,6 @@
+- **A bad overrides edit kills the merge daemon on SIGHUP**
+  - **File:** `config.py`
+  - **Lines:** `load_overrides` (~11-25)
+  - **Problem:** An operator saved `overrides.json` with a trailing comma and sent SIGHUP. `json.load` raised `json.JSONDecodeError`, which escapes `load_overrides` and `daemon.reload`, and the daemon exited. Nothing merged until someone noticed an hour later.
+  - **Why it matters:** A typo in a config file should not take the daemon down.
+  - **Recommended fix:** In `load_overrides`, catch `json.JSONDecodeError`, log it, and return `{}` so the daemon keeps running on the defaults.

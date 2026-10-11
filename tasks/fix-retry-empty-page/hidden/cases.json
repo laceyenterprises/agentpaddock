@@ -1,0 +1,39 @@
+[
+  {
+    "call": "import target\nfrom support import Client,PageStore\ns=PageStore(); c=Client(fail=True)\ntry:\n r=target.drain(c,s); e=False\nexcept BaseException as exc:\n r=None; e=isinstance(exc,target.TemporaryUnavailable)\nresult=[r,e,s.cursor,s.pages]",
+    "expected": {
+      "ok": [
+        null,
+        true,
+        7,
+        []
+      ]
+    }
+  },
+  {
+    "call": "import target\nfrom support import Client,PageStore\ns=PageStore(); c=Client(fail=True)\ntry:\n target.drain(c,s)\nexcept target.TemporaryUnavailable:\n pass\nc.fail=False\nr=target.drain(c,s)\nresult=[r,c.cursors]",
+    "expected": {
+      "ok": [
+        [
+          "row"
+        ],
+        [
+          7,
+          7
+        ]
+      ]
+    }
+  },
+  {
+    "call": "import target\nfrom support import Client,PageStore\ns=PageStore(); r=target.drain(Client([]),s)\nresult=[r,s.pages,s.cursor]",
+    "expected": {
+      "ok": [
+        [],
+        [
+          []
+        ],
+        8
+      ]
+    }
+  }
+]

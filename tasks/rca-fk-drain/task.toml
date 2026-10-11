@@ -1,0 +1,42 @@
+# GYM-02 RCA task, seeded from a real incident.
+#
+# Source incident doc: docs/SPEC-session-ledger-fk-recovery-2026-06-04.md
+#   (Session-ledger FK recovery (2026-06-04 SEV) — a SPEC- recovery doc, not a
+#    POSTMORTEM-.) Scaffolded via scripts/rca_from_postmortem.py, then filled in.
+#
+# The incident: migration 095 added an FK from a POLYMORPHIC source column
+# (transcript_sources.source_runtime_session_uuid, which holds a different kind
+# of id per adapter) onto runtime_sessions.session_uuid. Every new codex/acpx
+# dual-write insert fails the FK, the replay queue hot-loops, the daemon pegs
+# 98% CPU, the fleet goes down. The responders chased two wrong theories first
+# (retarget the FK to adapter_runtime_id; blame the replay queue) — both are
+# planted red herrings here.
+
+id = "rca-fk-drain"
+task_version = 1
+title = "RCA: session-ledger dual-write FK drain (2026-06-04 SEV)"
+suite = "rca"
+persona = "claude-code"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage the redacted daemon error log + schema/adapter excerpt."
+
+# Closed set. The true root cause is the polymorphic-column FK mismatch; the
+# other three are real distractors from the incident (the retarget theory, the
+# replay-queue-overflow symptom, and the 98%-CPU symptom).
+[result_schema]
+root_cause = { type = "enum", enum = [
+  "polymorphic-source-column-fk-mismatch",
+  "adapter-runtime-id-uniqueness-violation",
+  "dual-write-replay-queue-overflow",
+  "daemon-cpu-thrash",
+], required = true }
+evidence_id = { type = "string", required = false }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "root_cause == polymorphic FK mismatch AND evidence cites ev-703 or ev-704 (the FK-violation line)."

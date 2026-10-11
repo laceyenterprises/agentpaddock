@@ -1,0 +1,118 @@
+{
+  "marker": "GYM-GROUND-TRUTH-NEVER-STAGE",
+  "defects": [],
+  "tolerated": [],
+  "slack": 3,
+  "max_false_blocking": 0,
+  "clean_control": true,
+  "read_files": [
+    "alerts.py",
+    "digest.py",
+    "notify.py",
+    "notifyctl.py",
+    "quiet_hours.py"
+  ],
+  "decoys": [
+    {
+      "file": "notify.py",
+      "line_start": 83,
+      "line_end": 86
+    },
+    {
+      "file": "notify.py",
+      "line_start": 79,
+      "line_end": 82
+    },
+    {
+      "file": "notify.py",
+      "line_start": 27,
+      "line_end": 30
+    },
+    {
+      "file": "quiet_hours.py",
+      "line_start": 56,
+      "line_end": 58
+    },
+    {
+      "file": "digest.py",
+      "line_start": 43,
+      "line_end": 43
+    },
+    {
+      "file": "digest.py",
+      "line_start": 67,
+      "line_end": 70
+    },
+    {
+      "file": "digest.py",
+      "line_start": 94,
+      "line_end": 97
+    }
+  ],
+  "max_decoy_blocking": 0,
+  "decoy_claims": [
+    {
+      "file": "notify.py",
+      "line_start": 84,
+      "line_end": 86,
+      "category": "data-loss",
+      "source": "generic",
+      "summary": "Non-critical alerts raised during quiet hours are never sent when raised, a regression from immediate delivery."
+    },
+    {
+      "file": "notify.py",
+      "line_start": 79,
+      "line_end": 80,
+      "category": "correctness",
+      "source": "generic",
+      "summary": "Critical alerts skip the rate limit, so a critical storm floods the pager."
+    },
+    {
+      "file": "notify.py",
+      "line_start": 30,
+      "line_end": 30,
+      "category": "security",
+      "source": "generic",
+      "summary": "SHA-1 is broken; use SHA-256 for the dedupe key."
+    },
+    {
+      "file": "quiet_hours.py",
+      "line_start": 58,
+      "line_end": 58,
+      "category": "correctness",
+      "source": "generic",
+      "summary": "The wrap-around check uses or where it needs and, so most of the day counts as quiet hours."
+    },
+    {
+      "file": "digest.py",
+      "line_start": 43,
+      "line_end": 43,
+      "category": "security",
+      "source": "PR 7674",
+      "summary": "The digest state file is created without restricting its mode."
+    },
+    {
+      "file": "digest.py",
+      "line_start": 69,
+      "line_end": 69,
+      "category": "correctness",
+      "source": "PR 7537",
+      "summary": "The negated rank sorts the digest in the wrong order."
+    },
+    {
+      "file": "digest.py",
+      "line_start": 96,
+      "line_end": 97,
+      "category": "data-loss",
+      "source": "generic",
+      "summary": "The pending list is cleared before the cleared state is durable, so a crash re-sends or loses the digest."
+    }
+  ],
+  "provenance": {
+    "kind": "synthetic",
+    "decoy_sources": [
+      "PR 7674",
+      "PR 7537"
+    ]
+  }
+}

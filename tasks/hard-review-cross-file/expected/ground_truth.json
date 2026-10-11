@@ -1,0 +1,33 @@
+{
+  "marker": "GYM-GROUND-TRUTH-NEVER-STAGE",
+  "defects": [
+    {
+      "any_of": [
+        {
+          "file": "registry.py",
+          "line_start": 47,
+          "line_end": 49
+        },
+        {
+          "file": "sync.py",
+          "line_start": 26,
+          "line_end": 32
+        }
+      ],
+      "expected_category": "api-contract"
+    }
+  ],
+  "tolerated": [],
+  "slack": 3,
+  "max_false_blocking": 1,
+  "clean_control": false,
+  "read_files": [
+    "registry.py",
+    "sync.py"
+  ],
+  "contract_file": "registry.py",
+  "caller_file": "sync.py",
+  "provenance": {
+    "kind": "synthetic"
+  }
+}

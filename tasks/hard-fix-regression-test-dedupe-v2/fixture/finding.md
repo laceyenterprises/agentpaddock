@@ -1,0 +1,6 @@
+- **Newsletter sends reach the same subscriber twice**
+  - **File:** `subscribers.py`
+  - **Lines:** `unique` (~1-20)
+  - **Problem:** `unique` compares the raw `email` strings, but its docstring says two addresses are the same when they match ignoring case and surrounding whitespace. The signup form writes `ann@example.com` while the CSV import writes `Ann@Example.com `, so both subscribers survive and `newsletter.send_list` mails Ann twice.
+  - **Why it matters:** Every duplicate send counts against the sender reputation budget, and a second unsubscribe link for the same person confuses the suppression list.
+  - **Recommended fix:** Normalize each subscriber's `email` (strip it and lower-case it) before `unique` compares it. Add a regression test in `test_regression.py` that fails on the current code and passes once the fix is in.

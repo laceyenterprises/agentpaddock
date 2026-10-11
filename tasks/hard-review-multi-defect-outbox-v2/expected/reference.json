@@ -1,0 +1,36 @@
+{
+  "findings": [
+    {
+      "file": "dispatcher.py",
+      "line_start": 121,
+      "line_end": 124,
+      "blocking": true,
+      "category": "error-handling",
+      "summary": "sender.PermanentFailure subclasses DeliveryError, so the DeliveryError clause catches every rejected 4xx first: the message is retried with backoff until its attempts run out instead of being dead-lettered at once, and the PermanentFailure clause is unreachable."
+    },
+    {
+      "file": "store.py",
+      "line_start": 90,
+      "line_end": 104,
+      "blocking": true,
+      "category": "concurrency",
+      "summary": "claim_batch selects due ids outside the transaction, then updates them by id without re-checking state = 'pending'. Two dispatchers that select before either updates both claim, and both deliver, the same message."
+    },
+    {
+      "file": "store.py",
+      "line_start": 150,
+      "line_end": 150,
+      "blocking": true,
+      "category": "correctness",
+      "summary": "claim_batch already counted the expired attempt, so attempts > MAX_ATTEMPTS releases a message whose fifth attempt expired back to pending; it gets a sixth attempt. The test should be >=, matching the dispatcher."
+    },
+    {
+      "file": "store.py",
+      "line_start": 210,
+      "line_end": 212,
+      "blocking": true,
+      "category": "data-loss",
+      "summary": "purge deletes every row that is not pending or claimed, which includes dead letters; pr.md promises only sent messages are purged and dead letters stay until replay or discard."
+    }
+  ]
+}

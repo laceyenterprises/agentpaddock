@@ -1,0 +1,28 @@
+{
+  "findings": [
+    {
+      "file": "tool_calls.py",
+      "line_start": 60,
+      "line_end": 61,
+      "blocking": true,
+      "category": "security",
+      "summary": "Parsed call names are type-checked but never matched against the request's offered functions, and mlx_lm's parser ignores tools, so a model can return a call to a function the caller never offered."
+    },
+    {
+      "file": "tool_calls.py",
+      "line_start": 136,
+      "line_end": 140,
+      "blocking": true,
+      "category": "api-contract",
+      "summary": "Only tool_choice none is handled; with required or a named function and no parsed call the response is an ordinary stop answer, completing a turn that violated its tool_choice."
+    },
+    {
+      "file": "server_supervisor.py",
+      "line_start": 161,
+      "line_end": 162,
+      "blocking": true,
+      "category": "api-contract",
+      "summary": "Streaming requests bypass chat_completions, so a stream with tools and a required or named tool_choice succeeds as a plain text stream instead of being refused."
+    }
+  ]
+}

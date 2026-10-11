@@ -1,0 +1,14 @@
+{
+  "marker": "GYM-GROUND-TRUTH-NEVER-STAGE",
+  "defects": [],
+  "tolerated": [],
+  "slack": 3,
+  "max_false_blocking": 1,
+  "clean_control": true,
+  "read_files": [
+    "retention.py"
+  ],
+  "provenance": {
+    "kind": "synthetic"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "status": "fixed",
+  "regressing_commit_subject": "banner: select compact transport variant",
+  "failure_marker": "route-cedar-742"
+}

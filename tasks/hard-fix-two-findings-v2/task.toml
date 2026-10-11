@@ -1,0 +1,29 @@
+# Synthetic (HRX-03): two-findings task. Two review cards, two defects in two
+# files; one card's recommended fix is subtly wrong, and the contract that
+# shows it lives in a third, protected file.
+id = "hard-fix-two-findings-v2"
+task_version = 1
+title = "Rate-limit lockout and a wrong Retry-After"
+suite = "hard-fix"
+persona = "codex"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage pre-fix code, both reviewer findings, the proxy caller and visible smoke tests."
+
+[result_schema]
+done = { type = "boolean", required = true }
+
+[capture]
+files = ["limiter.py", "headers.py", "proxy.py", "test_visible.py", "finding.md", "staged-manifest.json"]
+
+[hidden_tests]
+entrypoint = "hidden/cases.json"
+expected_tests = 3
+timeout_seconds = 20
+
+[verifier]
+entrypoint = "verifier.py"

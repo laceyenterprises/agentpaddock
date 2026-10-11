@@ -1,0 +1,28 @@
+# Synthetic (HRF-05): wrong-recommendation task. Following the finding's
+# recommended fix literally double-charges; gateway.py documents why.
+id = "hard-fix-wrong-recommendation-retry-charge"
+task_version = 1
+title = "Retry a timed-out charge without charging twice"
+suite = "hard-fix"
+persona = "codex"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage pre-fix code, reviewer finding, gateway contract and visible smoke tests."
+
+[result_schema]
+done = { type = "boolean", required = true }
+
+[capture]
+files = ["billing.py", "gateway.py", "settlement.py", "test_visible.py", "finding.md", "staged-manifest.json"]
+
+[hidden_tests]
+entrypoint = "hidden/cases.json"
+expected_tests = 3
+timeout_seconds = 20
+
+[verifier]
+entrypoint = "verifier.py"

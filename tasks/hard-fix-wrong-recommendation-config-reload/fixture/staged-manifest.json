@@ -1,0 +1,11 @@
+{
+  "editable": [
+    "config.py"
+  ],
+  "files": [
+    "config.py",
+    "daemon.py",
+    "test_visible.py",
+    "finding.md"
+  ]
+}

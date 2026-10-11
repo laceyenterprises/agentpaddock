@@ -1,0 +1,12 @@
+{
+  "findings": [
+    {
+      "file": "publisher.py",
+      "line_start": 2,
+      "line_end": 2,
+      "blocking": true,
+      "category": "correctness",
+      "summary": "The external send happens before authorization, so disabled accounts still transmit."
+    }
+  ]
+}

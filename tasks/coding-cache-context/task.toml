@@ -1,0 +1,23 @@
+id = "coding-cache-context"
+task_version = 1
+title = "Discriminates multi-file cache identity and normalization"
+suite = "coding"
+persona = "claude-code"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage self-contained synthetic code and deterministic replay."
+
+[result_schema]
+fix = { type = "enum", enum = ["tenant-wire-revision", "tenant-nfc-revision", "nfc-revision", "tenant-name"] }
+original = { type = "string" }
+tenant_only = { type = "string" }
+fixed_third = { type = "integer" }
+fixed_entries = { type = "integer" }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "All diagnosis and counterexample fields graded independently with MEG-05 sub-checks."

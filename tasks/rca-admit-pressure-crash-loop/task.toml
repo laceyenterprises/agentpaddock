@@ -1,0 +1,43 @@
+# GYM-02 RCA task, seeded from a real incident.
+#
+# Source incident doc: docs/POSTMORTEM-admit-pressure-recovery-2026-05-30.md
+#   (admit-pressure crash-loop wedged the queue.)
+#   Scaffolded via scripts/rca_from_postmortem.py, then filled in.
+#
+# The incident: memory-pressure-refused LRQs stay status=requested and are only
+# re-attempted by the daemon's IN-MEMORY admit pass. The daemon crash-looped, so
+# the admit loop never ran long enough to retry — and there is no PERSISTED
+# backoff/retry state to take over. Even after pressure eased, the queue stayed
+# wedged. The fix persists admit-refusal backoff. The crash loop itself (jetsam
+# SIGKILL) is called out as a SEPARATE bug — so "daemon-oom-jetsam-kill" is the
+# most seductive red herring: it is the trigger, not the wedge.
+
+id = "rca-admit-pressure-crash-loop"
+task_version = 1
+title = "RCA: admit-pressure crash-loop wedged the queue (2026-05-30 SEV1)"
+suite = "rca"
+persona = "claude-code"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage the redacted daemon timeline + retry-contract excerpt."
+
+# Closed set. The true root cause is that the pre-admit retry contract lives only
+# in the in-memory admit loop and is lost on daemon death; the other three are
+# real distractors (blame the thresholds; blame the OOM crashes; blame the 24h
+# retry scheduler).
+[result_schema]
+root_cause = { type = "enum", enum = [
+  "in-memory-only-admit-retry-lost-on-daemon-death",
+  "memory-pressure-thresholds-too-strict",
+  "daemon-oom-jetsam-kill",
+  "worker-retry-scheduler-gap",
+], required = true }
+evidence_id = { type = "string", required = false }
+
+[verifier]
+entrypoint = "verifier.py"
+description = "root_cause == in-memory-only retry lost on death AND evidence cites ev-901 or ev-902 (pressure eased but no retry)."

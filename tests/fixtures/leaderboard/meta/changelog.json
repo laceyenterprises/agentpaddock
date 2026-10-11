@@ -1,0 +1,21 @@
+{
+  "entries": [
+    {
+      "boundary": "Rows before it carry pre-FIXGRADE-01.",
+      "date": "2026-01-01",
+      "excludes": "pre-FIXGRADE-01",
+      "id": "FIXGRADE-01",
+      "kind": "grading",
+      "summary": "Fixture grading fix."
+    },
+    {
+      "boundary": "Version 2 rows form their own board.",
+      "date": "2026-01-02",
+      "excludes": null,
+      "id": "FIXTASK-02",
+      "kind": "task",
+      "summary": "Fixture task bumped to version 2."
+    }
+  ],
+  "schema": "paddock-changelog/v1"
+}

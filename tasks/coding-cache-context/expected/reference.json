@@ -1,0 +1,7 @@
+{
+  "fix": "tenant-nfc-revision",
+  "original": "17,17,17,17",
+  "tenant_only": "17,29,17,17",
+  "fixed_third": 41,
+  "fixed_entries": 3
+}

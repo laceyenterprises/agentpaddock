@@ -1,0 +1,131 @@
+{
+  "marker": "GYM-GROUND-TRUTH-NEVER-STAGE",
+  "defects": [
+    {
+      "file": "jobs.py",
+      "line_start": 111,
+      "line_end": 114,
+      "expected_category": "concurrency"
+    },
+    {
+      "file": "sweeper.py",
+      "line_start": 33,
+      "line_end": 33,
+      "expected_category": "correctness"
+    }
+  ],
+  "tolerated": [],
+  "slack": 3,
+  "max_false_blocking": 1,
+  "clean_control": false,
+  "read_files": [
+    "db.py",
+    "jobs.py",
+    "sweeper.py"
+  ],
+  "decoys": [
+    {
+      "file": "jobs.py",
+      "line_start": 150,
+      "line_end": 157
+    },
+    {
+      "file": "jobs.py",
+      "line_start": 185,
+      "line_end": 186
+    },
+    {
+      "file": "jobs.py",
+      "line_start": 91,
+      "line_end": 93
+    },
+    {
+      "file": "sweeper.py",
+      "line_start": 38,
+      "line_end": 40
+    },
+    {
+      "file": "sweeper.py",
+      "line_start": 43,
+      "line_end": 45
+    },
+    {
+      "file": "sweeper.py",
+      "line_start": 50,
+      "line_end": 55
+    },
+    {
+      "file": "db.py",
+      "line_start": 68,
+      "line_end": 70
+    }
+  ],
+  "max_decoy_blocking": 0,
+  "decoy_claims": [
+    {
+      "file": "jobs.py",
+      "line_start": 151,
+      "line_end": 157,
+      "category": "concurrency",
+      "source": "generic",
+      "summary": "claim selects the oldest queued job and then updates it, so two workers can claim the same job."
+    },
+    {
+      "file": "jobs.py",
+      "line_start": 186,
+      "line_end": 186,
+      "category": "correctness",
+      "source": "generic",
+      "summary": "attempts >= MAX_ATTEMPTS kills the job one attempt early; it should be >."
+    },
+    {
+      "file": "jobs.py",
+      "line_start": 92,
+      "line_end": 92,
+      "category": "correctness",
+      "source": "PR 7516",
+      "summary": "LeaseMixin calls self._one, which LeaseMixin never defines, so holder_of raises AttributeError."
+    },
+    {
+      "file": "sweeper.py",
+      "line_start": 38,
+      "line_end": 38,
+      "category": "error-handling",
+      "source": "PR 7522",
+      "summary": "sqlite3.OperationalError('database is locked') bypasses the BusyError retry."
+    },
+    {
+      "file": "sweeper.py",
+      "line_start": 43,
+      "line_end": 43,
+      "category": "correctness",
+      "source": "PR 7663",
+      "summary": "swept is unbound when every attempt hits BusyError, raising UnboundLocalError."
+    },
+    {
+      "file": "sweeper.py",
+      "line_start": 52,
+      "line_end": 52,
+      "category": "correctness",
+      "source": "PR 7644",
+      "summary": "The read-only connection has no row factory, so row['state'] fails on tuples."
+    },
+    {
+      "file": "db.py",
+      "line_start": 68,
+      "line_end": 68,
+      "category": "error-handling",
+      "source": "generic",
+      "summary": "except BaseException swallows KeyboardInterrupt and SystemExit."
+    }
+  ],
+  "provenance": {
+    "kind": "synthetic",
+    "decoy_sources": [
+      "PR 7516",
+      "PR 7522",
+      "PR 7663",
+      "PR 7644"
+    ]
+  }
+}

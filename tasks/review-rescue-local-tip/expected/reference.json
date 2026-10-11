@@ -1,0 +1,12 @@
+{
+  "findings": [
+    {
+      "file": "provision.sh",
+      "line_start": 57,
+      "line_end": 61,
+      "blocking": true,
+      "category": "data-loss",
+      "summary": "Preferring origin and then running worktree add -B moves an unpushed local branch back to the remote tip."
+    }
+  ]
+}

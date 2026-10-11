@@ -1,0 +1,27 @@
+# HRF-03 fixture: a synthetic hard-fix task with two editable source files and
+# an agent-written regression test. Not part of the shipped corpus (HRF-05 adds
+# the real tasks); lives under tests/fixtures/ so the regression-test runner can
+# be exercised end to end.
+id = "hard-fix-regression-probe"
+task_version = 1
+title = "Synthetic hard-fix regression-test probe"
+suite = "hard-fix"
+persona = "codex"
+
+[result_schema]
+done = { type = "boolean", required = true }
+
+[capture]
+files = ["target.py", "rules.py", "test_regression.py", "staged-manifest.json"]
+
+[hidden_tests]
+entrypoint = "hidden/cases.json"
+expected_tests = 3
+timeout_seconds = 20
+
+[regression_test]
+path = "test_regression.py"
+timeout_seconds = 20
+
+[verifier]
+entrypoint = "verifier.py"

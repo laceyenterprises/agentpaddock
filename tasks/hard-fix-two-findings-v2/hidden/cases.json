@@ -1,0 +1,80 @@
+[
+  {
+    "call": "import limiter\nlim = limiter.Limiter(2, 1000)\nwaits = [lim.allow('a', t) for t in (0, 100, 200, 500, 1000, 1050, 1100)]\nother = lim.allow('b', 1050)\nresult = [waits, other]\n",
+    "expected": {
+      "ok": [
+        [
+          0,
+          0,
+          800,
+          500,
+          0,
+          50,
+          0
+        ],
+        0
+      ]
+    }
+  },
+  {
+    "call": "import headers\nresult = [headers.rejection_headers(wait) for wait in (1, 400, 999, 1000, 1001, 1500, 2000, 59001)]\n",
+    "expected": {
+      "ok": [
+        {
+          "Retry-After": "1"
+        },
+        {
+          "Retry-After": "1"
+        },
+        {
+          "Retry-After": "1"
+        },
+        {
+          "Retry-After": "1"
+        },
+        {
+          "Retry-After": "2"
+        },
+        {
+          "Retry-After": "2"
+        },
+        {
+          "Retry-After": "2"
+        },
+        {
+          "Retry-After": "60"
+        }
+      ]
+    }
+  },
+  {
+    "call": "import limiter, proxy\ndef sdk(lim, client, now_ms):\n    status, headers = proxy.handle(lim, client, now_ms)\n    if status != 429:\n        return [status]\n    after = int(headers['Retry-After'])\n    retry, _ = proxy.handle(lim, client, now_ms + after * 1000)\n    return [status, headers['Retry-After'], retry]\nburst = limiter.Limiter(2, 1000)\nslow = limiter.Limiter(1, 2000)\nresult = [[sdk(burst, 'a', t) for t in (0, 100, 200)], [sdk(slow, 'b', t) for t in (0, 500)]]\n",
+    "expected": {
+      "ok": [
+        [
+          [
+            200
+          ],
+          [
+            200
+          ],
+          [
+            429,
+            "1",
+            200
+          ]
+        ],
+        [
+          [
+            200
+          ],
+          [
+            429,
+            "2",
+            200
+          ]
+        ]
+      ]
+    }
+  }
+]

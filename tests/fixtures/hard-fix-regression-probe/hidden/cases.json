@@ -1,0 +1,20 @@
+[
+  {
+    "call": "import target\nresult=target.dedupe(['a', ' A', 'b'])",
+    "expected": {
+      "ok": ["a", "b"]
+    }
+  },
+  {
+    "call": "import target\nresult=target.dedupe(['x', 'y', 'x'])",
+    "expected": {
+      "ok": ["x", "y"]
+    }
+  },
+  {
+    "call": "import rules\nresult=rules.normalize(' Ab ')",
+    "expected": {
+      "ok": "ab"
+    }
+  }
+]

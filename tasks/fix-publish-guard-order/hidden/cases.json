@@ -1,0 +1,48 @@
+[
+  {
+    "call": "import target\nfrom support import Store\ns=Store(False)\ntry:\n r=target.publish(s,'a','payload'); e=False\nexcept BaseException as exc:\n r=None; e=isinstance(exc,PermissionError)\nresult=[r,e,s.calls]",
+    "expected": {
+      "ok": [
+        null,
+        true,
+        []
+      ]
+    }
+  },
+  {
+    "call": "import target\nfrom support import Store\ns=Store(True)\ntry:\n r=target.publish(s,'a',''); e=None\nexcept BaseException as exc:\n r=None; e=type(exc).__name__\nresult=[r,e,s.calls]\nresult.append([type(call).__name__ for call in s.calls])",
+    "expected": {
+      "ok": [
+        "receipt",
+        null,
+        [
+          [
+            "a",
+            ""
+          ]
+        ],
+        [
+          "tuple"
+        ]
+      ]
+    }
+  },
+  {
+    "call": "import target\nfrom support import Store\ns=Store(True)\ntry:\n r=target.publish(s,'a','payload'); e=None\nexcept BaseException as exc:\n r=None; e=type(exc).__name__\nresult=[r,e,s.calls]\nresult.append([type(call).__name__ for call in s.calls])",
+    "expected": {
+      "ok": [
+        "receipt",
+        null,
+        [
+          [
+            "a",
+            "payload"
+          ]
+        ],
+        [
+          "tuple"
+        ]
+      ]
+    }
+  }
+]

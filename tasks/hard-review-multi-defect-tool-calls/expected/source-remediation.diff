@@ -1,0 +1,105 @@
+diff --git a/server_supervisor.py b/server_supervisor.py
+--- a/server_supervisor.py
++++ b/server_supervisor.py
+@@ -159,6 +159,14 @@ class ServerSupervisor:
+             payload, ceiling=self.config.max_generation_tokens
+         )
+         if payload.get("stream"):
++            if payload.get("tools") and payload.get("tool_choice", "auto") not in ("auto", "none"):
++                # Streamed tool-call deltas do not exist yet. A plain text stream would
++                # report success without the tool call the request demanded, so refuse.
++                raise SupervisorError(
++                    "streaming responses cannot honour a required or named tool_choice yet",
++                    status=400,
++                    kind="TOOL_CHOICE_UNSUPPORTED",
++                )
+             return await self._handle_chat_stream(request, payload, require_auth=require_auth)
+         async with self._requested_model_inference(payload, surface="chat") as meter:
+             response = await self._run_generation_with_timeout(
+diff --git a/tool_calls.py b/tool_calls.py
+--- a/tool_calls.py
++++ b/tool_calls.py
+@@ -9,6 +9,7 @@ import uuid
+ from typing import Any
+ 
+ from .chat_shapes import chat_completion_response
++from .errors import SupervisorError
+ 
+ LOGGER = logging.getLogger(__name__)
+ 
+@@ -42,3 +43,30 @@ def normalize_history(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
++def offered_names(tools: list[dict[str, Any]]) -> set[str]:
++    """Function names the request offered; the installed parser never checks them."""
++    return {
++        tool["function"]["name"]
++        for tool in tools
++        if isinstance(tool, dict) and isinstance(tool.get("function"), dict)
++    }
++
++
++def resolve_tool_choice(
++    payload: dict[str, Any], tools: list[dict[str, Any]]
++) -> tuple[str, str | None]:
++    """Keep selection mode separate from the requested function name."""
++    choice = payload.get("tool_choice", "auto")
++    if choice in ("none", "auto", "required"):
++        return choice, None
++    if isinstance(choice, dict) and choice.get("type") == "function":
++        name = (choice.get("function") or {}).get("name")
++        if isinstance(name, str) and name in offered_names(tools):
++            return "named", name
++    raise SupervisorError(
++        "tool_choice must be none, auto, required or an offered function",
++        status=400,
++        kind="INVALID_REQUEST",
++    )
++
++
+ def parse_tool_text(
+     text: str, tokenizer: Any, tools: list[dict[str, Any]]
+ ) -> tuple[str, list[dict[str, Any]]]:
+@@ -59,6 +87,10 @@ def parse_tool_text(
+             for call in parsed if isinstance(parsed, list) else [parsed]:
+                 if not isinstance(call, dict) or not isinstance(call.get("name"), str):
+                     return text, []
++                if call["name"] not in offered_names(tools):
++                    # Never hand back a call to a function this request did not offer.
++                    LOGGER.warning("tool-call-unoffered name=%s", call["name"])
++                    return text, []
+                 arguments = call.get("arguments")
+                 if isinstance(arguments, str):
+                     arguments = json.loads(arguments)
+@@ -112,8 +144,16 @@ async def chat_completion_with_tools(
+         and getattr(tokenizer, "tool_call_start", None)
+         and getattr(tokenizer, "tool_call_end", None)
+     )
++    mode, selected_name = resolve_tool_choice(payload, tools)
++    demands_call = mode in ("required", "named")
++    if demands_call and not supported:
++        raise SupervisorError(
++            "this model has no tool calling, so a required tool_choice cannot be met",
++            status=400,
++            kind="TOOL_CHOICE_UNSUPPORTED",
++        )
+     loop = asyncio.get_running_loop()
+-    if not supported or payload.get("tool_choice") == "none":
++    if not supported or mode == "none":
+         if not supported:
+             LOGGER.warning(
+                 "tools-ignored model=%s tool_count=%d",
+@@ -131,6 +171,15 @@ async def chat_completion_with_tools(
+         backend._inference_executor, _generate_with_tools, backend, messages, tools, max_tokens
+     )
+     content, calls = parse_tool_text(text, tokenizer, tools)
++    if mode == "named":
++        calls = [call for call in calls if call["function"]["name"] == selected_name]
++    if demands_call and not calls:
++        # Completing normally here would hide that the demanded tool step never happened.
++        raise SupervisorError(
++            "the model answered without the tool call that tool_choice requires",
++            status=502,
++            kind="TOOL_CHOICE_VIOLATED",
++        )
+     response = chat_completion_response(backend.current_model_name or "unknown", text)
+     choice = response["choices"][0]
+     if calls:

@@ -1,0 +1,117 @@
+{
+  "currency": "USD",
+  "date": "2026-10-10",
+  "models": {
+    "anthropic/claude-haiku-4-5": {
+      "as_of": "2026-09-29",
+      "cache": 0.1,
+      "input": 1.0,
+      "note": null,
+      "output": 5.0,
+      "reference": "https://docs.anthropic.com/en/docs/about-claude/pricing",
+      "source": "published-rate"
+    },
+    "anthropic/claude-opus-5-5": {
+      "as_of": "2026-09-29",
+      "cache": 0.2,
+      "input": 4.0,
+      "note": null,
+      "output": 20.0,
+      "reference": "https://docs.anthropic.com/en/docs/about-claude/pricing",
+      "source": "published-rate"
+    },
+    "anthropic/claude-sonnet-5": {
+      "as_of": "2026-09-29",
+      "cache": 0.2,
+      "input": 2.0,
+      "note": null,
+      "output": 10.0,
+      "reference": "https://docs.anthropic.com/en/docs/about-claude/pricing",
+      "source": "published-rate"
+    },
+    "baseten/glm-5.3-flash": {
+      "as_of": "2026-09-20",
+      "cache": 0.03,
+      "input": 0.15,
+      "note": null,
+      "output": 0.5,
+      "reference": "Baseten /v1/models pricing for zai-org/GLM-5.3-Flash",
+      "source": "published-rate"
+    },
+    "fireworks/kimi-k3": {
+      "as_of": "2026-09-26",
+      "cache": 0.3,
+      "input": 3.0,
+      "note": null,
+      "output": 15.0,
+      "reference": "https://fireworks.ai/models/fireworks/kimi-k3",
+      "source": "published-rate"
+    },
+    "fireworks/qwen3.8-27b": {
+      "as_of": "2026-10-05",
+      "cache": null,
+      "input": null,
+      "note": "A dedicated deployment bills per GPU-hour, not per token, so no per-token price exists.",
+      "output": null,
+      "reference": "Fireworks dedicated BF16 deployment",
+      "source": "unknown"
+    },
+    "fireworks/qwen3.8-max": {
+      "as_of": "2026-09-28",
+      "cache": 0.25,
+      "input": 2.0,
+      "note": "Fireworks bills cached input at the cached rate; a proxy that billed it at the full input rate overstated cost about 3x (LITELLMPRICE-01).",
+      "output": 6.0,
+      "reference": "https://fireworks.ai/models/fireworks/qwen3p8-max",
+      "source": "published-rate"
+    },
+    "local/qwen3-coder-next-80b-a3b-6bit": {
+      "as_of": "2026-09-30",
+      "cache": null,
+      "input": null,
+      "note": "Self-hosted: no per-token price. Hardware and power cost are not measured.",
+      "output": null,
+      "reference": "Self-hosted on local hardware",
+      "source": "unknown"
+    },
+    "moonshot/kimi-k3": {
+      "as_of": "2026-09-21",
+      "cache": 0.3,
+      "input": 3.0,
+      "note": null,
+      "output": 15.0,
+      "reference": "Moonshot first-party published rate for Kimi K3",
+      "source": "published-rate"
+    },
+    "openai/gpt-6.1-sol": {
+      "as_of": "2026-09-29",
+      "cache": 0.1,
+      "input": 2.0,
+      "note": "Short-context rate; long-context pricing above 272K prompt tokens is not modelled.",
+      "output": 10.0,
+      "reference": "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+      "source": "published-rate"
+    },
+    "together/deepseek-v4.1-flash": {
+      "as_of": "2026-09-20",
+      "cache": 0.3,
+      "input": 0.3,
+      "note": "Together discloses no cached-input rate, so cache reads are priced at the input rate.",
+      "output": 1.2,
+      "reference": "Together /v1/models pricing for deepseek-ai/DeepSeek-V4.1-Flash",
+      "source": "published-rate"
+    },
+    "zai/glm-5.2": {
+      "as_of": "2026-10-10",
+      "cache": 0.26,
+      "input": 1.4,
+      "note": "Published rates, not yet reconciled against a Z.ai invoice. An earlier reading that Z.ai bills cache reads at the input rate was retracted (ZAIPRICE-02).",
+      "output": 4.4,
+      "reference": "https://docs.z.ai/guides/overview/pricing",
+      "source": "published-rate"
+    }
+  },
+  "note": "Per-token rates in USD per million tokens: input is fresh (uncached) input, cache is cache-read input, output includes reasoning tokens. Cache writes count as input at the input rate, so a provider's cache-write premium (Anthropic: 1.25x for 5-minute writes) is not included. A model absent from this table, or with source unknown, is priced unknown, never zero. Rates are what an API customer would pay; a run on a subscription plan is still priced at these API-equivalent rates. Proxy or gateway cost estimates are never a source.",
+  "schema": "paddock-price-table/v1",
+  "unit": "usd_per_million_tokens"
+}

@@ -1,0 +1,13 @@
+- **The second credential in an alert reaches the pager**
+  - **File:** `redact.py`
+  - **Lines:** `redact` (~1-8)
+  - **Problem:** `redact` passes `count=1` to `SECRET.sub`, so only the first matching token is replaced. A deploy alert that quoted both a `ghp-` token and an `sk-` key paged the on-call rotation with the second key in clear text.
+  - **Why it matters:** Pages are stored by the paging vendor and mirrored to phones; a leaked key there has to be rotated.
+  - **Recommended fix:** Replace every match, as the docstring says.
+
+- **Pages over the gateway's byte cap are rejected**
+  - **File:** `pager.py`
+  - **Lines:** `truncate` (~6-15)
+  - **Problem:** `truncate` measures characters, but the gateway's cap is in UTF-8 bytes, and the ellipsis it appends is three bytes on its own. A 160-character alert, or a shorter one with non-ASCII text, comes out over the cap and the gateway drops the page.
+  - **Why it matters:** A dropped page is a silent missed alert.
+  - **Recommended fix:** Measure and cut in UTF-8 bytes, as the docstring says, without splitting a character.

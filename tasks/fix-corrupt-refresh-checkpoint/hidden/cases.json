@@ -1,0 +1,115 @@
+[
+  {
+    "call": "import target, tempfile, logging\nfrom pathlib import Path\nrecords=[]\nclass RecordHandler(logging.Handler):\n def emit(self, record):\n  records.append(record.levelno)\nhandler=RecordHandler(logging.ERROR)\nlogging.getLogger().handlers=[handler]\nlogging.getLogger().setLevel(logging.ERROR)\nresult=[]\nfor data in [b'{']:\n with tempfile.TemporaryDirectory() as directory:\n  root=Path(directory); (root/'files').mkdir()\n  (root/'files/bad.json').write_bytes(data)\n  (root/'identities.json').write_text('{')\n  records.clear()\n  loaded=target.load(root)\n  reloaded=target.load(root)\n  result.append([type(loaded).__name__,type(reloaded).__name__,loaded,len(records),len(list(root.rglob('*.corrupt-*'))),reloaded])\n",
+    "expected": {
+      "ok": [
+        [
+          "tuple",
+          "tuple",
+          [
+            {},
+            {}
+          ],
+          2,
+          2,
+          [
+            {},
+            {}
+          ]
+        ]
+      ]
+    }
+  },
+  {
+    "call": "import target, tempfile, logging\nfrom pathlib import Path\nrecords=[]\nclass RecordHandler(logging.Handler):\n def emit(self, record):\n  records.append(record.levelno)\nhandler=RecordHandler(logging.ERROR)\nlogging.getLogger().handlers=[handler]\nlogging.getLogger().setLevel(logging.ERROR)\nresult=[]\nfor data in [b'[]',b'{\"version\":1}',b'{\"version\":2,\"path_key\":\"x\"}',b'\\xff']:\n with tempfile.TemporaryDirectory() as directory:\n  root=Path(directory); (root/'files').mkdir()\n  (root/'files/bad.json').write_bytes(data)\n  (root/'identities.json').write_text('[]')\n  records.clear()\n  loaded=target.load(root)\n  reloaded=target.load(root)\n  result.append([type(loaded).__name__,type(reloaded).__name__,loaded,len(records),len(list(root.rglob('*.corrupt-*'))),reloaded])\n",
+    "expected": {
+      "ok": [
+        [
+          "tuple",
+          "tuple",
+          [
+            {},
+            {}
+          ],
+          2,
+          2,
+          [
+            {},
+            {}
+          ]
+        ],
+        [
+          "tuple",
+          "tuple",
+          [
+            {},
+            {}
+          ],
+          2,
+          2,
+          [
+            {},
+            {}
+          ]
+        ],
+        [
+          "tuple",
+          "tuple",
+          [
+            {},
+            {}
+          ],
+          2,
+          2,
+          [
+            {},
+            {}
+          ]
+        ],
+        [
+          "tuple",
+          "tuple",
+          [
+            {},
+            {}
+          ],
+          2,
+          2,
+          [
+            {},
+            {}
+          ]
+        ]
+      ]
+    }
+  },
+  {
+    "call": "import target, tempfile, logging\nfrom pathlib import Path\nrecords=[]\nclass RecordHandler(logging.Handler):\n def emit(self, record):\n  records.append(record.levelno)\nhandler=RecordHandler(logging.ERROR)\nlogging.getLogger().handlers=[handler]\nlogging.getLogger().setLevel(logging.ERROR)\nimport errno\nfrom unittest.mock import patch\nwith tempfile.TemporaryDirectory() as directory:\n root=Path(directory); (root/'files').mkdir()\n (root/'files/good.json').write_text('{\"version\":2,\"path_key\":\"source\",\"checkpoint\":{\"offset\":9}}')\n (root/'identities.json').write_text('{\"source\":\"owner\"}')\n loaded=target.load(root)\n result=[[type(loaded).__name__,loaded]]\n for code in (errno.EACCES,errno.EIO):\n  with patch.object(Path,'read_text',side_effect=OSError(code,'read failed')), patch.object(Path,'rename') as rename:\n   try:\n    target.load(root); observed=None\n   except OSError as exc:\n    observed=exc.errno\n   result.append([observed,rename.call_count])\n result.append(len(list(root.rglob('*.corrupt-*'))))\n",
+    "expected": {
+      "ok": [
+        [
+          "tuple",
+          [
+            {
+              "source": {
+                "offset": 9
+              }
+            },
+            {
+              "source": "owner"
+            }
+          ]
+        ],
+        [
+          13,
+          0
+        ],
+        [
+          5,
+          0
+        ],
+        0
+      ]
+    }
+  }
+]

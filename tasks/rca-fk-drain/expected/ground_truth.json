@@ -1,0 +1,16 @@
+{
+  "root_cause": "polymorphic-source-column-fk-mismatch",
+  "evidence_id": "ev-703",
+  "red_herrings": [
+    "adapter-runtime-id-uniqueness-violation — the retarget-the-FK theory; rejected because adapter_runtime_id is a non-unique family id (ev-705).",
+    "dual-write-replay-queue-overflow — the replay backlog (ev-702) is the amplifier/symptom, not the root; a circuit breaker is follow-up work.",
+    "daemon-cpu-thrash — the 98% CPU (ev-701) is a downstream effect of the retry hot loop."
+  ],
+  "source_doc": "docs/SPEC-session-ledger-fk-recovery-2026-06-04.md",
+  "__ground_truth_marker__": "GYM-GROUND-TRUTH-NEVER-STAGE",
+  "note": "Ground truth. NEVER staged to the agent and NEVER reachable from the out-of-band verifier env. verifier.py hardcodes these constants and is what actually grades; this file documents the answer for maintainers.",
+  "accepted_evidence_ids": [
+    "ev-703",
+    "ev-704"
+  ]
+}
