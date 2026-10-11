@@ -3,6 +3,15 @@
 import pytest
 
 
+def checkout_root(module_root):
+    """Use the host root only in a modules/<package> checkout with a platform."""
+    if module_root.parent.name == "modules":
+        host_root = module_root.parent.parent
+        if (host_root / "platform").is_dir():
+            return host_root
+    return module_root
+
+
 def require_docker_backend():
     """Socket absence skips explicitly; a reachable but unusable engine fails."""
     import shutil
@@ -17,13 +26,17 @@ def require_docker_backend():
 
     docker = shutil.which("docker")
     if not docker:
-        unavailable("Docker executable unavailable; host real-engine validation required")
+        unavailable(
+            "Docker executable unavailable; host real-engine validation required"
+        )
     try:
         probe = subprocess.run([docker, "info"], capture_output=True, timeout=15)
     except (OSError, subprocess.TimeoutExpired) as exc:
         unavailable(f"Docker socket unavailable: {exc}; host validation required")
     if probe.returncode:
-        unavailable("Docker socket unavailable: " + probe.stderr.decode(errors="replace")[-500:])
+        unavailable(
+            "Docker socket unavailable: " + probe.stderr.decode(errors="replace")[-500:]
+        )
 
 
 #: Set by `ci / fast`: Actions never runs Docker containment (SPEC R1).

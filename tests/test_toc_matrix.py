@@ -1354,19 +1354,29 @@ def test_required_large_output_commands_schema_rejects_invalid_labels(
     from gym.schema import TaskSchemaError, parse_task_dict
 
     monkeypatch.setattr(
-        host_services.current(),
+        host_services.StandaloneServices,
         "large_output_commands",
-        lambda: frozenset({"git", "pytest"}),
+        lambda self: frozenset({"git", "pytest"}),
     )
-    with pytest.raises(TaskSchemaError, match="required_large_output_commands"):
-        parse_task_dict(
-            {
-                "id": "test",
-                "result_schema": {"status": {"type": "string"}},
-                "verifier": {"entrypoint": "verifier.py"},
-                "required_large_output_commands": commands,
-            }
-        )
+    # Select standalone services even when the suite is running in the host.
+    monkeypatch.setattr(host_services, "_installed", None)
+    monkeypatch.setattr(
+        host_services,
+        "resolve",
+        lambda: host_services.StandaloneServices(env={}, config={}),
+    )
+    task = {
+        "id": "test",
+        "result_schema": {"status": {"type": "string"}},
+        "verifier": {"entrypoint": "verifier.py"},
+        "required_large_output_commands": ["git", "pytest"],
+    }
+    assert parse_task_dict(task).required_large_output_commands == ("git", "pytest")
+    with pytest.raises(
+        TaskSchemaError,
+        match="^required_large_output_commands must be a nonempty array of distinct TOC command labels$",
+    ):
+        parse_task_dict({**task, "required_large_output_commands": commands})
 
 
 @pytest.mark.parametrize("task", ["../escape", "coding-toc-large-output"])

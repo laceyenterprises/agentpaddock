@@ -19,13 +19,31 @@ if str(_LIB_PYTHON) not in sys.path:
 _TESTS_DIR = Path(__file__).resolve().parent
 if str(_TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(_TESTS_DIR))
-from gym_test_support import NO_DOCKER_ENV, hide_docker, require_docker_backend  # noqa: E402
+from gym_test_support import (  # noqa: E402
+    NO_DOCKER_ENV,
+    checkout_root,
+    hide_docker,
+    require_docker_backend,
+)
 
 MODULE_ROOT = Path(__file__).resolve().parents[1]
 TASKS_DIR = MODULE_ROOT / "tasks"
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 SCRIPTS_DIR = MODULE_ROOT / "scripts"
-REPO_ROOT = MODULE_ROOT
+REPO_ROOT = checkout_root(MODULE_ROOT)
+
+# Host dependencies belong to the surrounding checkout, never arbitrary ancestors.
+if REPO_ROOT != MODULE_ROOT:
+    for relative in (
+        "modules/worker-pool/lib/python",
+        "platform/agent-os-config/src",
+        "platform/session-ledger/src",
+        "platform",
+        "tools/searchlight/lib/python",
+    ):
+        path = REPO_ROOT / relative
+        if path.is_dir() and str(path) not in sys.path:
+            sys.path.insert(0, str(path))
 
 # Make the scaffolding generator (scripts/rca_from_postmortem.py) importable by
 # the GYM-02 generator tests without an install.

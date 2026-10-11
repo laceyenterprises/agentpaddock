@@ -23,9 +23,10 @@ from cwp_dispatch.activation_contract import (
 from gym.grader import GraderError
 from gym.hidden_tests import require_fix_activation
 from gym.suite import discover_tasks
+from gym_test_support import checkout_root
 
 MODULE = Path(__file__).resolve().parents[1]
-ACTIVATION = MODULE / "projects/gym-review-fix-docs/activation"
+ACTIVATION = checkout_root(MODULE) / "projects/gym-review-fix-docs/activation"
 DOCUMENT = yaml.safe_load((ACTIVATION / "rfd.yaml").read_text())
 ASSERTIONS = parse_activation_yaml_document(
     DOCUMENT,

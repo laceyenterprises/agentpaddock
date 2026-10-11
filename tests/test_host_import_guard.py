@@ -14,11 +14,12 @@ import ast
 from pathlib import Path
 
 import pytest
+from gym_test_support import checkout_root
 
 MODULE_ROOT = Path(__file__).resolve().parents[1]
 GYM_DIR = MODULE_ROOT / "lib" / "python" / "gym"
 SCRIPTS_DIR = MODULE_ROOT / "scripts"
-REPO_ROOT = MODULE_ROOT
+REPO_ROOT = checkout_root(MODULE_ROOT)
 
 #: The host plugin: fleet runner and Agent OS host services. These drive the
 #: worker pool and the session ledger, and leave the gym with the plugin.
@@ -202,6 +203,29 @@ def test_known_packages_are_discovered_in_an_agent_os_checkout():
     } <= discovered
     assert "gym" not in discovered
     assert "sew" not in discovered  # Searchlight is its own repo, not Agent OS.
+
+
+@pytest.mark.parametrize("integrated", [False, True])
+def test_checkout_root_finds_host_inputs_only_in_modules_layout(tmp_path, integrated):
+    # The same host inputs above a standalone clone must not change its root.
+    (tmp_path / "platform").mkdir()
+    reports = tmp_path / "docs/reports"
+    reports.mkdir(parents=True)
+    activation = tmp_path / "projects/example/activation"
+    activation.mkdir(parents=True)
+    module_root = tmp_path / ("modules/gym" if integrated else "clones/gym")
+    module_root.mkdir(parents=True)
+    root = checkout_root(module_root)
+    assert root == (tmp_path if integrated else module_root)
+    assert (root / "platform").is_dir() == integrated
+    assert (root / "docs/reports").is_dir() == integrated
+    assert (root / "projects/example/activation").is_dir() == integrated
+
+
+def test_checkout_root_requires_host_platform(tmp_path):
+    module_root = tmp_path / "modules/gym"
+    module_root.mkdir(parents=True)
+    assert checkout_root(module_root) == module_root
 
 
 @pytest.mark.parametrize("path", shipped_files(), ids=lambda path: path.name)

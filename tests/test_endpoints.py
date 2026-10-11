@@ -235,14 +235,11 @@ def test_http_requests_no_api_key_literal(monkeypatch):
 
 
 def test_ojo_reaper_registration():
+    from gym_test_support import checkout_root
+
     test_file = Path(__file__).resolve()
     relative_manifest = Path("platform/os-job-orchestrator/manifest.d/prod.ojo.json")
-    manifest = test_file.parents[1] / relative_manifest
-    # Agent OS ships the manifest at the host root, above modules/<gym>/tests.
-    if len(test_file.parents) >= 4:
-        host_manifest = test_file.parents[3] / relative_manifest
-        if host_manifest.is_file():
-            manifest = host_manifest
+    manifest = checkout_root(test_file.parents[1]) / relative_manifest
     if not manifest.is_file():
         pytest.skip("host reaper manifest is not shipped")
     jobs = json.loads(manifest.read_text())["jobs"]
@@ -276,6 +273,17 @@ def test_ojo_reaper_registration_checkout_layout(tmp_path, monkeypatch, layout):
     job["schedule"]["everyMs"] = 30001
     manifest.write_text(json.dumps({"jobs": [job]}))
     with pytest.raises(AssertionError):
+        test_ojo_reaper_registration()
+
+
+def test_ojo_reaper_registration_ignores_unrelated_ancestor(tmp_path, monkeypatch):
+    test_file = tmp_path / "clones/paddock/tests/test_endpoints.py"
+    monkeypatch.setitem(globals(), "__file__", str(test_file))
+    manifest = tmp_path / "platform/os-job-orchestrator/manifest.d/prod.ojo.json"
+    manifest.parent.mkdir(parents=True)
+    # An unrelated ancestor's manifest must never be read, even if malformed.
+    manifest.write_text("invalid JSON")
+    with pytest.raises(pytest.skip.Exception, match="host reaper manifest"):
         test_ojo_reaper_registration()
 
 

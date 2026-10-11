@@ -9,10 +9,11 @@ from pathlib import Path
 import import_eval_bench
 import leaderboard as lb
 import pytest
+from gym_test_support import checkout_root
 
 MODULE_ROOT = Path(__file__).resolve().parents[1]
 # Source reports are optional inputs, absent from the standalone distribution.
-REPORTS = MODULE_ROOT / "docs" / "reports"
+REPORTS = checkout_root(MODULE_ROOT) / "docs" / "reports"
 needs_reports = pytest.mark.skipif(
     not all((REPORTS / name).is_file() for name, _ in import_eval_bench.SOURCES),
     reason="the eval-bench source reports are not in this checkout",

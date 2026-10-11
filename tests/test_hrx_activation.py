@@ -20,9 +20,10 @@ from cwp_dispatch.activation_contract import (
     validate_schema_runtime_contract,
 )
 from gym.suite import discover_tasks
+from gym_test_support import checkout_root
 
 MODULE = Path(__file__).resolve().parents[1]
-REPO = MODULE
+REPO = checkout_root(MODULE)
 ACTIVATION = REPO / "projects/gym-hard-review-fix-rework/activation"
 SPEC_REF = json.loads((ACTIVATION.parent / "plan.json").read_text())["specRef"]
 DOCUMENT = yaml.safe_load((ACTIVATION / "hrx.yaml").read_text())
