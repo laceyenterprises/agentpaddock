@@ -4,7 +4,7 @@
     "**": [
       {
         "name": "whitespace lint",
-        "command": "git diff --check origin/main...HEAD",
+        "command": "git diff --check origin/main...HEAD --",
         "tier": "fast"
       }
     ]
