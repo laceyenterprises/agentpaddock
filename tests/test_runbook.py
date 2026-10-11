@@ -7,9 +7,15 @@ a future edit can't silently drop one.
 
 from __future__ import annotations
 
+import pytest
+
 from conftest import REPO_ROOT
 
 RUNBOOK = REPO_ROOT / "docs" / "runbooks" / "RUNBOOK-adversarial-eval-gym.md"
+
+pytestmark = pytest.mark.skipif(
+    not RUNBOOK.is_file(), reason="host runbook is not shipped"
+)
 
 # The six mandated topics (SPEC §3 GYM-05), each a section heading in the runbook.
 _REQUIRED_SECTIONS = [

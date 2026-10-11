@@ -8,6 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
+pytest.importorskip("gym.dispatch", reason="host integration is not shipped")
+
 from gym.cli import build_parser
 from gym.dispatch import WorkerPoolTrajectorySource
 from gym.grader import Trajectory, grade

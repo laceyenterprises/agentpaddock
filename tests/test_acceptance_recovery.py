@@ -8,6 +8,10 @@ from unittest.mock import Mock
 
 import pytest
 
+pytest.importorskip("gym.acceptance_recovery", reason="host integration is not shipped")
+pytest.importorskip("gym.matrix", reason="host integration is not shipped")
+pytest.importorskip("gym.ledger", reason="host integration is not shipped")
+
 from gym import acceptance_recovery as recovery, matrix
 from gym.ledger import LedgerReader
 from test_matrix import prepare, result

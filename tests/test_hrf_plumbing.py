@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("gym.dispatch", reason="host integration is not shipped")
+
 from gym import cli, fix_audit, grader, outcomes
 from gym.dispatch import WorkerPoolTrajectorySource
 from gym.grader import GraderError, Trajectory

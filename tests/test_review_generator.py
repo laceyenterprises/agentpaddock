@@ -13,11 +13,15 @@ REPO = "example-org/example-repo"
 
 @pytest.fixture
 def recorded_gh(monkeypatch):
-    data = json.loads((Path(__file__).parent / "fixtures/review-generator/gh.json").read_text())
+    data = json.loads(
+        (Path(__file__).parent / "fixtures/review-generator/gh.json").read_text()
+    )
     calls = []
 
     def gh_json(endpoint, *, paginate=False):
-        calls.append(["gh", "api", endpoint, *(["--paginate", "--slurp"] if paginate else [])])
+        calls.append(
+            ["gh", "api", endpoint, *(["--paginate", "--slurp"] if paginate else [])]
+        )
         result = data[endpoint]
         return [item for page in result for item in page] if paginate else result
 
@@ -29,7 +33,11 @@ def test_generator_recorded_gh_no_network(tmp_path, recorded_gh):
     source = gen.fetch(123, REPO)
     paths = gen.scaffold(source, tmp_path)
     assert len(source["later_commits"]) == 1
-    assert all("--paginate" in c for c in recorded_gh[1] if c[2].endswith(("reviews", "commits")))
+    assert all(
+        "--paginate" in c
+        for c in recorded_gh[1]
+        if c[2].endswith(("reviews", "commits"))
+    )
     for directory in paths:
         task = load_task(directory)
         gt = json.loads((directory / "expected/ground_truth.json").read_text())
@@ -38,7 +46,10 @@ def test_generator_recorded_gh_no_network(tmp_path, recorded_gh):
             "status": "unverified",
             "value": "src/follow-up-merge-agent.mjs",
         }
-        assert gt["findings"][0]["expected_category"] == {"status": "unverified", "value": "auth"}
+        assert gt["findings"][0]["expected_category"] == {
+            "status": "unverified",
+            "value": "auth",
+        }
         assert all(
             value["status"] == "unverified"
             for key, value in gt["findings"][0].items()
@@ -53,7 +64,9 @@ def test_generator_recorded_gh_no_network(tmp_path, recorded_gh):
         else:
             assert not manifest.exists()
         result = {"findings": []} if task.suite == "review" else {"summary": "fixed"}
-        cell = grade(task, Trajectory(terminal_status="succeeded", submitted_result=result))
+        cell = grade(
+            task, Trajectory(terminal_status="succeeded", submitted_result=result)
+        )
         assert cell.outcome == outcomes.FAILED
         assert "SCAFFOLD" in cell.reason
         assert "expected/" not in (directory / "prompt.md").read_text()
@@ -191,11 +204,11 @@ def test_malformed_submission_grades_failed(tmp_path, changes, clean_control):
 
 
 def test_recorded_body_uses_canonical_review_fixture(recorded_gh):
-    original = (
-        Path(__file__).resolve().parents[3]
-        / "projects/merge-agent-rescue/fixtures/review-bodies/request-changes-with-blockers-auth.md"
-    )
     source = gen.fetch(123, REPO)
+    original = (
+        Path(__file__).parent
+        / "fixtures/review-generator/request-changes-with-blockers-auth.txt"
+    )
     assert source["review"]["body"] == original.read_text()
     assert len(gen.parse_findings(source["review"]["body"])) == 1
 
@@ -237,7 +250,9 @@ def test_history_warnings_in_fixture_and_provenance(recorded_gh, tmp_path, case)
         commits[1][0]["parents"].append({"sha": "upstream"})
         expected = "merge commits"
     elif case == "commits_cap":
-        commits[1].extend({"sha": f"extra-{i}", "parents": [{"sha": "parent"}]} for i in range(248))
+        commits[1].extend(
+            {"sha": f"extra-{i}", "parents": [{"sha": "parent"}]} for i in range(248)
+        )
         data[root + "/compare/" + "b" * 40 + "...extra-247"] = data[
             root + "/compare/" + "b" * 40 + "..." + "c" * 40
         ]
@@ -258,7 +273,9 @@ def test_history_warnings_in_fixture_and_provenance(recorded_gh, tmp_path, case)
 
 def test_default_output_is_outside_discovered_tasks(recorded_gh, tmp_path, monkeypatch):
     # Relocate the module so CLI default writes only to a disposable directory.
-    monkeypatch.setattr(gen, "__file__", str(tmp_path / "scripts/review_task_from_pr.py"))
+    monkeypatch.setattr(
+        gen, "__file__", str(tmp_path / "scripts/review_task_from_pr.py")
+    )
     assert gen.main(["--repo", REPO, "--pr", "123"]) == 0
     assert (tmp_path / "draft-tasks/review-pr-123/task.toml").exists()
     assert (tmp_path / "draft-tasks/fix-pr-123/task.toml").exists()
@@ -267,13 +284,14 @@ def test_default_output_is_outside_discovered_tasks(recorded_gh, tmp_path, monke
 
 def test_none_with_trailing_prose_is_not_a_finding():
     fixture = (
-        Path(__file__).resolve().parents[3]
-        / "projects/merge-agent-rescue/fixtures/review-bodies/none-with-trailing-prose.md"
+        Path(__file__).parent / "fixtures/review-generator/none-with-trailing-prose.txt"
     )
     assert gen.parse_findings(fixture.read_text()) == []
 
 
-def test_failed_scaffold_cleans_only_its_own_directories(recorded_gh, tmp_path, monkeypatch):
+def test_failed_scaffold_cleans_only_its_own_directories(
+    recorded_gh, tmp_path, monkeypatch
+):
     source = gen.fetch(123, REPO)
     original = Path.write_text
     sentinel = tmp_path / "unrelated.txt"
@@ -294,7 +312,9 @@ def test_failed_scaffold_cleans_only_its_own_directories(recorded_gh, tmp_path, 
     assert len(gen.scaffold(source, tmp_path)) == 2
 
 
-@pytest.mark.parametrize("stderr,expected_attempts", [("HTTP 503", 3), ("permission denied", 1)])
+@pytest.mark.parametrize(
+    "stderr,expected_attempts", [("HTTP 503", 3), ("permission denied", 1)]
+)
 def test_gh_errors_are_bounded_and_classified(monkeypatch, stderr, expected_attempts):
     calls, delays = [], []
 

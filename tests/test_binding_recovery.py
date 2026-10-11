@@ -6,6 +6,9 @@ from copy import deepcopy
 
 import pytest
 
+pytest.importorskip("gym.matrix", reason="host integration is not shipped")
+pytest.importorskip("gym.matrix_report", reason="host integration is not shipped")
+
 from gym import binding_recovery as recovery, matrix, matrix_report
 from test_matrix import prepare, result, resume
 

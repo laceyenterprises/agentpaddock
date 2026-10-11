@@ -9,6 +9,9 @@ from unittest.mock import patch
 
 import pytest
 
+pytest.importorskip("gym.matrix", reason="host integration is not shipped")
+pytest.importorskip("gym.matrix_report", reason="host integration is not shipped")
+
 from gym import binding_recovery, budget_amendment as amendment, matrix
 from test_binding_recovery import quarantine, stopped_aliases
 from test_matrix import resume

@@ -7,6 +7,11 @@ from copy import deepcopy
 
 import pytest
 
+pytest.importorskip("gym.matrix", reason="host integration is not shipped")
+pytest.importorskip("gym.matrix_report", reason="host integration is not shipped")
+pytest.importorskip("sew.report", reason="host integration is not shipped")
+pytest.importorskip("sew.bakeoff_report", reason="host integration is not shipped")
+
 from gym import matrix, matrix_report as report
 from sew.report import _wilson_ci
 from sew.bakeoff_report import newcombe_interval

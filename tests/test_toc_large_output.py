@@ -9,6 +9,8 @@ from types import SimpleNamespace
 
 import pytest
 
+pytest.importorskip("gym.toc_eval", reason="host integration is not shipped")
+
 from gym import grader, outcomes, toc_eval
 from gym.schema import TaskSchemaError, load_task
 from test_coding_corpus import _toc_trajectory

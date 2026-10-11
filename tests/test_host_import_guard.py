@@ -14,12 +14,12 @@ import ast
 from pathlib import Path
 
 import pytest
+from gym_test_support import checkout_root
 
 MODULE_ROOT = Path(__file__).resolve().parents[1]
 GYM_DIR = MODULE_ROOT / "lib" / "python" / "gym"
 SCRIPTS_DIR = MODULE_ROOT / "scripts"
-# modules/adversarial-eval-gym -> modules -> repo root (absent once extracted).
-REPO_ROOT = MODULE_ROOT.parents[1]
+REPO_ROOT = checkout_root(MODULE_ROOT)
 
 #: The host plugin: fleet runner and Agent OS host services. These drive the
 #: worker pool and the session ledger, and leave the gym with the plugin.
@@ -96,9 +96,13 @@ def forbidden_paths() -> frozenset[str]:
         if source != "platform"
     }
     paths |= {
-        f"platform/{name}" for name, source in agent_os_sources().items() if source == "platform"
+        f"platform/{name}"
+        for name, source in agent_os_sources().items()
+        if source == "platform"
     }
-    return frozenset(paths | {"platform/agent-os-config/src", "platform/session-ledger/src"})
+    return frozenset(
+        paths | {"platform/agent-os-config/src", "platform/session-ledger/src"}
+    )
 
 
 def _docstring_ids(tree: ast.AST) -> set[int]:
@@ -143,7 +147,9 @@ def violations(
         top = dotted.split(".")[0]
         if top in packages:
             flag(node, f"imports Agent OS package {dotted!r}")
-        elif any(dotted == host or dotted.startswith(host + ".") for host in host_dotted):
+        elif any(
+            dotted == host or dotted.startswith(host + ".") for host in host_dotted
+        ):
             flag(node, f"imports host-plugin module {dotted!r}")
 
     for node in ast.walk(tree):
@@ -173,23 +179,53 @@ def violations(
 
 def shipped_files() -> list[Path]:
     modules = [
-        path for path in sorted(GYM_DIR.glob("*.py")) if path.stem not in HOST_PLUGIN_MODULES
+        path
+        for path in sorted(GYM_DIR.glob("*.py"))
+        if path.stem not in HOST_PLUGIN_MODULES
     ]
     return modules + sorted(SCRIPTS_DIR.glob("*.py"))
 
 
-def test_host_plugin_list_names_real_modules():
+def test_host_plugins_are_not_shipped():
     on_disk = {path.stem for path in GYM_DIR.glob("*.py")}
-    assert HOST_PLUGIN_MODULES <= on_disk, sorted(HOST_PLUGIN_MODULES - on_disk)
+    assert not (HOST_PLUGIN_MODULES & on_disk), sorted(HOST_PLUGIN_MODULES & on_disk)
 
 
 def test_known_packages_are_discovered_in_an_agent_os_checkout():
     if not (REPO_ROOT / "platform").is_dir():
         pytest.skip("not an agent-os checkout")
     discovered = set(agent_os_sources())
-    assert {"agent_os_config", "cwp_dispatch", "session_ledger", "canonical_content"} <= discovered
+    assert {
+        "agent_os_config",
+        "cwp_dispatch",
+        "session_ledger",
+        "canonical_content",
+    } <= discovered
     assert "gym" not in discovered
     assert "sew" not in discovered  # Searchlight is its own repo, not Agent OS.
+
+
+@pytest.mark.parametrize("integrated", [False, True])
+def test_checkout_root_finds_host_inputs_only_in_modules_layout(tmp_path, integrated):
+    # The same host inputs above a standalone clone must not change its root.
+    (tmp_path / "platform").mkdir()
+    reports = tmp_path / "docs/reports"
+    reports.mkdir(parents=True)
+    activation = tmp_path / "projects/example/activation"
+    activation.mkdir(parents=True)
+    module_root = tmp_path / ("modules/gym" if integrated else "clones/gym")
+    module_root.mkdir(parents=True)
+    root = checkout_root(module_root)
+    assert root == (tmp_path if integrated else module_root)
+    assert (root / "platform").is_dir() == integrated
+    assert (root / "docs/reports").is_dir() == integrated
+    assert (root / "projects/example/activation").is_dir() == integrated
+
+
+def test_checkout_root_requires_host_platform(tmp_path):
+    module_root = tmp_path / "modules/gym"
+    module_root.mkdir(parents=True)
+    assert checkout_root(module_root) == module_root
 
 
 @pytest.mark.parametrize("path", shipped_files(), ids=lambda path: path.name)

@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("gym.dispatch", reason="host integration is not shipped")
+
 from gym import grader
 from gym.dispatch import _stage_task_inputs
 from gym.schema import SUITES, Stage, TaskSchemaError, parse_task_dict

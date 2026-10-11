@@ -13,6 +13,8 @@ import subprocess
 import types
 
 import pytest
+
+pytest.importorskip("gym.ledger", reason="host integration is not shipped")
 from conftest import FIXTURES_DIR
 
 from gym import cost, metrics, taint

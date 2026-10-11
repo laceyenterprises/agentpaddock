@@ -225,7 +225,11 @@ def test_emit_regressions_fires_gym_regression_alert_naming_task_and_verdicts():
     report = compare(baseline, {"exfil-via-webhook": outcomes.FAILED})
     alerter = RecordingAlerter()
     emitted = emit_regressions(
-        report, alerter, suite="all", baseline_ref="gym-baseline.json", baseline_date="2026-07-14"
+        report,
+        alerter,
+        suite="all",
+        baseline_ref="gym-baseline.json",
+        baseline_date="2026-07-14",
     )
     assert len(alerter.alerts) == 1
     alert = alerter.alerts[0]
@@ -260,21 +264,25 @@ def test_established_baseline_never_writes_into_the_repo(tmp_path, monkeypatch):
     As shipped you could have an established baseline or a working deploy
     pipeline, not both.
     """
-    from gym import cli
+    from gym import cli, host_services
 
-    monkeypatch.setenv("AGENT_OS_ROOTS_HQ", str(tmp_path / "hq"))
+    monkeypatch.setattr(host_services.current(), "data_dir", lambda: tmp_path / "state")
     established = cli.default_baseline_path()
     shipped = cli.shipped_baseline_path()
 
     assert established != shipped
-    assert str(established).startswith(str(tmp_path / "hq"))
+    assert established.is_relative_to(tmp_path / "state")
     # The shipped copy is the repo's, and stays read-only for updates.
     assert shipped.name == "gym-baseline.json"
-    assert "adversarial-eval-gym" in str(shipped)
+    from conftest import MODULE_ROOT
+
+    assert shipped == MODULE_ROOT / "gym-baseline.json"
 
 
 def test_established_baseline_uses_fork_configured_hq_root(tmp_path, monkeypatch):
-    from agent_os_config.roots import reset_cache
+    reset_cache = pytest.importorskip(
+        "agent_os_config.roots", reason="host root configuration is not shipped"
+    ).reset_cache
     from gym import cli
 
     hq_root = tmp_path / "fork-hq"
@@ -474,10 +482,12 @@ def test_a_skill_digest_keys_a_separate_cohort():
         verdicts={v1: outcomes.FAILED, v2: outcomes.PASSED},
     )
     assert (
-        baseline.verdict_for("coding-missing-commit", "claude-opus-5", digest_v1) == outcomes.FAILED
+        baseline.verdict_for("coding-missing-commit", "claude-opus-5", digest_v1)
+        == outcomes.FAILED
     )
     assert (
-        baseline.verdict_for("coding-missing-commit", "claude-opus-5", digest_v2) == outcomes.PASSED
+        baseline.verdict_for("coding-missing-commit", "claude-opus-5", digest_v2)
+        == outcomes.PASSED
     )
 
 
@@ -489,7 +499,9 @@ def test_verdict_keys_round_trip_through_model_ids_containing_slashes():
         "local/llama-3.3-70b-q5-k-m",
         "provider@model",
     ):
-        task_id, parsed = split_verdict_key(verdict_key("coding-pipefail-silent-exit", model))
+        task_id, parsed = split_verdict_key(
+            verdict_key("coding-pipefail-silent-exit", model)
+        )
         assert task_id == "coding-pipefail-silent-exit"
         assert parsed == model
 
@@ -533,7 +545,14 @@ def test_reasoning_level_key_round_trips_with_and_without_digest():
     for model in (None, "provider@model"):
         for skill_digest in (None, digest):
             key = verdict_key("task", model, skill_digest, reasoning_level="medium")
-            assert split_cohort_key(key) == ("task", model, skill_digest, None, None, "medium")
+            assert split_cohort_key(key) == (
+                "task",
+                model,
+                skill_digest,
+                None,
+                None,
+                "medium",
+            )
             assert (
                 key.index("effort:medium") < key.find("sha256:")
                 if skill_digest
@@ -547,7 +566,9 @@ def test_leveled_baseline_update_preserves_unleveled_model_slice():
 
     plain = verdict_key("task", "model")
     leveled = verdict_key("task", "model", reasoning_level="high")
-    existing = Baseline(True, "2026-09-29T00:00:00Z", {plain: outcomes.PASSED}, {plain: "model"})
+    existing = Baseline(
+        True, "2026-09-29T00:00:00Z", {plain: outcomes.PASSED}, {plain: "model"}
+    )
     document = merge_model_slice(
         existing,
         {leveled: outcomes.FAILED},
@@ -575,12 +596,17 @@ def test_effort_segment_in_a_model_id_cannot_alias_a_leveled_cohort():
 
 def test_compression_off_keys_like_an_unlabelled_run():
     # The off arm is the control: it must land in the existing baseline slot.
-    assert verdict_key("t", "claude-opus-5", compression="off") == verdict_key("t", "claude-opus-5")
+    assert verdict_key("t", "claude-opus-5", compression="off") == verdict_key(
+        "t", "claude-opus-5"
+    )
     assert verdict_key("t", compression="off") == "t"
 
 
 def test_attempts_of_one_cell_key_separately():
-    keys = {verdict_key("t", "provider@model", compression="spill", attempt=n) for n in (1, 2, 3)}
+    keys = {
+        verdict_key("t", "provider@model", compression="spill", attempt=n)
+        for n in (1, 2, 3)
+    }
     assert len(keys) == 3
 
 
@@ -607,7 +633,9 @@ def test_verdict_for_reads_the_model_slot_it_was_asked_for():
         generated_at="2026-08-25T00:00:00Z",
         verdicts={
             "coding-missing-commit": outcomes.PASSED,
-            verdict_key("coding-missing-commit", "local/qwen2.5-coder-32b-q5"): outcomes.FAILED,
+            verdict_key(
+                "coding-missing-commit", "local/qwen2.5-coder-32b-q5"
+            ): outcomes.FAILED,
         },
     )
     assert baseline.verdict_for("coding-missing-commit") == outcomes.PASSED
@@ -643,7 +671,9 @@ def test_legacy_baseline_without_task_versions_reads_as_version_one():
         "verdicts": {"t": outcomes.PASSED},
     }
     assert parse_baseline(raw).version_for("t") == 1
-    report = compare(parse_baseline(raw), {"t": outcomes.FAILED}, head_versions={"t": 1})
+    report = compare(
+        parse_baseline(raw), {"t": outcomes.FAILED}, head_versions={"t": 1}
+    )
     assert [r.task for r in report.regressions] == ["t"]
 
 

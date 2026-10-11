@@ -97,14 +97,18 @@ def test_read_lock_rejects_unknown_schema(tmp_path):
 
 
 def test_diff_added_and_removed_named_exactly():
-    diff = locks.diff_agent("claude-code", ["read", "write"], ["read", "browser.navigate"])
+    diff = locks.diff_agent(
+        "claude-code", ["read", "write"], ["read", "browser.navigate"]
+    )
     assert diff.added == ("browser.navigate",)
     assert diff.removed == ("write",)
     assert diff.drifted
 
 
 def test_clean_surface_has_no_drift():
-    diff = locks.diff_agent("claude-code", _CLAUDE_SURFACE, list(reversed(_CLAUDE_SURFACE)))
+    diff = locks.diff_agent(
+        "claude-code", _CLAUDE_SURFACE, list(reversed(_CLAUDE_SURFACE))
+    )
     assert not diff.drifted
 
 
@@ -124,6 +128,8 @@ def test_check_passes_on_matching_surface(locks_dir):
 )
 def test_shipped_oss_lock_matches_registry(agent):
     registry_path = REPO_ROOT / "modules" / "worker-pool" / "worker-classes.json"
+    if not registry_path.is_file():
+        pytest.skip("host worker-class registry is not shipped")
     entry = json.loads(registry_path.read_text(encoding="utf-8"))[agent]
     surface = entry["defaultTools"] + entry["toolsAllowlist"]
     locks.check_surface_locks([agent], FakeResolver(surface), locks.default_locks_dir())
@@ -194,8 +200,12 @@ def test_run_suite_drift_aborts_before_any_dispatch(locks_dir):
 def test_run_suite_clean_lock_proceeds(locks_dir):
     tasks = discover_tasks(MINI_SUITE, suite="all")
     trajectories = {
-        "mini-pass": Trajectory(terminal_status="succeeded", submitted_result={"answer": "ok"}),
-        "mini-fail": Trajectory(terminal_status="succeeded", submitted_result={"answer": "bad"}),
+        "mini-pass": Trajectory(
+            terminal_status="succeeded", submitted_result={"answer": "ok"}
+        ),
+        "mini-fail": Trajectory(
+            terminal_status="succeeded", submitted_result={"answer": "bad"}
+        ),
     }
 
     class MappingSource:

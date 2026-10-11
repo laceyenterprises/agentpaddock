@@ -17,9 +17,7 @@ SETTINGS = {
 }
 MODEL = "accounts/fireworks/models/test-model"
 # A URL carrying credentials, which the manager must refuse to persist.
-CREDENTIAL_URL = (
-    "http://user:RAW_SECRET@localhost:4000"  # publication-scan: allow(secret): refused input
-)
+CREDENTIAL_URL = "http://user:RAW_SECRET@localhost:4000"  # publication-scan: allow(secret): refused input
 
 
 def shape(name, gpu="NVIDIA_H100_80GB", count=1, validated=True):
@@ -87,7 +85,10 @@ def test_ready_registers_route_and_durable_lease(setup):
 @pytest.mark.parametrize(
     "status,kwargs",
     [
-        ({"state": "CREATING", "status": {"code": "RESOURCE_EXHAUSTED"}}, {"capacity_timeout": 10}),
+        (
+            {"state": "CREATING", "status": {"code": "RESOURCE_EXHAUSTED"}},
+            {"capacity_timeout": 10},
+        ),
         ({"state": "CREATING"}, {"creation_timeout": 10}),
     ],
 )
@@ -153,7 +154,9 @@ def test_down_idempotent_partial_failure_retry_and_surface(setup):
     manager.down(lease["id"])
     api.delete.assert_called_once()
     assert api.route_down.call_count == 2
-    assert "sensitive-provider-response" not in (manager.root / "audit.jsonl").read_text()
+    assert (
+        "sensitive-provider-response" not in (manager.root / "audit.jsonl").read_text()
+    )
 
 
 def test_deletion_pending_does_not_stop_cost_clock(setup):
@@ -177,7 +180,9 @@ def test_no_secret_in_disk_logs_or_audit(setup, capsys):
     assert "SUPER-SECRET-VALUE" not in str(failure.value)
     assert "SUPER-SECRET-VALUE" not in capsys.readouterr().err
     assert all(
-        "SUPER-SECRET-VALUE" not in p.read_text() for p in manager.root.iterdir() if p.is_file()
+        "SUPER-SECRET-VALUE" not in p.read_text()
+        for p in manager.root.iterdir()
+        if p.is_file()
     )
 
 
@@ -230,15 +235,56 @@ def test_http_requests_no_api_key_literal(monkeypatch):
 
 
 def test_ojo_reaper_registration():
-    repo = Path(__file__).resolve().parents[3]
-    jobs = json.loads((repo / "platform/os-job-orchestrator/manifest.d/prod.ojo.json").read_text())[
-        "jobs"
-    ]
+    from gym_test_support import checkout_root
+
+    test_file = Path(__file__).resolve()
+    relative_manifest = Path("platform/os-job-orchestrator/manifest.d/prod.ojo.json")
+    manifest = checkout_root(test_file.parents[1]) / relative_manifest
+    if not manifest.is_file():
+        pytest.skip("host reaper manifest is not shipped")
+    jobs = json.loads(manifest.read_text())["jobs"]
     job = next(j for j in jobs if j["id"] == "gym-endpoint-reaper")
     assert job["enabled"]
     assert job["schedule"]["everyMs"] <= 30000
     assert "gym endpoint reap" in job["command"][-1]
     assert job["alert_sink"]["channel"] == "telegram-alerts"
+
+
+@pytest.mark.parametrize("layout", ["tests", "modules/adversarial-eval-gym/tests"])
+def test_ojo_reaper_registration_checkout_layout(tmp_path, monkeypatch, layout):
+    test_file = tmp_path / layout / "test_endpoints.py"
+    monkeypatch.setitem(globals(), "__file__", str(test_file))
+    manifest = tmp_path / "platform/os-job-orchestrator/manifest.d/prod.ojo.json"
+    manifest.parent.mkdir(parents=True)
+    job = {
+        "id": "gym-endpoint-reaper",
+        "enabled": True,
+        "schedule": {"everyMs": 30000},
+        "command": ["hq gym endpoint reap"],
+        "alert_sink": {"channel": "telegram-alerts"},
+    }
+    manifest.write_text(json.dumps({"jobs": [job]}))
+    try:
+        test_ojo_reaper_registration()
+    except pytest.skip.Exception:
+        pytest.fail("shipped reaper manifest was not found")
+
+    # A discovered host manifest must be validated, rather than silently skipped.
+    job["schedule"]["everyMs"] = 30001
+    manifest.write_text(json.dumps({"jobs": [job]}))
+    with pytest.raises(AssertionError):
+        test_ojo_reaper_registration()
+
+
+def test_ojo_reaper_registration_ignores_unrelated_ancestor(tmp_path, monkeypatch):
+    test_file = tmp_path / "clones/paddock/tests/test_endpoints.py"
+    monkeypatch.setitem(globals(), "__file__", str(test_file))
+    manifest = tmp_path / "platform/os-job-orchestrator/manifest.d/prod.ojo.json"
+    manifest.parent.mkdir(parents=True)
+    # An unrelated ancestor's manifest must never be read, even if malformed.
+    manifest.write_text("invalid JSON")
+    with pytest.raises(pytest.skip.Exception, match="host reaper manifest"):
+        test_ojo_reaper_registration()
 
 
 def test_orphan_reaped_after_lease_file_lost(setup):
@@ -269,7 +315,10 @@ def test_invalid_credentials_never_persist(setup, override):
 
 def test_shared_dispatch_seam_refuses_before_hq_subprocess(setup, monkeypatch):
     from gym import endpoints
-    from gym.dispatch import WorkerPoolTrajectorySource
+
+    WorkerPoolTrajectorySource = pytest.importorskip(
+        "gym.dispatch", reason="host dispatch is not shipped"
+    ).WorkerPoolTrajectorySource
     from gym.schema import Task
 
     manager, api, clock = setup
@@ -282,7 +331,9 @@ def test_shared_dispatch_seam_refuses_before_hq_subprocess(setup, monkeypatch):
 
     run = Mock(side_effect=AssertionError("no cell should dispatch"))
     monkeypatch.setattr(subprocess, "run", run)
-    source = WorkerPoolTrajectorySource(hq_root=root, hq_bin=Path("/mock/hq"), model=lease["route"])
+    source = WorkerPoolTrajectorySource(
+        hq_root=root, hq_bin=Path("/mock/hq"), model=lease["route"]
+    )
     task = Task(
         id="cap-probe",
         title="Cap",
@@ -327,7 +378,9 @@ def test_final_idle_teardown_cost_rejoins_results(setup, tmp_path):
     manager.down(lease["id"])
     path = tmp_path / "results.json"
     path.write_text(
-        json.dumps({"cells": [{"launchRequestId": "lrq1", "verdict": "passed", "metrics": {}}]})
+        json.dumps(
+            {"cells": [{"launchRequestId": "lrq1", "verdict": "passed", "metrics": {}}]}
+        )
     )
     assert rejoin(manager, lease["id"], path)["updated_cells"] == 1
     cell = json.loads(path.read_text())["cells"][0]
@@ -343,7 +396,10 @@ def test_reaper_explicit_gym_annotation_owns_unprefixed_orphan(setup):
     labeled = "accounts/test-account/deployments/gym-owned"
     api.deployments.return_value = [
         {"name": labeled, "annotations": {"agent-os-gym": "true"}},
-        {"name": "accounts/foreign/deployments/gym-owned", "annotations": {"agent-os-gym": "true"}},
+        {
+            "name": "accounts/foreign/deployments/gym-owned",
+            "annotations": {"agent-os-gym": "true"},
+        },
     ]
     manager.reap()
     api.delete.assert_called_once_with(labeled)
@@ -358,7 +414,10 @@ def test_malformed_lease_does_not_block_valid_cell_cost(setup, contents):
     clock[0] += 3600
     assert manager.cell_cost(lease["route"], "lrq-valid")["cost_usd"] == 8
     assert [item["id"] for item in manager.leases()] == [lease["id"]]
-    audits = [json.loads(line) for line in (manager.root / "audit.jsonl").read_text().splitlines()]
+    audits = [
+        json.loads(line)
+        for line in (manager.root / "audit.jsonl").read_text().splitlines()
+    ]
     assert any(
         row["lease"] == "evalbench-gym-bad"
         and row["action"] == "lease_load"
@@ -401,8 +460,12 @@ def test_endpoint_refusal_does_not_revoke_existing_cell(setup):
 
 @pytest.mark.parametrize("explicit", [False, True])
 def test_endpoint_and_dispatch_share_hq_root(monkeypatch, tmp_path, explicit):
-    from agent_os_config import roots
-    from gym.dispatch import _resolve_hq_root
+    roots = pytest.importorskip(
+        "agent_os_config.roots", reason="host root configuration is not shipped"
+    )
+    _resolve_hq_root = pytest.importorskip(
+        "gym.dispatch", reason="host dispatch is not shipped"
+    )._resolve_hq_root
     from gym.endpoints import root_path
 
     monkeypatch.setattr(
@@ -422,7 +485,9 @@ def test_up_refuses_budget_too_small_for_one_cell(setup):
 def test_deletion_pending_is_quiet_bounded_and_not_redeleted(setup):
     manager, api, clock = setup
     lease = up(manager)
-    api.delete.side_effect = lambda name: setattr(api.get, "return_value", {"state": "DELETING"})
+    api.delete.side_effect = lambda name: setattr(
+        api.get, "return_value", {"state": "DELETING"}
+    )
     pending = manager.down(lease["id"])
     assert pending["state"] == "closing"
     assert pending["cleanup_failures"] == ["deployment_delete_pending"]
@@ -439,7 +504,10 @@ def test_reaper_does_not_redelete_orphan_already_deleting(setup):
     manager, api, _ = setup
     up(manager)
     api.deployments.return_value = [
-        {"name": "accounts/test-account/deployments/evalbench-pending", "state": "DELETING"}
+        {
+            "name": "accounts/test-account/deployments/evalbench-pending",
+            "state": "DELETING",
+        }
     ]
     manager.reap()
     api.delete.assert_not_called()

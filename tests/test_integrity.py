@@ -2,6 +2,8 @@
 
 import pytest
 
+pytest.importorskip("gym.dispatch", reason="host integration is not shipped")
+
 from gym.integrity import MARKERS, scan
 from gym.suite import run_suite
 from gym.grader import Trajectory

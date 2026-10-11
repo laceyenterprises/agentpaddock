@@ -17,6 +17,8 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+
+pytest.importorskip("gym.dispatch", reason="host integration is not shipped")
 from conftest import FIXTURES_DIR
 
 import gym

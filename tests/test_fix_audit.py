@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("gym.dispatch", reason="host integration is not shipped")
+
 from gym import cli, fix_audit, grader, suite
 from gym.schema import load_task
 from test_fix_corpus import ROOT, stage

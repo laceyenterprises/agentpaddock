@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(REPO_ROOT / "modules" / "adversarial-eval-gym" / "lib" / "python"))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "lib" / "python"))
 
 from gym import harness_toolcalls as h  # noqa: E402
 from gym import toolcalls  # noqa: E402
@@ -21,11 +21,18 @@ def _line(event: dict) -> str:
 
 
 def _item(kind: str, **fields) -> str:
-    return _line({"type": "item.completed", "item": {"id": f"item_{kind}", "type": kind, **fields}})
+    return _line(
+        {
+            "type": "item.completed",
+            "item": {"id": f"item_{kind}", "type": kind, **fields},
+        }
+    )
 
 
 def _acp(update: dict) -> str:
-    return _line({"jsonrpc": "2.0", "method": "session/update", "params": {"update": update}})
+    return _line(
+        {"jsonrpc": "2.0", "method": "session/update", "params": {"update": update}}
+    )
 
 
 def test_codex_exec_keeps_finished_tool_items_in_order():
@@ -41,13 +48,23 @@ def test_codex_exec_keeps_finished_tool_items_in_order():
         _item("agent_message", text="I will read schema.sql"),
         _item("command_execution", command="/bin/zsh -lc 'cat schema.sql'"),
         _item("file_change", changes=[{"path": "/w/bench-result.json", "kind": "add"}]),
-        _item("mcp_tool_call", server="linear", tool="get_issue", arguments={"id": "LAC-1"}),
+        _item(
+            "mcp_tool_call",
+            server="linear",
+            tool="get_issue",
+            arguments={"id": "LAC-1"},
+        ),
         _item("web_search", query="jsonb like"),
     ]
 
     calls = h.calls_from_codex_exec_stdout(lines)
 
-    assert [c["name"] for c in calls] == ["shell", "apply_patch", "linear.get_issue", "web_search"]
+    assert [c["name"] for c in calls] == [
+        "shell",
+        "apply_patch",
+        "linear.get_issue",
+        "web_search",
+    ]
     assert calls[0]["arguments"] == {"command": "/bin/zsh -lc 'cat schema.sql'"}
     assert calls[0]["call_id"] == "item_command_execution"
     assert calls[1]["arguments"]["changes"][0]["path"] == "/w/bench-result.json"
@@ -58,7 +75,10 @@ def test_claude_stream_json_keeps_each_tool_use_once():
     # bound: it Read schema.sql but was graded "answered without opening".
     def assistant(*blocks):
         return _line(
-            {"type": "assistant", "message": {"role": "assistant", "content": list(blocks)}}
+            {
+                "type": "assistant",
+                "message": {"role": "assistant", "content": list(blocks)},
+            }
         )
 
     read = {
@@ -72,12 +92,19 @@ def test_claude_stream_json_keeps_each_tool_use_once():
         _line({"type": "stream_event", "event": {"type": "content_block_start"}}),
         assistant(
             {"type": "text", "text": "Looking."},
-            {"type": "tool_use", "id": "call_1", "name": "Bash", "input": {"command": "ls -la"}},
+            {
+                "type": "tool_use",
+                "id": "call_1",
+                "name": "Bash",
+                "input": {"command": "ls -la"},
+            },
         ),
         _line(
             {
                 "type": "user",
-                "message": {"content": [{"type": "tool_result", "tool_use_id": "call_1"}]},
+                "message": {
+                    "content": [{"type": "tool_result", "tool_use_id": "call_1"}]
+                },
             }
         ),
         assistant(read),
@@ -88,10 +115,16 @@ def test_claude_stream_json_keeps_each_tool_use_once():
 
     calls = h.calls_from_claude_stream_json(lines)
 
-    assert [(c["name"], c["call_id"]) for c in calls] == [("Bash", "call_1"), ("Read", "call_2")]
+    assert [(c["name"], c["call_id"]) for c in calls] == [
+        ("Bash", "call_1"),
+        ("Read", "call_2"),
+    ]
     assert calls[1]["arguments"] == {"file_path": "/w/schema.sql"}
     # Codex exec events are not Claude stream-json, and vice versa.
-    assert h.calls_from_claude_stream_json([_item("command_execution", command="ls")]) == []
+    assert (
+        h.calls_from_claude_stream_json([_item("command_execution", command="ls")])
+        == []
+    )
     assert h.calls_from_codex_exec_stdout(lines) == []
 
 
@@ -104,7 +137,9 @@ def test_acpx_stream_merges_updates_per_tool_call_and_drops_file_bodies():
                 "toolCallId": "c1",
                 "kind": "edit",
                 "status": "in_progress",
-                "content": [{"type": "diff", "path": "/w/answer.txt", "newText": "SECRET BODY"}],
+                "content": [
+                    {"type": "diff", "path": "/w/answer.txt", "newText": "SECRET BODY"}
+                ],
             }
         ),
         _acp(
@@ -131,7 +166,10 @@ def test_acpx_stream_merges_updates_per_tool_call_and_drops_file_bodies():
 
     assert [c["call_id"] for c in calls] == ["c1", "c2"]
     assert calls[0]["name"] == "edit"
-    assert calls[0]["arguments"] == {"title": "Edit /w/answer.txt", "paths": ["/w/answer.txt"]}
+    assert calls[0]["arguments"] == {
+        "title": "Edit /w/answer.txt",
+        "paths": ["/w/answer.txt"],
+    }
     assert "SECRET BODY" not in json.dumps(calls)
     assert calls[1]["name"] == "tool"
     assert calls[1]["arguments"]["rawInput"] == {"command": ["cat", "schema.sql"]}
@@ -149,7 +187,9 @@ def test_acpx_execute_calls_count_as_review_read_commands():
                 "toolCallId": "e1",
                 "kind": "execute",
                 "title": "cat other.py",
-                "rawInput": {"command": ["bash", "-lc", "echo other.py && cat target.py"]},
+                "rawInput": {
+                    "command": ["bash", "-lc", "echo other.py && cat target.py"]
+                },
             }
         ),
     ]
@@ -158,15 +198,21 @@ def test_acpx_execute_calls_count_as_review_read_commands():
     assert calls[0]["name"] == "execute"
     assert evaluate([], calls, clean_control=True, read_files=["target.py"])[-1]["ok"]
     # The title is not a command, and echo is not a read.
-    assert not evaluate([], calls, clean_control=True, read_files=["other.py"])[-1]["ok"]
+    assert not evaluate([], calls, clean_control=True, read_files=["other.py"])[-1][
+        "ok"
+    ]
 
 
 def _write_record(
     sessions: Path, record_id: str, name: str, events: list[str], *, mtime: int
 ) -> Path:
     record = sessions / f"{record_id}.json"
-    record.write_text(json.dumps({"acpx_record_id": record_id, "name": name}), encoding="utf-8")
-    (sessions / f"{record_id}.stream.ndjson").write_text("\n".join(events) + "\n", encoding="utf-8")
+    record.write_text(
+        json.dumps({"acpx_record_id": record_id, "name": name}), encoding="utf-8"
+    )
+    (sessions / f"{record_id}.stream.ndjson").write_text(
+        "\n".join(events) + "\n", encoding="utf-8"
+    )
     os.utime(record, (mtime, mtime))
     return record
 
@@ -174,7 +220,9 @@ def _write_record(
 def test_find_acpx_record_matches_the_session_name_and_skips_noise(tmp_path):
     sessions = tmp_path / "sessions"
     sessions.mkdir()
-    (sessions / "index.json").write_text(json.dumps({"name": "cwp-w1"}), encoding="utf-8")
+    (sessions / "index.json").write_text(
+        json.dumps({"name": "cwp-w1"}), encoding="utf-8"
+    )
     (sessions / "broken.json").write_text("{not json", encoding="utf-8")
     _write_record(sessions, "old", "cwp-w1", [], mtime=1_000)
     newest = _write_record(sessions, "new", "cwp-w1", [], mtime=2_000)
@@ -208,9 +256,11 @@ def test_find_acpx_record_survives_a_record_vanishing_mid_sort(tmp_path, monkeyp
     assert h._mtime(tmp_path / "missing.json") == 0
 
 
-def test_default_acpx_sessions_dir_is_the_runtime_accounts_not_the_graders(tmp_path, monkeypatch):
+def test_default_acpx_sessions_dir_is_the_runtime_accounts_not_the_graders(
+    tmp_path, monkeypatch
+):
     """The gym may grade as the admin account; acpx writes as the runtime one."""
-    from agent_os_config.roots import reset_cache
+    from gym import host_services
 
     runtime_home = tmp_path / "runtime-home"
     sessions = runtime_home / ".acpx" / "sessions"
@@ -223,8 +273,7 @@ def test_default_acpx_sessions_dir_is_the_runtime_accounts_not_the_graders(tmp_p
         mtime=1_000,
     )
     monkeypatch.setenv("HOME", str(tmp_path / "admin-home"))
-    monkeypatch.setenv("AGENT_OS_ROOTS_RUNTIME_HOME", str(runtime_home))
-    reset_cache()
+    monkeypatch.setattr(host_services.current(), "harness_home", lambda: runtime_home)
 
     assert h.default_acpx_sessions_dir() == sessions
     calls = h.collect(dispatch_dir=None, session_name="cwp-w1")
@@ -269,25 +318,36 @@ def test_collect_prefers_codex_exec_events_then_the_acpx_session(tmp_path):
 
     # ACP adapter output in stdout.log is not codex JSON: fall back to acpx.
     (dispatch / "stdout.log").write_text("plain adapter output\n", encoding="utf-8")
-    calls = h.collect(dispatch_dir=dispatch, session_name="cwp-w1", acpx_sessions_dir=sessions)
+    calls = h.collect(
+        dispatch_dir=dispatch, session_name="cwp-w1", acpx_sessions_dir=sessions
+    )
     assert [c["call_id"] for c in calls] == ["seg1", "old-seg"]
 
     (dispatch / "stdout.log").write_text(
         _item("command_execution", command="cat loop.py") + "\n", encoding="utf-8"
     )
-    calls = h.collect(dispatch_dir=dispatch, session_name="cwp-w1", acpx_sessions_dir=sessions)
+    calls = h.collect(
+        dispatch_dir=dispatch, session_name="cwp-w1", acpx_sessions_dir=sessions
+    )
     assert [c["name"] for c in calls] == ["shell"]
 
     claude = {
         "type": "assistant",
         "message": {
             "content": [
-                {"type": "tool_use", "id": "t1", "name": "Read", "input": {"file_path": "loop.py"}}
+                {
+                    "type": "tool_use",
+                    "id": "t1",
+                    "name": "Read",
+                    "input": {"file_path": "loop.py"},
+                }
             ]
         },
     }
     (dispatch / "stdout.log").write_text(json.dumps(claude) + "\n", encoding="utf-8")
-    calls = h.collect(dispatch_dir=dispatch, session_name="cwp-w1", acpx_sessions_dir=sessions)
+    calls = h.collect(
+        dispatch_dir=dispatch, session_name="cwp-w1", acpx_sessions_dir=sessions
+    )
     assert [c["name"] for c in calls] == ["Read"]
 
     # The session name defaults to the dispatch directory's env-contract.json.
@@ -302,12 +362,21 @@ def test_collect_prefers_codex_exec_events_then_the_acpx_session(tmp_path):
 
     assert h.collect(dispatch_dir=tmp_path / "none", session_name=None) == []
     assert (
-        h.collect(dispatch_dir=None, session_name="cwp-missing", acpx_sessions_dir=sessions) == []
+        h.collect(
+            dispatch_dir=None, session_name="cwp-missing", acpx_sessions_dir=sessions
+        )
+        == []
     )
 
 
 def test_snapshot_uses_harness_calls_only_when_the_transcript_has_none():
-    fallback = [{"name": "shell", "arguments": {"command": "cat schema.sql"}, "call_id": "item_1"}]
+    fallback = [
+        {
+            "name": "shell",
+            "arguments": {"command": "cat schema.sql"},
+            "call_id": "item_1",
+        }
+    ]
 
     snapshot = toolcalls.build_snapshot([], [], fallback_calls=fallback)
     assert snapshot["calls"] == [
@@ -334,7 +403,10 @@ def test_snapshot_uses_harness_calls_only_when_the_transcript_has_none():
     assert [c["call_id"] for c in snapshot["calls"]] == ["t1"]
 
     assert toolcalls.build_snapshot([], [])["calls"] == []
-    assert toolcalls.build_snapshot([], [], fallback_calls=[{"arguments": {}}])["calls"] == []
+    assert (
+        toolcalls.build_snapshot([], [], fallback_calls=[{"arguments": {}}])["calls"]
+        == []
+    )
 
 
 def test_adapter_exported_toolcalls_jsonl_wins_over_stdout(tmp_path):
@@ -344,7 +416,13 @@ def test_adapter_exported_toolcalls_jsonl_wins_over_stdout(tmp_path):
     (dispatch / "toolcalls.jsonl").write_text(
         "\n".join(
             [
-                json.dumps({"name": "read", "arguments": {"path": "schema.sql"}, "call_id": "c1"}),
+                json.dumps(
+                    {
+                        "name": "read",
+                        "arguments": {"path": "schema.sql"},
+                        "call_id": "c1",
+                    }
+                ),
                 "garbage",
                 json.dumps({"arguments": {}}),
                 json.dumps({"name": "write", "arguments": "not-a-dict", "call_id": 7}),
@@ -365,17 +443,24 @@ def test_adapter_exported_toolcalls_jsonl_wins_over_stdout(tmp_path):
     ]
     # An empty export falls through to the other records.
     (dispatch / "toolcalls.jsonl").write_text("", encoding="utf-8")
-    assert [c["name"] for c in h.collect(dispatch_dir=dispatch, worker_class="pi")] == ["shell"]
+    assert [c["name"] for c in h.collect(dispatch_dir=dispatch, worker_class="pi")] == [
+        "shell"
+    ]
 
 
-def test_planted_toolcalls_jsonl_never_replaces_another_harness_record(tmp_path, caplog):
+def test_planted_toolcalls_jsonl_never_replaces_another_harness_record(
+    tmp_path, caplog
+):
     # Review of #7339: only the pi and opencode adapters clear toolcalls.jsonl,
     # and a codex worker can write to its own dispatch directory. A file there
     # on any other class is a plant, so the real stdout.log is graded.
     dispatch = tmp_path / "dispatch" / "lrq_codex"
     dispatch.mkdir(parents=True)
     (dispatch / "toolcalls.jsonl").write_text(
-        json.dumps({"name": "read", "arguments": {"path": "schema.sql"}, "call_id": "fake"}) + "\n",
+        json.dumps(
+            {"name": "read", "arguments": {"path": "schema.sql"}, "call_id": "fake"}
+        )
+        + "\n",
         encoding="utf-8",
     )
     (dispatch / "stdout.log").write_text(
@@ -401,13 +486,18 @@ def test_normalized_commands_preserves_raw_and_quoted_non_commands():
     call = {"name": "shell", "arguments": {"command": raw, "description": "pytest"}}
     assert h.normalized_commands(call) == ["git log --oneline -10", "pytest -q"]
     assert call["arguments"]["command"] == raw
-    assert h.normalized_commands({"arguments": {"command": "echo 'pytest; git log'"}}) == [
-        "echo 'pytest; git log'"
-    ]
-    assert h.normalized_commands({"arguments": {"description": "git log", "path": "pytest"}}) == []
-    assert h.normalized_commands({"arguments": {"command": ["bash", "script.sh", "pytest"]}}) == [
-        "bash script.sh pytest"
-    ]
+    assert h.normalized_commands(
+        {"arguments": {"command": "echo 'pytest; git log'"}}
+    ) == ["echo 'pytest; git log'"]
+    assert (
+        h.normalized_commands(
+            {"arguments": {"description": "git log", "path": "pytest"}}
+        )
+        == []
+    )
+    assert h.normalized_commands(
+        {"arguments": {"command": ["bash", "script.sh", "pytest"]}}
+    ) == ["bash script.sh pytest"]
 
 
 @pytest.mark.parametrize(
@@ -427,7 +517,9 @@ def test_normalized_commands_preserves_quoted_assignment_values(prefix):
     call = {"arguments": {"command": raw}}
     assert h.normalized_commands(call) == ["echo a"]
     assert call["arguments"]["command"] == raw
-    assert h.normalized_commands({"arguments": {"command": f"{prefix} git log"}}) == ["git log"]
+    assert h.normalized_commands({"arguments": {"command": f"{prefix} git log"}}) == [
+        "git log"
+    ]
 
 
 @pytest.mark.parametrize("operator", ["&&", "||", ";", "|", "&", "\n"])
@@ -443,7 +535,10 @@ def test_normalized_commands_keeps_outer_segments_after_wrapper(operator, prefix
 
 def test_normalized_commands_keeps_argv_wrapper_parameters_out_of_evidence():
     argv = ["bash", "-c", "pytest && git log", "arg0", "echo ignored && git status"]
-    assert h.normalized_commands({"arguments": {"command": argv}}) == ["pytest", "git log"]
+    assert h.normalized_commands({"arguments": {"command": argv}}) == [
+        "pytest",
+        "git log",
+    ]
 
 
 @pytest.mark.parametrize("redirect", ["2>&1", ">&2", "0<&3", "&>out", "&>>out", "2>&-"])
@@ -510,7 +605,9 @@ def test_gemini_trajectory_read_is_visible_to_verifier(tmp_path, monkeypatch):
     assert gv.toolcalls().any_arg_contains("read", "hello.py")
 
 
-@pytest.mark.parametrize("tool_info", [{"name": "finish"}, {"name": "finish", "parameters": {}}])
+@pytest.mark.parametrize(
+    "tool_info", [{"name": "finish"}, {"name": "finish", "parameters": {}}]
+)
 def test_agy_parser_keeps_empty_argument_tools(tool_info):
     lines = [
         _line({"event": "init", "conversation_id": "conversation"}),
@@ -548,7 +645,9 @@ def test_agy_parser_ignores_malformed_steps():
         {"step_index": None},
         {"step_index": True},
     ):
-        lines.append(_line({"event": "step_update", "step_update": {**base, **changes}}))
+        lines.append(
+            _line({"event": "step_update", "step_update": {**base, **changes}})
+        )
     lines.extend([_line({"event": "step_update", "step_update": []}), "{invalid"])
     assert h.calls_from_agy_stream_json(lines) == []
     lines.append(_line({"event": "step_update", "step_update": base}))
@@ -581,8 +680,14 @@ def _agy_call(name, parameters, index=0):
         ("notebook_edit", "NotebookEdit", "NotebookPath"),
     ],
 )
-def test_agy_file_tools_normalize_and_keep_audit_fields_in_snapshot(name, canonical, path_key):
-    parameters = {path_key: "/work/target.py", "Content": "original body", "file_path": "stale"}
+def test_agy_file_tools_normalize_and_keep_audit_fields_in_snapshot(
+    name, canonical, path_key
+):
+    parameters = {
+        path_key: "/work/target.py",
+        "Content": "original body",
+        "file_path": "stale",
+    }
     call = h.calls_from_agy_stream_json([_agy_call(name, parameters)])[0]
     assert call["name"] == canonical
     assert call["arguments"] == {**parameters, "file_path": "/work/target.py"}
@@ -630,7 +735,9 @@ def test_agy_command_normalization_and_review_read_segments():
     assert call["original_name"] == "run_command"
     assert call["original_arguments"] == parameters
     assert evaluate([], [call], clean_control=True, read_files=["target.py"])[-1]["ok"]
-    assert not evaluate([], [call], clean_control=True, read_files=["other.py"])[-1]["ok"]
+    assert not evaluate([], [call], clean_control=True, read_files=["other.py"])[-1][
+        "ok"
+    ]
 
 
 @pytest.mark.parametrize(
@@ -663,14 +770,17 @@ def test_coding_toc_verifiers_detect_agy_edits(task_id, subject, commands, edit_
     from gym.grader import Trajectory
     from gym.schema import load_task
 
-    task = load_task(REPO_ROOT / "modules/adversarial-eval-gym/tasks" / task_id)
+    task = load_task(REPO_ROOT / "tasks" / task_id)
     result = {
         "status": "fixed",
         "regressing_commit_subject": subject,
     }
     if task_id == "coding-toc-large-output":
         result["failure_marker"] = "route-cedar-742"
-    events = [_agy_call("run_command", {"CommandLine": cmd}, i) for i, cmd in enumerate(commands)]
+    events = [
+        _agy_call("run_command", {"CommandLine": cmd}, i)
+        for i, cmd in enumerate(commands)
+    ]
 
     def grade(path):
         path_key = "NotebookPath" if edit_tool == "notebook_edit" else "TargetFile"
@@ -735,7 +845,10 @@ def test_streamed_tool_calls_keep_latest_arguments_in_first_seen_order(harness):
         ]
     )
     assert [call["call_id"] for call in calls] == ["first", "second", None, None]
-    assert calls[0]["arguments"] == {"path": "complete.txt", "nested": {"body": "x" * 2100}}
+    assert calls[0]["arguments"] == {
+        "path": "complete.txt",
+        "nested": {"body": "x" * 2100},
+    }
     assert [call["arguments"]["path"] for call in calls[1:]] == [
         "second.txt",
         "anonymous-1",
@@ -745,7 +858,10 @@ def test_streamed_tool_calls_keep_latest_arguments_in_first_seen_order(harness):
 
 def test_opencode_export_updates_the_same_call_as_stream_events():
     partial = {"type": "tool", "tool": "read", "callID": "call", "state": {"input": {}}}
-    completed = {**partial, "state": {"status": "completed", "input": {"path": "input.txt"}}}
+    completed = {
+        **partial,
+        "state": {"status": "completed", "input": {"path": "input.txt"}},
+    }
     assert h.calls_from_opencode_json(
         [_line({"part": partial}), _line({"messages": [{"parts": [completed]}]})]
     ) == [{"name": "read", "arguments": {"path": "input.txt"}, "call_id": "call"}]

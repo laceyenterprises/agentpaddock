@@ -35,9 +35,17 @@ def test_quota_gate_suspends_on_an_exhausted_provider():
 
 
 def test_quota_gate_suspends_on_an_operator_suspension_or_suspended_lrq():
-    rows = [{"provider": "openai", "authPath": "oauth", "state": "ok", "operatorSuspendUntil": "x"}]
+    rows = [
+        {
+            "provider": "openai",
+            "authPath": "oauth",
+            "state": "ok",
+            "operatorSuspendUntil": "x",
+        }
+    ]
     assert (
-        toc_matrix.quota_gate(0, _status(providerStatuses=rows)).state == toc_matrix.QUOTA_SUSPENDED
+        toc_matrix.quota_gate(0, _status(providerStatuses=rows)).state
+        == toc_matrix.QUOTA_SUSPENDED
     )
     lrqs = [{"launchRequestId": "lrq-1"}]
     assert (
@@ -65,10 +73,14 @@ def test_quota_gate_unreadable_status_is_unknown(returncode, stdout):
 def test_arm_gate_runs_off_and_spill_and_refuses_rtk():
     assert toc_matrix.arm_omission_reason("off") is None
     assert toc_matrix.arm_omission_reason("spill", ("git", "pytest")) is None
-    assert "RTK-ELIGIBILITY.md" in toc_matrix.arm_omission_reason("rtk", ("git", "pytest"))
+    assert "RTK-ELIGIBILITY.md" in toc_matrix.arm_omission_reason(
+        "rtk", ("git", "pytest")
+    )
     assert "compress nothing" in toc_matrix.arm_omission_reason("spill", ())
     assert "unknown arm" in toc_matrix.arm_omission_reason("zstd", ("git",))
-    assert set(toc_matrix.LAUNCH_ARMS) | set(toc_matrix.OMITTED_ARM_REASONS) == set(toc_matrix.ARMS)
+    assert set(toc_matrix.LAUNCH_ARMS) | set(toc_matrix.OMITTED_ARM_REASONS) == set(
+        toc_matrix.ARMS
+    )
 
 
 def test_fidelity_note_records_that_spill_runs_as_a_measurement_arm():
@@ -89,7 +101,9 @@ def _stub_ledger(monkeypatch, toc_eval, estimate=None):
     monkeypatch.setattr(
         toc_eval, "_estimates", lambda cells, _days: {c: dict(estimate) for c in cells}
     )
-    monkeypatch.setattr(toc_eval, "_host_config", lambda: {"path": "p", "compressionSha256": "h"})
+    monkeypatch.setattr(
+        toc_eval, "_host_config", lambda: {"path": "p", "compressionSha256": "h"}
+    )
     monkeypatch.setattr(
         toc_eval,
         "_quota_once",
@@ -131,14 +145,18 @@ def test_cost_per_success_counts_every_attempt_but_only_graded_passes():
 
 
 def test_zero_passes_leaves_cost_per_success_undefined_not_zero():
-    (arm,) = toc_matrix.aggregate([_attempt(outcomes.FAILED, 1.5), _attempt(outcomes.FAILED, 0)])
+    (arm,) = toc_matrix.aggregate(
+        [_attempt(outcomes.FAILED, 1.5), _attempt(outcomes.FAILED, 0)]
+    )
     assert arm["costPerSuccessUsd"] is None
     assert arm["costPerSuccessUndefinedReason"] == "no gym-graded passes"
     assert arm["totalCostUsd"] == 1.5
 
 
 def test_missing_cost_leaves_cost_per_success_undefined():
-    (arm,) = toc_matrix.aggregate([_attempt(outcomes.PASSED, 1.0), _attempt(outcomes.PASSED, None)])
+    (arm,) = toc_matrix.aggregate(
+        [_attempt(outcomes.PASSED, 1.0), _attempt(outcomes.PASSED, None)]
+    )
     assert arm["costPerSuccessUsd"] is None
     assert "cost missing" in arm["costPerSuccessUndefinedReason"]
 
@@ -156,9 +174,15 @@ def test_compressed_arm_without_attributable_coverage_is_uninformative():
 
 def test_run_parser_validates_the_toc_flags():
     parser = cli.build_parser()
-    args = parser.parse_args(["run", "--priority", "low", "--compression", "off", "--attempt", "2"])
+    args = parser.parse_args(
+        ["run", "--priority", "low", "--compression", "off", "--attempt", "2"]
+    )
     assert (args.priority, args.compression, args.attempt) == ("low", "off", 2)
-    for bad in (["--priority", "urgent"], ["--compression", "zstd"], ["--attempt", "0"]):
+    for bad in (
+        ["--priority", "urgent"],
+        ["--compression", "zstd"],
+        ["--attempt", "0"],
+    ):
         with pytest.raises(SystemExit):
             parser.parse_args(["run", *bad])
 
@@ -251,9 +275,13 @@ class _Proc:
 def test_gym_run_without_a_cell_is_excluded_not_pending_forever(monkeypatch):
     toc_eval = pytest.importorskip("gym.toc_eval")
     monkeypatch.setattr(
-        toc_eval.subprocess, "run", lambda *a, **k: _Proc("", 1, "LockDriftError: codex")
+        toc_eval.subprocess,
+        "run",
+        lambda *a, **k: _Proc("", 1, "LockDriftError: codex"),
     )
-    (record,) = toc_eval._run_attempt("codex", "gpt-6-sol", "off", "coding-toc-commands", 1, "low")
+    (record,) = toc_eval._run_attempt(
+        "codex", "gpt-6-sol", "off", "coding-toc-commands", 1, "low"
+    )
     assert record["excluded"] is True
     assert record["launchRequestId"] is None
     assert toc_eval._join([record], _FakeReader({})) == 0
@@ -269,7 +297,9 @@ def test_poll_deadline_cell_is_excluded_from_the_arm(monkeypatch):
     }
     payload = json.dumps({"cells": [cell]})
     monkeypatch.setattr(toc_eval.subprocess, "run", lambda *a, **k: _Proc(payload))
-    (record,) = toc_eval._run_attempt("codex", "gpt-6-sol", "off", "coding-toc-commands", 1, "low")
+    (record,) = toc_eval._run_attempt(
+        "codex", "gpt-6-sol", "off", "coding-toc-commands", 1, "low"
+    )
     assert record["excluded"] is True
     assert "queue time" in record["excludedReason"]
     # Not rejoined: an excluded launch never holds the arm's cost pending.
@@ -313,11 +343,15 @@ def test_rejoin_only_joins_and_writes_without_dispatching(monkeypatch, tmp_path)
     monkeypatch.setattr(toc_eval, "_quota", no_dispatch)
     monkeypatch.setattr(toc_eval, "_host_config", no_dispatch)
     real_join = toc_eval._join
-    reader = _FakeReader({"lrq-1": {"runs": 1, "uncostedRuns": 0, "openRuns": 0, "costUsd": 2.5}})
+    reader = _FakeReader(
+        {"lrq-1": {"runs": 1, "uncostedRuns": 0, "openRuns": 0, "costUsd": 2.5}}
+    )
     monkeypatch.setattr(toc_eval, "_join", lambda attempts: real_join(attempts, reader))
 
     assert toc_eval.main(["--out", str(out), "--rejoin-only"]) == 1
-    assert json.loads(out.read_text())["result"]["tokenAccountingStatus"] == "unresolved"
+    assert (
+        json.loads(out.read_text())["result"]["tokenAccountingStatus"] == "unresolved"
+    )
     (arm,) = json.loads(out.read_text())["arms"]
     assert arm["costPerSuccessUsd"] == 2.5
 
@@ -340,13 +374,29 @@ def test_quota_is_rechecked_before_every_attempt(monkeypatch, tmp_path):
 
     def fake_attempt(worker_class, model, arm, task, attempt, priority):
         ran.append(attempt)
-        return [{**_attempt(outcomes.PASSED, 0.0), "arm": arm, "task": task, "attempt": attempt}]
+        return [
+            {
+                **_attempt(outcomes.PASSED, 0.0),
+                "arm": arm,
+                "task": task,
+                "attempt": attempt,
+            }
+        ]
 
     monkeypatch.setattr(toc_eval, "_run_attempt", fake_attempt)
     monkeypatch.setattr(toc_eval, "_join", lambda attempts, reader=None: 0)
     out = tmp_path / "matrix.json"
     rc = toc_eval.main(
-        ["--out", str(out), "--cell", "codex=gpt-6-sol", "--arm", "off", "--attempts", "3"]
+        [
+            "--out",
+            str(out),
+            "--cell",
+            "codex=gpt-6-sol",
+            "--arm",
+            "off",
+            "--attempts",
+            "3",
+        ]
     )
     assert rc == 0
     assert ran == [1]
@@ -358,12 +408,18 @@ def test_quota_is_rechecked_before_every_attempt(monkeypatch, tmp_path):
     assert "quota suspended" in document["result"]["reason"]
 
 
-def test_a_class_without_a_committed_lock_is_omitted_not_dispatched(monkeypatch, tmp_path):
+def test_a_class_without_a_committed_lock_is_omitted_not_dispatched(
+    monkeypatch, tmp_path
+):
     toc_eval = pytest.importorskip("gym.toc_eval")
     _stub_ledger(monkeypatch, toc_eval)
-    monkeypatch.setattr(toc_eval.locks, "default_locks_dir", lambda: tmp_path / "no-locks")
+    monkeypatch.setattr(
+        toc_eval.locks, "default_locks_dir", lambda: tmp_path / "no-locks"
+    )
     assert "lock" in toc_eval._lock_omission_reason("codex")
-    rc = toc_eval.main(["--out", str(tmp_path / "m.json"), "--cell", "codex=m", "--dry-run"])
+    rc = toc_eval.main(
+        ["--out", str(tmp_path / "m.json"), "--cell", "codex=m", "--dry-run"]
+    )
     assert rc == 0
 
 
@@ -419,7 +475,9 @@ def test_arm_mismatch_needs_request_run_adapter_and_rows_to_agree():
     assert "backend" in toc_matrix.arm_mismatch_reason("spill", spill, noop_rows)
     off = {"requested": "off", "recorded": ["off"], "effective": ["off"]}
     assert toc_matrix.arm_mismatch_reason("off", off, {"rows": 0}) is None
-    assert "off launch wrote 3" in toc_matrix.arm_mismatch_reason("off", off, {"rows": 3})
+    assert "off launch wrote 3" in toc_matrix.arm_mismatch_reason(
+        "off", off, {"rows": 3}
+    )
 
 
 def test_join_verifies_the_arm_and_counts_attributed_invocations():
@@ -449,7 +507,12 @@ def test_join_verifies_the_arm_and_counts_attributed_invocations():
             }
         },
         usage={
-            "s": {"turns": 7, "inputTokens": 5, "cacheReadTokens": 50, "outputTokens": 9},
+            "s": {
+                "turns": 7,
+                "inputTokens": 5,
+                "cacheReadTokens": 50,
+                "outputTokens": 9,
+            },
         },
     )
     assert toc_eval._join(attempts, reader) == 1  # the unknown launch stays pending
@@ -469,7 +532,9 @@ def test_aggregate_reports_variance_turns_and_bytes_not_as_the_decision():
         {**_attempt(outcomes.FAILED, 2.0, arm="spill", lrq="c"), "turns": 30},
     ]
     for row in rows:
-        row.update(eligibleInvocations=2, compressedInvocations=1, bytesIn=1000, bytesOut=250)
+        row.update(
+            eligibleInvocations=2, compressedInvocations=1, bytesIn=1000, bytesOut=250
+        )
     (arm,) = toc_matrix.aggregate(rows)
     assert arm["informative"] is True
     assert arm["costPerSuccessUsd"] == 3.0
@@ -491,9 +556,24 @@ def test_budget_counts_cached_input_once_per_class():
 
 def test_budget_estimate_prefers_the_model_then_the_class():
     samples = [
-        {"model": "gpt-5.5", "inputTokens": 100, "cacheReadTokens": 80, "outputTokens": 10},
-        {"model": "gpt-5.5", "inputTokens": 300, "cacheReadTokens": 80, "outputTokens": 30},
-        {"model": "gpt-6-sol", "inputTokens": 50, "cacheReadTokens": 0, "outputTokens": 5},
+        {
+            "model": "gpt-5.5",
+            "inputTokens": 100,
+            "cacheReadTokens": 80,
+            "outputTokens": 10,
+        },
+        {
+            "model": "gpt-5.5",
+            "inputTokens": 300,
+            "cacheReadTokens": 80,
+            "outputTokens": 30,
+        },
+        {
+            "model": "gpt-6-sol",
+            "inputTokens": 50,
+            "cacheReadTokens": 0,
+            "outputTokens": 5,
+        },
     ]
     same = toc_matrix.estimate_attempt_budget("codex", "gpt-6-sol", samples)
     assert (same["basis"], same["sampleSize"], same["totalTokens"]) == ("model", 1, 55)
@@ -511,14 +591,18 @@ def test_toc_matrix_accepts_only_low_priority_and_needs_out_unless_dry_run(tmp_p
     toc_eval = pytest.importorskip("gym.toc_eval")
     out = str(tmp_path / "ab-result.json")
     with pytest.raises(SystemExit):
-        toc_eval._parse_args(["--cell", "codex=m", "--out", out, "--priority", "normal"])
+        toc_eval._parse_args(
+            ["--cell", "codex=m", "--out", out, "--priority", "normal"]
+        )
     with pytest.raises(SystemExit):
         toc_eval._parse_args(["--cell", "codex=m"])
     assert toc_eval._parse_args(["--cell", "codex=m", "--out", out]).priority == "low"
     assert toc_eval._parse_args(["--cell", "codex=m", "--dry-run"]).out is None
 
 
-def test_dry_run_prints_cells_budget_and_caps_without_dispatching(monkeypatch, tmp_path, capsys):
+def test_dry_run_prints_cells_budget_and_caps_without_dispatching(
+    monkeypatch, tmp_path, capsys
+):
     toc_eval = pytest.importorskip("gym.toc_eval")
     estimate = {
         "basis": "class",
@@ -539,7 +623,10 @@ def test_dry_run_prints_cells_budget_and_caps_without_dispatching(monkeypatch, t
     argv = ["--out", str(out), "--cell", "codex=gpt-6-sol", "--dry-run"]
     assert toc_eval.main([*argv, "--arm", "off", "--arm", "spill", "--arm", "rtk"]) == 0
     text = capsys.readouterr().out
-    assert "codex/gpt-6-sol/off coding-toc-commands: per attempt 1,000(900):10 = 1,010" in text
+    assert (
+        "codex/gpt-6-sol/off coding-toc-commands: per attempt 1,000(900):10 = 1,010"
+        in text
+    )
     assert "per cell 3,000(2,700):30 = 3,030 (basis: class, n=4)" in text
     assert "omitted codex/gpt-6-sol/rtk" in text
     assert "Estimated total: 6,060 tokens" in text
@@ -562,7 +649,9 @@ def test_token_budget_stops_the_run_and_reports_it_partial(monkeypatch, tmp_path
     _stub_ledger(monkeypatch, toc_eval, estimate)
     monkeypatch.setattr(toc_eval, "_lock_omission_reason", lambda _cls: None)
     monkeypatch.setattr(
-        toc_eval, "_quota", lambda *_: toc_matrix.QuotaGate(toc_matrix.QUOTA_HEALTHY, "ok")
+        toc_eval,
+        "_quota",
+        lambda *_: toc_matrix.QuotaGate(toc_matrix.QUOTA_HEALTHY, "ok"),
     )
     ran = []
 
@@ -585,7 +674,16 @@ def test_token_budget_stops_the_run_and_reports_it_partial(monkeypatch, tmp_path
     monkeypatch.setattr(toc_eval, "_open_reader", lambda: _FakeReader({}))
     monkeypatch.setattr(toc_eval, "_join", lambda attempts, reader=None: 0)
     out = tmp_path / "ab.json"
-    argv = ["--out", str(out), "--cell", "codex=gpt-6-sol", "--arm", "off", "--arm", "spill"]
+    argv = [
+        "--out",
+        str(out),
+        "--cell",
+        "codex=gpt-6-sol",
+        "--arm",
+        "off",
+        "--arm",
+        "spill",
+    ]
     assert toc_eval.main([*argv, "--max-total-tokens", "1200"]) == 0
     # 500 + 500 spent; the third attempt's 400 estimate would reach 1400 > 1200.
     assert ran == [("off", 1), ("off", 2)]
@@ -595,13 +693,18 @@ def test_token_budget_stops_the_run_and_reports_it_partial(monkeypatch, tmp_path
     assert "token budget" in result["reason"]
     assert (result["plannedAttempts"], result["dispatchedAttempts"]) == (6, 2)
     assert result["tokensSpent"] == 1000
-    assert document["attempts"][0]["budgetTokens"] == {"tokens": 500, "source": "ledger"}
+    assert document["attempts"][0]["budgetTokens"] == {
+        "tokens": 500,
+        "source": "ledger",
+    }
     assert document["armNotes"]["spill"]["admitted"] is False
 
 
 def test_reader_ab_reads_use_the_bounded_psql_path_on_postgres():
     """The A/B reads never touch the compatibility connection on Postgres."""
-    from gym.ledger import LedgerReader
+    LedgerReader = pytest.importorskip(
+        "gym.ledger", reason="host ledger integration is not shipped"
+    ).LedgerReader
 
     sent = []
 
@@ -635,7 +738,9 @@ def test_unknown_estimate_never_dispatches(monkeypatch, tmp_path, error):
         estimate["error"] = error
     _stub_ledger(monkeypatch, toc_eval, estimate)
     monkeypatch.setattr(toc_eval, "_lock_omission_reason", lambda _: None)
-    monkeypatch.setattr(toc_eval, "_quota", lambda *_: toc_matrix.quota_gate(0, _status()))
+    monkeypatch.setattr(
+        toc_eval, "_quota", lambda *_: toc_matrix.quota_gate(0, _status())
+    )
 
     def refuse(*args):
         pytest.fail("missing estimate must stop dispatch")
@@ -644,7 +749,16 @@ def test_unknown_estimate_never_dispatches(monkeypatch, tmp_path, error):
     out = tmp_path / "matrix.json"
     assert (
         toc_eval.main(
-            ["--out", str(out), "--cell", "codex=m", "--arm", "off", "--max-total-tokens", "1"]
+            [
+                "--out",
+                str(out),
+                "--cell",
+                "codex=m",
+                "--arm",
+                "off",
+                "--max-total-tokens",
+                "1",
+            ]
         )
         == 1
     )
@@ -696,15 +810,26 @@ def test_reservation_survives_incomplete_usage_and_rejoins():
 @pytest.mark.parametrize(
     ("arm", "counts"),
     [
-        ("off", {"rows": 1, "okRows": 1, "backends": ["spill"], "armSources": ["launch"]}),
-        ("spill", {"rows": 1, "okRows": 1, "backends": ["spill"], "armSources": ["host"]}),
-        ("spill", {"rows": 1, "okRows": 1, "backends": ["rtk"], "armSources": ["launch"]}),
+        (
+            "off",
+            {"rows": 1, "okRows": 1, "backends": ["spill"], "armSources": ["launch"]},
+        ),
+        (
+            "spill",
+            {"rows": 1, "okRows": 1, "backends": ["spill"], "armSources": ["host"]},
+        ),
+        (
+            "spill",
+            {"rows": 1, "okRows": 1, "backends": ["rtk"], "armSources": ["launch"]},
+        ),
     ],
 )
 def test_late_journals_invalidate_a_previously_verified_arm(arm, counts):
     toc_eval = pytest.importorskip("gym.toc_eval")
     record = _attempt(outcomes.PASSED, 1, arm=arm, lrq="a")
-    reader = _FakeReader({}, arms={"a": {"requested": arm, "recorded": [arm], "effective": [arm]}})
+    reader = _FakeReader(
+        {}, arms={"a": {"requested": arm, "recorded": [arm], "effective": [arm]}}
+    )
     toc_eval._join([record], reader)
     assert record["armVerified"] is True
     reader.counts["a"] = counts
@@ -714,11 +839,15 @@ def test_late_journals_invalidate_a_previously_verified_arm(arm, counts):
 
 
 @pytest.mark.parametrize("failure", ["open", "read"])
-def test_accepted_launch_is_persisted_before_enrichment_failure(monkeypatch, tmp_path, failure):
+def test_accepted_launch_is_persisted_before_enrichment_failure(
+    monkeypatch, tmp_path, failure
+):
     toc_eval = pytest.importorskip("gym.toc_eval")
     _stub_ledger(monkeypatch, toc_eval)
     monkeypatch.setattr(toc_eval, "_lock_omission_reason", lambda _: None)
-    monkeypatch.setattr(toc_eval, "_quota", lambda *_: toc_matrix.quota_gate(0, _status()))
+    monkeypatch.setattr(
+        toc_eval, "_quota", lambda *_: toc_matrix.quota_gate(0, _status())
+    )
     out = tmp_path / "matrix.json"
     calls = []
 
@@ -736,7 +865,9 @@ def test_accepted_launch_is_persisted_before_enrichment_failure(monkeypatch, tmp
     if failure == "read":
         monkeypatch.setattr(reader, "cost_for_launch", fail)
     monkeypatch.setattr(toc_eval, "_run_attempt", run)
-    monkeypatch.setattr(toc_eval, "_open_reader", fail if failure == "open" else lambda: reader)
+    monkeypatch.setattr(
+        toc_eval, "_open_reader", fail if failure == "open" else lambda: reader
+    )
     assert toc_eval.main(["--out", str(out), "--cell", "codex=m", "--arm", "off"]) == 1
     saved = json.loads(out.read_text())
     assert len(calls) == 1 and saved["result"]["status"] == "partial"
@@ -744,7 +875,9 @@ def test_accepted_launch_is_persisted_before_enrichment_failure(monkeypatch, tmp
     reader = _FakeReader({"accepted": {"costUsd": 1}})
     monkeypatch.setattr(toc_eval, "_open_reader", lambda: reader)
     assert toc_eval.main(["--out", str(out), "--rejoin-only"]) == 1
-    assert json.loads(out.read_text())["result"]["tokenAccountingStatus"] == "unresolved"
+    assert (
+        json.loads(out.read_text())["result"]["tokenAccountingStatus"] == "unresolved"
+    )
     assert len(calls) == 1
 
 
@@ -757,10 +890,18 @@ def test_join_validates_and_reports_one_journal_snapshot():
         def toc_counts_for_launch(self, launch_request_id):
             self.reads += 1
             assert self.reads == 1
-            return {"rows": 1, "okRows": 1, "backends": ["spill"], "armSources": ["launch"]}
+            return {
+                "rows": 1,
+                "okRows": 1,
+                "backends": ["spill"],
+                "armSources": ["launch"],
+            }
 
     reader = Reader(
-        {}, arms={"a": {"requested": "spill", "recorded": ["spill"], "effective": ["spill"]}}
+        {},
+        arms={
+            "a": {"requested": "spill", "recorded": ["spill"], "effective": ["spill"]}
+        },
     )
     record = _attempt(outcomes.PASSED, 1, arm="spill", lrq="a")
     toc_eval._join([record], reader)
@@ -774,7 +915,11 @@ def test_later_worker_run_invalidates_verified_arm():
     toc_eval._join([record], reader)
     assert record["armVerified"] is True
     reader.arms = {
-        "a": {"requested": "off", "recorded": ["off", "spill"], "effective": ["off", "spill"]}
+        "a": {
+            "requested": "off",
+            "recorded": ["off", "spill"],
+            "effective": ["off", "spill"],
+        }
     }
     toc_eval._join([record], reader)
     assert record["excluded"] and not record["armVerified"]
@@ -782,13 +927,19 @@ def test_later_worker_run_invalidates_verified_arm():
 
 @pytest.mark.parametrize("field", ["recorded", "effective"])
 def test_missing_sibling_arm_excludes_attempt(field):
-    launch = {"requested": "spill", "recorded": ["spill", "spill"], "effective": ["spill", "spill"]}
+    launch = {
+        "requested": "spill",
+        "recorded": ["spill", "spill"],
+        "effective": ["spill", "spill"],
+    }
     launch[field][1] = None
     assert toc_matrix.arm_mismatch_reason("spill", launch, {}) is not None
 
 
 def test_read_only_reader_resolves_postgres_without_opening_database():
-    from gym.ledger import LedgerReader
+    LedgerReader = pytest.importorskip(
+        "gym.ledger", reason="host ledger integration is not shipped"
+    ).LedgerReader
 
     target = types.SimpleNamespace(backend="postgres")
     with (
@@ -799,7 +950,9 @@ def test_read_only_reader_resolves_postgres_without_opening_database():
 
 
 def test_read_only_reader_does_not_create_missing_sqlite(tmp_path):
-    from gym.ledger import LedgerReader
+    LedgerReader = pytest.importorskip(
+        "gym.ledger", reason="host ledger integration is not shipped"
+    ).LedgerReader
 
     path = tmp_path / "absent" / "ledger.sqlite"
     target = types.SimpleNamespace(backend="sqlite", db_path=path)
@@ -811,7 +964,10 @@ def test_read_only_reader_does_not_create_missing_sqlite(tmp_path):
 
 def test_read_only_reader_cannot_write_sqlite(tmp_path):
     import sqlite3
-    from gym.ledger import LedgerReader
+
+    LedgerReader = pytest.importorskip(
+        "gym.ledger", reason="host ledger integration is not shipped"
+    ).LedgerReader
 
     path = tmp_path / "ledger.sqlite"
     with sqlite3.connect(path) as conn:
@@ -834,7 +990,9 @@ def test_read_only_reader_cannot_write_sqlite(tmp_path):
     ],
 )
 def test_cell_scoped_quota(monkeypatch, worker_class, state, expected):
-    from gym import toc_eval
+    toc_eval = pytest.importorskip(
+        "gym.toc_eval", reason="host TOC evaluation is not shipped"
+    )
 
     payload = _status(
         providerStatuses=[
@@ -857,17 +1015,27 @@ def test_cell_scoped_quota(monkeypatch, worker_class, state, expected):
 
 
 def test_allow_unestimated_stops_on_actual_cap(monkeypatch, tmp_path):
-    from gym import toc_eval
+    toc_eval = pytest.importorskip(
+        "gym.toc_eval", reason="host TOC evaluation is not shipped"
+    )
 
-    _stub_ledger(monkeypatch, toc_eval, {"basis": "none", "sampleSize": 0, "totalTokens": None})
+    _stub_ledger(
+        monkeypatch, toc_eval, {"basis": "none", "sampleSize": 0, "totalTokens": None}
+    )
     monkeypatch.setattr(toc_eval, "_lock_omission_reason", lambda _: None)
-    monkeypatch.setattr(toc_eval, "_quota", lambda *_: toc_matrix.QuotaGate("healthy", "ok"))
+    monkeypatch.setattr(
+        toc_eval, "_quota", lambda *_: toc_matrix.QuotaGate("healthy", "ok")
+    )
     ran = []
 
     def run(*args):
         ran.append(args)
         return [
-            {**_attempt(outcomes.PASSED, 0, lrq="test"), "usageComplete": True, "totalTokens": 100}
+            {
+                **_attempt(outcomes.PASSED, 0, lrq="test"),
+                "usageComplete": True,
+                "totalTokens": 100,
+            }
         ]
 
     monkeypatch.setattr(toc_eval, "_run_attempt", run)
@@ -895,13 +1063,18 @@ def test_allow_unestimated_stops_on_actual_cap(monkeypatch, tmp_path):
 
 
 def test_mixed_matrix_stops_before_suspended_claude_cell(monkeypatch, tmp_path):
-    from gym import toc_eval
+    toc_eval = pytest.importorskip(
+        "gym.toc_eval", reason="host TOC evaluation is not shipped"
+    )
 
     _stub_ledger(monkeypatch, toc_eval)
     monkeypatch.setattr(
         toc_eval,
         "_plan",
-        lambda _: ([("codex", "m", "off", "task"), ("claude-code", "m", "off", "task")], []),
+        lambda _: (
+            [("codex", "m", "off", "task"), ("claude-code", "m", "off", "task")],
+            [],
+        ),
     )
 
     def quota(worker_class):
@@ -912,7 +1085,11 @@ def test_mixed_matrix_stops_before_suspended_claude_cell(monkeypatch, tmp_path):
             _status(
                 providerStatuses=[
                     {"provider": "openai", "authPath": "oauth", "state": "ok"},
-                    {"provider": "anthropic", "authPath": "oauth", "state": "exhausted"},
+                    {
+                        "provider": "anthropic",
+                        "authPath": "oauth",
+                        "state": "exhausted",
+                    },
                 ]
             ),
             requirements=class_quota_requirements(worker_class),
@@ -931,7 +1108,16 @@ def test_mixed_matrix_stops_before_suspended_claude_cell(monkeypatch, tmp_path):
     out = tmp_path / "mixed.json"
     assert (
         toc_eval.main(
-            ["--out", str(out), "--cell", "codex=m", "--cell", "claude-code=m", "--attempts", "1"]
+            [
+                "--out",
+                str(out),
+                "--cell",
+                "codex=m",
+                "--cell",
+                "claude-code=m",
+                "--attempts",
+                "1",
+            ]
         )
         == 0
     )
@@ -941,12 +1127,19 @@ def test_mixed_matrix_stops_before_suspended_claude_cell(monkeypatch, tmp_path):
 
 @pytest.mark.parametrize("effective", [["spill"], [None]])
 def test_rejoin_rechecks_arm_exclusions_and_names_missing_effective(effective):
-    from gym import toc_eval
+    toc_eval = pytest.importorskip(
+        "gym.toc_eval", reason="host TOC evaluation is not shipped"
+    )
 
     record = _attempt(outcomes.PASSED, 2, arm="spill", lrq="a")
-    record.update(excluded=True, excludedReason="arm mismatch: launch request records arm None")
+    record.update(
+        excluded=True, excludedReason="arm mismatch: launch request records arm None"
+    )
     reader = _FakeReader(
-        {}, arms={"a": {"requested": "spill", "recorded": ["spill"], "effective": effective}}
+        {},
+        arms={
+            "a": {"requested": "spill", "recorded": ["spill"], "effective": effective}
+        },
     )
     toc_eval._join([record], reader)
     if effective == ["spill"]:
@@ -961,13 +1154,19 @@ def test_rejoin_rechecks_arm_exclusions_and_names_missing_effective(effective):
 
 @pytest.mark.parametrize("completed", [False, True])
 def test_deadline_recovery_requires_a_fresh_grade(completed):
-    from gym import toc_eval
+    toc_eval = pytest.importorskip(
+        "gym.toc_eval", reason="host TOC evaluation is not shipped"
+    )
 
     class Reader(_FakeReader):
         def completed_gym_grade(self, lrq, task):
             assert (lrq, task) == ("a", "coding-toc-commands")
             return (
-                {"verdict": outcomes.PASSED, "reason": "regraded", "terminalStatus": "succeeded"}
+                {
+                    "verdict": outcomes.PASSED,
+                    "reason": "regraded",
+                    "terminalStatus": "succeeded",
+                }
                 if completed
                 else None
             )
@@ -989,15 +1188,29 @@ def test_deadline_recovery_requires_a_fresh_grade(completed):
 
 @pytest.mark.parametrize(
     ("requested", "effective", "reason"),
-    [("spill", ["spill"], "arm mismatch"), ("off", [None], "effective_arm_not_reported")],
+    [
+        ("spill", ["spill"], "arm mismatch"),
+        ("off", [None], "effective_arm_not_reported"),
+    ],
 )
-def test_first_arm_failure_stops_the_matrix(monkeypatch, tmp_path, requested, effective, reason):
-    from gym import toc_eval
+def test_first_arm_failure_stops_the_matrix(
+    monkeypatch, tmp_path, requested, effective, reason
+):
+    toc_eval = pytest.importorskip(
+        "gym.toc_eval", reason="host TOC evaluation is not shipped"
+    )
 
     _stub_ledger(monkeypatch, toc_eval)
     monkeypatch.setattr(toc_eval, "_lock_omission_reason", lambda _: None)
     reader = _FakeReader(
-        {}, arms={"a": {"requested": requested, "recorded": [requested], "effective": effective}}
+        {},
+        arms={
+            "a": {
+                "requested": requested,
+                "recorded": [requested],
+                "effective": effective,
+            }
+        },
     )
     monkeypatch.setattr(toc_eval, "_open_reader", lambda: reader)
     calls = []
@@ -1009,7 +1222,9 @@ def test_first_arm_failure_stops_the_matrix(monkeypatch, tmp_path, requested, ef
     monkeypatch.setattr(toc_eval, "_run_attempt", run)
     out = tmp_path / "result.json"
     assert (
-        toc_eval.main(["--out", str(out), "--cell", "codex=m", "--arm", "off", "--arm", "spill"])
+        toc_eval.main(
+            ["--out", str(out), "--cell", "codex=m", "--arm", "off", "--arm", "spill"]
+        )
         == 1
     )
     doc = json.loads(out.read_text())
@@ -1020,8 +1235,12 @@ def test_first_arm_failure_stops_the_matrix(monkeypatch, tmp_path, requested, ef
 
 @pytest.mark.parametrize("initial_cost", [None, 1.0])
 @pytest.mark.parametrize("calls", [{}, {"git": 9}, {"git": 1, "pytest": 2}])
-def test_required_seam_coverage_stays_pending_until_journals_arrive(initial_cost, calls):
-    from gym import toc_eval
+def test_required_seam_coverage_stays_pending_until_journals_arrive(
+    initial_cost, calls
+):
+    toc_eval = pytest.importorskip(
+        "gym.toc_eval", reason="host TOC evaluation is not shipped"
+    )
 
     record = {
         "launchRequestId": "lrq",
@@ -1034,7 +1253,9 @@ def test_required_seam_coverage_stays_pending_until_journals_arrive(initial_cost
     }
     reader = _FakeReader(
         {"lrq": {"costUsd": initial_cost}},
-        arms={"lrq": {"requested": "spill", "recorded": ["spill"], "effective": ["spill"]}},
+        arms={
+            "lrq": {"requested": "spill", "recorded": ["spill"], "effective": ["spill"]}
+        },
         counts={
             "lrq": {
                 "rows": sum(calls.values()),
@@ -1056,14 +1277,20 @@ def test_required_seam_coverage_stays_pending_until_journals_arrive(initial_cost
     reader.costs["lrq"]["costUsd"] = 1.0
     # Cost/usage completion cannot establish journal ingestion completion.
     assert toc_eval._join([record], reader) == int(missing)
-    reader.counts["lrq"].update(callsByCommand={"git": 1, "pytest": 2}, rows=3, okRows=3)
+    reader.counts["lrq"].update(
+        callsByCommand={"git": 1, "pytest": 2}, rows=3, okRows=3
+    )
     assert toc_eval._join([record], reader) == 0
     assert record["seamCoverage"] == "observed"
     assert not record.get("seamMissingCommands")
 
 
-def test_finish_rejoins_legacy_seam_exclusion_even_with_complete_usage(monkeypatch, tmp_path):
-    from gym import toc_eval
+def test_finish_rejoins_legacy_seam_exclusion_even_with_complete_usage(
+    monkeypatch, tmp_path
+):
+    toc_eval = pytest.importorskip(
+        "gym.toc_eval", reason="host TOC evaluation is not shipped"
+    )
 
     record = {
         **_attempt(outcomes.PASSED, None, arm="spill", lrq="lrq"),
@@ -1075,7 +1302,9 @@ def test_finish_rejoins_legacy_seam_exclusion_even_with_complete_usage(monkeypat
     }
     reader = _FakeReader(
         {"lrq": {"costUsd": None}},
-        arms={"lrq": {"requested": "spill", "recorded": ["spill"], "effective": ["spill"]}},
+        arms={
+            "lrq": {"requested": "spill", "recorded": ["spill"], "effective": ["spill"]}
+        },
         usage={"lrq": {"usageComplete": True, "totalTokens": 10}},
     )
     monkeypatch.setattr(toc_eval, "_open_reader", lambda: reader)
@@ -1099,7 +1328,9 @@ def test_finish_rejoins_legacy_seam_exclusion_even_with_complete_usage(monkeypat
 
 @pytest.mark.parametrize("arm", ["off", "rtk"])
 def test_required_commands_do_not_change_other_arm_accounting(arm):
-    from gym import toc_eval
+    toc_eval = pytest.importorskip(
+        "gym.toc_eval", reason="host TOC evaluation is not shipped"
+    )
 
     record = {
         "launchRequestId": "lrq",
@@ -1116,23 +1347,45 @@ def test_required_commands_do_not_change_other_arm_accounting(arm):
 
 
 @pytest.mark.parametrize("commands", ["git", ["unknown"], [None]])
-def test_required_large_output_commands_schema_rejects_invalid_labels(commands):
+def test_required_large_output_commands_schema_rejects_invalid_labels(
+    commands, monkeypatch
+):
+    from gym import host_services
     from gym.schema import TaskSchemaError, parse_task_dict
 
-    with pytest.raises(TaskSchemaError, match="required_large_output_commands"):
-        parse_task_dict(
-            {
-                "id": "test",
-                "result_schema": {"status": {"type": "string"}},
-                "verifier": {"entrypoint": "verifier.py"},
-                "required_large_output_commands": commands,
-            }
-        )
+    monkeypatch.setattr(
+        host_services.StandaloneServices,
+        "large_output_commands",
+        lambda self: frozenset({"git", "pytest"}),
+    )
+    # Select standalone services even when the suite is running in the host.
+    monkeypatch.setattr(host_services, "_installed", None)
+    monkeypatch.setattr(
+        host_services,
+        "resolve",
+        lambda: host_services.StandaloneServices(env={}, config={}),
+    )
+    task = {
+        "id": "test",
+        "result_schema": {"status": {"type": "string"}},
+        "verifier": {"entrypoint": "verifier.py"},
+        "required_large_output_commands": ["git", "pytest"],
+    }
+    assert parse_task_dict(task).required_large_output_commands == ("git", "pytest")
+    with pytest.raises(
+        TaskSchemaError,
+        match="^required_large_output_commands must be a nonempty array of distinct TOC command labels$",
+    ):
+        parse_task_dict({**task, "required_large_output_commands": commands})
 
 
 @pytest.mark.parametrize("task", ["../escape", "coding-toc-large-output"])
-def test_dispatch_freezes_required_commands_from_configured_corpus(tmp_path, monkeypatch, task):
-    from gym import toc_eval
+def test_dispatch_freezes_required_commands_from_configured_corpus(
+    tmp_path, monkeypatch, task
+):
+    toc_eval = pytest.importorskip(
+        "gym.toc_eval", reason="host TOC evaluation is not shipped"
+    )
     from gym.schema import TaskSchemaError
 
     task_dir = tmp_path / "coding-toc-large-output"
@@ -1147,7 +1400,9 @@ def test_dispatch_freezes_required_commands_from_configured_corpus(tmp_path, mon
 
     def run(*args, **kwargs):
         calls.append(args)
-        return types.SimpleNamespace(stdout=json.dumps({"cells": [{"launchRequestId": "lrq"}]}))
+        return types.SimpleNamespace(
+            stdout=json.dumps({"cells": [{"launchRequestId": "lrq"}]})
+        )
 
     monkeypatch.setattr(toc_eval.subprocess, "run", run)
     if task.startswith(".."):
@@ -1161,7 +1416,13 @@ def test_dispatch_freezes_required_commands_from_configured_corpus(tmp_path, mon
         (task_dir / "task.toml").write_text("invalid task")
         reader = _FakeReader(
             {"lrq": {"costUsd": 1}},
-            arms={"lrq": {"requested": "spill", "recorded": ["spill"], "effective": ["spill"]}},
+            arms={
+                "lrq": {
+                    "requested": "spill",
+                    "recorded": ["spill"],
+                    "effective": ["spill"],
+                }
+            },
             counts={
                 "lrq": {
                     "rows": 1,
@@ -1176,7 +1437,9 @@ def test_dispatch_freezes_required_commands_from_configured_corpus(tmp_path, mon
 
 
 def test_legacy_join_does_not_read_untrusted_or_current_task_files():
-    from gym import toc_eval
+    toc_eval = pytest.importorskip(
+        "gym.toc_eval", reason="host TOC evaluation is not shipped"
+    )
 
     record = {**_attempt(outcomes.PASSED, 1, lrq="lrq"), "task": "../escape"}
     assert toc_eval._join([record], _FakeReader({"lrq": {"costUsd": 1}})) == 0

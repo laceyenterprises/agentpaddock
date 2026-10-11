@@ -9,6 +9,9 @@ from types import SimpleNamespace
 
 import pytest
 
+pytest.importorskip("gym.dispatch", reason="host integration is not shipped")
+pytest.importorskip("gym.ledger", reason="host integration is not shipped")
+
 import gym.dispatch as dispatch_mod
 import gym.provider_health as health_mod
 from gym.dispatch import WorkerPoolTrajectorySource

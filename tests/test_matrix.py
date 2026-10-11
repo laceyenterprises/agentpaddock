@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("gym.matrix", reason="host integration is not shipped")
+
 from gym import matrix
 from gym.suite import discover_tasks, default_tasks_dir
 

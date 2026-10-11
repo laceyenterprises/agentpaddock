@@ -10,6 +10,9 @@ from types import SimpleNamespace
 
 import pytest
 
+pytest.importorskip("gym.agent_os_host", reason="host integration is not shipped")
+pytest.importorskip("gym.agent_os_services", reason="host integration is not shipped")
+
 from gym import (
     agent_os_host,
     alerting,

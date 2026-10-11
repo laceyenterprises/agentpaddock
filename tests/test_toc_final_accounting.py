@@ -4,6 +4,8 @@ import json
 
 import pytest
 
+pytest.importorskip("gym.toc_eval", reason="host integration is not shipped")
+
 from gym import toc_eval
 
 

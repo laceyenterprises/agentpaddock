@@ -10,6 +10,8 @@ from urllib.parse import urlparse
 
 import pytest
 
+pytest.importorskip("gym.ledger", reason="host integration is not shipped")
+
 from gym.ledger import LedgerReader
 
 

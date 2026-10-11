@@ -145,7 +145,9 @@ def test_validate_result_rejects_missing_required():
 def test_programmatic_list_without_limit_accepts_valid_items(findings):
     task = Task(
         id="programmatic",
-        result_schema=(FieldSpec("findings", "list", items=(FieldSpec("line", "integer"),)),),
+        result_schema=(
+            FieldSpec("findings", "list", items=(FieldSpec("line", "integer"),)),
+        ),
         verifier_entrypoint="verifier.py",
     )
     assert validate_result(task, {"findings": findings}) is None
@@ -164,7 +166,9 @@ def test_programmatic_list_without_limit_accepts_valid_items(findings):
 def test_programmatic_unbounded_list_still_validates_items(findings, reason):
     task = Task(
         id="programmatic",
-        result_schema=(FieldSpec("findings", "list", items=(FieldSpec("line", "integer"),)),),
+        result_schema=(
+            FieldSpec("findings", "list", items=(FieldSpec("line", "integer"),)),
+        ),
         verifier_entrypoint="verifier.py",
     )
     assert reason in validate_result(task, {"findings": findings})
@@ -181,7 +185,16 @@ def test_programmatic_zero_list_limit_accepts_only_empty_list():
 
 
 @pytest.mark.parametrize("commands", [[], ["git", "git"], ["rg"], [["git"]], "git"])
-def test_required_commands_reject_empty_duplicates_and_nonseam_labels(commands):
+def test_required_commands_reject_empty_duplicates_and_nonseam_labels(
+    commands, monkeypatch
+):
+    from gym import host_services
+
+    monkeypatch.setattr(
+        host_services.current(),
+        "large_output_commands",
+        lambda: frozenset({"git", "pytest"}),
+    )
     data = copy.deepcopy(VALID)
     data["required_large_output_commands"] = commands
     with pytest.raises(TaskSchemaError, match="distinct TOC command labels"):
@@ -189,9 +202,16 @@ def test_required_commands_reject_empty_duplicates_and_nonseam_labels(commands):
 
 
 def test_required_commands_follow_the_seam_owner(monkeypatch):
-    from cwp_dispatch import tool_output_compression as seam
+    from gym import host_services
 
-    monkeypatch.setattr(seam, "COMMANDS", seam.COMMANDS | {"future-label"})
+    monkeypatch.setattr(
+        host_services.current(),
+        "large_output_commands",
+        lambda: frozenset({"git", "future-label"}),
+    )
     data = copy.deepcopy(VALID)
     data["required_large_output_commands"] = ["future-label", "git"]
-    assert parse_task_dict(data).required_large_output_commands == ("future-label", "git")
+    assert parse_task_dict(data).required_large_output_commands == (
+        "future-label",
+        "git",
+    )

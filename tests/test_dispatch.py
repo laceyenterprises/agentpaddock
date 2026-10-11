@@ -13,6 +13,8 @@ import types
 
 import pytest
 
+pytest.importorskip("gym.dispatch", reason="host integration is not shipped")
+
 import gym.dispatch as dispatch_mod
 from gym.dispatch import WorkerPoolTrajectorySource
 from gym.schema import Stage, Task

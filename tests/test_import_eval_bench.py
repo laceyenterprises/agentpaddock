@@ -9,10 +9,11 @@ from pathlib import Path
 import import_eval_bench
 import leaderboard as lb
 import pytest
+from gym_test_support import checkout_root
 
 MODULE_ROOT = Path(__file__).resolve().parents[1]
-# modules/adversarial-eval-gym -> repo root; the reports stay in agent-os.
-REPORTS = MODULE_ROOT.parents[1] / "docs" / "reports"
+# Source reports are optional inputs, absent from the standalone distribution.
+REPORTS = checkout_root(MODULE_ROOT) / "docs" / "reports"
 needs_reports = pytest.mark.skipif(
     not all((REPORTS / name).is_file() for name, _ in import_eval_bench.SOURCES),
     reason="the eval-bench source reports are not in this checkout",
@@ -102,10 +103,15 @@ def test_open_weight_matrix_matches_the_ossharn_report():
             key = (record["harness"]["name"], record["harness"]["config_hash"])
             totals[key] += 1
             passed[key] += record["verdict"] == lb.PASSED
-    by_harness = {key[0]: (passed[key], totals[key]) for key in totals if key[0] != "codex"}
+    by_harness = {
+        key[0]: (passed[key], totals[key]) for key in totals if key[0] != "codex"
+    }
     assert by_harness == {"claude-code": (26, 40), "opencode": (27, 42), "pi": (28, 42)}
     # The original codex cells, and the post-KIMIEMPTY-01 rerun under its own config.
-    assert sorted((passed[k], totals[k]) for k in totals if k[0] == "codex") == [(4, 7), (27, 38)]
+    assert sorted((passed[k], totals[k]) for k in totals if k[0] == "codex") == [
+        (4, 7),
+        (27, 38),
+    ]
 
 
 def test_every_exclusion_survives_the_import(records):
@@ -124,7 +130,9 @@ def test_every_exclusion_survives_the_import(records):
 def test_imported_rows_are_graded_task_versions_and_unmeasured(records):
     tasks_dir = MODULE_ROOT / "tasks"
     for record in records:
-        task = tomllib.loads((tasks_dir / record["task"] / "task.toml").read_text("utf-8"))
+        task = tomllib.loads(
+            (tasks_dir / record["task"] / "task.toml").read_text("utf-8")
+        )
         assert task["suite"] == record["suite"]
         assert record["task_version"] == 1
         assert record["task_version"] <= task["task_version"]
@@ -137,11 +145,17 @@ def test_imported_rows_are_graded_task_versions_and_unmeasured(records):
     ("label", "provider_id"),
     [
         ("litellm-local-openai/anthropic/claude-opus-5-5", "anthropic/claude-opus-5-5"),
-        ("litellm-local-openai/anthropic/claude-sonnet-5-5", "anthropic/claude-sonnet-5-5"),
+        (
+            "litellm-local-openai/anthropic/claude-sonnet-5-5",
+            "anthropic/claude-sonnet-5-5",
+        ),
         ("litellm-local-openai/openai/gpt-6.1-sol", "openai/gpt-6.1-sol"),
     ],
 )
 def test_cross_harness_proxy_labels_name_the_native_model(label, provider_id):
     # A frontier model in another vendor's harness is the same model as its
     # native cell, so both import under one provider id.
-    assert import_eval_bench.model_of(label) == {"provider_id": provider_id, "reasoning": None}
+    assert import_eval_bench.model_of(label) == {
+        "provider_id": provider_id,
+        "reasoning": None,
+    }
