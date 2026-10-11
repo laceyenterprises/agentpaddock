@@ -9,6 +9,10 @@ from pathlib import Path
 import pytest
 import yaml
 
+pytest.importorskip(
+    "cwp_dispatch.activation_contract", reason="host activation contract is not shipped"
+)
+
 from cwp_dispatch.activation_contract import (
     evaluate_output,
     parse_activation_yaml_document,
@@ -18,11 +22,13 @@ from cwp_dispatch.activation_contract import (
 from gym.suite import discover_tasks
 
 MODULE = Path(__file__).resolve().parents[1]
-REPO = MODULE.parents[1]
+REPO = MODULE
 ACTIVATION = REPO / "projects/gym-hard-review-fix/activation"
 SPEC_REF = "gym-hard-review-fix@b3689f1ea261"
 DOCUMENT = yaml.safe_load((ACTIVATION / "hrf.yaml").read_text())
-ASSERTIONS = parse_activation_yaml_document(DOCUMENT, expected_spec_ref=SPEC_REF).assertions
+ASSERTIONS = parse_activation_yaml_document(
+    DOCUMENT, expected_spec_ref=SPEC_REF
+).assertions
 SUITES = ("hard-review", "hard-fix", "review", "fix")
 # HRX-02 adds three hard-review -v2 tasks and HRX-03 adds five hard-fix -v2
 # tasks beside the six HRF originals of each suite.
@@ -89,7 +95,8 @@ def test_activation_schema_and_pinned_interpreter():
 def test_pack_validates_beside_plan():
     # The PMA reads every activation/*.yaml beside plan.json against its specRef.
     ids = [
-        assertion.id for assertion in validate_pack(REPO, "projects/gym-hard-review-fix/plan.json")
+        assertion.id
+        for assertion in validate_pack(REPO, "projects/gym-hard-review-fix/plan.json")
     ]
     assert ids == ["hrf-task-discovery", "hrf-regression-test-containment"]
 
@@ -116,7 +123,9 @@ def test_probe_bootstrap_without_config_on_pythonpath(index, probe_roots):
     # PMA exports the worker-pool package; the helper must locate config itself.
     # Disable site hooks so an editable config install cannot mask a broken bootstrap.
     # Stop before discovery/containment to verify both bootstraps without Docker.
-    bootstrap = probe_program(index).split("\nfrom gym.suite", 1)[0].split("\nimport re", 1)[0]
+    bootstrap = (
+        probe_program(index).split("\nfrom gym.suite", 1)[0].split("\nimport re", 1)[0]
+    )
     result = subprocess.run(
         [sys.executable, "-S", "-c", bootstrap + "\nprint(module)"],
         cwd="/",
@@ -205,7 +214,12 @@ def test_probe_runs_the_hrf03_runner_and_grades_four_outcomes(
     assert report["error"] is None
     # The protocol backend proves no network containment, so the socket verdict
     # is left to the real engine (below); only its shape is checked here.
-    assert set(report["socket_outcomes"]) == {"original", "insufficient", "reference", "submission"}
+    assert set(report["socket_outcomes"]) == {
+        "original",
+        "insufficient",
+        "reference",
+        "submission",
+    }
     assert not list(hidden_tests.shared_work_root().iterdir())
 
 
@@ -273,7 +287,9 @@ def test_engine_down_is_transient(monkeypatch, capsys, probe_roots):
 
 
 @pytest.mark.parametrize("timed_out_command", ["info", "image"])
-def test_docker_probe_timeout_is_transient(monkeypatch, capsys, probe_roots, timed_out_command):
+def test_docker_probe_timeout_is_transient(
+    monkeypatch, capsys, probe_roots, timed_out_command
+):
     calls = []
 
     def docker(command, *args, **kwargs):
@@ -367,7 +383,9 @@ def test_cleanup_permission_failure_preserves_runner_error(
     def failed_runner(*args, **kwargs):
         raise GraderError("original runner failure")
 
-    monkeypatch.setattr(tempfile.TemporaryDirectory, "_rmtree", classmethod(permission_cleanup))
+    monkeypatch.setattr(
+        tempfile.TemporaryDirectory, "_rmtree", classmethod(permission_cleanup)
+    )
     monkeypatch.setattr(hidden_tests, "run_regression_test", failed_runner)
     execute_probe(1, monkeypatch)
     report = json.loads(capsys.readouterr().out)

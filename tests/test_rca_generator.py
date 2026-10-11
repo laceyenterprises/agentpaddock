@@ -18,21 +18,37 @@ from gym import outcomes
 from gym.grader import Trajectory, grade
 from gym.schema import load_task
 
-SEED_DOC = REPO_ROOT / "docs" / "POSTMORTEM-litellm-watchdog-restart-storm-2026-06-01.md"
+SEED_DOC = (
+    REPO_ROOT / "docs" / "POSTMORTEM-litellm-watchdog-restart-storm-2026-06-01.md"
+)
+
+
+@pytest.fixture
+def seed_doc(tmp_path):
+    doc = tmp_path / "docs" / SEED_DOC.name
+    doc.parent.mkdir()
+    doc.write_text("# Test incident\n\nA synthetic incident for scaffolding.\n")
+    return doc
 
 
 def test_derive_task_id_strips_prefix_and_date():
     assert gen.derive_task_id(SEED_DOC) == "rca-litellm-watchdog-restart-storm"
     assert (
-        gen.derive_task_id(REPO_ROOT / "docs" / "SPEC-session-ledger-fk-recovery-2026-06-04.md")
+        gen.derive_task_id(
+            REPO_ROOT / "docs" / "SPEC-session-ledger-fk-recovery-2026-06-04.md"
+        )
         == "rca-session-ledger-fk-recovery"
     )
 
 
-def test_scaffold_produces_skeleton_shape(tmp_path):
-    assert SEED_DOC.is_file()  # seeded from a real incident doc
+def test_scaffold_produces_skeleton_shape(tmp_path, seed_doc):
+    assert seed_doc.is_file()
     task_dir = gen.scaffold(
-        SEED_DOC, tmp_path, "rca-scaffold-probe", force=False, repo_root=REPO_ROOT
+        seed_doc,
+        tmp_path,
+        "rca-scaffold-probe",
+        force=False,
+        repo_root=seed_doc.parents[1],
     )
 
     # Every skeleton file lands.
@@ -65,11 +81,15 @@ def test_scaffold_produces_skeleton_shape(tmp_path):
     assert gen.GROUND_TRUTH_MARKER in gt
 
 
-def test_scaffold_fails_closed_until_filled_in(tmp_path):
+def test_scaffold_fails_closed_until_filled_in(tmp_path, seed_doc):
     # A freshly scaffolded task must NOT grade passed even if the agent submits a
     # placeholder enum value — the verifier stub short-circuits to failed.
     task_dir = gen.scaffold(
-        SEED_DOC, tmp_path, "rca-scaffold-probe", force=False, repo_root=REPO_ROOT
+        seed_doc,
+        tmp_path,
+        "rca-scaffold-probe",
+        force=False,
+        repo_root=seed_doc.parents[1],
     )
     task = load_task(task_dir)
     placeholder_value = task.field_spec("root_cause").enum[0]
@@ -95,7 +115,9 @@ def test_verifier_guard_checks_both_placeholders():
 def test_scaffold_escapes_quoted_title_and_json_source_path(tmp_path):
     doc = tmp_path / "incident.md"
     doc.write_text('# A "quoted" incident\n', encoding="utf-8")
-    task_dir = gen.scaffold(doc, tmp_path / "tasks", "rca-quoted", force=False, repo_root=tmp_path)
+    task_dir = gen.scaffold(
+        doc, tmp_path / "tasks", "rca-quoted", force=False, repo_root=tmp_path
+    )
 
     task = load_task(task_dir)
     assert task.title == 'RCA: A "quoted" incident'
@@ -104,7 +126,8 @@ def test_scaffold_escapes_quoted_title_and_json_source_path(tmp_path):
 
     windows_path = r"docs\incident.md"
     assert (
-        json.loads(gen._ground_truth_stub("rca-probe", windows_path))["source_doc"] == windows_path
+        json.loads(gen._ground_truth_stub("rca-probe", windows_path))["source_doc"]
+        == windows_path
     )
 
 
@@ -112,30 +135,40 @@ def test_scaffold_falls_back_to_filename_for_malformed_utf8_doc(tmp_path):
     doc = tmp_path / "legacy-incident.md"
     doc.write_bytes(b"# legacy \x80 incident\n")
 
-    task_dir = gen.scaffold(doc, tmp_path / "tasks", "rca-legacy", force=False, repo_root=tmp_path)
+    task_dir = gen.scaffold(
+        doc, tmp_path / "tasks", "rca-legacy", force=False, repo_root=tmp_path
+    )
 
     task = load_task(task_dir)
     assert task.title == "RCA: legacy-incident.md"
 
 
-def test_scaffold_refuses_overwrite_without_force(tmp_path):
-    gen.scaffold(SEED_DOC, tmp_path, "dup", force=False, repo_root=REPO_ROOT)
+def test_scaffold_refuses_overwrite_without_force(tmp_path, seed_doc):
+    gen.scaffold(seed_doc, tmp_path, "dup", force=False, repo_root=seed_doc.parents[1])
     with pytest.raises(FileExistsError):
-        gen.scaffold(SEED_DOC, tmp_path, "dup", force=False, repo_root=REPO_ROOT)
+        gen.scaffold(
+            seed_doc, tmp_path, "dup", force=False, repo_root=seed_doc.parents[1]
+        )
     # --force replaces the directory rather than retaining stale task files.
     stale = tmp_path / "dup" / "stages" / "obsolete-stage.sh"
     stale.write_text("obsolete", encoding="utf-8")
-    task_dir = gen.scaffold(SEED_DOC, tmp_path, "dup", force=True, repo_root=REPO_ROOT)
+    task_dir = gen.scaffold(
+        seed_doc, tmp_path, "dup", force=True, repo_root=seed_doc.parents[1]
+    )
     assert (task_dir / "task.toml").is_file()
     assert not stale.exists()
 
 
 def test_scaffold_rejects_missing_doc(tmp_path):
     with pytest.raises(FileNotFoundError):
-        gen.scaffold(tmp_path / "nope.md", tmp_path, "rca-x", force=False, repo_root=REPO_ROOT)
+        gen.scaffold(
+            tmp_path / "nope.md", tmp_path, "rca-x", force=False, repo_root=REPO_ROOT
+        )
 
 
-def test_cli_main_scaffolds(tmp_path):
-    rc = gen.main(["--doc", str(SEED_DOC), "--id", "rca-cli-probe", "--out-dir", str(tmp_path)])
+def test_cli_main_scaffolds(tmp_path, seed_doc):
+    rc = gen.main(
+        ["--doc", str(seed_doc), "--id", "rca-cli-probe", "--out-dir", str(tmp_path)]
+    )
     assert rc == 0
     assert (tmp_path / "rca-cli-probe" / "task.toml").is_file()

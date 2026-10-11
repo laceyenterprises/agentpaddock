@@ -25,27 +25,7 @@ MODULE_ROOT = Path(__file__).resolve().parents[1]
 TASKS_DIR = MODULE_ROOT / "tasks"
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 SCRIPTS_DIR = MODULE_ROOT / "scripts"
-# modules/adversarial-eval-gym -> modules -> repo root.
-REPO_ROOT = MODULE_ROOT.parents[1]
-WORKER_POOL_PYTHON = REPO_ROOT / "modules" / "worker-pool" / "lib" / "python"
-if str(WORKER_POOL_PYTHON) not in sys.path:
-    sys.path.insert(0, str(WORKER_POOL_PYTHON))
-AGENT_OS_CONFIG_PYTHON = REPO_ROOT / "platform" / "agent-os-config" / "src"
-if str(AGENT_OS_CONFIG_PYTHON) not in sys.path:
-    sys.path.insert(0, str(AGENT_OS_CONFIG_PYTHON))
-# The ledger reads (gym.ledger) resolve against this checkout's session ledger,
-# not whichever tree an inherited PYTHONPATH names.
-SESSION_LEDGER_PYTHON = REPO_ROOT / "platform" / "session-ledger" / "src"
-if str(SESSION_LEDGER_PYTHON) not in sys.path:
-    sys.path.insert(0, str(SESSION_LEDGER_PYTHON))
-CANONICAL_CONTENT_PARENT = REPO_ROOT / "platform"
-if str(CANONICAL_CONTENT_PARENT) not in sys.path:
-    sys.path.insert(0, str(CANONICAL_CONTENT_PARENT))
-
-# gym.cost prices through SEW's one price table (sew.cost_model).
-SEW_PYTHON = REPO_ROOT / "tools" / "searchlight" / "lib" / "python"
-if str(SEW_PYTHON) not in sys.path:
-    sys.path.insert(0, str(SEW_PYTHON))
+REPO_ROOT = MODULE_ROOT
 
 # Make the scaffolding generator (scripts/rca_from_postmortem.py) importable by
 # the GYM-02 generator tests without an install.
@@ -126,8 +106,14 @@ def protocol_backend(monkeypatch):
                     "/work/", str(work) + "/"
                 ),
             ]
-        if sys.platform != "linux" and args[-1] in (runner._WRAPPER, runner._REGRESSION_WRAPPER):
-            return [*args[:-1], args[-1].replace("protect_parent()\nrequest", "request")]
+        if sys.platform != "linux" and args[-1] in (
+            runner._WRAPPER,
+            runner._REGRESSION_WRAPPER,
+        ):
+            return [
+                *args[:-1],
+                args[-1].replace("protect_parent()\nrequest", "request"),
+            ]
         return args
 
     monkeypatch.setattr(runner, "_command", command)
@@ -145,13 +131,15 @@ def docker_backend(monkeypatch, request):
 
     # HQ scratch is VM-shared; pytest tmp_path/default TMPDIR need not be.
     import tempfile
-    from agent_os_config import roots
+    from gym import host_services
 
     test_hq = tempfile.TemporaryDirectory(
         prefix="gym-test-hq-", dir=hidden_tests.shared_work_root()
     )
     request.addfinalizer(test_hq.cleanup)
-    monkeypatch.setattr(roots, "hq_root", lambda: test_hq.name)
+    monkeypatch.setattr(
+        host_services.current(), "scratch_dir", lambda: Path(test_hq.name) / "tmp"
+    )
     work_root = hidden_tests.shared_work_root()
     original = hidden_tests.run
 
@@ -173,7 +161,9 @@ def docker_backend(monkeypatch, request):
 def fake_host_headroom(monkeypatch):
     # Unit tests must not let live host pressure decide whether fake dispatches run.
     if AGENT_OS_HOST:
-        monkeypatch.setattr("cwp_dispatch.resource_admission.sample_headroom_pause", lambda: None)
+        monkeypatch.setattr(
+            "cwp_dispatch.resource_admission.sample_headroom_pause", lambda: None
+        )
 
 
 @pytest.fixture(scope="session")

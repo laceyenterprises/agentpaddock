@@ -9,6 +9,10 @@ from pathlib import Path
 import pytest
 import yaml
 
+pytest.importorskip(
+    "cwp_dispatch.activation_contract", reason="host activation contract is not shipped"
+)
+
 from cwp_dispatch.activation_contract import (
     evaluate_output,
     parse_activation_yaml_document,
@@ -18,11 +22,13 @@ from cwp_dispatch.activation_contract import (
 from gym.suite import discover_tasks
 
 MODULE = Path(__file__).resolve().parents[1]
-REPO = MODULE.parents[1]
+REPO = MODULE
 ACTIVATION = REPO / "projects/gym-hard-review-fix-rework/activation"
 SPEC_REF = json.loads((ACTIVATION.parent / "plan.json").read_text())["specRef"]
 DOCUMENT = yaml.safe_load((ACTIVATION / "hrx.yaml").read_text())
-ASSERTIONS = parse_activation_yaml_document(DOCUMENT, expected_spec_ref=SPEC_REF).assertions
+ASSERTIONS = parse_activation_yaml_document(
+    DOCUMENT, expected_spec_ref=SPEC_REF
+).assertions
 # HRX-02 adds three hard-review -v2 tasks and HRX-03 five hard-fix -v2 tasks.
 REWORKED = {
     "hard-review": [
@@ -78,7 +84,9 @@ def test_pack_validates_beside_plan():
     # The PMA reads every activation/*.yaml beside plan.json against its specRef.
     ids = [
         assertion.id
-        for assertion in validate_pack(REPO, "projects/gym-hard-review-fix-rework/plan.json")
+        for assertion in validate_pack(
+            REPO, "projects/gym-hard-review-fix-rework/plan.json"
+        )
     ]
     assert ids == ["hrx-v2-task-discovery"]
 
@@ -119,7 +127,9 @@ def test_probe_bootstrap_without_config_on_pythonpath(probe_roots):
 @pytest.mark.parametrize("suite", sorted(REWORKED))
 def test_actual_discovery_matches_recorded_sample(suite):
     discovered = [
-        task.id for task in discover_tasks(MODULE / "tasks", suite=suite) if task.id.endswith("-v2")
+        task.id
+        for task in discover_tasks(MODULE / "tasks", suite=suite)
+        if task.id.endswith("-v2")
     ]
     assert discovered == json.loads(sample())[suite] == REWORKED[suite]
 
@@ -153,17 +163,23 @@ def _drifted(edit):
 @pytest.mark.parametrize(
     "edit",
     [
-        pytest.param(lambda report: report["hard-review"].pop(), id="missing-review-v2"),
+        pytest.param(
+            lambda report: report["hard-review"].pop(), id="missing-review-v2"
+        ),
         pytest.param(lambda report: report["hard-fix"].pop(0), id="missing-fix-v2"),
         pytest.param(
-            lambda report: report["hard-fix"].append("hard-fix-extra-v2"), id="extra-fix-v2"
+            lambda report: report["hard-fix"].append("hard-fix-extra-v2"),
+            id="extra-fix-v2",
         ),
         pytest.param(
-            lambda report: report["must_fail_variants"].pop("hard-fix-regression-test-dedupe-v2"),
+            lambda report: report["must_fail_variants"].pop(
+                "hard-fix-regression-test-dedupe-v2"
+            ),
             id="must-fail-variants-dropped",
         ),
         pytest.param(
-            lambda report: report["must_fail_variants"].clear(), id="must-fail-variants-absent"
+            lambda report: report["must_fail_variants"].clear(),
+            id="must-fail-variants-absent",
         ),
     ],
 )

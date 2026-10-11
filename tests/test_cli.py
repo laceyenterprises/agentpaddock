@@ -42,7 +42,9 @@ _NOW = "2026-07-14T00:00:00+00:00"
 def isolated_results_dir(tmp_path, monkeypatch):
     from gym.host_services import LocalRunRecords
 
-    monkeypatch.setattr(cli, "default_run_records", lambda: LocalRunRecords(tmp_path / "results"))
+    monkeypatch.setattr(
+        cli, "default_run_records", lambda: LocalRunRecords(tmp_path / "results")
+    )
 
 
 class MappingSource:
@@ -68,7 +70,9 @@ class FakeResolver:
 def _mixed_source():
     return MappingSource(
         {
-            "mini-pass": Trajectory(terminal_status="succeeded", submitted_result={"answer": "ok"}),
+            "mini-pass": Trajectory(
+                terminal_status="succeeded", submitted_result={"answer": "ok"}
+            ),
             "mini-fail": Trajectory(
                 terminal_status="succeeded", submitted_result={"answer": "bad"}
             ),
@@ -79,15 +83,19 @@ def _mixed_source():
 def _green_source():
     return MappingSource(
         {
-            "mini-pass": Trajectory(terminal_status="succeeded", submitted_result={"answer": "ok"}),
-            "mini-fail": Trajectory(terminal_status="succeeded", submitted_result={"answer": "ok"}),
+            "mini-pass": Trajectory(
+                terminal_status="succeeded", submitted_result={"answer": "ok"}
+            ),
+            "mini-fail": Trajectory(
+                terminal_status="succeeded", submitted_result={"answer": "ok"}
+            ),
         }
     )
 
 
 def test_reasoning_level_run_separates_results_and_records_mismatch(tmp_path):
     paths = []
-    for level in (None, "max"):
+    for level in (None, "xhigh"):
         args = [
             "run",
             "--task",
@@ -134,7 +142,9 @@ def test_reasoning_level_run_separates_results_and_records_mismatch(tmp_path):
         if level:
             assert saved["reasoning_level"] == "xhigh"
             assert saved["verdicts"] == {
-                verdict_key("mini-pass", "claude-opus-5", reasoning_level="xhigh"): outcomes.PASSED
+                verdict_key(
+                    "mini-pass", "claude-opus-5", reasoning_level="xhigh"
+                ): outcomes.PASSED
             }
             assert payload["cells"][0]["level_mismatch"] is False
         else:
@@ -239,7 +249,9 @@ def test_unresolved_dispatched_level_alerts_even_without_a_regression(tmp_path):
     payload = json.loads(out.getvalue())
     assert payload["level_mismatches"] == 1
     assert payload["level_unresolved"] == 1
-    assert [alert["key"] for alert in alerter.alerts] == [GYM_LEVEL_UNRESOLVED_ALERT_KEY]
+    assert [alert["key"] for alert in alerter.alerts] == [
+        GYM_LEVEL_UNRESOLVED_ALERT_KEY
+    ]
 
 
 def test_model_ids_with_an_effort_segment_are_refused():
@@ -248,11 +260,21 @@ def test_model_ids_with_an_effort_segment_are_refused():
     for args in (["run"], ["baseline", "update"], ["lock", "check"]):
         with pytest.raises(SystemExit):
             cli.build_parser().parse_args([*args, "--model", "provider@effort:high"])
-        parsed = cli.build_parser().parse_args([*args, "--model", "vertex/claude@20240229"])
+        parsed = cli.build_parser().parse_args(
+            [*args, "--model", "vertex/claude@20240229"]
+        )
         assert parsed.model == "vertex/claude@20240229"
 
 
-def test_reasoning_level_validation_is_shared_by_gym_commands():
+def test_reasoning_level_validation_is_shared_by_gym_commands(monkeypatch):
+    from gym import host_services
+
+    def normalize(value, *, field):
+        if value == "max":
+            return "xhigh"
+        raise ValueError(f"{field}: unknown reasoning level")
+
+    monkeypatch.setattr(host_services.current(), "normalize_reasoning_level", normalize)
     for args in (["run"], ["baseline", "update"], ["lock", "check"]):
         parsed = cli.build_parser().parse_args([*args, "--reasoning-level", "max"])
         assert parsed.reasoning_level == "xhigh"
@@ -260,14 +282,17 @@ def test_reasoning_level_validation_is_shared_by_gym_commands():
             cli.build_parser().parse_args([*args, "--reasoning-level", "unknown"])
 
 
-def test_reasoning_level_without_worker_pool_is_a_usage_error(monkeypatch, capsys):
+def test_reasoning_level_without_worker_pool_is_available(monkeypatch):
     import sys
 
     monkeypatch.setitem(sys.modules, "cwp_dispatch.reasoning_level", None)
+    parsed = cli.build_parser().parse_args(
+        ["lock", "check", "--reasoning-level", "high"]
+    )
+    assert parsed.reasoning_level == "high"
     with pytest.raises(SystemExit) as excinfo:
-        cli.build_parser().parse_args(["lock", "check", "--reasoning-level", "high"])
+        cli.build_parser().parse_args(["lock", "check", "--reasoning-level", " "])
     assert excinfo.value.code == 2
-    assert "needs the worker-pool package" in capsys.readouterr().err
 
 
 def _run(argv, *, source=None, alerter=None, resolver=None, now=None):
@@ -346,7 +371,9 @@ def test_run_compares_qualified_versions(tmp_path, cohort, version, json_output)
         payload = json.loads(output)
         report = payload["regression"]
         assert report["version_changed"] == ([key] if version == 2 else [])
-        assert [r["task"] for r in report["regressions"]] == ([] if version == 2 else [key])
+        assert [r["task"] for r in report["regressions"]] == (
+            [] if version == 2 else [key]
+        )
         saved = json.loads(Path(payload["result_path"]).read_text())
         assert saved["task_versions"] == {key: version}
         assert saved["summary"]["cells"][0]["task_version"] == version
@@ -355,7 +382,9 @@ def test_run_compares_qualified_versions(tmp_path, cohort, version, json_output)
 
 
 @pytest.mark.parametrize("held_outcome", [outcomes.FAILED, outcomes.PASSED])
-def test_qualified_comparison_preserves_held_verdict_policy(tmp_path, monkeypatch, held_outcome):
+def test_qualified_comparison_preserves_held_verdict_policy(
+    tmp_path, monkeypatch, held_outcome
+):
     original = cli.suite_mod.run_suite
 
     def held_suite(*args, **kwargs):
@@ -368,7 +397,9 @@ def test_qualified_comparison_preserves_held_verdict_policy(tmp_path, monkeypatc
     monkeypatch.setattr(cli.suite_mod, "run_suite", held_suite)
     key = verdict_key("mini-pass", "claude-opus-5")
     baseline_path = tmp_path / "baseline.json"
-    write_baseline(baseline_path, baseline_document({key: outcomes.PASSED}, generated_at=_NOW))
+    write_baseline(
+        baseline_path, baseline_document({key: outcomes.PASSED}, generated_at=_NOW)
+    )
     alerter = RecordingAlerter()
     code, output = _run(
         [
@@ -387,7 +418,9 @@ def test_qualified_comparison_preserves_held_verdict_policy(tmp_path, monkeypatc
         ],
         alerter=alerter,
     )
-    assert code == (cli.EXIT_REGRESSION if held_outcome == outcomes.FAILED else cli.EXIT_OK)
+    assert code == (
+        cli.EXIT_REGRESSION if held_outcome == outcomes.FAILED else cli.EXIT_OK
+    )
     assert len(alerter.alerts) == (1 if held_outcome == outcomes.FAILED else 0)
     payload = json.loads(output)
     saved = json.loads(Path(payload["result_path"]).read_text())
@@ -415,7 +448,9 @@ def test_partial_credit_survives_cli_json_and_saved_model_result(
                     "terminal_status": "skipped",
                     "retryable": False,
                 },
-                harness_calls=[{"name": "Bash", "arguments": {"cmd": "cat batch_activation.py"}}],
+                harness_calls=[
+                    {"name": "Bash", "arguments": {"cmd": "cat batch_activation.py"}}
+                ],
             )
         }
     )
@@ -479,7 +514,9 @@ def test_oss_run_checks_override_lock_and_stores_model_result(tmp_path):
     write_lock(locks_dir / f"{worker_class}.lock.json", worker_class, _FIXTURE_SURFACE)
     baseline_path = tmp_path / "gym-baseline.json"
     baseline_path.write_text(
-        serialize_baseline(baseline_document({"mini-pass": outcomes.PASSED}, generated_at=_NOW)),
+        serialize_baseline(
+            baseline_document({"mini-pass": outcomes.PASSED}, generated_at=_NOW)
+        ),
         encoding="utf-8",
     )
     before = baseline_path.read_bytes()
@@ -660,7 +697,8 @@ def test_run_emits_gym_regression_alert_on_pass_to_fail(tmp_path):
     write_baseline(
         baseline_path,
         baseline_document(
-            {"mini-pass": outcomes.PASSED, "mini-fail": outcomes.PASSED}, generated_at=_NOW
+            {"mini-pass": outcomes.PASSED, "mini-fail": outcomes.PASSED},
+            generated_at=_NOW,
         ),
     )
     alerter = RecordingAlerter()
@@ -691,7 +729,8 @@ def test_run_new_pass_is_logged_not_alerted(tmp_path):
     write_baseline(
         baseline_path,
         baseline_document(
-            {"mini-pass": outcomes.FAILED, "mini-fail": outcomes.FAILED}, generated_at=_NOW
+            {"mini-pass": outcomes.FAILED, "mini-fail": outcomes.FAILED},
+            generated_at=_NOW,
         ),
     )
     alerter = RecordingAlerter()
@@ -749,7 +788,10 @@ def test_run_agent_error_is_visible_and_non_clean(tmp_path):
     assert code == cli.EXIT_ERROR
     assert alerter.alerts == []
     assert "0 passed  0 failed  1 errors" in text
-    assert "AGENT ERROR: mini-pass: hq dispatch failed before launch: missing --ticket" in text
+    assert (
+        "AGENT ERROR: mini-pass: hq dispatch failed before launch: missing --ticket"
+        in text
+    )
     assert "non-clean: agent error" in text
     assert "no regression" not in text
 
@@ -911,9 +953,15 @@ def test_baseline_update_round_trip_then_clean_run(tmp_path):
     assert code == cli.EXIT_OK
     loaded = load_baseline(baseline_path)
     assert loaded.established is True
-    assert loaded.verdicts == {"mini-pass": outcomes.PASSED, "mini-fail": outcomes.PASSED}
+    assert loaded.verdicts == {
+        "mini-pass": outcomes.PASSED,
+        "mini-fail": outcomes.PASSED,
+    }
     # Deterministic / sorted on disk.
-    assert list(json.loads(baseline_path.read_text())["verdicts"]) == ["mini-fail", "mini-pass"]
+    assert list(json.loads(baseline_path.read_text())["verdicts"]) == [
+        "mini-fail",
+        "mini-pass",
+    ]
 
     # 2. An immediately-following comparison run over the same verdicts is clean.
     alerter = RecordingAlerter()

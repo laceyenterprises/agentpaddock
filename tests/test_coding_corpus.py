@@ -13,8 +13,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-GYM = REPO_ROOT / "modules" / "adversarial-eval-gym"
+GYM = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(GYM / "lib" / "python"))
 
 from gym import grader, outcomes  # noqa: E402
@@ -87,14 +86,20 @@ def _stage(task_id: str, dest: Path) -> None:
 
 
 def _line_of(path: Path, needle: str) -> int:
-    for index, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    for index, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
         if needle in line:
             return index
     raise AssertionError(f"{needle!r} not found in {path}")
 
 
 def _verifier_const(task_id: str, name: str) -> str:
-    for line in (GYM / "tasks" / task_id / "verifier.py").read_text(encoding="utf-8").splitlines():
+    for line in (
+        (GYM / "tasks" / task_id / "verifier.py")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ):
         if line.startswith(f"{name} ="):
             return line.split("=", 1)[1].strip()
     raise AssertionError(f"{name} not found in {task_id} verifier")
@@ -144,7 +149,9 @@ def test_ground_truth_matches_the_staged_files():
         )
         # The defect only exists because of the column type, so the schema must
         # actually declare it as jsonb.
-        assert "metadata_json     jsonb" in (jsonb / "schema.sql").read_text(encoding="utf-8")
+        assert "metadata_json     jsonb" in (jsonb / "schema.sql").read_text(
+            encoding="utf-8"
+        )
 
         commit = root / "commit"
         commit.mkdir()
@@ -169,7 +176,9 @@ def test_ground_truth_matches_the_staged_files():
         # The trap is that the line already looks defended.
         assert (
             "2>/dev/null"
-            in probe.read_text(encoding="utf-8").splitlines()[_line_of(probe, "LATEST_META=") - 1]
+            in probe.read_text(encoding="utf-8").splitlines()[
+                _line_of(probe, "LATEST_META=") - 1
+            ]
         )
         assert "set -euo pipefail" in probe.read_text(encoding="utf-8")
 
@@ -183,21 +192,23 @@ def test_ground_truth_matches_the_staged_files():
         pr_not_found = root / "pr-not-found"
         pr_not_found.mkdir()
         _stage("coding-pr-not-found-terminal", pr_not_found)
-        assert _line_of(pr_not_found / "batch_activation.py", "return STATUS_FAILED") == int(
-            _verifier_const("coding-pr-not-found-terminal", "EXPECTED_LINE")
-        )
+        assert _line_of(
+            pr_not_found / "batch_activation.py", "return STATUS_FAILED"
+        ) == int(_verifier_const("coding-pr-not-found-terminal", "EXPECTED_LINE"))
 
         behind_wording = root / "behind-wording"
         behind_wording.mkdir()
         _stage("coding-schema-behind-wording", behind_wording)
-        assert _line_of(behind_wording / "schema_parser.py", "not at Alembic head") == int(
-            _verifier_const("coding-schema-behind-wording", "EXPECTED_LINE")
-        )
+        assert _line_of(
+            behind_wording / "schema_parser.py", "not at Alembic head"
+        ) == int(_verifier_const("coding-schema-behind-wording", "EXPECTED_LINE"))
 
         unknown = root / "unknown"
         unknown.mkdir()
         _stage("coding-unknown-change-kind-sentinel", unknown)
-        assert _line_of(unknown / "change_kind.py", "normalize_change_kind(explicit)") == int(
+        assert _line_of(
+            unknown / "change_kind.py", "normalize_change_kind(explicit)"
+        ) == int(
             _verifier_const("coding-unknown-change-kind-sentinel", "EXPECTED_LINE")
         )
 
@@ -215,7 +226,9 @@ def test_stages_never_write_the_answer_into_the_sandbox():
                     continue
                 body = staged.read_text(encoding="utf-8", errors="replace")
                 for token in forbidden:
-                    assert token not in body, f"{task_id}: {staged.name} leaks {token!r}"
+                    assert token not in body, (
+                        f"{task_id}: {staged.name} leaks {token!r}"
+                    )
 
 
 def test_unclean_run_with_a_submission_is_still_graded():
@@ -264,7 +277,10 @@ def test_unclean_run_without_a_submission_is_still_an_agent_error():
     """The gate is reordered, not removed."""
     task = load_task(GYM / "tasks" / "coding-pipefail-silent-exit")
     silent = Trajectory(
-        terminal_status="failed", submitted_result=None, transcript_rows=[], control_rows=[]
+        terminal_status="failed",
+        submitted_result=None,
+        transcript_rows=[],
+        control_rows=[],
     )
     cell = grader.grade(task, silent)
     assert cell.outcome == outcomes.AGENT_ERROR
@@ -281,7 +297,9 @@ def test_new_real_regression_verifiers_fail_pre_fix_and_pass_post_fix():
         assert post_fix.outcome == outcomes.PASSED, task_id
 
 
-def _harness_trajectory(result: dict[str, object], calls: list[dict[str, object]]) -> Trajectory:
+def _harness_trajectory(
+    result: dict[str, object], calls: list[dict[str, object]]
+) -> Trajectory:
     """A run the ledger cannot see (codex exec, ACP): no transcript rows."""
     return Trajectory(
         terminal_status="succeeded",
@@ -362,8 +380,12 @@ def test_read_evidence_is_graded_from_harness_calls_when_the_ledger_has_none():
         assert blind.outcome == outcomes.FAILED, task_id
 
 
-def _toc_trajectory(result: dict[str, object], commands: list[str], edits=()) -> Trajectory:
-    calls = [{"name": "shell", "arguments": {"command": command}} for command in commands]
+def _toc_trajectory(
+    result: dict[str, object], commands: list[str], edits=()
+) -> Trajectory:
+    calls = [
+        {"name": "shell", "arguments": {"command": command}} for command in commands
+    ]
     calls += [{"name": name, "arguments": {"file_path": path}} for name, path in edits]
     return _harness_trajectory(result, calls)
 
@@ -401,16 +423,26 @@ def test_toc_commands_verifier_grades_from_result_and_tool_calls():
         "pytest test.py",
     ]
 
-    assert grader.grade(task, _toc_trajectory(good, commands)).outcome == outcomes.PASSED
+    assert (
+        grader.grade(task, _toc_trajectory(good, commands)).outcome == outcomes.PASSED
+    )
 
-    wrong_subject = {**good, "regressing_commit_subject": "greet: add greeting and its test"}
-    assert grader.grade(task, _toc_trajectory(wrong_subject, commands)).outcome == outcomes.FAILED
+    wrong_subject = {
+        **good,
+        "regressing_commit_subject": "greet: add greeting and its test",
+    }
+    assert (
+        grader.grade(task, _toc_trajectory(wrong_subject, commands)).outcome
+        == outcomes.FAILED
+    )
 
     no_git = [c for c in commands if not c.startswith("git log")]
     assert grader.grade(task, _toc_trajectory(good, no_git)).outcome == outcomes.FAILED
 
     one_pytest = commands[:3]
-    assert grader.grade(task, _toc_trajectory(good, one_pytest)).outcome == outcomes.FAILED
+    assert (
+        grader.grade(task, _toc_trajectory(good, one_pytest)).outcome == outcomes.FAILED
+    )
 
     edited_test = _toc_trajectory(good, commands, edits=[("Edit", "test.py")])
     assert grader.grade(task, edited_test).outcome == outcomes.FAILED
@@ -429,7 +461,11 @@ def test_toc_commands_verifier_counts_only_real_pytest_runs_and_shell_edits():
     # and `python -m pytest` still count.
     assert (
         grade(
-            ['git -c safe.directory="$PWD" log', "python3 -m pytest test.py", f"{fix} && pytest -q"]
+            [
+                'git -c safe.directory="$PWD" log',
+                "python3 -m pytest test.py",
+                f"{fix} && pytest -q",
+            ]
         )
         == outcomes.PASSED
     )
@@ -443,10 +479,22 @@ def test_toc_commands_verifier_counts_only_real_pytest_runs_and_shell_edits():
         "cp main.py test.py",
         "python3 -c \"open('test.py', 'w').write('')\"",
     ):
-        assert grade(["git log", "pytest test.py", edit, "pytest test.py"]) == outcomes.FAILED, edit
+        assert (
+            grade(["git log", "pytest test.py", edit, "pytest test.py"])
+            == outcomes.FAILED
+        ), edit
     # Reading or backing up test.py is not an edit.
     assert (
-        grade(["git log", "cat test.py", "cp test.py /tmp/test.py.bak", "pytest", fix, "pytest"])
+        grade(
+            [
+                "git log",
+                "cat test.py",
+                "cp test.py /tmp/test.py.bak",
+                "pytest",
+                fix,
+                "pytest",
+            ]
+        )
         == outcomes.PASSED
     )
     # codex exec reports argv; the script is the last element of `bash -lc`.
@@ -454,7 +502,10 @@ def test_toc_commands_verifier_counts_only_real_pytest_runs_and_shell_edits():
         {"name": "shell", "arguments": {"command": ["bash", "-lc", c]}}
         for c in ("git log --oneline", "pytest test.py", fix, "pytest test.py")
     ]
-    assert grader.grade(task, _harness_trajectory(good, argv_calls)).outcome == outcomes.PASSED
+    assert (
+        grader.grade(task, _harness_trajectory(good, argv_calls)).outcome
+        == outcomes.PASSED
+    )
 
 
 def test_ambiguous_lines_and_all_field_checks():
@@ -467,14 +518,18 @@ def test_ambiguous_lines_and_all_field_checks():
         for line in accepted + rejected:
             result = {**case["post_fix"], "defect_line": line}
             cell = grader.grade(task, _trajectory(result, case["opened"]))
-            assert cell.outcome == (outcomes.PASSED if line in accepted else outcomes.FAILED)
+            assert cell.outcome == (
+                outcomes.PASSED if line in accepted else outcomes.FAILED
+            )
             assert cell.score == (1.0 if line in accepted else 0.75)
             assert len(cell.subchecks) == 4
         wrong = {**case["pre_fix"], "defect_line": 99}
         cell = grader.grade(task, _trajectory(wrong, case["opened"]))
         failed = {c["name"] for c in cell.subchecks if not c["ok"]}
         assert "defect_line" in failed
-        assert ("terminal_status" if accepted == (12, 14) else "sentinel_handling") in failed
+        assert (
+            "terminal_status" if accepted == (12, 14) else "sentinel_handling"
+        ) in failed
         assert len(cell.subchecks) == 4
         assert cell.to_dict()["score"] == cell.score
 
@@ -490,7 +545,9 @@ HARD_CODING_TASKS = (
 def _hard_answer(task_id, name="reference"):
     import json
 
-    return json.loads((GYM / "tasks" / task_id / "expected" / f"{name}.json").read_text())
+    return json.loads(
+        (GYM / "tasks" / task_id / "expected" / f"{name}.json").read_text()
+    )
 
 
 def _run_staged(dest, code):
@@ -535,7 +592,9 @@ def test_harder_verifiers_grade_reference_wrong_and_each_independent_field():
                 if isinstance(value, int)
                 else "wrong"
             )
-            cell = grader.grade(task, _trajectory({**good, spec.name: bad}, "scenario.py"))
+            cell = grader.grade(
+                task, _trajectory({**good, spec.name: bad}, "scenario.py")
+            )
             assert cell.outcome == outcomes.FAILED, (task_id, spec.name)
             assert [c["name"] for c in cell.subchecks if not c["ok"]] == [spec.name]
             assert cell.score == (len(good) - 1) / len(good)
@@ -613,7 +672,10 @@ def test_harder_commit_ground_truth_and_reorder_counterexample(tmp_path):
                 return
             store.apply(event, amount)""",
     )
-    assert _run_staged(tmp_path, replay) == [answer["fixed_balance"], answer["fixed_receipts"]]
+    assert _run_staged(tmp_path, replay) == [
+        answer["fixed_balance"],
+        answer["fixed_receipts"],
+    ]
     # With acknowledgements delivered, and with one lost after durability,
     # the same reference fix still applies each event once.
     assert _run_staged(
@@ -644,14 +706,19 @@ from scenario import replay, SCHEDULES
 print(json.dumps([replay(order) for order in SCHEDULES]))
 """
     original = _run_staged(tmp_path, replay)
-    assert sum(trace[-1] != 30 for trace in original) == answer["original_wrong_schedules"]
+    assert (
+        sum(trace[-1] != 30 for trace in original) == answer["original_wrong_schedules"]
+    )
 
     def trace_string(trace):
         return ",".join("null" if v is None else str(v) for v in trace)
 
     assert trace_string(original[4]) == answer["original_trace"]
     _replace_staged(
-        tmp_path, "loader.py", "if not self.pending:", "if generation == self.generation:"
+        tmp_path,
+        "loader.py",
+        "if not self.pending:",
+        "if generation == self.generation:",
     )
     fixed = _run_staged(tmp_path, replay)
     assert sum(trace[-1] != 30 for trace in fixed) == answer["fixed_wrong_schedules"]
@@ -730,14 +797,18 @@ def test_toc_absolute_shell_wrappers_and_harness_shapes():
     ]
     for wrap in wrappers:
         for name in ("shell", "Bash", "bash"):
-            calls = [{"name": name, "arguments": {"command": wrap(c)}} for c in commands]
+            calls = [
+                {"name": name, "arguments": {"command": wrap(c)}} for c in commands
+            ]
             cell = grader.grade(task, _harness_trajectory(good, calls))
             assert cell.outcome == outcomes.PASSED, (calls, cell.reason)
     calls = [
         {"name": "execute", "arguments": {"rawInput": {"cmd": ["/bin/zsh", "-lc", c]}}}
         for c in commands
     ]
-    assert grader.grade(task, _harness_trajectory(good, calls)).outcome == outcomes.PASSED
+    assert (
+        grader.grade(task, _harness_trajectory(good, calls)).outcome == outcomes.PASSED
+    )
 
 
 def test_toc_verifier_recovers_quoted_assignments_and_outer_commands():
@@ -750,8 +821,12 @@ def test_toc_verifier_recovers_quoted_assignments_and_outer_commands():
         'GIT_AUTHOR_NAME="A B" bash -c "pytest test.py" && git log --oneline',
         "env LABEL='before fix' sh -c \"sed -i s/bye/hello/ main.py\" && pytest -q",
     ]
-    assert grader.grade(task, _toc_trajectory(good, commands)).outcome == outcomes.PASSED
+    assert (
+        grader.grade(task, _toc_trajectory(good, commands)).outcome == outcomes.PASSED
+    )
 
     # A test-file write after a wrapper must remain visible to the edit guard.
     commands.append("bash -c 'echo done' && printf x > test.py")
-    assert grader.grade(task, _toc_trajectory(good, commands)).outcome == outcomes.FAILED
+    assert (
+        grader.grade(task, _toc_trajectory(good, commands)).outcome == outcomes.FAILED
+    )

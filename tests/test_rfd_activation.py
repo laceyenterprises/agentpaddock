@@ -10,6 +10,10 @@ from pathlib import Path
 import pytest
 import yaml
 
+pytest.importorskip(
+    "cwp_dispatch.activation_contract", reason="host activation contract is not shipped"
+)
+
 from cwp_dispatch.activation_contract import (
     _execute_assertion,
     evaluate_output,
@@ -21,7 +25,7 @@ from gym.hidden_tests import require_fix_activation
 from gym.suite import discover_tasks
 
 MODULE = Path(__file__).resolve().parents[1]
-ACTIVATION = MODULE.parents[1] / "projects/gym-review-fix-docs/activation"
+ACTIVATION = MODULE / "projects/gym-review-fix-docs/activation"
 DOCUMENT = yaml.safe_load((ACTIVATION / "rfd.yaml").read_text())
 ASSERTIONS = parse_activation_yaml_document(
     DOCUMENT,
@@ -46,11 +50,11 @@ def execute_probe(index, monkeypatch):
 def probe_roots(monkeypatch, tmp_path):
     from agent_os_config import roots
 
-    monkeypatch.setenv("AGENT_OS_ROOT", str(MODULE.parents[1]))
+    monkeypatch.setenv("AGENT_OS_ROOT", str(MODULE))
     hq = tmp_path / "shared-hq"
     monkeypatch.setenv("AGENT_OS_ROOTS_HQ", str(hq))
     roots.reset_cache()
-    assert roots.deploy_root() == str(MODULE.parents[1])
+    assert roots.deploy_root() == str(MODULE)
     assert roots.hq_root() == str(hq)
     return hq
 
@@ -58,7 +62,7 @@ def probe_roots(monkeypatch, tmp_path):
 def test_discovery_probe_executes_real_root_resolver(probe_roots):
     result = subprocess.run(
         [sys.executable, "-c", probe_program(0)],
-        cwd=MODULE.parents[1],
+        cwd=MODULE,
         env=os.environ.copy(),
         capture_output=True,
         text=True,
@@ -77,7 +81,9 @@ def test_activation_schema_and_pinned_interpreter():
         compile(program, "rfd.yaml", "exec")
 
 
-@pytest.mark.parametrize("index,sample", [(0, "discovery"), (1, "prospective-activation")])
+@pytest.mark.parametrize(
+    "index,sample", [(0, "discovery"), (1, "prospective-activation")]
+)
 def test_recorded_expectation(index, sample):
     assert evaluate_output(
         ASSERTIONS[index], (ACTIVATION / f"samples/{sample}.json").read_text()
@@ -107,7 +113,9 @@ def test_activation_matches_operator_lift():
     ],
 )
 def test_incomplete_activation_fails(field, value):
-    sample = json.loads((ACTIVATION / "samples/prospective-activation.json").read_text())
+    sample = json.loads(
+        (ACTIVATION / "samples/prospective-activation.json").read_text()
+    )
     sample[field] = value
     assert not evaluate_output(ASSERTIONS[1], json.dumps(sample)).passed
 
@@ -137,7 +145,10 @@ def test_battery_axes():
 @pytest.mark.parametrize(
     "socket_output,contained",
     [
-        ("GYM_NETWORK_DENIED errno=101\nOSError: [Errno 101] Network is unreachable", True),
+        (
+            "GYM_NETWORK_DENIED errno=101\nOSError: [Errno 101] Network is unreachable",
+            True,
+        ),
         ("GYM_NETWORK_DENIED errno=113\nOSError: [Errno 113] No route to host", True),
         ("PermissionError: [Errno 13] Permission denied", False),
         ("OSError: [Errno 1] Operation not permitted", False),
@@ -152,11 +163,15 @@ def test_probe_reports_real_gate_and_only_network_denial(
     from agent_os_config import roots
     from gym import hidden_tests
 
-    monkeypatch.setattr(roots, "deploy_root", lambda: str(MODULE.parents[1]))
+    monkeypatch.setattr(roots, "deploy_root", lambda: str(MODULE))
     real_run = subprocess.run
 
     def inspect_image(command, *args, **kwargs):
-        if command == ["docker", "info"] or command[:3] == ["docker", "image", "inspect"]:
+        if command == ["docker", "info"] or command[:3] == [
+            "docker",
+            "image",
+            "inspect",
+        ]:
             return subprocess.CompletedProcess(command, 0, "", "")
         return real_run(command, *args, **kwargs)
 
@@ -210,7 +225,9 @@ def test_probe_real_runner_mounts_shared_root_despite_default_tmp(
         # Exercise real run(), snapshotting and Docker command construction.
         assert work.is_relative_to(probe_roots / "tmp")
         assert work.parent.stat().st_mode & 0o777 == 0o700
-        assert command[command.index("--mount") + 1] == (f"type=bind,src={work},dst=/work,readonly")
+        assert command[command.index("--mount") + 1] == (
+            f"type=bind,src={work},dst=/work,readonly"
+        )
         mounts.append(work)
         if not input_data:
             return 0, False, "gym-ready\n" + next(work.glob("gym-bind-*")).read_text()
@@ -249,7 +266,13 @@ def test_probe_real_runner_mounts_shared_root_despite_default_tmp(
     ],
 )
 def test_probe_infrastructure_failures_enable_bounded_pma_retry(
-    monkeypatch, capsys, probe_roots, failure, transient, engine_reachable, image_present
+    monkeypatch,
+    capsys,
+    probe_roots,
+    failure,
+    transient,
+    engine_reachable,
+    image_present,
 ):
     from gym import hidden_tests
 
@@ -306,7 +329,9 @@ def test_probe_infrastructure_failures_enable_bounded_pma_retry(
 
     def runner(command, timeout):
         retries.append(command)
-        return subprocess.CompletedProcess(command, int(transient), output.out, output.err)
+        return subprocess.CompletedProcess(
+            command, int(transient), output.out, output.err
+        )
 
     execution = _execute_assertion(
         ASSERTIONS[1], runner=runner, retry_transient=True, sleep=naps.append
@@ -335,15 +360,24 @@ def test_grader_real_runner_mounts_shared_root_despite_default_tmp(
 
     def execute(command, work, timeout, *, input_data=b""):
         assert work.parent == hidden_tests.shared_work_root() == probe_roots / "tmp"
-        assert command[command.index("--mount") + 1] == f"type=bind,src={work},dst=/work,readonly"
+        assert (
+            command[command.index("--mount") + 1]
+            == f"type=bind,src={work},dst=/work,readonly"
+        )
         mounts.append(work)
         if not input_data:
             return 0, False, "gym-ready\n" + next(work.glob("gym-bind-*")).read_text()
         request = json.loads(input_data)
-        return 0, False, "GYM_RESULT " + json.dumps({"nonce": request["nonce"], "ok": 42})
+        return (
+            0,
+            False,
+            "GYM_RESULT " + json.dumps({"nonce": request["nonce"], "ok": 42}),
+        )
 
     monkeypatch.setattr(hidden_tests, "_execute", execute)
-    _run_verifier_out_of_band(task, {}, {}, python_exe=sys.executable, sandbox_root=capture)
+    _run_verifier_out_of_band(
+        task, {}, {}, python_exe=sys.executable, sandbox_root=capture
+    )
     assert len(mounts) == 2
     assert all(not path.exists() for path in mounts)
     assert not list(hidden_tests.shared_work_root().iterdir())

@@ -19,11 +19,15 @@ def fixture_task(tmp_path, call="result=42", expected=None, target="", timeout=2
     root = tmp_path / "task"
     (root / "hidden").mkdir(parents=True)
     (root / "hidden/cases.json").write_text(
-        json.dumps([{"call": call, "expected": {"ok": 42} if expected is None else expected}])
+        json.dumps(
+            [{"call": call, "expected": {"ok": 42} if expected is None else expected}]
+        )
     )
     (root / "verifier.py").write_text("")
     (root / "fixture").mkdir()
-    (root / "fixture/staged-manifest.json").write_text(json.dumps({"editable": ["target.py"]}))
+    (root / "fixture/staged-manifest.json").write_text(
+        json.dumps({"editable": ["target.py"]})
+    )
     (root / "fixture/target.py").write_text("")
     capture = tmp_path / "capture"
     capture.mkdir()
@@ -57,7 +61,8 @@ def test_hostile_submission_fails(tmp_path, protocol_backend, target):
 
 
 @pytest.mark.parametrize(
-    "kind", ["missing", "malformed", "nonce", "extra", "replay", "keys", "boolean", "nan"]
+    "kind",
+    ["missing", "malformed", "nonce", "extra", "replay", "keys", "boolean", "nan"],
 )
 def test_invalid_responses(tmp_path, protocol_backend, monkeypatch, kind):
     import gym.hidden_tests as runner
@@ -141,11 +146,17 @@ def test_docker_unavailable_is_error(tmp_path, monkeypatch, usable):
     import gym.hidden_tests as runner
 
     task, capture = fixture_task(tmp_path)
-    monkeypatch.setattr(runner.shutil, "which", lambda name: "/usr/bin/false" if usable else None)
-    monkeypatch.setattr(runner, "_execute", lambda *args: (1, False, "Docker unavailable"))
+    monkeypatch.setattr(
+        runner.shutil, "which", lambda name: "/usr/bin/false" if usable else None
+    )
+    monkeypatch.setattr(
+        runner, "_execute", lambda *args: (1, False, "Docker unavailable")
+    )
     with pytest.raises(
         GraderError,
-        match="sandbox unusable: Docker unavailable" if usable else "require usable Docker",
+        match="sandbox unusable: Docker unavailable"
+        if usable
+        else "require usable Docker",
     ):
         run(task, capture)
 
@@ -223,7 +234,10 @@ def test_expected_test_count_required(expected):
                 "suite": "fix",
                 "result_schema": {"ok": {"type": "boolean"}},
                 "verifier": {},
-                "hidden_tests": {"entrypoint": "hidden/cases.json", "expected_tests": expected},
+                "hidden_tests": {
+                    "entrypoint": "hidden/cases.json",
+                    "expected_tests": expected,
+                },
             }
         )
 
@@ -241,7 +255,9 @@ def test_valid_hidden_test_schema():
     assert task.hidden_tests_expected_tests == 3
 
 
-@pytest.mark.parametrize("suite", [None, "coding", "rca", "injection", "docs", "review"])
+@pytest.mark.parametrize(
+    "suite", [None, "coding", "rca", "injection", "docs", "review"]
+)
 def test_only_fix_can_declare_hidden(suite):
     with pytest.raises(TaskSchemaError, match="requires suite"):
         parse_task_dict(
@@ -280,7 +296,8 @@ def test_hidden_schema_bounds(hidden):
 
 def test_verifier_has_no_exec_helper():
     assert not any(
-        name in vars(verifier_runtime) for name in ("exec", "execute", "run", "subprocess", "Popen")
+        name in vars(verifier_runtime)
+        for name in ("exec", "execute", "run", "subprocess", "Popen")
     )
 
 
@@ -313,7 +330,9 @@ def test_trusted_fixture_env_never_bypasses_backend(
     task, capture = fixture_task(tmp_path, "raise AssertionError('must not execute')\n")
     monkeypatch.setattr(runner.sys, "platform", platform)
     monkeypatch.setattr(
-        runner.shutil, "which", lambda name: None if backend_state == "missing" else "/fake/backend"
+        runner.shutil,
+        "which",
+        lambda name: None if backend_state == "missing" else "/fake/backend",
     )
     if switch is None:
         monkeypatch.delenv("GYM_HIDDEN_TESTS_TRUSTED_FIXTURE", raising=False)
@@ -403,7 +422,9 @@ os._exit(0)
 
 
 @pytest.mark.parametrize("value", ["set()", "b'bytes'", "object()", "float('nan')"])
-def test_unserializable_observation_only_fails_its_case(tmp_path, protocol_backend, value):
+def test_unserializable_observation_only_fails_its_case(
+    tmp_path, protocol_backend, value
+):
     task, capture = fixture_task(tmp_path)
     cases = [
         {"call": f"result={value}", "expected": {"ok": 42}},
@@ -548,7 +569,9 @@ def test_fork_loop_contained(tmp_path, docker_backend, monkeypatch):
 
 
 def test_output_bounded(tmp_path, docker_backend):
-    task, capture = fixture_task(tmp_path, "import os\nos.write(1,b'x'*100000)\nresult=42")
+    task, capture = fixture_task(
+        tmp_path, "import os\nos.write(1,b'x'*100000)\nresult=42"
+    )
     result = run(task, capture)
     assert result["status"] == "failed"
     assert len(result["output_tail"].encode()) <= 16384
@@ -601,7 +624,9 @@ def test_backend_readiness_requires_real_engine_when_requested(
         monkeypatch.setenv("GYM_REQUIRE_REAL_ENGINE", "1")
     else:
         monkeypatch.delenv("GYM_REQUIRE_REAL_ENGINE", raising=False)
-    monkeypatch.setattr(shutil, "which", lambda _: None if state == "missing" else "/docker")
+    monkeypatch.setattr(
+        shutil, "which", lambda _: None if state == "missing" else "/docker"
+    )
 
     def info(*args, **kwargs):
         if state == "timeout":
@@ -623,11 +648,15 @@ def test_invalid_work_root_raises_grader_error(tmp_path, kind):
     root = tmp_path / "invalid-root"
     if kind == "file":
         root.write_text("not a directory")
-    with pytest.raises(GraderError, match="work_root must be an existing VM-shared directory"):
+    with pytest.raises(
+        GraderError, match="work_root must be an existing VM-shared directory"
+    ):
         run(task, capture, work_root=root)
 
 
-def test_readiness_timeout_keeps_retry_evidence_and_cleans_work_root(tmp_path, monkeypatch):
+def test_readiness_timeout_keeps_retry_evidence_and_cleans_work_root(
+    tmp_path, monkeypatch
+):
     import gym.hidden_tests as runner
 
     task, capture = fixture_task(tmp_path, "raise AssertionError('must not run')")
@@ -669,14 +698,21 @@ def test_mixed_case_counts(tmp_path, protocol_backend):
     task, capture = fixture_task(tmp_path)
     cases = [
         {"call": call, "expected": {"ok": 42}}
-        for call in ["result=42", "result=0", "import os; os._exit(0)", "import os; os._exit(0)"]
+        for call in [
+            "result=42",
+            "result=0",
+            "import os; os._exit(0)",
+            "import os; os._exit(0)",
+        ]
     ]
     (task.task_dir / task.hidden_tests_entrypoint).write_text(json.dumps(cases))
     result = run(replace(task, hidden_tests_expected_tests=4), capture)
     assert (result["passed"], result["failed"], result["errors"]) == (1, 1, 2)
 
 
-def test_expired_budget_counts_unexecuted_cases(tmp_path, protocol_backend, monkeypatch):
+def test_expired_budget_counts_unexecuted_cases(
+    tmp_path, protocol_backend, monkeypatch
+):
     import gym.hidden_tests as runner
 
     task, capture = fixture_task(tmp_path)
@@ -783,7 +819,9 @@ def test_bind_preflight_refuses_before_copy_and_cleans(
 ):
     from gym import hidden_tests
 
-    task, capture = fixture_task(tmp_path, target="raise RuntimeError('must not execute')")
+    task, capture = fixture_task(
+        tmp_path, target="raise RuntimeError('must not execute')"
+    )
     work_root = tmp_path / "shared"
     work_root.mkdir()
     seen = []
@@ -800,7 +838,9 @@ def test_bind_preflight_refuses_before_copy_and_cleans(
         return code, False, reported
 
     monkeypatch.setattr(hidden_tests, "_execute", execute)
-    with pytest.raises(GraderError, match="work root is not shared with the Docker VM") as error:
+    with pytest.raises(
+        GraderError, match="work root is not shared with the Docker VM"
+    ) as error:
         run(task, capture, work_root=work_root)
     assert str(reported) in str(error.value)
     assert len(seen) == 1
@@ -811,10 +851,12 @@ def test_bind_preflight_refuses_before_copy_and_cleans(
 @pytest.mark.parametrize("umask", [0o002, 0o022, 0o077])
 def test_shared_work_root_creates_group_writable_parent(tmp_path, monkeypatch, umask):
     from gym import hidden_tests
-    from agent_os_config import roots
+    from gym import host_services
 
     (tmp_path / "hq").mkdir(mode=0o775)
-    monkeypatch.setattr(roots, "hq_root", lambda: str(tmp_path / "hq"))
+    monkeypatch.setattr(
+        host_services.current(), "scratch_dir", lambda: tmp_path / "hq/tmp"
+    )
     previous_umask = os.umask(umask)
     try:
         root = hidden_tests.shared_work_root()
@@ -829,24 +871,28 @@ def test_shared_work_root_creates_group_writable_parent(tmp_path, monkeypatch, u
 @pytest.mark.parametrize("mode", [0o700, 0o755, 0o1770])
 def test_shared_work_root_repairs_owned_parent(tmp_path, monkeypatch, mode):
     from gym import hidden_tests
-    from agent_os_config import roots
+    from gym import host_services
 
     root = tmp_path / "tmp"
     root.mkdir()
     root.chmod(mode)
-    monkeypatch.setattr(roots, "hq_root", lambda: str(tmp_path))
+    monkeypatch.setattr(
+        host_services.current(), "scratch_dir", lambda: tmp_path / "tmp"
+    )
     assert hidden_tests.shared_work_root() == root
     assert root.stat().st_mode & 0o7777 == mode | 0o070
 
 
 def test_shared_work_root_preserves_other_owner_permissions(tmp_path, monkeypatch):
     from gym import hidden_tests
-    from agent_os_config import roots
+    from gym import host_services
 
     root = tmp_path / "tmp"
     root.mkdir()
     root.chmod(0o775)
-    monkeypatch.setattr(roots, "hq_root", lambda: str(tmp_path))
+    monkeypatch.setattr(
+        host_services.current(), "scratch_dir", lambda: tmp_path / "tmp"
+    )
     monkeypatch.setattr(hidden_tests.os, "getuid", lambda: root.stat().st_uid + 1)
 
     def deny_chmod(*args, **kwargs):
@@ -857,7 +903,9 @@ def test_shared_work_root_preserves_other_owner_permissions(tmp_path, monkeypatc
     assert root.stat().st_mode & 0o777 == 0o775
 
 
-def test_real_engine_parent_memory_and_descriptors_inaccessible(tmp_path, docker_backend):
+def test_real_engine_parent_memory_and_descriptors_inaccessible(
+    tmp_path, docker_backend
+):
     target = """
 import ctypes, gc, inspect, os, sys
 assert not hasattr(sys.modules['__main__'], 'nonce')
@@ -896,7 +944,9 @@ def test_submitted_main_has_no_nonce(tmp_path, request, backend):
     from gym.hidden_tests import shared_work_root
 
     result = run(
-        task, capture, work_root=shared_work_root() if backend == "docker_backend" else None
+        task,
+        capture,
+        work_root=shared_work_root() if backend == "docker_backend" else None,
     )
     assert result["status"] == "passed"
 

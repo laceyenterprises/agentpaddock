@@ -1,0 +1,5 @@
+## Blocking issues
+- None. No blocking defects found.
+
+## Verdict
+Approve
