@@ -6,6 +6,16 @@
         "name": "whitespace lint",
         "command": "git diff --check origin/main...HEAD --",
         "tier": "fast"
+      },
+      {
+        "name": "publication scan",
+        "command": "python3 scripts/publication_scan.py",
+        "tier": "fast"
+      },
+      {
+        "name": "internal-note guard",
+        "command": "python3 scripts/internal_note_guard.py",
+        "tier": "fast"
       }
     ]
   }
