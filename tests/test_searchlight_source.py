@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from gym_test_support import checkout_root
+
 
 def test_sew_imports_are_from_searchlight():
     pytest.importorskip(
@@ -11,6 +13,6 @@ def test_sew_imports_are_from_searchlight():
     )
     from sew import cost_model, report, bakeoff_report
 
-    root = Path(__file__).resolve().parents[1] / "tools" / "searchlight"
+    root = checkout_root(Path(__file__).resolve().parents[1]) / "tools" / "searchlight"
     for module in (cost_model, report, bakeoff_report):
         assert Path(module.__file__).resolve().is_relative_to(root)

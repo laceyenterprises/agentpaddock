@@ -51,19 +51,33 @@ def execute_probe(index, monkeypatch):
 def probe_roots(monkeypatch, tmp_path):
     from agent_os_config import roots
 
-    monkeypatch.setenv("AGENT_OS_ROOT", str(MODULE))
+    monkeypatch.setenv("AGENT_OS_ROOT", str(checkout_root(MODULE)))
     hq = tmp_path / "shared-hq"
+    hq.mkdir()
     monkeypatch.setenv("AGENT_OS_ROOTS_HQ", str(hq))
+    config = tmp_path / "config.yaml"
+    config.write_text(yaml.safe_dump({"version": 1, "roots": {
+        "deploy": str(checkout_root(MODULE)), "hq": str(hq),
+    }}))
+    monkeypatch.setenv("AGENT_OS_CONFIG_PATH", str(config))
     roots.reset_cache()
-    assert roots.deploy_root() == str(MODULE)
+    assert roots.deploy_root() == str(checkout_root(MODULE))
     assert roots.hq_root() == str(hq)
-    return hq
+    from gym import host_services
+
+    previous = host_services.install(
+        host_services.StandaloneServices(hq, env={}, config={})
+    )
+    try:
+        yield hq
+    finally:
+        host_services.install(previous)
 
 
 def test_discovery_probe_executes_real_root_resolver(probe_roots):
     result = subprocess.run(
         [sys.executable, "-c", probe_program(0)],
-        cwd=MODULE,
+        cwd=checkout_root(MODULE),
         env=os.environ.copy(),
         capture_output=True,
         text=True,
@@ -128,7 +142,9 @@ def test_actual_discovery_matches_recorded_sample(suite):
 
 
 def test_battery_axes():
-    from gym.matrix import load_battery
+    load_battery = pytest.importorskip(
+        "gym.matrix", reason="host battery integration is not shipped"
+    ).load_battery
 
     battery, _, identities = load_battery(
         MODULE / "batteries/rfd-pilot.toml",
@@ -164,7 +180,7 @@ def test_probe_reports_real_gate_and_only_network_denial(
     from agent_os_config import roots
     from gym import hidden_tests
 
-    monkeypatch.setattr(roots, "deploy_root", lambda: str(MODULE))
+    monkeypatch.setattr(roots, "deploy_root", lambda: str(checkout_root(MODULE)))
     real_run = subprocess.run
 
     def inspect_image(command, *args, **kwargs):
