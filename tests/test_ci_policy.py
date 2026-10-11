@@ -26,6 +26,7 @@ from __future__ import annotations
 import copy
 import os
 import re
+import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -187,19 +188,33 @@ def policy_violations(workflows: Mapping[str, Any]) -> list[str]:
 
 
 def uncovered_entries(workflow: Mapping[str, Any], root: Path = ROOT) -> list[str]:
-    """Top-level entries no ci pull_request ``paths`` pattern matches.
+    """Tracked top-level entries no ci pull_request ``paths`` pattern matches.
 
     `ci / fast` is the required check: a PR whose files all miss the filter
-    would wait forever on a check that never runs.
+    would wait forever on a check that never runs. Exports without a repository
+    use the filesystem instead.
     """
     paths = set((triggers(workflow).get("pull_request") or {}).get("paths") or [])
+    if any((directory / ".git").exists() for directory in (root, *root.parents)):
+        tracked = subprocess.run(
+            ["git", "ls-files", "-z"], cwd=root, check=True, capture_output=True
+        ).stdout
+        entries = {}
+        for path in os.fsdecode(tracked).split("\0"):
+            if path:
+                entry, separator, _ = path.partition("/")
+                entries[entry] = (
+                    bool(separator) or (root / entry).is_dir() or entries.get(entry, False)
+                )
+    else:
+        entries = {
+            entry: (root / entry).is_dir()
+            for entry in os.listdir(root)
+            if entry not in UNTRACKED and not entry.endswith(".egg-info")
+        }
     missing = []
-    for entry in sorted(os.listdir(root)):
-        if entry in UNTRACKED or entry.endswith(".egg-info"):
-            continue
-        covered = (
-            f"{entry}/**" in paths if (root / entry).is_dir() else "*" in paths or entry in paths
-        )
+    for entry, is_directory in sorted(entries.items()):
+        covered = f"{entry}/**" in paths if is_directory else "*" in paths or entry in paths
         if not covered and "**" not in paths:
             missing.append(entry)
     return missing
@@ -221,7 +236,7 @@ def test_ci_paths_cover_every_top_level_entry():
     assert uncovered_entries(load_workflows()["ci.yml"]) == []
 
 
-def test_uncovered_entry_is_reported(tmp_path):
+def test_uncovered_entry_is_reported_without_repository(tmp_path):
     root = tmp_path / "repo"
     (root / "docs").mkdir(parents=True)
     (root / "lib").mkdir()
@@ -231,6 +246,43 @@ def test_uncovered_entry_is_reported(tmp_path):
     assert uncovered_entries(workflow, root) == ["README.md", "docs"]
     workflow = {"on": {"pull_request": {"paths": ["*", "lib/**", "docs/**"]}}}
     assert uncovered_entries(workflow, root) == []
+
+
+@pytest.fixture
+def fixture_checkout(tmp_path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    subprocess.run(["git", "init", "--quiet", str(root)], check=True)
+    (root / "lib").mkdir()
+    (root / "lib" / "example.py").write_text("", encoding="utf-8")
+    subprocess.run(["git", "add", "lib"], cwd=root, check=True)
+    return root
+
+
+def test_untracked_top_level_directory_is_ignored(fixture_checkout):
+    root = fixture_checkout
+    (root / ".git-hooks").mkdir()
+    (root / ".git-hooks" / "pre-push").write_text("", encoding="utf-8")
+    workflow = {"on": {"pull_request": {"paths": ["lib/**"]}}}
+    assert uncovered_entries(workflow, root) == []
+
+
+@pytest.mark.parametrize("entry", ["docs", "site", ".git-hooks", "example.egg-info"])
+def test_uncovered_tracked_directory_is_reported(fixture_checkout, entry):
+    root = fixture_checkout
+    (root / entry).mkdir()
+    (root / entry / "example.txt").write_text("", encoding="utf-8")
+    subprocess.run(["git", "add", "--force", entry], cwd=root, check=True)
+    workflow = {"on": {"pull_request": {"paths": ["lib/**"]}}}
+    assert uncovered_entries(workflow, root) == [entry]
+
+
+def test_uncovered_tracked_file_is_reported(fixture_checkout):
+    root = fixture_checkout
+    (root / "README.md").write_text("", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=root, check=True)
+    workflow = {"on": {"pull_request": {"paths": ["lib/**"]}}}
+    assert uncovered_entries(workflow, root) == ["README.md"]
 
 
 def _ci(workflows):

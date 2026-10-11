@@ -37,6 +37,11 @@ transient host failures up to three times with bounded backoff; permanent
 errors fail immediately. Without that flag, the scans inspect the full tree
 outside their built-output and cache exclusions, including exports without Git.
 
+In a checkout containing untracked tool directories, run both scans with
+`--tracked-only`, which is what the pre-push check runs. Default mode scans
+everything on disk outside the documented exclusions and is what CI runs on a
+clean checkout.
+
 A test may need a refused value on purpose, such as a URL with credentials that
 the code must reject. Mark that line with
 `publication-scan: allow(<category>): <reason>`; the marker covers one
