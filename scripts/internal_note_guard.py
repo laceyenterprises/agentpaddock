@@ -14,7 +14,9 @@ exemptions.
     python3 scripts/internal_note_guard.py [ROOT] [--tracked-only]
 
 The pre-push mirror uses ``--tracked-only`` to scan index blobs and every
-commit reachable from HEAD, without reading local untracked metadata. Local
+unpublished commit reachable from HEAD, excluding all remote-tracking refs,
+without reading local untracked metadata. Only HEAD is checked, not other pushed
+refs; the index also includes staged work that a push does not publish. Local
 edits and deletions cannot hide committed content. Gitlinks are not file blobs.
 The default full-tree mode also works on exports without Git metadata.
 
@@ -27,7 +29,7 @@ import argparse
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from publication_scan import iter_file_contents
@@ -62,9 +64,10 @@ class Finding:
     path: str
     line: int
     rule: str
+    blob: str | None = None
 
     def __str__(self) -> str:
-        return f"{self.path}:{self.line}: internal automation record ({self.rule})"
+        return f"{self.path}" + (f" [blob {self.blob}]" if self.blob else "") + f":{self.line}: internal automation record ({self.rule})"
 
 
 def check_text(text: str, path: str = "<text>") -> list[Finding]:
@@ -78,13 +81,13 @@ def check_text(text: str, path: str = "<text>") -> list[Finding]:
 
 def check_tree(root: Path, *, tracked_only: bool = False) -> list[Finding]:
     findings: list[Finding] = []
-    for path, content in iter_file_contents(root, tracked_only=tracked_only):
+    for path, content, oid in iter_file_contents(root, tracked_only=tracked_only):
         relative = path.relative_to(root).as_posix()
         findings.extend(
-            Finding(relative, 0, rule) for rule, regex in ARTIFACT_NAMES if regex.match(path.name)
+            Finding(relative, 0, rule, oid) for rule, regex in ARTIFACT_NAMES if regex.match(path.name)
         )
         text = content.decode("utf-8", errors="replace")
-        findings.extend(check_text(text, relative))
+        findings.extend(replace(finding, blob=oid) for finding in check_text(text, relative))
     return findings
 
 
@@ -92,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("root", nargs="?", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument(
-        "--tracked-only", action="store_true", help="scan index and HEAD-history blobs"
+        "--tracked-only", action="store_true", help="scan index and unpublished HEAD-history blobs (repository root only)"
     )
     args = parser.parse_args(argv)
     if not args.root.is_dir():

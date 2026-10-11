@@ -268,7 +268,7 @@ def test_tracked_scans_skip_gitlinks(tmp_path, initialized):
     assert guard.main([str(tmp_path), "--tracked-only"]) == 0
 
 
-@pytest.mark.parametrize("failure", ["stderr", "spawn", "timeout"])
+@pytest.mark.parametrize("failure", ["stderr", "spawn"])
 @pytest.mark.parametrize("recover", [False, True])
 def test_git_transient_retries_are_bounded(monkeypatch, tmp_path, failure, recover):
     attempts, delays = [], []
@@ -328,6 +328,8 @@ def test_unreadable_git_blob_fails_closed(monkeypatch, tmp_path, failure):
     def git(root, *args, input=None):
         if args[0] == "ls-files":
             return b"100644 " + oid + b" 0\tfile.txt\0"
+        if args == ("rev-parse", "--show-prefix"):
+            return b""
         if args[0] == "rev-parse":
             raise subprocess.CalledProcessError(1, ["git"])
         assert args == ("cat-file", "--batch")
@@ -375,3 +377,44 @@ def test_the_gates_and_their_rules_pass_their_own_scan():
     ):
         path = MODULE_ROOT / name
         assert scan.scan_text(path.read_text(encoding="utf-8"), name) == [], name
+
+
+def test_git_timeouts_are_not_retried(monkeypatch, tmp_path):
+    calls = []
+    def run(command, **kwargs):
+        calls.append(command)
+        raise subprocess.TimeoutExpired(command, 30)
+    monkeypatch.setattr(scan.subprocess, "run", run)
+    with pytest.raises(subprocess.TimeoutExpired):
+        scan._git(tmp_path, "cat-file", "--batch", input=b"")
+    assert len(calls) == 1
+
+
+def test_published_history_is_excluded_and_unpublished_blob_is_named(tmp_path):
+    import internal_note_guard as guard
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, capture_output=True)
+    path = tmp_path / "old.txt"
+    path.write_text("gh" + "p_" + "Q" * 40 + "\nReviewer " + "verdict: approve\n")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
+    _commit(tmp_path, "published fixture")
+    subprocess.run(["git", "-C", str(tmp_path), "update-ref", "refs/remotes/origin/main", "HEAD"], check=True)
+    path.unlink()
+    subprocess.run(["git", "-C", str(tmp_path), "add", "-u"], check=True)
+    _commit(tmp_path, "cleanup")
+    assert scan.scan_tree(tmp_path, tracked_only=True) == []
+    assert guard.check_tree(tmp_path, tracked_only=True) == []
+    path.write_text("gh" + "p_" + "R" * 40 + "\nReviewer " + "verdict: approve\n")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
+    _commit(tmp_path, "unpublished fixture")
+    oid = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD:old.txt"]).decode().strip()
+    path.unlink()
+    subprocess.run(["git", "-C", str(tmp_path), "add", "-u"], check=True)
+    _commit(tmp_path, "unpublished cleanup")
+    for findings in (scan.scan_tree(tmp_path, tracked_only=True), guard.check_tree(tmp_path, tracked_only=True)):
+        assert findings
+        assert all(f.blob == oid for f in findings)
+        assert oid in str(findings[0])
+    child = tmp_path / "child"
+    child.mkdir()
+    assert scan.main([str(child), "--tracked-only"]) == 2
+    assert guard.main([str(child), "--tracked-only"]) == 2
