@@ -157,7 +157,7 @@ def test_mirror_scans_only_tracked_files(tmp_path, check_name):
 
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, capture_output=True)
     (tmp_path / "README.md").write_text("# Paddock\n")
-    (tmp_path / ".gitignore").write_text(".agent-os/\n")
+    (tmp_path / ".gitignore").write_text(".agent-os/\n__pycache__/\n*.py[cod]\n")
     subprocess.run(["git", "-C", str(tmp_path), "add", "README.md", ".gitignore"], check=True)
     payload = "gh" + "p_" + "Q" * 40 + "\nReviewer " + "verdict: approve\n"
     for directory in (".claude", ".agent-os", "__pycache__"):
@@ -175,7 +175,7 @@ def test_mirror_scans_only_tracked_files(tmp_path, check_name):
     # Staged files must be checked even under a normally skipped directory,
     # with a cache suffix, binary bytes, spaces and a newline in the filename.
     subprocess.run(
-        ["git", "-C", str(tmp_path), "add", "__pycache__/local metadata\nfile.pyc"],
+        ["git", "-C", str(tmp_path), "add", "-f", "__pycache__/local metadata\nfile.pyc"],
         check=True,
     )
     result = run_scan(command)
