@@ -235,8 +235,14 @@ def test_http_requests_no_api_key_literal(monkeypatch):
 
 
 def test_ojo_reaper_registration():
-    repo = Path(__file__).resolve().parents[1]
-    manifest = repo / "platform/os-job-orchestrator/manifest.d/prod.ojo.json"
+    test_file = Path(__file__).resolve()
+    relative_manifest = Path("platform/os-job-orchestrator/manifest.d/prod.ojo.json")
+    manifest = test_file.parents[1] / relative_manifest
+    # Agent OS ships the manifest at the host root, above modules/<gym>/tests.
+    if len(test_file.parents) >= 4:
+        host_manifest = test_file.parents[3] / relative_manifest
+        if host_manifest.is_file():
+            manifest = host_manifest
     if not manifest.is_file():
         pytest.skip("host reaper manifest is not shipped")
     jobs = json.loads(manifest.read_text())["jobs"]
@@ -245,6 +251,32 @@ def test_ojo_reaper_registration():
     assert job["schedule"]["everyMs"] <= 30000
     assert "gym endpoint reap" in job["command"][-1]
     assert job["alert_sink"]["channel"] == "telegram-alerts"
+
+
+@pytest.mark.parametrize("layout", ["tests", "modules/adversarial-eval-gym/tests"])
+def test_ojo_reaper_registration_checkout_layout(tmp_path, monkeypatch, layout):
+    test_file = tmp_path / layout / "test_endpoints.py"
+    monkeypatch.setitem(globals(), "__file__", str(test_file))
+    manifest = tmp_path / "platform/os-job-orchestrator/manifest.d/prod.ojo.json"
+    manifest.parent.mkdir(parents=True)
+    job = {
+        "id": "gym-endpoint-reaper",
+        "enabled": True,
+        "schedule": {"everyMs": 30000},
+        "command": ["hq gym endpoint reap"],
+        "alert_sink": {"channel": "telegram-alerts"},
+    }
+    manifest.write_text(json.dumps({"jobs": [job]}))
+    try:
+        test_ojo_reaper_registration()
+    except pytest.skip.Exception:
+        pytest.fail("shipped reaper manifest was not found")
+
+    # A discovered host manifest must be validated, rather than silently skipped.
+    job["schedule"]["everyMs"] = 30001
+    manifest.write_text(json.dumps({"jobs": [job]}))
+    with pytest.raises(AssertionError):
+        test_ojo_reaper_registration()
 
 
 def test_orphan_reaped_after_lease_file_lost(setup):
