@@ -37,7 +37,11 @@ Actions minutes cost money, so CI does only what must gate a merge:
   for pull requests and pushes to `main`, with `paths` filters and
   `concurrency` that cancels superseded runs. It runs the publication scan, the
   internal-note guard, the CI-policy test and the fast unit subset.
-- `pages` builds the site from `results/` on pushes to `main`.
+- `pages` builds the site from `results/` on pushes to `main` or manual
+  dispatch, only when the repository variable `PADDOCK_SITE_LIVE` is `true`.
+  Until then the job is skipped and nothing is built or deployed. To launch,
+  enable Pages for the repository and set that variable to `true`; nothing
+  else changes.
 - No schedules, matrices, macOS, Windows or larger runners. No eval,
   benchmark, live-model or Docker-containment jobs: run those on your machine
   and submit a run bundle. The runner has Docker, so `ci / fast` sets
