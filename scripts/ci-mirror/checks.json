@@ -1,0 +1,12 @@
+{
+  "always-on-workflow-coverage": {},
+  "path-glob": {
+    "**": [
+      {
+        "name": "whitespace lint",
+        "command": "git diff --check origin/main...HEAD --",
+        "tier": "fast"
+      }
+    ]
+  }
+}
