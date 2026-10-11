@@ -2,7 +2,9 @@ name: pages
 
 # Builds the leaderboard from results/ and deploys it as a Pages artifact
 # (SPEC R1): one Linux job, stdlib only, on pushes to main that change the
-# results or the site build. workflow_dispatch serves the first deploy. The
+# results or the site build. Both push and workflow_dispatch skip the job
+# until the repository variable PADDOCK_SITE_LIVE is 'true'. To launch,
+# enable Pages for the repository and set that variable to 'true'. The
 # custom domain is a repository setting, so there is no CNAME file here.
 on:
   push:
@@ -24,6 +26,7 @@ permissions:
 
 jobs:
   deploy:
+    if: ${{ vars.PADDOCK_SITE_LIVE == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment:

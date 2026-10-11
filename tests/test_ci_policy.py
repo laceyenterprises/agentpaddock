@@ -40,6 +40,7 @@ WORKFLOWS_DIR = ROOT / ".github" / "workflows"
 #: The R1 workflows: file name -> (workflow name, its only job).
 R1_WORKFLOWS = {"ci.yml": ("ci", "fast"), "pages.yml": ("pages", "deploy")}
 PAGES_PATHS = ["results/**", "site/**", "scripts/build_site.py"]
+PAGES_LAUNCH_CONDITION = "${{ vars.PADDOCK_SITE_LIVE == 'true' }}"
 ALLOWED_EVENTS = frozenset({"pull_request", "push", "workflow_dispatch"})
 LINUX_RUNNERS = frozenset({"ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04"})
 MAX_TIMEOUT_MINUTES = 5
@@ -58,7 +59,16 @@ HEAVY_COMMANDS = re.compile(
 PROVIDER_SECRET = re.compile(r"\$\{\{\s*secrets\.(?!GITHUB_TOKEN\b)")
 #: Built output and caches are never tracked, so CI need not cover them.
 UNTRACKED = frozenset(
-    {".git", ".pytest_cache", ".ruff_cache", ".venv", "__pycache__", "_site", "site", "venv"}
+    {
+        ".git",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".venv",
+        "__pycache__",
+        "_site",
+        "site",
+        "venv",
+    }
 )
 
 
@@ -155,7 +165,10 @@ def policy_violations(workflows: Mapping[str, Any]) -> list[str]:
 
         jobs = workflow.get("jobs") or {}
         expected = R1_WORKFLOWS.get(file)
-        if expected and (workflow.get("name"), sorted(jobs)) != (expected[0], [expected[1]]):
+        if expected and (workflow.get("name"), sorted(jobs)) != (
+            expected[0],
+            [expected[1]],
+        ):
             found.append(f"{file}: must be workflow {expected[0]!r} with one job {expected[1]!r}")
         for job_id, job in sorted(jobs.items()):
             found.extend(_job_violations(f"{file}:{job_id}", job or {}))
@@ -167,6 +180,9 @@ def policy_violations(workflows: Mapping[str, Any]) -> list[str]:
     pages = triggers(workflows.get("pages.yml") or {})
     if "pull_request" in pages or (pages.get("push") or {}).get("paths") != PAGES_PATHS:
         found.append(f"pages.yml: runs only on push to main with paths {PAGES_PATHS}")
+    deploy = ((workflows.get("pages.yml") or {}).get("jobs") or {}).get("deploy") or {}
+    if deploy.get("if") != PAGES_LAUNCH_CONDITION:
+        found.append(f"pages.yml:deploy: launch condition must be {PAGES_LAUNCH_CONDITION}")
     return found
 
 
@@ -237,19 +253,31 @@ def _set_python(workflows, version):
 
 
 VIOLATIONS = {
-    "macos-runner": (lambda w: _fast(w).update({"runs-on": "macos-latest"}), "Linux runner"),
-    "windows-runner": (lambda w: _fast(w).update({"runs-on": "windows-latest"}), "Linux runner"),
+    "macos-runner": (
+        lambda w: _fast(w).update({"runs-on": "macos-latest"}),
+        "Linux runner",
+    ),
+    "windows-runner": (
+        lambda w: _fast(w).update({"runs-on": "windows-latest"}),
+        "Linux runner",
+    ),
     "larger-runner": (
         lambda w: _fast(w).update({"runs-on": "ubuntu-latest-8-cores"}),
         "Linux runner",
     ),
-    "runner-list": (lambda w: _fast(w).update({"runs-on": ["ubuntu-latest"]}), "Linux runner"),
+    "runner-list": (
+        lambda w: _fast(w).update({"runs-on": ["ubuntu-latest"]}),
+        "Linux runner",
+    ),
     "matrix": (
         lambda w: _fast(w).update({"strategy": {"matrix": {"os": ["ubuntu-latest"]}}}),
         "matrix",
     ),
     "python-list": (lambda w: _set_python(w, ["3.11", "3.12"]), "more than one Python"),
-    "python-multiline": (lambda w: _set_python(w, "3.11\n3.12"), "more than one Python"),
+    "python-multiline": (
+        lambda w: _set_python(w, "3.11\n3.12"),
+        "more than one Python",
+    ),
     "second-setup-python": (
         lambda w: _fast(w)["steps"].append(
             {"uses": "actions/setup-python@v5", "with": {"python-version": "3.13"}}
@@ -269,12 +297,18 @@ VIOLATIONS = {
     ),
     "no-paths": (lambda w: _on(w)["pull_request"].pop("paths"), "paths filter"),
     "no-timeout": (lambda w: _fast(w).pop("timeout-minutes"), "timeout-minutes"),
-    "long-timeout": (lambda w: _fast(w).update({"timeout-minutes": 6}), "timeout-minutes"),
+    "long-timeout": (
+        lambda w: _fast(w).update({"timeout-minutes": 6}),
+        "timeout-minutes",
+    ),
     "pages-timeout": (
         lambda w: w["pages.yml"]["jobs"]["deploy"].update({"timeout-minutes": 30}),
         "timeout-minutes",
     ),
-    "schedule": (lambda w: _on(w).update({"schedule": [{"cron": "0 3 * * *"}]}), "schedule"),
+    "schedule": (
+        lambda w: _on(w).update({"schedule": [{"cron": "0 3 * * *"}]}),
+        "schedule",
+    ),
     "pages-schedule": (
         lambda w: _on(w, "pages.yml").update({"schedule": [{"cron": "0 3 * * *"}]}),
         "schedule",
@@ -335,6 +369,22 @@ VIOLATIONS = {
     "pages-wider-paths": (
         lambda w: _on(w, "pages.yml")["push"].update({"paths": ["**"]}),
         "only on push to main",
+    ),
+    "pages-no-launch-switch": (
+        lambda w: w["pages.yml"]["jobs"]["deploy"].pop("if"),
+        "launch condition",
+    ),
+    "pages-launch-switch-bypassed": (
+        lambda w: w["pages.yml"]["jobs"]["deploy"].update({"if": "${{ true }}"}),
+        "launch condition",
+    ),
+    "pages-manual-launch-bypass": (
+        lambda w: w["pages.yml"]["jobs"]["deploy"].update(
+            {
+                "if": "${{ github.event_name == 'workflow_dispatch' || vars.PADDOCK_SITE_LIVE == 'true' }}"
+            }
+        ),
+        "launch condition",
     ),
 }
 
