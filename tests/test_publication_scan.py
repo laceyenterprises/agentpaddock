@@ -7,6 +7,8 @@ scan refuses: it ships in the tree the scan gates.
 from __future__ import annotations
 
 import json
+import shlex
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -136,6 +138,68 @@ def test_clean_tree_and_usage_errors(tmp_path, capsys):
     assert scan.main([str(tmp_path)]) == 0
     assert "is clean" in capsys.readouterr().out
     assert scan.main([str(tmp_path / "absent")]) == 2
+
+
+@pytest.mark.parametrize("check_name", ["publication scan", "internal-note guard"])
+def test_mirror_scans_only_tracked_files(tmp_path, check_name):
+    manifest = json.loads((MODULE_ROOT / "scripts/ci-mirror/checks.json").read_text())
+    command = next(
+        shlex.split(check["command"])
+        for check in manifest["path-glob"]["**"]
+        if check["name"] == check_name
+    )
+
+    def run_scan(argv):
+        return subprocess.run(
+            [*argv, str(tmp_path)], cwd=MODULE_ROOT, capture_output=True, timeout=10
+        )
+
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, capture_output=True)
+    (tmp_path / "README.md").write_text("# Paddock\n")
+    (tmp_path / ".gitignore").write_text(".agent-os/\n")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "README.md", ".gitignore"], check=True)
+    payload = "gh" + "p_" + "Q" * 40 + "\nReviewer " + "verdict: approve\n"
+    for directory in (".claude", ".agent-os", "__pycache__"):
+        (tmp_path / directory).mkdir()
+        (tmp_path / directory / "local metadata\nfile.pyc").write_bytes(
+            b"\x00\xff" + payload.encode()
+        )
+        (tmp_path / directory / "metadata.json").write_text(payload)
+
+    # The actual manifest commands ignore both untracked and ignored metadata.
+    assert run_scan(command).returncode == 0
+    full_tree_command = [arg for arg in command if arg != "--tracked-only"]
+    assert run_scan(full_tree_command).returncode == 1
+
+    # Staged files must be checked even under a normally skipped directory,
+    # with a cache suffix, binary bytes, spaces and a newline in the filename.
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "add", "__pycache__/local metadata\nfile.pyc"],
+        check=True,
+    )
+    result = run_scan(command)
+    assert result.returncode == 1
+    assert b"__pycache__/" in result.stdout
+
+    # A missing tracked file is a read error, never a clean scan.
+    (tmp_path / "__pycache__" / "local metadata\nfile.pyc").unlink()
+    assert run_scan(command).returncode == 2
+
+
+@pytest.mark.parametrize("script", ["publication_scan.py", "internal_note_guard.py"])
+def test_tracked_scan_requires_git_repository(tmp_path, script):
+    result = subprocess.run(
+        [
+            "python3",
+            str(MODULE_ROOT / "scripts" / script),
+            str(tmp_path),
+            "--tracked-only",
+        ],
+        capture_output=True,
+        timeout=10,
+    )
+    assert result.returncode == 2
+    assert result.stderr
 
 
 def test_the_gates_and_their_rules_pass_their_own_scan():

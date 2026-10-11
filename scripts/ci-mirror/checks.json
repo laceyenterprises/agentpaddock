@@ -9,12 +9,12 @@
       },
       {
         "name": "publication scan",
-        "command": "python3 scripts/publication_scan.py",
+        "command": "python3 scripts/publication_scan.py --tracked-only",
         "tier": "fast"
       },
       {
         "name": "internal-note guard",
-        "command": "python3 scripts/internal_note_guard.py",
+        "command": "python3 scripts/internal_note_guard.py --tracked-only",
         "tier": "fast"
       }
     ]

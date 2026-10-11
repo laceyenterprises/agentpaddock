@@ -23,6 +23,12 @@ addresses, private-network URLs, machine hostnames, other repositories of the
 publishing organization, the operator's identity, and `github.io` links. The
 site is served only at [agentpaddock.ai](https://agentpaddock.ai).
 
+The pre-push mirror runs both scans with `--tracked-only`: they inspect
+Git-tracked working-tree files (including staged additions), excluding
+untracked local metadata. Tracked files in cache or build directories are
+still checked. Without that flag, the scans inspect the full tree outside
+their built-output and cache exclusions, including exports without Git.
+
 A test may need a refused value on purpose, such as a URL with credentials that
 the code must reject. Mark that line with
 `publication-scan: allow(<category>): <reason>`; the marker covers one

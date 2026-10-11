@@ -26,7 +26,11 @@ A line may carry ``publication-scan: allow(<category>): <reason>`` to keep a
 deliberate value of that one category, such as a test that proves a URL with
 credentials is refused. The reason is required.
 
-    python3 scripts/publication_scan.py [ROOT] [--json]
+    python3 scripts/publication_scan.py [ROOT] [--json] [--tracked-only]
+
+The pre-push mirror uses ``--tracked-only`` to scan Git-tracked working-tree
+files, including staged additions, without reading local untracked metadata.
+The default full-tree mode also works on exports without Git metadata.
 
 Exit status: 0 clean, 1 findings, 2 usage or read error. Stdlib only.
 """
@@ -39,6 +43,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 from collections.abc import Iterable, Iterator
 from dataclasses import asdict, dataclass
@@ -248,8 +253,20 @@ def scan_text(
     return findings
 
 
-def iter_files(root: Path) -> Iterator[Path]:
-    """Files under ``root`` in sorted order, outside :data:`SKIP_DIRS` and egg-info."""
+def iter_files(root: Path, *, tracked_only: bool = False) -> Iterator[Path]:
+    """Tracked files, or all files outside :data:`SKIP_DIRS` and egg-info."""
+    if tracked_only:
+        result = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--cached", "-z"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        # NUL separation preserves spaces, newlines and non-UTF-8 file names.
+        # Tracked files must be scanned even in normally skipped cache directories.
+        for name in sorted(set(result.stdout.split(b"\0")) - {b""}):
+            yield root / os.fsdecode(name)
+        return
     for directory, subdirs, files in os.walk(root):
         subdirs[:] = sorted(
             name for name in subdirs if name not in SKIP_DIRS and not name.endswith(".egg-info")
@@ -259,10 +276,12 @@ def iter_files(root: Path) -> Iterator[Path]:
                 yield Path(directory) / name
 
 
-def scan_tree(root: Path, *, identities: Identities = IDENTITIES) -> list[Finding]:
+def scan_tree(
+    root: Path, *, identities: Identities = IDENTITIES, tracked_only: bool = False
+) -> list[Finding]:
     """Every finding in the tree at ``root``; paths are relative and POSIX."""
     findings: list[Finding] = []
-    for path in iter_files(root):
+    for path in iter_files(root, tracked_only=tracked_only):
         relative = path.relative_to(root).as_posix()
         # Binary files are read as text too: a key does not stop leaking in a blob.
         text = path.read_bytes().decode("utf-8", errors="replace")
@@ -282,13 +301,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("root", nargs="?", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--json", action="store_true", help="print findings as JSON")
+    parser.add_argument("--tracked-only", action="store_true", help="scan only Git-tracked files")
     args = parser.parse_args(argv)
     if not args.root.is_dir():
         print(f"publication scan: {args.root} is not a directory", file=sys.stderr)
         return 2
     try:
-        findings = scan_tree(args.root)
-    except OSError as exc:
+        findings = scan_tree(args.root, tracked_only=args.tracked_only)
+    except (OSError, subprocess.CalledProcessError) as exc:
         print(f"publication scan: {exc}", file=sys.stderr)
         return 2
     if args.json:
