@@ -23,6 +23,20 @@ addresses, private-network URLs, machine hostnames, other repositories of the
 publishing organization, the operator's identity, and `github.io` links. The
 site is served only at [agentpaddock.ai](https://agentpaddock.ai).
 
+The pre-push mirror runs both scans with `--tracked-only`: they inspect
+index blobs (including staged additions) and unpublished commits reachable from HEAD
+(excluding commits reachable from any remote-tracking ref),
+excluding untracked local metadata. Only HEAD is checked; pushes of other refs
+need a separate scan. The index includes staged work even though a push does not
+publish it. Tracked-only scans require the repository root and identify findings
+by blob ID. Already-published history belongs to separate audit tooling. Editing or deleting a local file, even in
+a later commit, cannot hide content in the history being published. Gitlinks
+are skipped because their content belongs to a separate repository. Tracked
+files in cache or build directories are still checked. Git reads retry known
+transient host failures up to three times with bounded backoff; permanent
+errors fail immediately. Without that flag, the scans inspect the full tree
+outside their built-output and cache exclusions, including exports without Git.
+
 A test may need a refused value on purpose, such as a URL with credentials that
 the code must reject. Mark that line with
 `publication-scan: allow(<category>): <reason>`; the marker covers one

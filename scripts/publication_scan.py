@@ -26,7 +26,14 @@ A line may carry ``publication-scan: allow(<category>): <reason>`` to keep a
 deliberate value of that one category, such as a test that proves a URL with
 credentials is refused. The reason is required.
 
-    python3 scripts/publication_scan.py [ROOT] [--json]
+    python3 scripts/publication_scan.py [ROOT] [--json] [--tracked-only]
+
+The pre-push mirror uses ``--tracked-only`` to scan index blobs and every
+unpublished commit reachable from HEAD, excluding all remote-tracking refs,
+without reading local untracked metadata. Only HEAD is checked, not other pushed
+refs; the index also includes staged work that a push does not publish. Local
+edits and deletions cannot hide committed content. Gitlinks are not file blobs.
+The default full-tree mode also works on exports without Git metadata.
 
 Exit status: 0 clean, 1 findings, 2 usage or read error. Stdlib only.
 """
@@ -34,14 +41,17 @@ Exit status: 0 clean, 1 findings, 2 usage or read error. Stdlib only.
 from __future__ import annotations
 
 import argparse
+import errno
 import functools
 import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
+import time
 from collections.abc import Iterable, Iterator
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 #: The organization that publishes Paddock, and its repositories that are public.
@@ -196,9 +206,10 @@ class Finding:
     column: int
     category: str
     rule: str
+    blob: str | None = None
 
     def __str__(self) -> str:
-        return f"{self.path}:{self.line}:{self.column}: {self.category} ({self.rule})"
+        return f"{self.path}" + (f" [blob {self.blob}]" if self.blob else "") + f":{self.line}:{self.column}: {self.category} ({self.rule})"
 
 
 def _identity_matches(line: str, identities: Identities) -> Iterator[tuple[int, str, str]]:
@@ -248,8 +259,53 @@ def scan_text(
     return findings
 
 
-def iter_files(root: Path) -> Iterator[Path]:
-    """Files under ``root`` in sorted order, outside :data:`SKIP_DIRS` and egg-info."""
+def _git(root: Path, *args: str, input: bytes | None = None) -> bytes:
+    """Read Git with at most three attempts for transient host failures."""
+    for attempt in range(3):
+        try:
+            return subprocess.run(
+                ["git", "-C", str(root), *args],
+                input=input,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=30,
+            ).stdout
+        except (OSError, subprocess.SubprocessError) as exc:
+            transient = (
+                isinstance(exc, OSError)
+                and exc.errno in {errno.EAGAIN, errno.ENOMEM, errno.EINTR, errno.ETIMEDOUT}
+                or isinstance(exc, subprocess.CalledProcessError)
+                and re.search(
+                    rb"resource temporarily unavailable|temporary failure|cannot fork|"
+                    rb"interrupted system call",
+                    exc.stderr or b"",
+                    re.I,
+                )
+            )
+            if not transient or attempt == 2:
+                raise
+            time.sleep((0.25, 0.5)[attempt])
+    raise AssertionError("unreachable")
+
+
+def _index_entries(root: Path) -> Iterator[tuple[bytes, bytes]]:
+    for entry in _git(root, "ls-files", "--cached", "--stage", "-z").split(b"\0"):
+        if entry:
+            metadata, name = entry.split(b"\t", 1)
+            mode, oid, _stage = metadata.split()
+            if mode != b"160000":  # A gitlink references a commit, not a file.
+                yield name, oid
+
+
+def iter_files(root: Path, *, tracked_only: bool = False) -> Iterator[Path]:
+    """Tracked files, or all files outside :data:`SKIP_DIRS` and egg-info."""
+    if tracked_only:
+        # NUL separation preserves spaces, newlines and non-UTF-8 file names.
+        # Tracked files must be scanned even in normally skipped cache directories.
+        for name in sorted({name for name, _oid in _index_entries(root)}):
+            yield root / os.fsdecode(name)
+        return
     for directory, subdirs, files in os.walk(root):
         subdirs[:] = sorted(
             name for name in subdirs if name not in SKIP_DIRS and not name.endswith(".egg-info")
@@ -259,16 +315,66 @@ def iter_files(root: Path) -> Iterator[Path]:
                 yield Path(directory) / name
 
 
-def scan_tree(root: Path, *, identities: Identities = IDENTITIES) -> list[Finding]:
+def iter_file_contents(root: Path, *, tracked_only: bool = False) -> Iterator[tuple[Path, bytes, str | None]]:
+    """Read exports, or index and unpublished HEAD blobs, one blob at a time."""
+    if not tracked_only:
+        for path in iter_files(root):
+            yield path, path.read_bytes(), None
+        return
+
+    if _git(root, "rev-parse", "--show-prefix").strip():
+        raise OSError("--tracked-only requires the repository root")
+    entries = set(_index_entries(root))
+    try:
+        head = _git(root, "rev-parse", "--verify", "--quiet", "HEAD").decode().strip()
+    except subprocess.CalledProcessError as exc:
+        if exc.returncode != 1:
+            raise
+        head = None
+    if head:
+        # Remote-reachable content is already published; only new history is gated.
+        for commit in _git(root, "rev-list", head, "--not", "--remotes").decode().splitlines():
+            for entry in _git(root, "ls-tree", "--full-tree", "-r", "-z", commit).split(b"\0"):
+                if entry:
+                    metadata, name = entry.split(b"\t", 1)
+                    _mode, kind, oid = metadata.split()
+                    if kind == b"blob":
+                        entries.add((name, oid))
+
+    # Group paths by object; each bounded read holds only one blob in memory.
+    paths = {}
+    for name, oid in sorted(entries):
+        paths.setdefault(oid, []).append(name)
+    for oid, names in paths.items():
+        output = _git(root, "cat-file", "--batch", input=oid + b"\n")
+        end = output.find(b"\n")
+        if end < 0:
+            raise OSError("Git returned a truncated file blob header")
+        header = output[:end].split()
+        if len(header) != 3 or header[:2] != [oid, b"blob"] or not header[2].isdigit():
+            raise OSError("Git returned an unreadable file blob")
+        size = int(header[2])
+        offset = end + 1
+        if len(output) != offset + size + 1 or output[-1:] != b"\n":
+            raise OSError("Git returned a truncated file blob")
+        content = output[offset:offset + size]
+        del output
+        for name in names:
+            yield root / os.fsdecode(name), content, oid.decode("ascii")
+
+
+def scan_tree(
+    root: Path, *, identities: Identities = IDENTITIES, tracked_only: bool = False
+) -> list[Finding]:
     """Every finding in the tree at ``root``; paths are relative and POSIX."""
     findings: list[Finding] = []
-    for path in iter_files(root):
+    for path, content, oid in iter_file_contents(root, tracked_only=tracked_only):
         relative = path.relative_to(root).as_posix()
         # Binary files are read as text too: a key does not stop leaking in a blob.
-        text = path.read_bytes().decode("utf-8", errors="replace")
-        findings.extend(scan_text(text, relative, identities=identities))
+        text = content.decode("utf-8", errors="replace")
+        findings.extend(replace(finding, blob=oid) for finding in scan_text(text, relative, identities=identities))
         findings.extend(
-            Finding(relative, 0, 0, category, rule)
+            Finding(relative, 0, 0, category, rule, oid)
             for _, category, rule in _identity_matches(relative, identities)
         )
     return findings
@@ -282,13 +388,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("root", nargs="?", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--json", action="store_true", help="print findings as JSON")
+    parser.add_argument(
+        "--tracked-only", action="store_true", help="scan index and unpublished HEAD-history blobs (repository root only)"
+    )
     args = parser.parse_args(argv)
     if not args.root.is_dir():
         print(f"publication scan: {args.root} is not a directory", file=sys.stderr)
         return 2
     try:
-        findings = scan_tree(args.root)
-    except OSError as exc:
+        findings = scan_tree(args.root, tracked_only=args.tracked_only)
+    except (OSError, subprocess.SubprocessError) as exc:
         print(f"publication scan: {exc}", file=sys.stderr)
         return 2
     if args.json:
