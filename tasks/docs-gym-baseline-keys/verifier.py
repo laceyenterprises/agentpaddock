@@ -26,7 +26,7 @@ CONTRACT = {
                 "model[ -]pinned|pinned to a model|tasks? that resolve to a model|task(?:_id)?[>}]*@[<{]?model",
                 "matching model-qualified keys|updat\\w*|migrat\\w*|re-record|regenerat\\w*|rebuild\\w*|refresh\\w*|task(?:_id)?[>}]*@[<{]?model",
             ],
-            "scope": "paragraph",
+            "scope": "section",
             "reject_subject": [
                 "model[ -]pinned|pinned to a model|tasks? that resolve to a model"
             ],

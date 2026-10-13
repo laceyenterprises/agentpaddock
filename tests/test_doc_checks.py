@@ -328,3 +328,36 @@ def test_heading_plus_first_list_scope():
         ["cache", "128"],
         scope="paragraph",
     )
+
+
+@pytest.mark.parametrize(
+    "body",
+    ["Cache is configured.\n\n- Default 128.", "Cache is configured.\n\nDefault 128."],
+)
+def test_section_scope_adjacent_blocks(body):
+    assert not unit_failures("### Settings\n" + body, ["cache", "128"], scope="section")
+    assert "fact:claim" in unit_failures(
+        "### Settings\n" + body.replace("\n\n", "\n### Other\n"),
+        ["cache", "128"],
+        scope="section",
+    )
+    assert "fact:claim" in unit_failures(
+        "### Settings\n" + body.replace("\n\n", "\n\n" + "padding\n" * 1200 + "\n"),
+        ["cache", "128"],
+        scope="section",
+    )
+
+
+def test_section_scope_keeps_clause_reject():
+    assert not unit_failures(
+        "### Settings\nOther default needs no update.\n\nCache default is 128.",
+        ["cache", "128"],
+        scope="section",
+        reject=["no update"],
+    )
+    assert "fact:claim" in unit_failures(
+        "### Settings\nCache default is 128.\n\nCache needs no update.",
+        ["cache", "128"],
+        scope="section",
+        reject=["no update"],
+    )

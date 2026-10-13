@@ -1264,3 +1264,87 @@ def test_saved_matching_baseline_keys():
         forbidden_claims={},
     )
     assert next(c["ok"] for c in records if c["name"] == "fact:migration")
+
+
+@pytest.mark.parametrize(
+    "task,fact,text,ok",
+    [
+        (
+            "docs-gym-run-flags",
+            "levels",
+            "## Reasoning level\n\n`--reasoning-level` requests a dispatch reasoning level for a cohort.\n\n- Accepted values: `low`, `medium`, `high`, `xhigh`.",
+            True,
+        ),
+        (
+            "docs-gym-run-flags",
+            "levels",
+            "## Reasoning level\n`--reasoning-level` requests the dispatch reasoning level.\n\n```bash\nhq gym run --reasoning-level high\n```\n\n- Accepted values: `low`, `medium`, `high`, `xhigh`.",
+            True,
+        ),
+        (
+            "docs-gym-run-flags",
+            "levels",
+            "## Reasoning level\n`--reasoning-level` requests a dispatch reasoning level.\n\n- Accepted values: `low`, `medium`, `high`, `xhigh`. `max` is an alias for\n  `xhigh`. Any other value is rejected at parse time (argparse error).",
+            True,
+        ),
+        (
+            "docs-gym-run-flags",
+            "levels",
+            "## Reasoning level\n\n`--reasoning-level` is the requested dispatch reasoning level for the\ncohort.\n\n- Accepted values: `low`, `medium`, `high`, `xhigh`.\n- Alias: `max` is accepted and normalizes to `xhigh`.",
+            True,
+        ),
+        (
+            "docs-gym-run-flags",
+            "levels",
+            "## Reasoning level\n\n`--reasoning-level` is accepted by `hq gym run`.\n\nAccepted values are `low`, `medium`, `high`, and `xhigh`. `max` is an alias:\nit is normalized to `xhigh` at argument-parse time.",
+            True,
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "migration",
+            "### Old baselines\n\nBaselines written before models were selectable contain bare task ids.\n\n- Those entries read and compare unchanged against an unmodelled run.\n- As soon as a model resolves for a task its key becomes `<task_id>@<model>`.\n  That is a different string from the stored bare entry. The bare entry is\n  not rewritten and no longer matches while the task stays pinned.",
+            True,
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "migration",
+            "### Upgrade behavior for old baselines\n\nBaselines written before models were selectable store bare `task_id` keys. The\nkey helper keeps the bare task id whenever no model is pinned, so those\nbaselines remain wire-compatible: they read and compare unchanged. They are not\nrewritten, and no `@model` entry is synthesized for them.",
+            False,
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "migration",
+            "### Upgrade Behavior for Old Baselines\n\n- Baselines written before models were selectable stored bare task IDs.\n- Because unmodelled runs retain the bare task ID, the baseline key structure is fully wire-compatible with older baselines.\n- Existing baselines read and compare unchanged with unmodelled runs without requiring data migration or baseline format upgrades.",
+            False,
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "migration",
+            "## Baseline keys\n\n        Unmodelled runs keep the bare task id, so this is wire-compatible with\n        every baseline written before models were selectable.",
+            False,
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "migration",
+            "### Upgrade Behavior for Old Baselines\n\n- **Backward and wire compatibility**: Because unmodelled runs continue to produce bare task IDs (`task_id`), the key format is wire-compatible with baselines written before models were selectable.\n- **Unchanged comparison**: Baselines recorded prior to model selection read and compare unchanged against unmodelled runs without requiring key upgrades, migration scripts, or schema conversions.",
+            False,
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "migration",
+            "### Old baselines\n\nBaselines written before models were selectable contain bare task ids.\n\nOnce a task has a model its key becomes `<task_id>@<model>`. The bare entry\nis not rewritten and no longer matches while the task stays pinned.",
+            True,
+        ),
+    ],
+)
+def test_saved_adjacent_blocks(task, fact, text, ok):
+    from gym.doc_checks import checks
+
+    contract = contract_for(TASKS / task)
+    records = checks(
+        text,
+        required_facts={fact: contract["required_facts"][fact]},
+        forbidden_claims={},
+        known_flags=contract["known_flags"],
+    )
+    assert next(c["ok"] for c in records if c["name"] == f"fact:{fact}") is ok

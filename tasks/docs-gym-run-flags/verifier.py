@@ -11,7 +11,7 @@ CONTRACT = {
                 "\\bhigh\\b",
                 "\\bxhigh\\b",
             ],
-            "scope": "paragraph",
+            "scope": "section",
         },
         "alias": {
             "patterns": [
