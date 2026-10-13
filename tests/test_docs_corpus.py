@@ -319,7 +319,9 @@ def test_one_missing_required_fact_fails(task_dir, tmp_path):
     import re
 
     text = "\n".join(
-        line for line in text.splitlines() if not re.search(patterns[0], line, re.I)
+        line
+        for line in text.splitlines()
+        if line.startswith("#") or not re.search(patterns["patterns"][0], line, re.I)
     )
     cell = run_doc(task_dir, text, tmp_path)
     assert cell.outcome == "failed"
@@ -451,195 +453,357 @@ def test_help_and_source_attributes_pass(task_dir, tmp_path):
     assert cell.outcome == "passed", cell.reason
 
 
+# Saved submissions: complete assertions pass; fragments and headings alone do
+# not establish a fact. Wrapped continuations belong to their list item. A
+# heading may identify the subject of its item, but sibling claims stay apart.
+SAVED_PASS = {
+    "docs-cache-config": {
+        "entries": [
+            "- `cache.max_entries` — maximum number of cached entries. Default: 128."
+        ],
+        "ttl": [
+            "- `cache.ttl_seconds` — time-to-live for cached entries, in seconds. Default: 60."
+        ],
+        "disabled": [
+            "| `cache.ttl_seconds` | `60` | Entry time-to-live in seconds. `0` disables caching. Negative values are invalid and cause exit code `2`. |",
+            "- `cache.ttl_seconds` — defaults to `60`. Setting it to `0` disables caching. Negative values are invalid and cause the process to exit with code `2`.",
+            "- `cache.ttl_seconds` — defaults to 60. Setting it to `0` disables caching. Negative values are invalid and exit with status 2.",
+        ],
+        "invalid": [
+            "- Negative `cache.ttl_seconds` values are invalid; the process exits with code 2."
+        ],
+        "eviction": ["Eviction is least-recently-used (LRU)."],
+        "bypass": [
+            "The `--no-cache` flag bypasses both cache reads and cache writes.",
+            "- `--no-cache` — bypasses both cache reads and cache writes.",
+            "Eviction is least-recently-used (LRU). The `--no-cache` flag bypasses both cache reads and cache writes.",
+            "- `--no-cache` bypasses cache reads and cache writes.",
+            "--no-cache bypasses both cache reads and cache writes.",
+            "- `--no-cache` bypasses both cache reads and cache writes.",
+        ],
+    },
+    "docs-config-loader-keys": {
+        "values": [
+            "- Allowed values (`__enum`): `plan`, `codex`, `claude-code`; values outside this enum are not valid"
+        ],
+        "default": [
+            "- Default (`__default`): `plan`, applied when the key is not set",
+            "- `__default` — `plan`. This is the value applied when the key is unset; the\n  key does have a default, it is not absent.",
+            "| Key | Type | Default | Allowed values |\n| `roles.build_pack_default_worker_class` | `_TYPE_STRING` (string) | `plan` | `plan`, `codex`, `claude-code` |",
+            "| Key | Type | Default | Allowed values |\n| `roles.build_pack_default_worker_class` | string (`_TYPE_STRING`) | `plan` | `plan`, `codex`, `claude-code` |",
+        ],
+    },
+    "docs-gym-baseline-keys": {
+        "bare": [
+            "- Unmodelled task: the key is the bare `task_id` — no separator, no suffix.",
+            "- When both are falsy, the resolved value is falsy and the task keys bare.",
+            "- Unmodelled / no model override: the key is the bare `task_id`.",
+            "`verdict_key` treats any falsy model (`None` or empty string) as unmodelled and\nreturns the bare `task_id`. A non-empty model is appended after the separator.",
+        ],
+        "pinned": [
+            "### Model-pinned tasks (model override set)\n<task_id>@<model>",
+            "| Model selected by task dispatch or the run-level model | Task ID followed by `@` and the model | `task-a@model-x` |",
+            "- **Model-pinned tasks**: When a `model` is provided, the baseline key combines the task ID and model name separated by `@`:",
+            "- **Model-pinned additions**: Model-pinned cells introduce keys formatted as `{task_id}@{model}` without altering the structure or validity of unmodelled bare task ID entries in baseline comparisons.",
+            '- **Model-pinned tasks**: When a model is specified, the baseline key uses the format `{task_id}@{model}`, joined by the separator `@` (`VERDICT_KEY_SEPARATOR = "@"`).',
+        ],
+        "migration": [
+            "Old baselines for model-pinned tasks need a one-time baseline update."
+        ],
+    },
+    "docs-gym-run-flags": {
+        "cohort": [
+            "`{task_id}@{model or ''}@effort:{reasoning_level}[@{skill_digest}][@compression={compression}][@attempt={attempt}]`"
+        ],
+    },
+    "docs-retry-behavior-diff": {
+        "attempts": [
+            "`deliver(send)` attempts to call `send()` up to **3 times** (attempts are\nindexed 0, 1, 2 via `for attempt in range(3)`).",
+            "`deliver(send)` calls `send()` up to 3 times.",
+            "`deliver(send)` performs at most 3 delivery attempts and takes no configuration options.",
+            "Delivery is bounded to a maximum of 3.",
+        ],
+        "timeout": [
+            "- A `TimeoutError` is retried. After the third and final timed-out attempt, the function returns `4`.",
+            "- **Error Handling**: Catches only `TimeoutError`. All other exceptions propagate to the caller.",
+            "- Only **`TimeoutError`** is caught and retried. Any other exception propagates",
+            "Retries are limited to `TimeoutError`:",
+            "- On `TimeoutError`, the call is retried until 3 attempts have been made in",
+            "- **Retries**: Up to 3 attempts on `TimeoutError` only.",
+        ],
+        "other": [
+            "- Any exception other than `TimeoutError` is not caught: it propagates to the\n  caller.",
+            "- Other exceptions: any exception other than `TimeoutError` is not caught. It propagates to the caller right away, and no further attempts are made.",
+        ],
+        "exit": [
+            "- **4** — all 3 attempts raised `TimeoutError` (returned after the failure\n  on attempt index 2, the final attempt).",
+            "- If all 3 attempts raise `TimeoutError`, the final (third) timeout returns `4`.",
+            "- `4` — the third and final attempt (`attempt == 2`) raised `TimeoutError`.",
+            "- Returns **`4`** when the third and final attempt (index 2) raises\n  `TimeoutError`.",
+            "- Every path terminates: `0` on success, `4` after three timeouts, or a\n  propagated exception.",
+        ],
+        "success": [
+            "- **0** — `send()` succeeded on some attempt.",
+            "- Returns `0` as soon as a `send()` call succeeds.",
+            "- `0` — `send` succeeded. Returned as soon as any attempt succeeds, including a\n  success on the second or third attempt after earlier timeouts.",
+            "If `send()` succeeds on any attempt, `deliver` returns `0` immediately.",
+            "`deliver(send)` calls `send()` up to 3 times and returns 0 on the first success.",
+            "- Success: as soon as a call to `send()` returns without raising, `deliver` returns `0`.",
+        ],
+    },
+    "docs-snapshot-new-command": {
+        "limit": [
+            "| Flag | Type | Default | Description |\n| `--limit N` | integer | `20` | Return at most N rows. |",
+            "| Flag | Type | Default | Description |\n| `--limit N` | integer | `20` | Maximum number of rows returned. Rows are sliced after sorting, so this caps the result at the N newest rows. |",
+            "- The `limit` parameter of `inspect` defaults to `20`, matching the `--limit` CLI default.",
+            "- a function `inspect(rows, limit=20)`.",
+            "inspect(rows, limit=20)",
+            "| Flag | Type | Default | Description |\n| `--limit LIMIT` | `int` | `20` | Maximum number of rows returned. Parsed with `type=int`; a value that is not a valid integer is an argument error (exit 2). No range validation is performed. |",
+        ],
+        "json": [
+            "| `--json` | boolean flag | off | Store-true flag; enables JSON output when set. |"
+        ],
+        "readonly": [
+            "- The input rows are never mutated.",
+            "- The input rows are never mutated; inspection returns a new sorted slice.",
+            "- The input `rows` are never mutated; sorting produces a new list.",
+            "- The function never mutates `rows`.",
+            "- The command inspects snapshot rows; it never mutates them.",
+        ],
+        "success": [
+            "- `0` — successful inspection.",
+            "- `0`: inspection succeeded.",
+            "| `0` | Successful inspection |",
+            "| `0` | Inspection completed successfully. |",
+            "- `0` — Inspection completed successfully.",
+            "- `0`: Successful inspection.",
+            "| `0` | Inspection succeeded. |",
+        ],
+        "invalid": [
+            "- `2` — invalid arguments (for example, a non-integer `--limit` value).",
+            "- `2`: invalid arguments.",
+            "- `2` — invalid arguments (standard argparse failure).",
+            "- `2` — invalid arguments (e.g. a non-integer `--limit`).",
+            "| `2` | Invalid arguments |",
+            "| `2` | Invalid arguments. |",
+            "Exit code `2` is produced by argparse on any argument error, including an\ninvalid integer.",
+            "- `2` — invalid arguments.",
+            "- `2` — Invalid arguments (e.g., a non-integer value passed to `--limit`).",
+            "| `2` | Invalid arguments were supplied (e.g. a non-integer `--limit`). |",
+        ],
+    },
+}
+
+SAVED_FAIL = [
+    (
+        "docs-cache-config",
+        "entries",
+        "cache.max_entries defaults to 256. cache.ttl_seconds defaults to 300. Eviction is FIFO.",
+    ),
+    (
+        "docs-cache-config",
+        "invalid",
+        "- Negative values for `cache.ttl_seconds` are invalid and cause the program to",
+    ),
+    (
+        "docs-config-loader-keys",
+        "values",
+        "| `roles.build_pack_default_worker_class` | `plan` |",
+    ),
+    (
+        "docs-config-loader-keys",
+        "default",
+        "| `roles.build_pack_default_worker_class` | (none) |",
+    ),
+    (
+        "docs-gym-baseline-keys",
+        "bare",
+        "Baselines written before models were selectable contain bare task ids.",
+    ),
+    ("docs-gym-baseline-keys", "migration", "### Upgrading old baselines"),
+    (
+        "docs-gym-baseline-keys",
+        "migration",
+        "- Existing baselines read and compare unchanged with unmodelled runs without requiring data migration or baseline format upgrades.",
+    ),
+    ("docs-gym-baseline-keys", "pinned", "### Model-pinned tasks"),
+    (
+        "docs-gym-run-flags",
+        "cohort",
+        "- With reasoning level and model: `task_id@model@effort:high`",
+    ),
+    (
+        "docs-gym-run-flags",
+        "cohort",
+        "- Without model: `@effort:<reasoning_level>` (e.g. `@effort:high`).",
+    ),
+    (
+        "docs-retry-behavior-diff",
+        "attempts",
+        "- **No sleep/backoff** between attempts; retries are immediate.",
+    ),
+    (
+        "docs-retry-behavior-diff",
+        "timeout",
+        "- `4` — all 3 attempts failed with `TimeoutError`.",
+    ),
+    (
+        "docs-retry-behavior-diff",
+        "success",
+        "indexed 0, 1, 2 via `for attempt in range(3)`).",
+    ),
+    (
+        "docs-retry-behavior-diff",
+        "exit",
+        "Delivery retries every exception indefinitely and exits 0 on exhaustion.",
+    ),
+    ("docs-snapshot-new-command", "limit", "hq snapshot inspect [--limit N] [--json]"),
+    (
+        "docs-snapshot-new-command",
+        "json",
+        "| `--json` | flag (no value) | off | Boolean flag; takes no argument. |",
+    ),
+    ("docs-snapshot-new-command", "success", "| `0` | Empty list. |"),
+    ("docs-snapshot-new-command", "success", "- `--limit 0` returns no rows."),
+    (
+        "docs-snapshot-new-command",
+        "invalid",
+        "2. The sorted result is truncated to `limit` rows.",
+    ),
+]
+
+
 # Each tuple holds equivalent assertions, followed by a contradictory assertion.
 FACT_FORMS = {
     "docs-cache-config": {
         "entries": (
             "cache.max_entries defaults to 128.",
-            'cache.max_entries = "128"',
-            "| cache.max_entries | string | `128` |",
             "cache.max_entries defaults to 129.",
         ),
         "ttl": (
             "cache.ttl_seconds defaults to 60.",
-            'cache.ttl_seconds = "60"',
-            "| cache.ttl_seconds | string | `60` |",
             "cache.ttl_seconds defaults to 61.",
         ),
         "disabled": (
-            "cache.ttl_seconds=0 disables caching.",
-            'Setting `cache.ttl_seconds` to "0" disables caching.',
-            "| cache.ttl_seconds | 0 | no caching |",
-            "cache.ttl_seconds: 0 disables caching.",
-            "- cache.ttl_seconds: 0 (disables caching)",
-            "To disable caching, set cache.ttl_seconds to 0.",
-            "Disable caching with ttl_seconds = 0.",
-            'For no caching, set `cache.ttl_seconds` to "0".',
+            "cache.ttl_seconds=0 disables caching; negative values are "
+            "invalid (exit 2).",
             "cache.ttl_seconds=1 disables caching.",
         ),
         "invalid": (
-            "Negative `cache.ttl_seconds` values are invalid and exit with code `2`.",
-            "Negative values are invalid and cause the process to exit with status `2`.",
-            "Negative ttl_seconds values are invalid; the surface exits with status 2.",
+            "cache.ttl_seconds=0 disables caching; negative values are "
+            "invalid (exit 2).",
             "Negative values exit with status 3.",
         ),
         "eviction": (
-            "Eviction is least-recently-used.",
-            "Evictions use LRU.",
-            "| Eviction | LRU |",
-            "The cache uses least-recently-used eviction.",
-            "Least-recently-used eviction is enforced.",
-            "Least recently used replacement is enforced.",
+            "Eviction is least-recently-used. --no-cache bypasses reads and writes.",
             "Eviction uses FIFO.",
         ),
         "bypass": (
-            "--no-cache bypasses reads and writes.",
-            "--no-cache skips writes and reads.",
-            "--no-cache disables read and write operations.",
+            "Eviction is least-recently-used. --no-cache bypasses reads and writes.",
             "--no-cache enables reads and writes.",
         ),
     },
     "docs-config-loader-keys": {
         "values": (
-            "roles.build_pack_default_worker_class accepts plan, codex, claude-code.",
-            "| roles.build_pack_default_worker_class | plan, codex, claude-code |",
-            'roles.build_pack_default_worker_class allows "claude-code", `plan`, and "codex".',
-            "roles.build_pack_default_worker_class selects the worker. Allowed values: plan; codex; claude-code.",
-            "roles.build_pack_default_worker_class selects the worker.\n- plan.\n- codex.\n- claude-code.",
+            "`roles.build_pack_default_worker_class` accepts `plan`, "
+            "`codex`, and `claude-code`.",
             "roles.build_pack_default_worker_class accepts plan and codex.",
         ),
         "default": (
-            "| Key | Type | Default | Allowed values |\n| `roles.build_pack_default_worker_class` | string | `plan` | `plan`, `codex`, `claude-code` |",
-            '| Key | Type | Default | Allowed values |\n| `roles.build_pack_default_worker_class` | string | `"plan"` | `plan`, `codex`, `claude-code` |',
-            '| `roles.build_pack_default_worker_class` | `"plan"` |',
-            "| `roles.build_pack_default_worker_class` | `codex` | plan, codex, claude-code |",
+            "The default is `plan`.",
+            "| `roles.build_pack_default_worker_class` | `codex` | "
+            "plan, codex, claude-code |",
         ),
     },
     "docs-gym-baseline-keys": {
         "bare": (
             "Unmodelled tasks keep the bare task id.",
-            "Without a model, use just `task_id`.",
-            "No model: the task identifier alone.",
             "Unmodelled tasks use task@model.",
         ),
         "pinned": (
-            "**Model-pinned task**: the key is `<task_id>@<model>`, e.g. `my-task@some-model`.",
-            "| Model-pinned | `<task_id>@<model>` | `my-task@some-model` |",
-            "Task-level model pins use task@model.",
+            "Model-pinned tasks use task@model even without a run override.",
             "Model-pinned tasks use model@task.",
         ),
         "migration": (
             "Old baselines for model-pinned tasks need a one-time baseline update.",
-            "Migrate legacy baseline entries for model-pinned tasks.",
-            "Refresh existing baselines to use `<task_id>@<model>`.",
             "Old baselines for model-pinned tasks need no changes.",
         ),
     },
     "docs-gym-run-flags": {
         "levels": (
-            "--reasoning-level accepts low, medium, high, xhigh.",
-            "| --reasoning-level | `low`, `medium`, `high`, `xhigh` |",
-            '--reasoning-level supports "xhigh", "high", "medium", "low".',
+            "Use --reasoning-level low, medium, high, or xhigh; max "
+            "normalizes to xhigh.",
             "--reasoning-level accepts low, medium, high, extreme.",
         ),
         "alias": (
-            "max normalizes to xhigh.",
-            "`max` is an alias for `xhigh`.",
-            'xhigh has the alias "max".',
+            "Use --reasoning-level low, medium, high, or xhigh; max "
+            "normalizes to xhigh.",
             "max normalizes to high.",
         ),
         "omitted": (
-            "Omitting --reasoning-level preserves existing keys.",
-            "Without --reasoning-level, keys remain unchanged.",
-            "--reasoning-level is unspecified: keep the same key.",
+            "Omitting --reasoning-level preserves existing keys, slices, "
+            "paths and dispatch arguments.",
             "Omitting --reasoning-level changes existing keys.",
         ),
         "cohort": (
-            "`task@model@effort:<level>[@<skill-digest>][@compression=<arm>][@attempt=<n>]`",
-            "@effort:<level> is immediately after `task_id@<model>` and ahead of the skill digest.",
-            "@effort:<level> is placed immediately after the model component, preceding any `skill_digest`.",
-            "@effort:<level> is placed before the skill_digest and after the model.",
-            "@effort:high is placed before the skill digest and after the model.",
-            "@effort:low is placed ahead of any `skill-digest` and after the `model`.",
-            '@effort:medium is placed preceding the "skill_digest" and after the "model".',
-            "@effort:xhigh is placed before the skill digest and after the model.",
+            "A leveled verdict uses @effort:<level> after the model, before "
+            "the skill digest.",
             "`task@model@<skill-digest>@effort:<level>`",
         ),
     },
     "docs-retry-behavior-diff": {
         "attempts": (
-            "Delivery makes at most 3 attempts.",
-            'Up to "three" attempts are made.',
-            "Maximum of `3` attempts.",
+            "Delivery makes at most 3 attempts and retries only TimeoutError.",
             "Delivery makes at most 4 attempts.",
         ),
         "timeout": (
-            "Delivery retries only TimeoutError.",
-            "Only `TimeoutError` is retried.",
-            'Only "TimeoutError" triggers retries.',
-            "Delivery only retries TimeoutError.",
-            "The function only retries `TimeoutError`.",
+            "Delivery makes at most 3 attempts and retries only TimeoutError.",
             "Delivery retries only ValueError.",
         ),
         "other": (
-            "Any other exception propagates to the caller immediately (not retried, not swallowed).",
-            "Only `TimeoutError` is retried; any other exception propagates to the caller.",
-            "Non-timeout exceptions are raised to the caller.",
+            "Other exceptions propagate. Exhaustion returns 4; success returns 0.",
             "Any other exception is swallowed.",
         ),
         "exit": (
-            "If the third attempt also raises `TimeoutError`, it returns exit code `4`.",
-            "After the third and final timed-out attempt, the function returns `4`.",
-            "| Exhaustion | `4` |",
+            "Other exceptions propagate. Exhaustion returns 4; success returns 0.",
             "Exhaustion returns 0.",
         ),
         "success": (
-            "Success returns 0.",
-            'Successful delivery exits with status "0".',
-            "| Success | `0` |",
+            "Other exceptions propagate. Exhaustion returns 4; success returns 0.",
             "Success returns 4.",
         ),
     },
     "docs-snapshot-new-command": {
         "limit": (
-            "--limit defaults to 20.",
-            '--limit = "20"',
-            "| --limit | string | `20` |",
-            "The default value for --limit is 20.",
-            'The default of `--limit` is "20".',
+            "hq snapshot inspect --limit defaults to 20.",
             "--limit defaults to 21.",
         ),
-        "json": (
-            "--json emits JSON.",
-            "| --json | JSON output |",
-            "--json returns a JSON object.",
-            "--json emits YAML.",
-        ),
+        "json": ("--json emits JSON.", "--json emits YAML."),
         "order": (
-            "Rows are sorted by created_at descending.",
-            "Newest first by `created_at`.",
-            "| created_at | newest-first |",
+            "Rows are sorted by created_at descending; inspection is read-only.",
             "Rows are sorted by created_at ascending.",
         ),
         "readonly": (
-            "Inspection is read-only.",
-            "Inspection is read only.",
-            "Inspection never mutates rows.",
+            "Rows are sorted by created_at descending; inspection is read-only.",
             "Inspection updates rows.",
         ),
         "success": (
-            "Successful inspection exits with status `0`.",
-            'Success returns "0".',
-            "Exit 0 on success.",
+            "Exit 0 on success and 2 for invalid arguments.",
             "Success exits with status 2.",
         ),
         "invalid": (
-            "Invalid arguments exit with status `2`.",
-            'Invalid arguments return "2".',
-            "Exit 2 for invalid arguments.",
+            "Exit 0 on success and 2 for invalid arguments.",
             "Invalid arguments exit with status 0.",
         ),
     },
+}
+
+FACT_FORMS = {
+    task: {
+        fact: (forms[0], *SAVED_PASS.get(task, {}).get(fact, []), forms[-1])
+        for fact, forms in facts.items()
+    }
+    for task, facts in FACT_FORMS.items()
 }
 
 FACT_CASES = [
@@ -778,21 +942,9 @@ def test_independent_facts_can_use_separate_headings(task_dir):
             "## Key\nroles.build_pack_default_worker_class\n## Other\nplan, codex, claude-code.",
         ),
         (
-            "docs-config-loader-keys",
-            "values",
-            "roles.build_pack_default_worker_class "
-            + "x" * 101
-            + " plan, codex, claude-code.",
-        ),
-        (
             "docs-cache-config",
             "disabled",
             "Disable caching. Another option sets ttl_seconds to 0.",
-        ),
-        (
-            "docs-cache-config",
-            "disabled",
-            "Disable caching " + "x" * 101 + " ttl_seconds = 0.",
         ),
     ],
 )
@@ -891,3 +1043,77 @@ def test_additional_table_and_numeric_forms(task_id, fact, text, ok):
         forbidden_claims={},
     )
     assert next(c["ok"] for c in records if c["name"] == "fact:" + fact) is ok
+
+
+@pytest.mark.parametrize(
+    "task_id,fact,text,ok",
+    [
+        (task, fact, text, True)
+        for task, facts in SAVED_PASS.items()
+        for fact, texts in facts.items()
+        for text in texts
+    ]
+    + [(task, fact, text, False) for task, fact, text in SAVED_FAIL],
+)
+def test_saved_submission_assertions(task_id, fact, text, ok):
+    from gym.doc_checks import checks
+
+    spec = contract_for(TASKS / task_id)["required_facts"][fact]
+    records = checks(text, required_facts={fact: spec}, forbidden_claims={})
+    assert next(c["ok"] for c in records if c["name"] == "fact:" + fact) is ok
+
+
+@pytest.mark.parametrize(
+    "task_id,fact,text",
+    [
+        (
+            "docs-cache-config",
+            "entries",
+            "- cache.max_entries defaults to 129; 128 is the old default.",
+        ),
+        (
+            "docs-cache-config",
+            "ttl",
+            "- cache.ttl_seconds defaults to 61; 60 is the old default.",
+        ),
+        (
+            "docs-cache-config",
+            "disabled",
+            "- cache.ttl_seconds=1 disables caching; 0 is another value.",
+        ),
+        ("docs-cache-config", "entries", "cache.max_entries defaults to -128."),
+        (
+            "docs-config-loader-keys",
+            "default",
+            "roles.build_pack_default_worker_class allows plan, codex and claude-code.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "limit",
+            "- --limit defaults to 21; 20 is the old default.",
+        ),
+        ("docs-snapshot-new-command", "limit", "--limit defaults to -20."),
+        (
+            "docs-retry-behavior-diff",
+            "attempts",
+            "Delivery makes at most 3.5 attempts.",
+        ),
+        ("docs-retry-behavior-diff", "attempts", "Delivery makes at most 30 attempts."),
+        (
+            "docs-retry-behavior-diff",
+            "success",
+            "- Success returns 4; an earlier return code was 0.",
+        ),
+        (
+            "docs-retry-behavior-diff",
+            "exit",
+            "- Exhaustion returns 0; an earlier return code was 4.",
+        ),
+    ],
+)
+def test_wrong_value_in_same_unit_fails(task_id, fact, text):
+    from gym.doc_checks import checks
+
+    spec = contract_for(TASKS / task_id)["required_facts"][fact]
+    records = checks(text, required_facts={fact: spec}, forbidden_claims={})
+    assert not next(c["ok"] for c in records if c["name"] == "fact:" + fact)

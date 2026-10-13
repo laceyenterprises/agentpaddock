@@ -3,25 +3,55 @@ from gym_doc_checks import check_document
 
 CONTRACT = {
     "required_facts": {
-        "attempts": [
-            "(?:at most|up to|maximum(?: of)?|no more than)\\s*[ `\"']*(?:3|three)\\b[ `\"']*\\s*attempts?|\\b(?:maximum attempts?|attempt limit|attempts?)\\b[ `\"']*\\s*(?:\\||:|=|is)\\s*[ `\"']*(?:3|three)\\b"
-        ],
-        "timeout": [
-            "(?:only\\s*[ `\"']*TimeoutError\\b[^.;]{0,100}retr\\w*|\\bonly\\s+retr\\w*\\s*[ `\"']*TimeoutError\\b|retr\\w*\\s+only\\s*[ `\"']*TimeoutError\\b)"
-        ],
-        "other": [
-            "(?:other exceptions?|non[ -]timeout exceptions?)[^.;]{0,100}(?:propagat\\w*|rais\\w*)"
-        ],
-        "exit": [
-            "(?:(?:exhaustion|exhausted|third(?: and final)? timed-out attempt|third attempt[^.;|]{0,60}\\bTimeoutError\\b)(?:(?!\\b(?:returns?|exits?|success|invalid|exhaustion)\\b)[^|]){0,100}?(?:\\b(?:returns?|exits?)(?:\\s+(?:with|exit))?(?:\\s+(?:code|status))?\\s*(?:is|:|=)?\\s*[ `\"']*4\\b(?!\\.\\d)|[ `\"']*\\s*\\|\\s*[ `\"']*4\\b(?!\\.\\d))|\\b4\\b(?!\\.\\d)[ `\"']*\\s*(?:on|for)\\s+(?:exhaustion|exhausted|third(?: and final)? timed-out attempt|third attempt[^.;|]{0,60}\\bTimeoutError\\b))"
-        ],
-        "success": [
-            "(?:success(?:ful(?: delivery)?)?(?:(?!\\b(?:returns?|exits?|success|invalid|exhaustion)\\b)[^|]){0,100}?(?:\\b(?:returns?|exits?)(?:\\s+(?:with|exit))?(?:\\s+(?:code|status))?\\s*(?:is|:|=)?\\s*[ `\"']*0\\b(?!\\.\\d)|[ `\"']*\\s*\\|\\s*[ `\"']*0\\b(?!\\.\\d))|\\b0\\b(?!\\.\\d)[ `\"']*\\s*(?:on|for)\\s+success(?:ful(?: delivery)?)?)"
-        ],
+        "attempts": {
+            "patterns": [
+                "attempt\\w*|deliver\\w*|send",
+                "(?<![\\w.+-])(?:3|three|third)\\b(?!\\.\\d)",
+                "at most|up to|maximum|no more than|bounded|all|final|\\|",
+            ],
+            "scope": "unit",
+            "reject": ["\\b(?:4|four)\\s+(?:delivery\\s+)?attempts"],
+        },
+        "timeout": {
+            "patterns": ["\\bTimeoutError\\b", "retr\\w*|caught|catches"],
+            "scope": "unit",
+            "reject": ["only\\s+(?:retr\\w*\\s+)?ValueError"],
+        },
+        "other": {
+            "patterns": [
+                "other\\s+(?:than\\s+[`]*TimeoutError|exceptions?)|non[ "
+                "-]timeout exceptions?",
+                "propagat\\w*|rais\\w*|not caught",
+            ],
+            "scope": "unit",
+        },
+        "exit": {
+            "patterns": [
+                "exhaust\\w*|(?:all|three|3|third|final)[^.;]{0,100}(?:TimeoutError|timeout|timed-out)",
+                "(?<![\\w.+-])4\\b(?!\\.\\d)",
+            ],
+            "scope": "unit",
+            "reject": [
+                "\\b(?:returns?|exits?)(?:\\s+(?:with|exit|code|status)){0,3}\\s*[ "
+                "`\"\\']*(?!4\\b)\\d+\\b"
+            ],
+        },
+        "success": {
+            "patterns": [
+                "success\\w*|succeed\\w*|without raising",
+                "(?<![\\w.+-])0\\b(?!\\.\\d)",
+            ],
+            "scope": "unit",
+            "reject": [
+                "\\b(?:returns?|exits?)(?:\\s+(?:with|exit|code|status)){0,3}\\s*[ "
+                "`\"\\']*(?!0\\b)\\d+\\b"
+            ],
+        },
     },
     "forbidden_claims": {
         "old": [
-            "(?<!no longer )(?<!never )(?<!not )retries (?:every exception|indefinitely)",
+            "(?<!no longer )(?<!never )(?<!not )retries (?:every "
+            "exception|indefinitely)",
             "(?<!no longer )(?<!never )(?<!not )exits 0 on exhaustion",
         ]
     },

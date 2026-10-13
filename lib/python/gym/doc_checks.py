@@ -1,6 +1,6 @@
 """Deterministic documentation assertions; captured text is never executed.
 
-Required facts match bounded Markdown sections (or unheaded paragraphs),
+Required facts match bounded Markdown units or legacy sections,
 with whitespace normalized. Stale claims still match the original text.
 Only dotted identifiers in the declared config namespaces are config keys.
 """
@@ -8,11 +8,14 @@ Only dotted identifiers in the declared config namespaces are config keys.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 _FLAG = re.compile(r"(?<![\w-])--[A-Za-z][A-Za-z0-9_-]*")
-_KEY = re.compile(r"(?<![\w.-])[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)+(?![\w-]|\.[A-Za-z_])")
+_KEY = re.compile(
+    r"(?<![\w.-])[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)+(?![\w-]|\.[A-Za-z_])"
+)
 _HEADING = re.compile(r"^ {0,3}#{1,6} .+?$", re.MULTILINE)
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 _TASK_FILENAMES = {"surface.py", "guide.md", "change.diff", "bench-result.json"}
@@ -74,10 +77,179 @@ def _fact_windows(lines: Sequence[str]) -> list[str]:
     return [re.sub(r"\s+", " ", section).strip() for section in sections]
 
 
+MAX_FACT_UNIT = 2048
+_LIST_ITEM = re.compile(r"^\s*(?:[-+*]|\d+[.)])\s+")
+
+
+@dataclass(frozen=True)
+class _FactUnit:
+    text: str
+    default_text: str | None = None
+
+
+def _fact_units(lines: Sequence[str]) -> list[_FactUnit]:
+    """Sentences, wrapped list items, and table rows with their header.
+
+    Headings supply context but do not match alone. A colon introduction
+    reaches the following list. Adjacent literal-only items form one enum
+    unit; independent sibling assertions never join. Blank lines end that
+    introduction. List continuations may contain multiple sentences, while
+    independent outcome clauses are separated to prevent swapped values.
+    Overlong list items and rows fail closed; sentences and literal lists
+    also have a length limit, including their context.
+    """
+    units = []
+    heading = ""
+    intro = ""
+    pending = []
+    is_item = False
+    header = []
+    literals = []
+    literals_overlong = False
+
+    def add(raw, default_text=None):
+        if len(raw) <= MAX_FACT_UNIT:
+            units.append(_FactUnit(re.sub(r"\s+", " ", raw).strip(), default_text))
+
+    def finish_literals():
+        nonlocal literals, literals_overlong
+        if literals and not literals_overlong:
+            add(" ".join((heading, intro, *literals)))
+        literals = []
+        literals_overlong = False
+
+    def flush():
+        nonlocal pending, intro, literals_overlong
+        raw = " ".join(pending)
+        pending = []
+        if is_item and re.fullmatch(r"[ `]*[\w-]+[ `.]*", raw) and (intro or heading):
+            if not literals_overlong:
+                if (
+                    len(heading)
+                    + len(intro)
+                    + sum(len(v) + 1 for v in literals)
+                    + len(raw)
+                    + 2
+                    > MAX_FACT_UNIT
+                ):
+                    literals_overlong = True
+                else:
+                    literals.append(raw)
+            return
+        finish_literals()
+        if not raw or (is_item and len(raw) > MAX_FACT_UNIT):
+            intro = ""
+            return
+        # Keep identifiers and decimals intact. A list item retains its own
+        # explanatory sentences, but not separate outcome/value clauses.
+        outcome_split = r";\s*(?=(?:success|exhaustion|invalid)\b)|,?\s+(?:and\s+)?(?=[024]\s+(?:for|on|after)\b)"
+        split = outcome_split if is_item else r"(?<=[.!?])\s+|" + outcome_split
+        for part in re.split(split, raw, flags=re.I):
+            add(" ".join((heading, intro, part)))
+        if raw.endswith(":"):
+            intro = raw
+        elif re.fullmatch(r"[`\w.]+ selects the worker\.", raw):
+            # A key followed by a literal-only enum list is an introduction.
+            intro = raw
+
+    for index, line in enumerate(lines):
+        if _HEADING.fullmatch(line.rstrip()):
+            flush()
+            finish_literals()
+            heading = line.strip()
+            intro = ""
+            header = []
+            is_item = False
+        elif line.strip().startswith("|"):
+            flush()
+            finish_literals()
+            is_item = False
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if all(re.fullmatch(r"[: -]+", c) for c in cells):
+                continue
+            next_line = lines[index + 1].strip() if index + 1 < len(lines) else ""
+            has_rule = next_line.startswith("|") and all(
+                re.fullmatch(r":?-{3,}:?", cell.strip())
+                for cell in next_line.strip("|").split("|")
+            )
+            if has_rule:
+                header = cells
+                continue
+            if not header and any(
+                re.fullmatch(
+                    r"Key|Flag|Type|Default(?: / Output)?|Allowed values|Outcome|Condition|Exit code|Code|Alias|Canonical level",
+                    c,
+                    re.I,
+                )
+                for c in cells
+            ):
+                header = cells
+                continue
+            row = "| " + " | ".join(cells) + " |"
+            if header:
+                row = " | ".join(header) + " : " + row
+            default_text = None
+            for i, label in enumerate(header):
+                if re.search(r"\bdefault\b", label, re.I) and i < len(cells):
+                    default_text = cells[0] + " default " + cells[i]
+            add(row, default_text)
+        elif not line.strip():
+            flush()
+            finish_literals()
+            intro = ""
+            header = []
+            is_item = False
+        elif _LIST_ITEM.match(line):
+            flush()
+            is_item = True
+            pending = [_LIST_ITEM.sub("", line).strip()]
+        else:
+            if is_item and line == line.lstrip():
+                flush()
+                finish_literals()
+                is_item = False
+                intro = ""
+            header = []
+            pending.append(line.strip())
+    flush()
+    finish_literals()
+    return units
+
+
+def _matches_fact(spec, windows, units, options):
+    if isinstance(spec, Mapping):
+        patterns = spec["patterns"]
+        scope = spec.get("scope", "unit")
+        if scope not in ("unit", "section"):
+            raise ValueError("unknown fact scope")
+        candidates = (
+            [
+                u.default_text
+                if spec.get("default_column") and u.default_text is not None
+                else u.text
+                for u in units
+            ]
+            if scope == "unit"
+            else windows
+        )
+        rejected = spec.get("reject", ())
+    else:
+        patterns = spec
+        candidates = windows
+        rejected = ()
+    if not patterns or isinstance(patterns, str):
+        raise ValueError("fact requires a nonempty regex sequence")
+    return any(
+        all(re.search(p, unit, options) for p in patterns)
+        and not any(re.search(p, unit, options) for p in rejected)
+        for unit in candidates
+    )
+
+
 def checks(
     text: str | None,
     *,
-    required_facts: Mapping[str, Sequence[str]],
+    required_facts: Mapping[str, Sequence[str] | Mapping[str, Any]],
     forbidden_claims: Mapping[str, Sequence[str]],
     known_flags: Sequence[str] = (),
     known_config_keys: Sequence[str] = (),
@@ -94,7 +266,9 @@ def checks(
     records = []
 
     def record(name, ok, reason):
-        records.append(dict(name=name, ok=bool(ok), reason=None if ok else reason, required=True))
+        records.append(
+            dict(name=name, ok=bool(ok), reason=None if ok else reason, required=True)
+        )
 
     record("document_captured", text is not None, "document was not captured")
     text = text or ""
@@ -102,24 +276,29 @@ def checks(
     # separators must not let a single regex input bypass the length limit.
     lines = text.split("\n")
     shape_ok = all(len(line) <= MAX_LINE_LENGTH for line in lines)
-    record("document_shape", shape_ok, f"document line exceeds {MAX_LINE_LENGTH} characters")
+    record(
+        "document_shape",
+        shape_ok,
+        f"document line exceeds {MAX_LINE_LENGTH} characters",
+    )
     if not shape_ok:
         # Reject before running any task regex, so stuffing is a failed check,
         # never a verifier timeout. Task patterns must also avoid chained wildcards.
         return records
     windows = _fact_windows(lines)
+    units = _fact_units(lines)
     options = re.MULTILINE | re.IGNORECASE
     for name, patterns in required_facts.items():
-        if not patterns or isinstance(patterns, str):
-            raise ValueError(f"fact {name} requires a nonempty regex sequence")
         record(
             f"fact:{name}",
-            any(all(re.search(p, window, options) for p in patterns) for window in windows),
+            _matches_fact(patterns, windows, units, options),
             f"missing fact: {name}",
         )
     for name, patterns in forbidden_claims.items():
         if not patterns or isinstance(patterns, str):
-            raise ValueError(f"forbidden claim {name} requires a nonempty regex sequence")
+            raise ValueError(
+                f"forbidden claim {name} requires a nonempty regex sequence"
+            )
         record(
             f"stale:{name}",
             not any(re.search(p, text, options) for p in patterns),
@@ -137,13 +316,18 @@ def checks(
         - set(known_config_keys)
         - set(non_config_literals)
         - _TASK_FILENAMES
-        if key.startswith(prefixes) and not all(len(segment) == 1 for segment in key.split("."))
+        if key.startswith(prefixes)
+        and not all(len(segment) == 1 for segment in key.split("."))
     )
     record("known_flags", not flags, "unknown flags: " + ", ".join(flags))
     record("known_config_keys", not keys, "unknown config keys: " + ", ".join(keys))
     headings = _headings(lines)
     for heading in preserved_headings:
-        record(f"heading:{heading}", heading in headings, f"missing unchanged heading: {heading}")
+        record(
+            f"heading:{heading}",
+            heading in headings,
+            f"missing unchanged heading: {heading}",
+        )
     return records
 
 

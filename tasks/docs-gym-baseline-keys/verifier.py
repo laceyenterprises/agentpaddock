@@ -3,15 +3,32 @@ from gym_doc_checks import check_document
 
 CONTRACT = {
     "required_facts": {
-        "bare": [
-            "(?:unmodel(?:l)?ed|no model|without (?:a )?model)[^.;]{0,100}(?:bare task (?:id|identifier)|(?:only|just)\\s+[ `\"']*<?task(?:_id)?>?|task (?:id|identifier) alone)|(?:unmodel(?:l)?ed|no model)\\b[ `\"']*\\s*\\|\\s*[ `\"']*<?task(?:_id)?>?[ `\"']*\\s*\\|"
-        ],
-        "pinned": [
-            "(?:model[ -]pinned|task[ -](?:pinned|level))[^.;]{0,100}<?task(?:_id)?>?@<?model>?"
-        ],
-        "migration": [
-            "\\A(?=[\\s\\S]{0,8192}\\b(?:old|legacy|existing)\\b)(?=[\\s\\S]{0,8192}\\bbaseline\\w*\\b)(?=[\\s\\S]{0,8192}\\b(?:updat\\w*|migrat\\w*|regenerat\\w*|rebuild\\w*|refresh\\w*)\\b)(?=[\\s\\S]{0,8192}(?:model[ -]pinned|<?task(?:_id)?>?@<?model>?))"
-        ],
+        "bare": {
+            "patterns": [
+                "unmodel(?:l)?ed|no model|without (?:a )?model|falsy",
+                "bare|\\b(?:only|just)\\b|alone|\\|\\s*[`<]*task(?:_id)?[>`]*\\s*\\|",
+            ],
+            "scope": "unit",
+        },
+        "pinned": {
+            "patterns": [
+                "model[ -]pinned|task[ -](?:pinned|level)|model "
+                "(?:selected|specified|provided)",
+                "(?:[<{]?task(?:_id)?[>}]*@[<{]?model[>}]*|task ID "
+                "followed by\\s*[`\\']*@|separated by\\s*[`\\']*@)",
+            ],
+            "scope": "unit",
+        },
+        "migration": {
+            "patterns": [
+                "\\b(?:old|legacy|existing)\\b",
+                "baseline\\w*",
+                "updat\\w*|migrat\\w*|regenerat\\w*|rebuild\\w*|refresh\\w*",
+                "model[ -]pinned|[<{]?task(?:_id)?[>}]*@[<{]?model",
+            ],
+            "scope": "unit",
+            "reject": ["no (?:changes|updat\\w*)|without requiring|do not require"],
+        },
     },
     "forbidden_claims": {"old": ["wire-compatible with\\s*every baseline"]},
     "known_flags": [],

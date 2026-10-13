@@ -3,22 +3,52 @@ from gym_doc_checks import check_document
 
 CONTRACT = {
     "required_facts": {
-        "limit": [
-            "--limit\\b(?:[ `\"']*\\s*\\|\\s*(?:[ `\"']*(?:string|str|integer|int|number|enum)[ `\"']*\\s*\\|\\s*)?[ `\"']*|[^.;]{0,100}\\bdefault(?:s)?\\s*(?:is|to|:|=)?\\s*[ `\"']*|[ `\"']*\\s*(?:=|:)\\s*[ `\"']*)20\\b(?!\\.\\d)|\\bdefault(?: value)?\\s+(?:for|of)\\s+[ `\"']*--limit\\b[ `\"']*\\s*(?:is|:|=)\\s*[ `\"']*20\\b(?!\\.\\d)"
-        ],
-        "json": ["--json\\b[^.;]{0,100}\\bJSON\\b"],
-        "order": [
-            "created_at\\b[^.;]{0,100}(?:descending|newest[ -]first)|(?:descending|newest[ -]first)[^.;]{0,100}created_at\\b"
-        ],
-        "readonly": [
-            "read[ -]only|(?:never|does not|doesn.t)\\s+(?:mutate|modify|update|write)\\w*\\s+(?:the )?rows"
-        ],
-        "success": [
-            "(?:success(?:ful(?: inspection)?)?(?:(?!\\b(?:returns?|exits?|success|invalid)\\b)[^|]){0,100}?(?:\\b(?:returns?|exits?)(?:\\s+(?:with|exit))?(?:\\s+(?:code|status))?\\s*(?:is|:|=)?\\s*[ `\"']*0\\b(?!\\.\\d)|[ `\"']*\\s*\\|\\s*[ `\"']*0\\b(?!\\.\\d))|\\b0\\b(?!\\.\\d)[ `\"']*\\s*(?:on|for)\\s+success(?:ful(?: inspection)?)?)"
-        ],
-        "invalid": [
-            "(?:invalid(?: arguments)?(?:(?!\\b(?:returns?|exits?|success|invalid)\\b)[^|]){0,100}?(?:\\b(?:returns?|exits?)(?:\\s+(?:with|exit))?(?:\\s+(?:code|status))?\\s*(?:is|:|=)?\\s*[ `\"']*2\\b(?!\\.\\d)|[ `\"']*\\s*\\|\\s*[ `\"']*2\\b(?!\\.\\d))|\\b2\\b(?!\\.\\d)[ `\"']*\\s*(?:on|for)\\s+invalid(?: arguments)?)"
-        ],
+        "limit": {
+            "patterns": [
+                "--limit\\b|\\blimit\\s*=",
+                "(?<![\\w.+-])20\\b(?!\\.\\d)",
+                "\\bdefaults?\\b|[=:|]",
+            ],
+            "scope": "unit",
+            "reject": [
+                "\\bdefaults?\\s*(?:is|to|:|=)?\\s*[ `\"\\']*(?!20\\b)\\d+",
+                "\\blimit\\s*=\\s*(?!20\\b)\\d+",
+            ],
+            "default_column": True,
+        },
+        "json": {"patterns": ["--json\\b", "(?<![-\\w])JSON\\b"], "scope": "unit"},
+        "order": {
+            "patterns": ["created_at\\b", "descending|newest[ -]first"],
+            "scope": "unit",
+        },
+        "readonly": {
+            "patterns": [
+                "inspect\\w*|\\brows\\b|\\bfunction\\b|\\bcommand\\b",
+                "read[ -]only|never "
+                "(?:mutat|modif|updat|writ)\\w*|never mutated|does "
+                "not mutat\\w*|doesn.t mutat\\w*",
+            ],
+            "scope": "unit",
+        },
+        "success": {
+            "patterns": ["success\\w*|succeed\\w*", "(?<![\\w.+-])0\\b(?!\\.\\d)"],
+            "scope": "unit",
+            "reject": [
+                "\\b(?:returns?|exits?)(?:\\s+(?:with|exit|code|status)){0,3}\\s*[ "
+                "`\"\\']*(?!0\\b)\\d+\\b"
+            ],
+        },
+        "invalid": {
+            "patterns": [
+                "invalid arguments?|argument error",
+                "(?<![\\w.+-])2\\b(?!\\.\\d)",
+            ],
+            "scope": "unit",
+            "reject": [
+                "\\b(?:returns?|exits?)(?:\\s+(?:with|exit|code|status)){0,3}\\s*[ "
+                "`\"\\']*(?!2\\b)\\d+\\b"
+            ],
+        },
     },
     "forbidden_claims": {"write": ["inspection (?:deletes|updates) rows"]},
     "known_flags": ["--limit", "--json"],

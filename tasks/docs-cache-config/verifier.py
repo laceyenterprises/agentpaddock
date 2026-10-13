@@ -3,24 +3,61 @@ from gym_doc_checks import check_document
 
 CONTRACT = {
     "required_facts": {
-        "entries": [
-            "cache\\.max_entries\\b(?:[ `\"']*\\s*\\|\\s*(?:[ `\"']*(?:string|str|integer|int|number|enum)[ `\"']*\\s*\\|\\s*)?[ `\"']*|[^.;]{0,100}\\bdefault(?:s)?\\s*(?:is|to|:|=)?\\s*[ `\"']*|[ `\"']*\\s*(?:=|:)\\s*[ `\"']*)128\\b(?!\\.\\d)|\\bdefault(?: value)?\\s+(?:for|of)\\s+[ `\"']*cache\\.max_entries\\b[ `\"']*\\s*(?:is|:|=)\\s*[ `\"']*128\\b(?!\\.\\d)"
-        ],
-        "ttl": [
-            "cache\\.ttl_seconds\\b(?:[ `\"']*\\s*\\|\\s*(?:[ `\"']*(?:string|str|integer|int|number|enum)[ `\"']*\\s*\\|\\s*)?[ `\"']*|[^.;]{0,100}\\bdefault(?:s)?\\s*(?:is|to|:|=)?\\s*[ `\"']*|[ `\"']*\\s*(?:=|:)\\s*[ `\"']*)60\\b(?!\\.\\d)|\\bdefault(?: value)?\\s+(?:for|of)\\s+[ `\"']*cache\\.ttl_seconds\\b[ `\"']*\\s*(?:is|:|=)\\s*[ `\"']*60\\b(?!\\.\\d)"
-        ],
-        "disabled": [
-            "(?:cache\\.)?ttl_seconds\\b[ `\"']*\\s*(?:=|:|to|is|\\|)\\s*[ `\"']*0\\b(?!\\.\\d)[^.;]{0,100}(?:disabl\\w*\\s+cach\\w*|(?:no|without)\\s+cach\\w*)|(?:disabl\\w*\\s+cach\\w*|(?:no|without)\\s+cach\\w*)[^.;]{0,100}(?:cache\\.)?ttl_seconds\\b[ `\"']*\\s*(?:=|:|to|is|\\|)\\s*[ `\"']*0\\b(?!\\.\\d)"
-        ],
-        "invalid": [
-            "(?:negative\\b(?:(?!\\b(?:returns?|exits?|success)\\b)[^|]){0,100}?(?:\\b(?:returns?|exits?)(?:\\s+(?:with|exit))?(?:\\s+(?:code|status))?\\s*(?:is|:|=)?\\s*[ `\"']*2\\b(?!\\.\\d)|[ `\"']*\\s*\\|\\s*[ `\"']*2\\b(?!\\.\\d))|\\b2\\b(?!\\.\\d)[ `\"']*\\s*(?:on|for)\\s+negative\\b)"
-        ],
-        "eviction": [
-            "(?:evict\\w*|replacement)[^.;]{0,100}(?:least[ -]recently[ -]used|\\bLRU\\b)|(?:least[ -]recently[ -]used|\\bLRU\\b)[^.;]{0,100}(?:evict\\w*|replacement)"
-        ],
-        "bypass": [
-            "--no-cache\\b[^.;]{0,100}(?:bypass\\w*|skip\\w*|disabl\\w*)[^.;]{0,100}(?:read\\w*\\s+(?:and|or|/)\\s*write\\w*|write\\w*\\s+(?:and|or|/)\\s*read\\w*)"
-        ],
+        "entries": {
+            "patterns": [
+                "cache\\.max_entries\\b",
+                "(?<![\\w.+-])128\\b(?!\\.\\d)",
+                "\\bdefaults?\\b|[=:|]",
+            ],
+            "scope": "unit",
+            "reject": ["\\bdefaults?\\s*(?:is|to|:|=)?\\s*[ `\"\\']*(?!128\\b)\\d+"],
+            "default_column": True,
+        },
+        "ttl": {
+            "patterns": [
+                "cache\\.ttl_seconds\\b",
+                "(?<![\\w.+-])60\\b(?!\\.\\d)",
+                "\\bdefaults?\\b|[=:|]",
+            ],
+            "scope": "unit",
+            "reject": ["\\bdefaults?\\s*(?:is|to|:|=)?\\s*[ `\"\\']*(?!60\\b)\\d+"],
+            "default_column": True,
+        },
+        "disabled": {
+            "patterns": [
+                "(?:cache\\.)?ttl_seconds\\b",
+                "(?<![\\w.+-])0\\b(?!\\.\\d)",
+                "disabl\\w*|(?:no|without)\\s+cach\\w*",
+            ],
+            "scope": "unit",
+            "reject": [
+                "ttl_seconds\\b[ `\"\\']*\\s*(?:=|:|to|is)\\s*[ `\"\\']*(?!0\\b)\\d+"
+            ],
+        },
+        "invalid": {
+            "patterns": ["\\bnegative\\b", "(?<![\\w.+-])2\\b(?!\\.\\d)"],
+            "scope": "unit",
+            "reject": [
+                "\\b(?:returns?|exits?)(?:\\s+(?:with|exit|code|status)){0,3}\\s*[ "
+                "`\"\\']*(?!2\\b)\\d+\\b"
+            ],
+        },
+        "eviction": {
+            "patterns": [
+                "evict\\w*|replacement",
+                "least[ -]recently[ -]used|\\bLRU\\b",
+            ],
+            "scope": "unit",
+        },
+        "bypass": {
+            "patterns": [
+                "--no-cache\\b",
+                "bypass\\w*|skip\\w*|disabl\\w*",
+                "\\bread\\w*",
+                "\\bwrite\\w*",
+            ],
+            "scope": "unit",
+        },
     },
     "forbidden_claims": {
         "old": ["defaults to 256", "defaults to 300", "Eviction is FIFO"]
