@@ -7,7 +7,7 @@ CONTRACT = {
             "(?:at most|up to|maximum(?: of)?|no more than)\\s*[ `\"']*(?:3|three)\\b[ `\"']*\\s*attempts?|\\b(?:maximum attempts?|attempt limit|attempts?)\\b[ `\"']*\\s*(?:\\||:|=|is)\\s*[ `\"']*(?:3|three)\\b"
         ],
         "timeout": [
-            "(?:only\\s*[ `\"']*TimeoutError\\b[^.;]{0,100}retr\\w*|retr\\w*\\s+only\\s*[ `\"']*TimeoutError\\b)"
+            "(?:only\\s*[ `\"']*TimeoutError\\b[^.;]{0,100}retr\\w*|\\bonly\\s+retr\\w*\\s*[ `\"']*TimeoutError\\b|retr\\w*\\s+only\\s*[ `\"']*TimeoutError\\b)"
         ],
         "other": [
             "(?:other exceptions?|non[ -]timeout exceptions?)[^.;]{0,100}(?:propagat\\w*|rais\\w*)"

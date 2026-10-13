@@ -4,7 +4,7 @@ from gym_doc_checks import check_document
 CONTRACT = {
     "required_facts": {
         "limit": [
-            "--limit\\b(?:[ `\"']*\\s*\\|\\s*(?:[ `\"']*(?:string|str|integer|int|number|enum)[ `\"']*\\s*\\|\\s*)?[ `\"']*|[^.;]{0,100}\\bdefault(?:s)?\\s*(?:is|to|:|=)?\\s*[ `\"']*|[ `\"']*\\s*(?:=|:)\\s*[ `\"']*)20\\b(?!\\.\\d)(?!\\.\\d)"
+            "--limit\\b(?:[ `\"']*\\s*\\|\\s*(?:[ `\"']*(?:string|str|integer|int|number|enum)[ `\"']*\\s*\\|\\s*)?[ `\"']*|[^.;]{0,100}\\bdefault(?:s)?\\s*(?:is|to|:|=)?\\s*[ `\"']*|[ `\"']*\\s*(?:=|:)\\s*[ `\"']*)20\\b(?!\\.\\d)|\\bdefault(?: value)?\\s+(?:for|of)\\s+[ `\"']*--limit\\b[ `\"']*\\s*(?:is|:|=)\\s*[ `\"']*20\\b(?!\\.\\d)"
         ],
         "json": ["--json\\b[^.;]{0,100}\\bJSON\\b"],
         "order": [
@@ -14,10 +14,10 @@ CONTRACT = {
             "read[ -]only|(?:never|does not|doesn.t)\\s+(?:mutate|modify|update|write)\\w*\\s+(?:the )?rows"
         ],
         "success": [
-            "(?:success(?:ful(?: inspection)?)?(?:(?!\\b(?:returns?|exits?|success|invalid|exhaustion)\\b)[^|]){0,100}?(?:\\b(?:returns?|exits?)(?:\\s+(?:with|exit))?(?:\\s+(?:code|status))?\\s*(?:is|:|=)?\\s*[ `\"']*0\\b(?!\\.\\d)|[ `\"']*\\s*\\|\\s*[ `\"']*0\\b(?!\\.\\d))|\\b0\\b(?!\\.\\d)[ `\"']*\\s*(?:on|for)\\s+success(?:ful(?: inspection)?)?)"
+            "(?:success(?:ful(?: inspection)?)?(?:(?!\\b(?:returns?|exits?|success|invalid)\\b)[^|]){0,100}?(?:\\b(?:returns?|exits?)(?:\\s+(?:with|exit))?(?:\\s+(?:code|status))?\\s*(?:is|:|=)?\\s*[ `\"']*0\\b(?!\\.\\d)|[ `\"']*\\s*\\|\\s*[ `\"']*0\\b(?!\\.\\d))|\\b0\\b(?!\\.\\d)[ `\"']*\\s*(?:on|for)\\s+success(?:ful(?: inspection)?)?)"
         ],
         "invalid": [
-            "(?:invalid(?: arguments)?(?:(?!\\b(?:returns?|exits?|success|invalid|exhaustion)\\b)[^|]){0,100}?(?:\\b(?:returns?|exits?)(?:\\s+(?:with|exit))?(?:\\s+(?:code|status))?\\s*(?:is|:|=)?\\s*[ `\"']*2\\b(?!\\.\\d)|[ `\"']*\\s*\\|\\s*[ `\"']*2\\b(?!\\.\\d))|\\b2\\b(?!\\.\\d)[ `\"']*\\s*(?:on|for)\\s+invalid(?: arguments)?)"
+            "(?:invalid(?: arguments)?(?:(?!\\b(?:returns?|exits?|success|invalid)\\b)[^|]){0,100}?(?:\\b(?:returns?|exits?)(?:\\s+(?:with|exit))?(?:\\s+(?:code|status))?\\s*(?:is|:|=)?\\s*[ `\"']*2\\b(?!\\.\\d)|[ `\"']*\\s*\\|\\s*[ `\"']*2\\b(?!\\.\\d))|\\b2\\b(?!\\.\\d)[ `\"']*\\s*(?:on|for)\\s+invalid(?: arguments)?)"
         ],
     },
     "forbidden_claims": {"write": ["inspection (?:deletes|updates) rows"]},

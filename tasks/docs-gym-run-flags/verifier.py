@@ -17,7 +17,7 @@ CONTRACT = {
             "\\A(?=[\\s\\S]{0,8192}(?:omit\\w*|without|unset|not (?:set|supplied|specified)|unspecified))(?=[\\s\\S]{0,8192}--reasoning-level\\b)(?=[\\s\\S]{0,8192}(?:preserv\\w*|unchanged|retain\\w*|same|keep\\w*))(?=[\\s\\S]{0,8192}\\bkeys?\\b)"
         ],
         "cohort": [
-            "(?:<?task(?:_id)?>?@<?model>?@effort:<?(?:level|low|medium|high|xhigh)>?(?:\\[?@<?skill[-_]digest>?\\]?)|@effort:<?(?:level|low|medium|high|xhigh)>?[^.;]{0,100}(?:after (?:the )?[ `\"']*model|after [ `\"']*<?task(?:_id)?>?@<?model>?)[^.;]{0,100}(?:before|ahead of|preceding)\\s+(?:any |the )?[ `\"']*skill[-_ ]digest|@effort:<?level>?[^.;]{0,100}before (?:the )?skill digest[^.;]{0,100}after (?:the )?model)"
+            "(?:<?task(?:_id)?>?@<?model>?@effort:<?(?:level|low|medium|high|xhigh)>?(?:\\[?@<?skill[-_]digest>?\\]?)|@effort:<?(?:level|low|medium|high|xhigh)>?[^.;]{0,100}(?:after (?:the )?[ `\"']*model|after [ `\"']*<?task(?:_id)?>?@<?model>?)[^.;]{0,100}(?:before|ahead of|preceding)\\s+(?:any |the )?[ `\"']*skill[-_ ]digest|@effort:<?(?:level|low|medium|high|xhigh)>?[^.;]{0,100}(?:before|ahead of|preceding)\\s+(?:any |the )?[ `\"']*skill[-_ ]digest[^.;]{0,100}after (?:the )?[ `\"']*model)"
         ],
     },
     "forbidden_claims": {

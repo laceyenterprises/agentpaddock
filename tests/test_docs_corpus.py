@@ -19,9 +19,9 @@ ALTERNATE_DOCS = {
 | Key | Default |
 | cache.max_entries | 128 |
 | cache.ttl_seconds | 60 |
-Setting `cache.ttl_seconds` to 0 disables caching.
+Setting `cache.ttl_seconds`: 0 disables caching.
 Negative TTL values are invalid (exit code `2`).
-Eviction uses LRU. --no-cache skips writes and reads.
+The cache uses least-recently-used eviction. --no-cache skips writes and reads.
 """,
     "docs-config-loader-keys": """## Config keys
 | Key | Default | Allowed values |
@@ -37,11 +37,11 @@ Migrate legacy baseline entries for model-pinned tasks to their qualified keys.
 | --reasoning-level | xhigh, high, medium, low |
 `max` is an alias for `xhigh`.
 Without --reasoning-level, existing keys and slices remain unchanged.
-Insert @effort:<level> before the skill digest and after the model.
+Insert @effort:high before the `skill_digest` and after the model.
 --compression labels the cohort; worker_pool.tool_output_compression selects the backend.
 """,
     "docs-retry-behavior-diff": """## Delivery
-Delivery makes up to three attempts. Only TimeoutError is retried.
+Delivery makes up to three attempts. Delivery only retries TimeoutError.
 Non-timeout exceptions are raised to the caller.
 Success returns `0`. When exhausted, delivery returns `4`.
 Delivery no longer retries indefinitely.
@@ -49,8 +49,8 @@ Delivery no longer retries every exception.
 """,
     "docs-snapshot-new-command": """## Inspect
 | Flag | Default / Output |
-| `--limit` | 20 |
 | `--json` | JSON |
+The default value for --limit is 20.
 Inspection is read only, ordered newest first by created_at.
 Exit codes: 0 on success, 2 for invalid arguments.
 """,
@@ -218,7 +218,7 @@ def test_alternate_format_still_rejects_wrong_values(task_dir, tmp_path):
         "docs-gym-baseline-keys": ("task@model", "task/model"),
         "docs-gym-run-flags": ("alias for `xhigh`", "alias for `high`"),
         "docs-retry-behavior-diff": ("three attempts", "four attempts"),
-        "docs-snapshot-new-command": ("| 20 |", "| 200 |"),
+        "docs-snapshot-new-command": ("is 20.", "is 200."),
     }
     old, new = replacements[task_dir.name]
     text = ALTERNATE_DOCS[task_dir.name].replace(old, new)
@@ -427,7 +427,7 @@ def test_help_and_source_attributes_pass(task_dir, tmp_path):
     assert cell.outcome == "passed", cell.reason
 
 
-# Each tuple holds three equivalent assertions and a contradictory assertion.
+# Each tuple holds equivalent assertions, followed by a contradictory assertion.
 FACT_FORMS = {
     "docs-cache-config": {
         "entries": (
@@ -446,6 +446,8 @@ FACT_FORMS = {
             "cache.ttl_seconds=0 disables caching.",
             'Setting `cache.ttl_seconds` to "0" disables caching.',
             "| cache.ttl_seconds | 0 | no caching |",
+            "cache.ttl_seconds: 0 disables caching.",
+            "- cache.ttl_seconds: 0 (disables caching)",
             "cache.ttl_seconds=1 disables caching.",
         ),
         "invalid": (
@@ -458,6 +460,9 @@ FACT_FORMS = {
             "Eviction is least-recently-used.",
             "Evictions use LRU.",
             "| Eviction | LRU |",
+            "The cache uses least-recently-used eviction.",
+            "Least-recently-used eviction is enforced.",
+            "Least recently used replacement is enforced.",
             "Eviction uses FIFO.",
         ),
         "bypass": (
@@ -524,6 +529,11 @@ FACT_FORMS = {
             "`task@model@effort:<level>[@<skill-digest>][@compression=<arm>][@attempt=<n>]`",
             "@effort:<level> is immediately after `task_id@<model>` and ahead of the skill digest.",
             "@effort:<level> is placed immediately after the model component, preceding any `skill_digest`.",
+            "@effort:<level> is placed before the skill_digest and after the model.",
+            "@effort:high is placed before the skill digest and after the model.",
+            "@effort:low is placed ahead of any `skill-digest` and after the `model`.",
+            '@effort:medium is placed preceding the "skill_digest" and after the "model".',
+            "@effort:xhigh is placed before the skill digest and after the model.",
             "`task@model@<skill-digest>@effort:<level>`",
         ),
     },
@@ -538,6 +548,8 @@ FACT_FORMS = {
             "Delivery retries only TimeoutError.",
             "Only `TimeoutError` is retried.",
             'Only "TimeoutError" triggers retries.',
+            "Delivery only retries TimeoutError.",
+            "The function only retries `TimeoutError`.",
             "Delivery retries only ValueError.",
         ),
         "other": (
@@ -564,6 +576,8 @@ FACT_FORMS = {
             "--limit defaults to 20.",
             '--limit = "20"',
             "| --limit | string | `20` |",
+            "The default value for --limit is 20.",
+            'The default of `--limit` is "20".',
             "--limit defaults to 21.",
         ),
         "json": (
@@ -604,8 +618,8 @@ FACT_CASES = [
     for task, facts in FACT_FORMS.items()
     for fact, forms in facts.items()
     for text, ok in [
-        *((text, True) for text in forms[:3]),
-        (forms[3], False),
+        *((text, True) for text in forms[:-1]),
+        (forms[-1], False),
         ("Unrelated documentation.", False),
     ]
 ]
@@ -653,6 +667,36 @@ def test_independent_facts_can_use_separate_headings(task_dir):
 @pytest.mark.parametrize(
     "task_id,fact,text",
     [
+        (
+            "docs-retry-behavior-diff",
+            "timeout",
+            "Delivery only retries ValueError. TimeoutError propagates.",
+        ),
+        (
+            "docs-cache-config",
+            "eviction",
+            "Least-recently-used tracks access. Eviction uses FIFO.",
+        ),
+        (
+            "docs-cache-config",
+            "disabled",
+            "cache.ttl_seconds: 0. Another option disables caching.",
+        ),
+        (
+            "docs-gym-run-flags",
+            "cohort",
+            "@effort:high is before the skill_digest. Another tag is after the model.",
+        ),
+        (
+            "docs-gym-run-flags",
+            "cohort",
+            "@effort:high is after the skill_digest and before the model.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "limit",
+            "The default value for --limit is 21. Another default is 20.",
+        ),
         (
             "docs-cache-config",
             "entries",
@@ -757,6 +801,18 @@ def test_unrelated_correct_values_do_not_satisfy_fact(task_id, fact, text):
             False,
         ),
         ("docs-snapshot-new-command", "limit", "--limit defaults to 20.5.", False),
+        (
+            "docs-snapshot-new-command",
+            "limit",
+            "The default value for --limit is 20.5.",
+            False,
+        ),
+        (
+            "docs-cache-config",
+            "disabled",
+            "cache.ttl_seconds: 0.5 disables caching.",
+            False,
+        ),
         ("docs-cache-config", "entries", "cache.max_entries defaults to 128.5.", False),
         ("docs-cache-config", "ttl", "cache.ttl_seconds defaults to 60.5.", False),
         ("docs-retry-behavior-diff", "exit", "Exhaustion returns 4.5.", False),

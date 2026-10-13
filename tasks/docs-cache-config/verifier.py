@@ -7,16 +7,16 @@ CONTRACT = {
             "cache\\.max_entries\\b(?:[ `\"']*\\s*\\|\\s*(?:[ `\"']*(?:string|str|integer|int|number|enum)[ `\"']*\\s*\\|\\s*)?[ `\"']*|[^.;]{0,100}\\bdefault(?:s)?\\s*(?:is|to|:|=)?\\s*[ `\"']*|[ `\"']*\\s*(?:=|:)\\s*[ `\"']*)128\\b(?!\\.\\d)|\\bdefault(?: value)?\\s+(?:for|of)\\s+[ `\"']*cache\\.max_entries\\b[ `\"']*\\s*(?:is|:|=)\\s*[ `\"']*128\\b(?!\\.\\d)"
         ],
         "ttl": [
-            "cache\\.ttl_seconds\\b(?:[ `\"']*\\s*\\|\\s*(?:[ `\"']*(?:string|str|integer|int|number|enum)[ `\"']*\\s*\\|\\s*)?[ `\"']*|[^.;]{0,100}\\bdefault(?:s)?\\s*(?:is|to|:|=)?\\s*[ `\"']*|[ `\"']*\\s*(?:=|:)\\s*[ `\"']*)60\\b(?!\\.\\d)(?!\\.\\d)|\\bdefault(?: value)?\\s+(?:for|of)\\s+[ `\"']*cache\\.ttl_seconds\\b[ `\"']*\\s*(?:is|:|=)\\s*[ `\"']*60\\b(?!\\.\\d)"
+            "cache\\.ttl_seconds\\b(?:[ `\"']*\\s*\\|\\s*(?:[ `\"']*(?:string|str|integer|int|number|enum)[ `\"']*\\s*\\|\\s*)?[ `\"']*|[^.;]{0,100}\\bdefault(?:s)?\\s*(?:is|to|:|=)?\\s*[ `\"']*|[ `\"']*\\s*(?:=|:)\\s*[ `\"']*)60\\b(?!\\.\\d)|\\bdefault(?: value)?\\s+(?:for|of)\\s+[ `\"']*cache\\.ttl_seconds\\b[ `\"']*\\s*(?:is|:|=)\\s*[ `\"']*60\\b(?!\\.\\d)"
         ],
         "disabled": [
-            "(?:cache\\.)?ttl_seconds\\b[ `\"']*\\s*(?:=|to|is|\\|)\\s*[ `\"']*0\\b(?!\\.\\d)[^.;]{0,100}(?:disabl\\w*\\s+cach\\w*|(?:no|without)\\s+cach\\w*)"
+            "(?:cache\\.)?ttl_seconds\\b[ `\"']*\\s*(?:=|:|to|is|\\|)\\s*[ `\"']*0\\b(?!\\.\\d)[^.;]{0,100}(?:disabl\\w*\\s+cach\\w*|(?:no|without)\\s+cach\\w*)"
         ],
         "invalid": [
             "(?:negative\\b(?:(?!\\b(?:returns?|exits?|success|exhaustion)\\b)[^|]){0,100}?(?:\\b(?:returns?|exits?)(?:\\s+(?:with|exit))?(?:\\s+(?:code|status))?\\s*(?:is|:|=)?\\s*[ `\"']*2\\b(?!\\.\\d)|[ `\"']*\\s*\\|\\s*[ `\"']*2\\b(?!\\.\\d))|\\b2\\b(?!\\.\\d)[ `\"']*\\s*(?:on|for)\\s+negative\\b)"
         ],
         "eviction": [
-            "(?:evict\\w*|replacement)[^.;]{0,100}(?:least[ -]recently[ -]used|\\bLRU\\b)|\\bLRU\\b[^.;]{0,100}evict\\w*"
+            "(?:evict\\w*|replacement)[^.;]{0,100}(?:least[ -]recently[ -]used|\\bLRU\\b)|(?:least[ -]recently[ -]used|\\bLRU\\b)[^.;]{0,100}(?:evict\\w*|replacement)"
         ],
         "bypass": [
             "--no-cache\\b[^.;]{0,100}(?:bypass\\w*|skip\\w*|disabl\\w*)[^.;]{0,100}(?:read\\w*\\s+(?:and|or|/)\\s*write\\w*|write\\w*\\s+(?:and|or|/)\\s*read\\w*)"
