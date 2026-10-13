@@ -11,7 +11,7 @@ CONTRACT = {
                 "\\bhigh\\b",
                 "\\bxhigh\\b",
             ],
-            "scope": "unit",
+            "scope": "paragraph",
         },
         "alias": {
             "patterns": [
@@ -23,22 +23,22 @@ CONTRACT = {
         },
         "omitted": {
             "patterns": [
-                "--reasoning-level\\b",
+                "--reasoning-level\\b|reasoning|level",
                 "omit\\w*|without|unset|not (?:set|supplied|specified)|unspecified",
                 "preserv\\w*|unchanged|retain\\w*|same|keep\\w*",
-                "\\bkeys?\\b",
+                "\\bkeys?\\b|slice|identity|cohort",
             ],
-            "scope": "unit",
+            "scope": "paragraph",
         },
         "cohort": {
             "patterns": [
-                "@effort:",
-                "(?:model[^@]{0,20}@effort:|after\\s+(?:the\\s+)?[`\"\\']*(?:model|<?task(?:_id)?>?@<?model>?))",
-                "(?:@effort:[^@]{0,70}@(?:[<{]?skill[-_]digest)|(?:before|ahead "
-                "of|preceding)\\s+(?:any |the )?[`\"\\']*skill[-_ "
-                "]digest)",
+                "effort:",
+                "(?:model[^@]{0,20}@effort:|effort:[^.]{0,100}after\\s+(?:the\\s+)?[`\"\\']*(?:model|<?task(?:_id)?>?@<?model>?))",
+                "(?:@effort:[^@]{0,70}@(?:[<{]?skill[-_ ]digest)|(?:before|ahead "
+                "of|preceding|precedes)\\s+(?:any |the )?(?:optional )?[`\"\\']*skill[-_ "
+                "]digest|effort[^.]{0,60}(?:first tail segment|tail is added first))",
             ],
-            "scope": "unit",
+            "scope": "paragraph",
         },
     },
     "forbidden_claims": {

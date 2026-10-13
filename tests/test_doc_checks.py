@@ -271,3 +271,60 @@ def test_arbitrary_table_headers_with_markdown_rule_supply_context():
     text = "| Setting | Initial value |\n| :--- | ---: |\n| Cache | 128 |"
     assert not unit_failures(text, ["cache", "initial value", "128"])
     assert "fact:claim" in unit_failures(text + "\n| Other | 129 |", ["cache", "129"])
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Cache is configured. Its default is 128.",
+        "- Cache is configured.\n  Its default is 128.\n  - Nested explanation.",
+        "### Cache\n\nThe default is 128.",
+        "### Cache\n- Default is 128.\n  - Nested explanation.",
+    ],
+)
+def test_paragraph_scope(text):
+    assert not unit_failures(text, ["cache", "128"], scope="paragraph")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "### Cache default 128",
+        "Cache.\n\nDefault 128.",
+        "- Cache.\n- Default 128.",
+        "### Cache\nOther block.\n\nDefault 128.",
+        "Cache " + ("padding\n" * 600) + "default 128.",
+    ],
+)
+def test_paragraph_boundaries_and_limit(text):
+    assert "fact:claim" in unit_failures(text, ["cache", "128"], scope="paragraph")
+
+
+@pytest.mark.parametrize(
+    "text,ok",
+    [
+        ("Other default is 128, no update needed; cache default is 128.", True),
+        ("Other default is 128, no update needed. Cache default is 128.", True),
+        ("Cache default is 128, no update needed.", False),
+    ],
+)
+def test_reject_is_clause_local(text, ok):
+    assert (
+        "fact:claim"
+        not in unit_failures(
+            text, ["cache", "128"], scope="paragraph", reject=["no update"]
+        )
+    ) is ok
+
+
+def test_heading_plus_first_list_scope():
+    assert not unit_failures(
+        "### Cache\n- Initial configuration.\n- Default 128.",
+        ["cache", "128"],
+        scope="paragraph",
+    )
+    assert "fact:claim" in unit_failures(
+        "### Cache\nFirst paragraph.\n\n- Default 128.",
+        ["cache", "128"],
+        scope="paragraph",
+    )

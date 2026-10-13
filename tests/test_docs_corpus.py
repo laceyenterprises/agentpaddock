@@ -1117,3 +1117,150 @@ def test_wrong_value_in_same_unit_fails(task_id, fact, text):
     spec = contract_for(TASKS / task_id)["required_facts"][fact]
     records = checks(text, required_facts={fact: spec}, forbidden_claims={})
     assert not next(c["ok"] for c in records if c["name"] == "fact:" + fact)
+
+
+@pytest.mark.parametrize(
+    "task,fact,text,ok",
+    [
+        (
+            "docs-gym-run-flags",
+            "levels",
+            "`--reasoning-level` sets the requested level. Accepted values are `low`, `medium`, `high`, and `xhigh`.",
+            True,
+        ),
+        ("docs-gym-run-flags", "levels", "## Reasoning level", False),
+        (
+            "docs-gym-run-flags",
+            "omitted",
+            "`--reasoning-level` defaults to omitted. An omitted reasoning level retains the existing model-only sweep identity.",
+            True,
+        ),
+        (
+            "docs-gym-run-flags",
+            "omitted",
+            "An omitted level preserves the original unlevelled cohort slice and key format.",
+            True,
+        ),
+        (
+            "docs-gym-run-flags",
+            "omitted",
+            "Omitting --reasoning-level changes existing keys.",
+            False,
+        ),
+        (
+            "docs-gym-run-flags",
+            "cohort",
+            "The cohort key becomes `<model>@effort:<level>`. In verdict keys the `effort:<level>` segment is ahead of any skill digest.",
+            True,
+        ),
+        (
+            "docs-gym-run-flags",
+            "cohort",
+            "`<task>@<model>[@effort:<level>][@<skill digest>][@compression=<arm>][@attempt=<n>]`",
+            True,
+        ),
+        ("docs-gym-run-flags", "cohort", "`<model>@effort:<level>`", False),
+        (
+            "docs-gym-baseline-keys",
+            "migration",
+            "Unmodelled old baselines are read unchanged, no migration needed; model-pinned tasks now use `task@model`, so their old entries need a one-time baseline update.",
+            True,
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "migration",
+            "Baselines written before models were selectable contain only bare task ids. Unmodelled runs still produce bare ids, so those baselines are read and compared unchanged, with no migration needed. Keys change only for tasks that resolve to a model: they become `<task_id>@<model>`.",
+            True,
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "migration",
+            "Because unmodelled runs keep the bare task id, the format is wire-compatible with every baseline written before models were selectable: those baselines still read and compare unchanged, with no migration or rewrite required. Only model-pinned tasks introduce the new `task_id@model` keys.",
+            True,
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "migration",
+            "Upgrade behavior for old baselines: because an unmodelled run keeps the bare task id as its key, every baseline written before models were selectable remains wire-compatible — it reads and compares unchanged, with no migration step. Only tasks pinned to a model gain the `task@model` key form.",
+            True,
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "migration",
+            "Old baselines for model-pinned tasks keep working unchanged.",
+            False,
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "migration",
+            "### Upgrade behavior for old baselines",
+            False,
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "Only tasks that resolve to a model produce new `task@model` keys.",
+            True,
+        ),
+    ],
+)
+def test_adjacent_saved_fact_forms(task, fact, text, ok):
+    from gym.doc_checks import checks
+
+    contract = contract_for(TASKS / task)
+    records = checks(
+        text,
+        required_facts={fact: contract["required_facts"][fact]},
+        forbidden_claims={},
+    )
+    assert next(c["ok"] for c in records if c["name"] == "fact:" + fact) is ok
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Cohort key placement: the reasoning level is immediately after the model, as `<model>@effort:<level>`. In the full baseline verdict key the effort tail is added first, joined by `@`, producing `<task_id>@<model>@effort:<level>...`.",
+        "When supplied, the reasoning level becomes part of the cohort key after the model as `effort:<level>`. A run uses `MODEL@effort:high`. Within a verdict key, that same marker precedes the optional skill digest, compression, and attempt markers.",
+    ],
+)
+def test_saved_effort_placement(text):
+    from gym.doc_checks import checks
+
+    contract = contract_for(TASKS / "docs-gym-run-flags")
+    records = checks(
+        text,
+        required_facts={"cohort": contract["required_facts"]["cohort"]},
+        forbidden_claims={},
+    )
+    assert next(c["ok"] for c in records if c["name"] == "fact:cohort")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Because unmodelled runs keep the bare task id, the format is wire-compatible with every baseline written before models were selectable: those baselines still read and compare unchanged, with no migration or rewrite required. Only model-pinned tasks introduce the new `task_id@model` keys.",
+        "Upgrade behavior for old baselines: because an unmodelled run keeps the bare task id as its key, every baseline written before models were selectable remains wire-compatible — it reads and compares unchanged, with no migration step. Only tasks pinned to a model gain the `task@model` key form.",
+        "Unmodelled runs retain bare task IDs. Existing baselines read and compare unchanged with unmodelled runs without requiring data migration. Model-pinned cells introduce keys formatted as `{task_id}@{model}` without altering unmodelled entries.",
+    ],
+)
+def test_saved_baseline_paragraph_full_contract(text):
+    from gym.doc_checks import checks
+
+    contract = contract_for(TASKS / "docs-gym-baseline-keys")
+    assert all(
+        c["ok"]
+        for c in checks("## Baseline keys\n" + text.replace(". ", ".\n"), **contract)
+    )
+
+
+def test_saved_matching_baseline_keys():
+    from gym.doc_checks import checks
+
+    text = "After upgrading, baselines written before models were selectable continue to read and compare unchanged for unmodelled runs because those runs retain bare task IDs. Selecting a model changes the key: `task-a` and `task-a@model-x` are distinct keys. Use a baseline with the matching model-qualified keys when comparing model-pinned runs; the helper does not rewrite an old bare key or fall back to it."
+    contract = contract_for(TASKS / "docs-gym-baseline-keys")
+    records = checks(
+        text,
+        required_facts={"migration": contract["required_facts"]["migration"]},
+        forbidden_claims={},
+    )
+    assert next(c["ok"] for c in records if c["name"] == "fact:migration")

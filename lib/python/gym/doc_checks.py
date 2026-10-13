@@ -216,11 +216,107 @@ def _fact_units(lines: Sequence[str]) -> list[_FactUnit]:
     return units
 
 
-def _matches_fact(spec, windows, units, options):
+MAX_FACT_PARAGRAPH = 4096
+
+
+def _fact_paragraphs(lines: Sequence[str]) -> list[str]:
+    """Bound paragraphs and complete list items, with first-block headings."""
+    result = []
+    pending = []
+    heading = ""
+    item_indent = None
+    fence = None
+
+    def flush():
+        nonlocal pending, heading, item_indent
+        if pending:
+            raw = " ".join((heading, *pending))
+            if len(raw) <= MAX_FACT_PARAGRAPH:
+                result.append(re.sub(r"\s+", " ", raw).strip())
+            heading = ""
+        pending = []
+        item_indent = None
+
+    for line in lines:
+        marker = _FENCE.match(line)
+        if fence:
+            pending.append(line)
+            if (
+                marker
+                and marker[1][0] == fence[0]
+                and len(marker[1]) >= len(fence)
+                and not marker[2].strip()
+            ):
+                fence = None
+                flush()
+            continue
+        if marker:
+            flush()
+            fence = marker[1]
+            pending.append(line)
+        elif _HEADING.fullmatch(line.rstrip()):
+            flush()
+            heading = line.strip()
+        elif not line.strip():
+            if item_indent is None:
+                flush()
+            else:
+                pending.append(line)
+        elif _LIST_ITEM.match(line):
+            indent = len(line) - len(line.lstrip())
+            if item_indent is not None and indent <= item_indent:
+                flush()
+            elif item_indent is None and pending:
+                flush()
+            if item_indent is None:
+                item_indent = indent
+            pending.append(line)
+        else:
+            if (
+                item_indent is not None
+                and len(line) - len(line.lstrip()) <= item_indent
+            ):
+                flush()
+            pending.append(line)
+    flush()
+    # A heading can introduce an entire first list, including sibling items.
+    headings = _headings(lines)
+    for index, line in enumerate(lines):
+        if line.rstrip() not in headings:
+            continue
+        start = index + 1
+        while start < len(lines) and not lines[start].strip():
+            start += 1
+        if start == len(lines) or not _LIST_ITEM.match(lines[start]):
+            continue
+        block = [line]
+        for following in lines[start:]:
+            if following.strip() and not (
+                _LIST_ITEM.match(following) or following[:1].isspace()
+            ):
+                break
+            block.append(following)
+        raw = " ".join(block)
+        if len(raw) <= MAX_FACT_PARAGRAPH:
+            result.append(re.sub(r"\s+", " ", raw).strip())
+    return result
+
+
+def _rejected(spec, candidate, patterns, options):
+    # Negative statements about a different subject cannot veto a paragraph.
+    for clause in re.split(r"(?<=[.!?;])\s+", candidate):
+        if any(re.search(p, clause, options) for p in spec.get("reject", ())):
+            subjects = spec.get("reject_subject", patterns[:1])
+            if all(re.search(p, clause, options) for p in subjects):
+                return True
+    return False
+
+
+def _matches_fact(spec, windows, units, paragraphs, options):
     if isinstance(spec, Mapping):
         patterns = spec["patterns"]
         scope = spec.get("scope", "unit")
-        if scope not in ("unit", "section"):
+        if scope not in ("unit", "paragraph", "section"):
             raise ValueError("unknown fact scope")
         candidates = (
             [
@@ -230,6 +326,8 @@ def _matches_fact(spec, windows, units, options):
                 for u in units
             ]
             if scope == "unit"
+            else paragraphs
+            if scope == "paragraph"
             else windows
         )
         rejected = spec.get("reject", ())
@@ -241,7 +339,7 @@ def _matches_fact(spec, windows, units, options):
         raise ValueError("fact requires a nonempty regex sequence")
     return any(
         all(re.search(p, unit, options) for p in patterns)
-        and not any(re.search(p, unit, options) for p in rejected)
+        and not (rejected and _rejected(spec, unit, patterns, options))
         for unit in candidates
     )
 
@@ -287,11 +385,12 @@ def checks(
         return records
     windows = _fact_windows(lines)
     units = _fact_units(lines)
+    paragraphs = _fact_paragraphs(lines)
     options = re.MULTILINE | re.IGNORECASE
     for name, patterns in required_facts.items():
         record(
             f"fact:{name}",
-            _matches_fact(patterns, windows, units, options),
+            _matches_fact(patterns, windows, units, paragraphs, options),
             f"missing fact: {name}",
         )
     for name, patterns in forbidden_claims.items():

@@ -12,7 +12,7 @@ CONTRACT = {
         },
         "pinned": {
             "patterns": [
-                "model[ -]pinned|task[ -](?:pinned|level)|model "
+                "pinned to a model|tasks? that resolve to a model|model[ -]pinned|task[ -](?:pinned|level)|model "
                 "(?:selected|specified|provided)",
                 "(?:[<{]?task(?:_id)?[>}]*@[<{]?model[>}]*|task ID "
                 "followed by\\s*[`\\']*@|separated by\\s*[`\\']*@)",
@@ -21,16 +21,25 @@ CONTRACT = {
         },
         "migration": {
             "patterns": [
-                "\\b(?:old|legacy|existing)\\b",
-                "baseline\\w*",
-                "updat\\w*|migrat\\w*|regenerat\\w*|rebuild\\w*|refresh\\w*",
-                "model[ -]pinned|[<{]?task(?:_id)?[>}]*@[<{]?model",
+                "old|legacy|existing|before models|prior to model",
+                "baseline",
+                "model[ -]pinned|pinned to a model|tasks? that resolve to a model|task(?:_id)?[>}]*@[<{]?model",
+                "matching model-qualified keys|updat\\w*|migrat\\w*|re-record|regenerat\\w*|rebuild\\w*|refresh\\w*|task(?:_id)?[>}]*@[<{]?model",
             ],
-            "scope": "unit",
-            "reject": ["no (?:changes|updat\\w*)|without requiring|do not require"],
+            "scope": "paragraph",
+            "reject_subject": [
+                "model[ -]pinned|pinned to a model|tasks? that resolve to a model"
+            ],
+            "reject": [
+                "no (?:changes|matching model-qualified keys|updat\\w*|migration)|unchanged|without requiring|do not require"
+            ],
         },
     },
-    "forbidden_claims": {"old": ["wire-compatible with\\s*every baseline"]},
+    "forbidden_claims": {
+        "old": [
+            "wire-compatible with\\s*every baseline(?!\\s+(?:written|created)\\s+(?:before|prior to)\\s+models)"
+        ]
+    },
     "known_flags": [],
     "known_config_keys": [],
     "preserved_headings": ["## Baseline keys"],
