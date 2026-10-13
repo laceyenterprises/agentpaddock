@@ -1,5 +1,5 @@
 id = "docs-gym-baseline-keys"
-task_version = 1
+task_version = 2
 title = "Document gym-baseline-keys"
 suite = "docs"
 persona = "codex"

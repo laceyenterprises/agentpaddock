@@ -4,17 +4,19 @@ from gym_doc_checks import check_document
 CONTRACT = {
     "required_facts": {
         "attempts": [
-            "\\A(?=.*(?:at most|up to|maximum))(?=.*(?:\\b(?:3|three)\\b))(?=.*(?:attempts))",
-            "\\A(?=.*(?:\\bTimeoutError\\b))(?=.*(?:only))(?=.*(?:retr))",
+            "(?:at most|up to|maximum(?: of)?|no more than)\\s*[ `\"']*(?:3|three)\\b[ `\"']*\\s*attempts?|\\b(?:maximum attempts?|attempt limit|attempts?)\\b[ `\"']*\\s*(?:\\||:|=|is)\\s*[ `\"']*(?:3|three)\\b"
         ],
-        "other": ["\\A(?=.*(?:other exceptions|non[ -]timeout exceptions))(?=.*(?:propagat|rais))"],
+        "timeout": [
+            "(?:only\\s*[ `\"']*TimeoutError\\b[^.;]{0,100}retr\\w*|retr\\w*\\s+only\\s*[ `\"']*TimeoutError\\b)"
+        ],
+        "other": [
+            "(?:other exceptions?|non[ -]timeout exceptions?)[^.;]{0,100}(?:propagat\\w*|rais\\w*)"
+        ],
         "exit": [
-            r"\A(?=.*(?:exhaustion|exhausted))(?=.*(?:"
-            r"(?:returns?(?: exit code)?|exit code)[ `]+4\b"
-            r"|\b(?:exhaustion|exhausted)[ `|():=-]*4\b))",
-            r"\A(?=.*(?:success))(?=.*(?:"
-            r"(?:returns?(?: exit code)?|exit code)[ `]+0\b"
-            r"|\bsuccess[ `|():=-]*0\b))",
+            "(?:(?:exhaustion|exhausted|third(?: and final)? timed-out attempt|third attempt[^.;|]{0,60}\\bTimeoutError\\b)(?:(?!\\b(?:returns?|exits?|success|invalid|exhaustion)\\b)[^|]){0,100}?(?:\\b(?:returns?|exits?)(?:\\s+(?:with|exit))?(?:\\s+(?:code|status))?\\s*(?:is|:|=)?\\s*[ `\"']*4\\b(?!\\.\\d)|[ `\"']*\\s*\\|\\s*[ `\"']*4\\b(?!\\.\\d))|\\b4\\b(?!\\.\\d)[ `\"']*\\s*(?:on|for)\\s+(?:exhaustion|exhausted|third(?: and final)? timed-out attempt|third attempt[^.;|]{0,60}\\bTimeoutError\\b))"
+        ],
+        "success": [
+            "(?:success(?:ful(?: delivery)?)?(?:(?!\\b(?:returns?|exits?|success|invalid|exhaustion)\\b)[^|]){0,100}?(?:\\b(?:returns?|exits?)(?:\\s+(?:with|exit))?(?:\\s+(?:code|status))?\\s*(?:is|:|=)?\\s*[ `\"']*0\\b(?!\\.\\d)|[ `\"']*\\s*\\|\\s*[ `\"']*0\\b(?!\\.\\d))|\\b0\\b(?!\\.\\d)[ `\"']*\\s*(?:on|for)\\s+success(?:ful(?: delivery)?)?)"
         ],
     },
     "forbidden_claims": {

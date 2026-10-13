@@ -59,7 +59,11 @@ Exit codes: 0 on success, 2 for invalid arguments.
 
 def contract_for(task_dir):
     tree = ast.parse((task_dir / "verifier.py").read_text())
-    return next(ast.literal_eval(node.value) for node in tree.body if isinstance(node, ast.Assign))
+    return next(
+        ast.literal_eval(node.value)
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+    )
 
 
 def run_doc(task_dir, text, tmp_path):
@@ -69,7 +73,9 @@ def run_doc(task_dir, text, tmp_path):
     return grade(
         task,
         Trajectory(
-            terminal_status="succeeded", submitted_result={"done": True}, sandbox_root=tmp_path
+            terminal_status="succeeded",
+            submitted_result={"done": True},
+            sandbox_root=tmp_path,
         ),
     )
 
@@ -80,7 +86,8 @@ def test_exactly_six_docs_three_real_and_three_synthetic():
     for d in DOCS:
         if (d / "expected/provenance.json").exists():
             assert (
-                json.loads((d / "expected/provenance.json").read_text())["kind"] == "real-derived"
+                json.loads((d / "expected/provenance.json").read_text())["kind"]
+                == "real-derived"
             )
 
 
@@ -106,7 +113,9 @@ def test_correct_doc_with_prose_and_filenames_passes(task_dir, tmp_path):
 
 @pytest.mark.parametrize("task_dir", DOCS, ids=lambda d: d.name)
 def test_all_staged_source_identifiers_are_declared(task_dir, tmp_path):
-    subprocess.run(["bash", str(task_dir / "stages/stage-input.sh"), str(tmp_path)], check=True)
+    subprocess.run(
+        ["bash", str(task_dir / "stages/stage-input.sh"), str(tmp_path)], check=True
+    )
     literals = {
         key
         for name in ("surface.py", "change.diff")
@@ -115,7 +124,9 @@ def test_all_staged_source_identifiers_are_declared(task_dir, tmp_path):
         if not all(len(segment) == 1 for segment in key.split("."))
     }
     contract = contract_for(task_dir)
-    declared = set(contract["known_config_keys"]) | set(contract.get("non_config_literals", []))
+    declared = set(contract["known_config_keys"]) | set(
+        contract.get("non_config_literals", [])
+    )
     assert not literals - declared
     # Citing any source identifier must also pass the real verifier.
     text = (task_dir / "expected/reference.md").read_text()
@@ -135,7 +146,9 @@ def test_all_staged_source_identifiers_are_declared(task_dir, tmp_path):
 )
 def test_exit_codes_in_markdown_tables_pass(task_id, table, tmp_path):
     text = ALTERNATE_DOCS[task_id]
-    line = "Negative TTL values" if task_id == "docs-cache-config" else "Success returns"
+    line = (
+        "Negative TTL values" if task_id == "docs-cache-config" else "Success returns"
+    )
     text = "\n".join(part for part in text.splitlines() if not part.startswith(line))
     assert run_doc(TASKS / task_id, text + "\n" + table, tmp_path).outcome == "passed"
     assert (
@@ -172,14 +185,22 @@ def test_retry_accepts_only_documented_adjacent_negations(prefix, tmp_path):
     text = ALTERNATE_DOCS["docs-retry-behavior-diff"]
     text += f"\nDelivery {prefix} retries every exception indefinitely.\n"
     text += f"Delivery {prefix} exits 0 on exhaustion.\n"
-    assert run_doc(TASKS / "docs-retry-behavior-diff", text, tmp_path).outcome == "passed"
+    assert (
+        run_doc(TASKS / "docs-retry-behavior-diff", text, tmp_path).outcome == "passed"
+    )
 
 
 @pytest.mark.parametrize(
     "task_id, claim",
     [
-        ("docs-retry-behavior-diff", "Previously, delivery retries every exception indefinitely."),
-        ("docs-retry-behavior-diff", "Before: Delivery retries every exception indefinitely."),
+        (
+            "docs-retry-behavior-diff",
+            "Previously, delivery retries every exception indefinitely.",
+        ),
+        (
+            "docs-retry-behavior-diff",
+            "Before: Delivery retries every exception indefinitely.",
+        ),
         ("docs-cache-config", "The cache no longer defaults to 256."),
         ("docs-cache-config", "Eviction is FIFO no longer."),
     ],
@@ -210,7 +231,7 @@ def test_snapshot_exit_values_cannot_be_swapped(tmp_path):
     )
     cell = run_doc(TASKS / "docs-snapshot-new-command", text, tmp_path)
     assert cell.outcome == "failed"
-    assert not next(c["ok"] for c in cell.subchecks if c["name"] == "fact:exits")
+    assert not next(c["ok"] for c in cell.subchecks if c["name"] == "fact:success")
 
 
 @pytest.mark.parametrize("repeats", [100, 400, 4000])
@@ -219,7 +240,9 @@ def test_stuffed_reasoning_line_fails_quickly(repeats, tmp_path):
 
     started = time.monotonic()
     cell = run_doc(
-        TASKS / "docs-gym-run-flags", "--reasoning-level " + "low medium high " * repeats, tmp_path
+        TASKS / "docs-gym-run-flags",
+        "--reasoning-level " + "low medium high " * repeats,
+        tmp_path,
     )
     assert time.monotonic() - started < 5
     assert cell.outcome == "failed"
@@ -243,14 +266,18 @@ def test_staged_headings_cannot_be_deleted(task_dir, tmp_path):
 @pytest.mark.parametrize("task_dir", DOCS, ids=lambda d: d.name)
 def test_stale_doc_fails(task_dir, tmp_path):
     assert (
-        run_doc(task_dir, (task_dir / "expected/stale.md").read_text(), tmp_path).outcome
+        run_doc(
+            task_dir, (task_dir / "expected/stale.md").read_text(), tmp_path
+        ).outcome
         == "failed"
     )
 
 
 @pytest.mark.parametrize("task_dir", DOCS, ids=lambda d: d.name)
 def test_one_invented_flag_fails(task_dir, tmp_path):
-    text = (task_dir / "expected/reference.md").read_text() + "\nUse --invented-rfd-option.\n"
+    text = (
+        task_dir / "expected/reference.md"
+    ).read_text() + "\nUse --invented-rfd-option.\n"
     cell = run_doc(task_dir, text, tmp_path)
     assert cell.outcome == "failed"
     assert [c for c in cell.subchecks if not c["ok"]] == [
@@ -267,11 +294,13 @@ def test_one_missing_required_fact_fails(task_dir, tmp_path):
     # assertions may share that line; the named fact must specifically fail.
     import re
 
-    text = "\n".join(line for line in text.splitlines() if not re.search(patterns[0], line, re.I))
+    text = "\n".join(
+        line for line in text.splitlines() if not re.search(patterns[0], line, re.I)
+    )
     cell = run_doc(task_dir, text, tmp_path)
     assert cell.outcome == "failed"
     assert not next(c["ok"] for c in cell.subchecks if c["name"] == "fact:" + name)
-    assert {c["name"] for c in cell.subchecks if not c["ok"]} == {"fact:" + name}
+    assert all(c["name"].startswith("fact:") for c in cell.subchecks if not c["ok"])
 
 
 @pytest.mark.parametrize("task_dir", DOCS, ids=lambda d: d.name)
@@ -283,7 +312,8 @@ def test_invented_key_and_missing_capture_fail(task_dir, tmp_path):
         assert (
             run_doc(
                 task_dir,
-                (task_dir / "expected/reference.md").read_text() + "\nself.models obj.attr\n",
+                (task_dir / "expected/reference.md").read_text()
+                + "\nself.models obj.attr\n",
                 tmp_path,
             ).outcome
             == "passed"
@@ -302,13 +332,21 @@ def test_staging_contains_only_inputs(task_dir, tmp_path):
     sandbox = tmp_path / "sandbox"
     sandbox.mkdir()
     tmp_path = sandbox
-    subprocess.run(["bash", str(task_dir / "stages/stage-input.sh"), str(tmp_path)], check=True)
-    assert set(p.name for p in tmp_path.iterdir()) <= {"surface.py", "guide.md", "change.diff"}
+    subprocess.run(
+        ["bash", str(task_dir / "stages/stage-input.sh"), str(tmp_path)], check=True
+    )
+    assert set(p.name for p in tmp_path.iterdir()) <= {
+        "surface.py",
+        "guide.md",
+        "change.diff",
+    }
     assert (tmp_path / "surface.py").is_file()
     assert (
         run_doc(
             task_dir,
-            (tmp_path / "guide.md").read_text() if (tmp_path / "guide.md").exists() else None,
+            (tmp_path / "guide.md").read_text()
+            if (tmp_path / "guide.md").exists()
+            else None,
             tmp_path,
         ).outcome
         == "failed"
@@ -344,7 +382,9 @@ def test_doc_helper_is_snapshotted_before_disk_changes(tmp_path, monkeypatch):
         "review_checks.py",
     ):
         shutil.copyfile(Path(grader.__file__).with_name(name), support / name)
-    monkeypatch.setattr(grader, "_SUPPORT_FILES", grader.snapshot_support_files(support))
+    monkeypatch.setattr(
+        grader, "_SUPPORT_FILES", grader.snapshot_support_files(support)
+    )
     (support / "doc_checks.py").write_text("raise RuntimeError('deployed mid-run')\n")
     task_dir = TASKS / "docs-cache-config"
     cell = run_doc(task_dir, (task_dir / "expected/reference.md").read_text(), tmp_path)
@@ -368,7 +408,11 @@ def test_facts_wrapped_across_bullets_and_lines_pass(task_dir, tmp_path):
         line
         if line.startswith("#")
         else "- "
-        + "\n  ".join(textwrap.wrap(line, width=24, break_long_words=False, break_on_hyphens=False))
+        + "\n  ".join(
+            textwrap.wrap(
+                line, width=24, break_long_words=False, break_on_hyphens=False
+            )
+        )
         for line in reference.splitlines()
     )
     cell = run_doc(task_dir, text, tmp_path)
@@ -381,3 +425,350 @@ def test_help_and_source_attributes_pass(task_dir, tmp_path):
     text += "\nUse --help or -h. Source reads `self.models` and obj.attr.\n"
     cell = run_doc(task_dir, text, tmp_path)
     assert cell.outcome == "passed", cell.reason
+
+
+# Each tuple holds three equivalent assertions and a contradictory assertion.
+FACT_FORMS = {
+    "docs-cache-config": {
+        "entries": (
+            "cache.max_entries defaults to 128.",
+            'cache.max_entries = "128"',
+            "| cache.max_entries | string | `128` |",
+            "cache.max_entries defaults to 129.",
+        ),
+        "ttl": (
+            "cache.ttl_seconds defaults to 60.",
+            'cache.ttl_seconds = "60"',
+            "| cache.ttl_seconds | string | `60` |",
+            "cache.ttl_seconds defaults to 61.",
+        ),
+        "disabled": (
+            "cache.ttl_seconds=0 disables caching.",
+            'Setting `cache.ttl_seconds` to "0" disables caching.',
+            "| cache.ttl_seconds | 0 | no caching |",
+            "cache.ttl_seconds=1 disables caching.",
+        ),
+        "invalid": (
+            "Negative `cache.ttl_seconds` values are invalid and exit with code `2`.",
+            "Negative values are invalid and cause the process to exit with status `2`.",
+            "Negative ttl_seconds values are invalid; the surface exits with status 2.",
+            "Negative values exit with status 3.",
+        ),
+        "eviction": (
+            "Eviction is least-recently-used.",
+            "Evictions use LRU.",
+            "| Eviction | LRU |",
+            "Eviction uses FIFO.",
+        ),
+        "bypass": (
+            "--no-cache bypasses reads and writes.",
+            "--no-cache skips writes and reads.",
+            "--no-cache disables read and write operations.",
+            "--no-cache enables reads and writes.",
+        ),
+    },
+    "docs-config-loader-keys": {
+        "values": (
+            "roles.build_pack_default_worker_class accepts plan, codex, claude-code.",
+            "| roles.build_pack_default_worker_class | plan, codex, claude-code |",
+            'roles.build_pack_default_worker_class allows "claude-code", `plan`, and "codex".',
+            "roles.build_pack_default_worker_class accepts plan and codex.",
+        ),
+        "default": (
+            "| Key | Type | Default | Allowed values |\n| `roles.build_pack_default_worker_class` | string | `plan` | `plan`, `codex`, `claude-code` |",
+            '| Key | Type | Default | Allowed values |\n| `roles.build_pack_default_worker_class` | string | `"plan"` | `plan`, `codex`, `claude-code` |',
+            '| `roles.build_pack_default_worker_class` | `"plan"` |',
+            "| `roles.build_pack_default_worker_class` | `codex` | plan, codex, claude-code |",
+        ),
+    },
+    "docs-gym-baseline-keys": {
+        "bare": (
+            "Unmodelled tasks keep the bare task id.",
+            "Without a model, use just `task_id`.",
+            "No model: the task identifier alone.",
+            "Unmodelled tasks use task@model.",
+        ),
+        "pinned": (
+            "**Model-pinned task**: the key is `<task_id>@<model>`, e.g. `my-task@some-model`.",
+            "| Model-pinned | `<task_id>@<model>` | `my-task@some-model` |",
+            "Task-level model pins use task@model.",
+            "Model-pinned tasks use model@task.",
+        ),
+        "migration": (
+            "Old baselines for model-pinned tasks need a one-time baseline update.",
+            "Migrate legacy baseline entries for model-pinned tasks.",
+            "Refresh existing baselines to use `<task_id>@<model>`.",
+            "Old baselines for model-pinned tasks need no changes.",
+        ),
+    },
+    "docs-gym-run-flags": {
+        "levels": (
+            "--reasoning-level accepts low, medium, high, xhigh.",
+            "| --reasoning-level | `low`, `medium`, `high`, `xhigh` |",
+            '--reasoning-level supports "xhigh", "high", "medium", "low".',
+            "--reasoning-level accepts low, medium, high, extreme.",
+        ),
+        "alias": (
+            "max normalizes to xhigh.",
+            "`max` is an alias for `xhigh`.",
+            'xhigh has the alias "max".',
+            "max normalizes to high.",
+        ),
+        "omitted": (
+            "Omitting --reasoning-level preserves existing keys.",
+            "Without --reasoning-level, keys remain unchanged.",
+            "--reasoning-level is unspecified: keep the same key.",
+            "Omitting --reasoning-level changes existing keys.",
+        ),
+        "cohort": (
+            "`task@model@effort:<level>[@<skill-digest>][@compression=<arm>][@attempt=<n>]`",
+            "@effort:<level> is immediately after `task_id@<model>` and ahead of the skill digest.",
+            "@effort:<level> is placed immediately after the model component, preceding any `skill_digest`.",
+            "`task@model@<skill-digest>@effort:<level>`",
+        ),
+    },
+    "docs-retry-behavior-diff": {
+        "attempts": (
+            "Delivery makes at most 3 attempts.",
+            'Up to "three" attempts are made.',
+            "Maximum of `3` attempts.",
+            "Delivery makes at most 4 attempts.",
+        ),
+        "timeout": (
+            "Delivery retries only TimeoutError.",
+            "Only `TimeoutError` is retried.",
+            'Only "TimeoutError" triggers retries.',
+            "Delivery retries only ValueError.",
+        ),
+        "other": (
+            "Any other exception propagates to the caller immediately (not retried, not swallowed).",
+            "Only `TimeoutError` is retried; any other exception propagates to the caller.",
+            "Non-timeout exceptions are raised to the caller.",
+            "Any other exception is swallowed.",
+        ),
+        "exit": (
+            "If the third attempt also raises `TimeoutError`, it returns exit code `4`.",
+            "After the third and final timed-out attempt, the function returns `4`.",
+            "| Exhaustion | `4` |",
+            "Exhaustion returns 0.",
+        ),
+        "success": (
+            "Success returns 0.",
+            'Successful delivery exits with status "0".',
+            "| Success | `0` |",
+            "Success returns 4.",
+        ),
+    },
+    "docs-snapshot-new-command": {
+        "limit": (
+            "--limit defaults to 20.",
+            '--limit = "20"',
+            "| --limit | string | `20` |",
+            "--limit defaults to 21.",
+        ),
+        "json": (
+            "--json emits JSON.",
+            "| --json | JSON output |",
+            "--json returns a JSON object.",
+            "--json emits YAML.",
+        ),
+        "order": (
+            "Rows are sorted by created_at descending.",
+            "Newest first by `created_at`.",
+            "| created_at | newest-first |",
+            "Rows are sorted by created_at ascending.",
+        ),
+        "readonly": (
+            "Inspection is read-only.",
+            "Inspection is read only.",
+            "Inspection never mutates rows.",
+            "Inspection updates rows.",
+        ),
+        "success": (
+            "Successful inspection exits with status `0`.",
+            'Success returns "0".',
+            "Exit 0 on success.",
+            "Success exits with status 2.",
+        ),
+        "invalid": (
+            "Invalid arguments exit with status `2`.",
+            'Invalid arguments return "2".',
+            "Exit 2 for invalid arguments.",
+            "Invalid arguments exit with status 0.",
+        ),
+    },
+}
+
+FACT_CASES = [
+    (task, fact, text, ok)
+    for task, facts in FACT_FORMS.items()
+    for fact, forms in facts.items()
+    for text, ok in [
+        *((text, True) for text in forms[:3]),
+        (forms[3], False),
+        ("Unrelated documentation.", False),
+    ]
+]
+
+
+@pytest.mark.parametrize("task_id,fact,text,ok", FACT_CASES)
+def test_required_fact_wording(task_id, fact, text, ok):
+    from gym.doc_checks import checks
+
+    contract = contract_for(TASKS / task_id)
+    records = checks(
+        text,
+        required_facts={fact: contract["required_facts"][fact]},
+        forbidden_claims={},
+    )
+    assert next(c["ok"] for c in records if c["name"] == "fact:" + fact) is ok
+
+
+def test_wording_table_covers_every_required_fact():
+    assert set(FACT_FORMS) == {d.name for d in DOCS}
+    for task_id, facts in FACT_FORMS.items():
+        assert set(facts) == set(contract_for(TASKS / task_id)["required_facts"])
+
+
+@pytest.mark.parametrize("task_dir", DOCS, ids=lambda d: d.name)
+def test_independent_facts_can_use_separate_headings(task_dir):
+    from gym.doc_checks import checks
+
+    contract = contract_for(task_dir)
+    text = "\n".join(
+        f"## {fact}\n{forms[0]}" for fact, forms in FACT_FORMS[task_dir.name].items()
+    )
+    assert all(
+        c["ok"]
+        for c in checks(
+            text,
+            required_facts=contract["required_facts"],
+            forbidden_claims={},
+            known_flags=contract["known_flags"],
+            known_config_keys=contract["known_config_keys"],
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "task_id,fact,text",
+    [
+        (
+            "docs-cache-config",
+            "entries",
+            "cache.max_entries defaults to 129. Another default is 128.",
+        ),
+        (
+            "docs-cache-config",
+            "ttl",
+            "cache.ttl_seconds defaults to 61. Another default is 60.",
+        ),
+        ("docs-cache-config", "invalid", "Negative values exit 3; success exits 2."),
+        (
+            "docs-retry-behavior-diff",
+            "exit",
+            "Exhaustion returns 0; success returns 4.",
+        ),
+        (
+            "docs-retry-behavior-diff",
+            "exit",
+            "The third attempt succeeds and returns 4.",
+        ),
+        (
+            "docs-retry-behavior-diff",
+            "success",
+            "Success returns 4; exhaustion returns 0.",
+        ),
+        (
+            "docs-retry-behavior-diff",
+            "other",
+            "Other exceptions are not retried but are swallowed.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "success",
+            "Success exits 2; invalid arguments exit 0.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "invalid",
+            "Invalid arguments exit 0; success exits 2.",
+        ),
+        (
+            "docs-config-loader-keys",
+            "default",
+            "| roles.build_pack_default_worker_class | string | codex | plan, codex, claude-code |",
+        ),
+    ],
+)
+def test_unrelated_correct_values_do_not_satisfy_fact(task_id, fact, text):
+    from gym.doc_checks import checks
+
+    contract = contract_for(TASKS / task_id)
+    records = checks(
+        text,
+        required_facts={fact: contract["required_facts"][fact]},
+        forbidden_claims={},
+    )
+    assert not next(c["ok"] for c in records if c["name"] == "fact:" + fact)
+
+
+@pytest.mark.parametrize(
+    "task_id,fact,text,ok",
+    [
+        (
+            "docs-cache-config",
+            "entries",
+            '| cache.max_entries | integer | "128" |',
+            True,
+        ),
+        ("docs-cache-config", "ttl", "| cache.ttl_seconds | int | `60` |", True),
+        (
+            "docs-cache-config",
+            "entries",
+            'The default value for `cache.max_entries` is "128".',
+            True,
+        ),
+        ("docs-cache-config", "ttl", "The default of cache.ttl_seconds is 60.", True),
+        (
+            "docs-config-loader-keys",
+            "default",
+            'The default value for roles.build_pack_default_worker_class is "plan".',
+            True,
+        ),
+        (
+            "docs-config-loader-keys",
+            "default",
+            '| Key | Type | Default | Allowed values |\n| `roles.build_pack_default_worker_class` | string | "plan" | plan, codex, claude-code |',
+            True,
+        ),
+        (
+            "docs-gym-run-flags",
+            "alias",
+            '| Alias | Canonical level |\n| `max` | "xhigh" |',
+            True,
+        ),
+        ("docs-retry-behavior-diff", "attempts", "| Attempts | `3` |", True),
+        ("docs-gym-baseline-keys", "bare", "| Unmodelled | `<task_id>` |", True),
+        (
+            "docs-cache-config",
+            "invalid",
+            "Negative values exit with status 2.5.",
+            False,
+        ),
+        ("docs-snapshot-new-command", "limit", "--limit defaults to 20.5.", False),
+        ("docs-cache-config", "entries", "cache.max_entries defaults to 128.5.", False),
+        ("docs-cache-config", "ttl", "cache.ttl_seconds defaults to 60.5.", False),
+        ("docs-retry-behavior-diff", "exit", "Exhaustion returns 4.5.", False),
+    ],
+)
+def test_additional_table_and_numeric_forms(task_id, fact, text, ok):
+    from gym.doc_checks import checks
+
+    contract = contract_for(TASKS / task_id)
+    records = checks(
+        text,
+        required_facts={fact: contract["required_facts"][fact]},
+        forbidden_claims={},
+    )
+    assert next(c["ok"] for c in records if c["name"] == "fact:" + fact) is ok

@@ -4,19 +4,25 @@ from gym_doc_checks import check_document
 CONTRACT = {
     "required_facts": {
         "levels": [
-            "\\A(?=.*(?:--reasoning-level\\b))(?=.*(?:\\blow\\b))(?=.*(?:\\bmedium\\b))(?=.*(?:\\bhigh\\b))(?=.*(?:\\bxhigh\\b))",
-            r"\bmax\b.{0,80}?(?:alias|normaliz|map)\w*.{0,40}?\bxhigh\b|\bxhigh\b.{0,80}?alias\w*.{0,40}?\bmax\b",
+            "--reasoning-level\\b",
+            "\\blow\\b",
+            "\\bmedium\\b",
+            "\\bhigh\\b",
+            "\\bxhigh\\b",
+        ],
+        "alias": [
+            "\\bmax\\b[^.;]{0,100}(?:alias|normaliz|map)\\w*[^.;]{0,100}\\bxhigh\\b|\\bxhigh\\b[^.;]{0,100}alias\\w*[^.;]{0,100}\\bmax\\b|\\bmax\\b[ `\"']*\\s*(?:\\||->|→|=)\\s*[ `\"']*xhigh\\b"
         ],
         "omitted": [
-            "\\A(?=.*(?:omit\\w*|without|not "
-            "(?:set|supplied)))(?=.*(?:--reasoning-level\\b))(?=.*(?:preserv\\w*|unchanged|retain\\w*))(?=.*(?:keys))"
+            "\\A(?=[\\s\\S]{0,8192}(?:omit\\w*|without|unset|not (?:set|supplied|specified)|unspecified))(?=[\\s\\S]{0,8192}--reasoning-level\\b)(?=[\\s\\S]{0,8192}(?:preserv\\w*|unchanged|retain\\w*|same|keep\\w*))(?=[\\s\\S]{0,8192}\\bkeys?\\b)"
         ],
         "cohort": [
-            "\\A(?=.*(?:@effort:<level>|@effort:(?:low|medium|high|xhigh)))(?=.*(?:after "
-            "(?:the )?model))(?=.*(?:before (?:the )?skill))"
+            "(?:<?task(?:_id)?>?@<?model>?@effort:<?(?:level|low|medium|high|xhigh)>?(?:\\[?@<?skill[-_]digest>?\\]?)|@effort:<?(?:level|low|medium|high|xhigh)>?[^.;]{0,100}(?:after (?:the )?[ `\"']*model|after [ `\"']*<?task(?:_id)?>?@<?model>?)[^.;]{0,100}(?:before|ahead of|preceding)\\s+(?:any |the )?[ `\"']*skill[-_ ]digest|@effort:<?level>?[^.;]{0,100}before (?:the )?skill digest[^.;]{0,100}after (?:the )?model)"
         ],
     },
-    "forbidden_claims": {"bad_alias": [r"\bmax\b[ `]*(?:normalizes to|means|aliases)[ `]*high\b"]},
+    "forbidden_claims": {
+        "bad_alias": ["\\bmax\\b[ `]*(?:normalizes to|means|aliases)[ `]*high\\b"]
+    },
     "known_flags": [
         "--task",
         "--results-dir",

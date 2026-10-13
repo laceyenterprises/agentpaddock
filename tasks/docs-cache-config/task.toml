@@ -1,5 +1,5 @@
 id = "docs-cache-config"
-task_version = 1
+task_version = 2
 title = "Document cache-config"
 suite = "docs"
 persona = "codex"

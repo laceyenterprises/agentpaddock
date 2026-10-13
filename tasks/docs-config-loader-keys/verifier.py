@@ -4,13 +4,12 @@ from gym_doc_checks import check_document
 CONTRACT = {
     "required_facts": {
         "values": [
-            "\\A(?=.*(?:roles\\.build_pack_default_worker_class\\b))(?=.*(?:\\bplan\\b))",
-            "\\A(?=.*(?:roles\\.build_pack_default_worker_class\\b))(?=.*(?:\\bcodex\\b))",
-            "\\A(?=.*(?:roles\\.build_pack_default_worker_class\\b))(?=.*(?:\\bclaude-code\\b))",
+            "roles\\.build_pack_default_worker_class\\b[^.;]{0,100}\\bplan\\b",
+            "roles\\.build_pack_default_worker_class\\b[^.;]{0,100}\\bcodex\\b",
+            "roles\\.build_pack_default_worker_class\\b[^.;]{0,100}\\bclaude-code\\b",
         ],
         "default": [
-            "\\bdefault\\b\\s*(?:is\\s+|:\\s*|=\\s*)?[ "
-            "`]*plan\\b|roles\\.build_pack_default_worker_class`?\\s*\\|\\s*`?plan`?\\s*\\|"
+            "roles\\.build_pack_default_worker_class\\b(?:[ `\"']*\\s*\\|\\s*(?:[ `\"']*(?:string|str|integer|int|number|enum)[ `\"']*\\s*\\|\\s*)?[ `\"']*|[^.;]{0,100}\\bdefault(?:s)?\\s*(?:is|to|:|=)?\\s*[ `\"']*|[ `\"']*\\s*(?:=|:)\\s*[ `\"']*)plan\\b|\\bdefault\\b\\s*(?:is|to|:|=)?\\s*[ `\"']*plan\\b|\\bdefault(?: value)?\\s+(?:for|of)\\s+[ `\"']*roles\\.build_pack_default_worker_class\\b[ `\"']*\\s*(?:is|:|=)\\s*[ `\"']*plan\\b"
         ],
     },
     "forbidden_claims": {"old_default": ["default [ `]*(?:codex|claude-code)"]},
