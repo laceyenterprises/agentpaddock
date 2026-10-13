@@ -87,7 +87,30 @@ class _FactUnit:
     default_text: str | None = None
 
 
-def _fact_units(lines: Sequence[str]) -> list[_FactUnit]:
+def _table_cells(line: str) -> list[str]:
+    """Split Markdown cells on unescaped pipes and decode escaped pipes."""
+    cells = []
+    current = []
+    backslashes = 0
+    for char in line.strip():
+        if char == "|" and backslashes % 2 == 0:
+            cells.append("".join(current).strip())
+            current = []
+        elif char == "|":
+            current.pop()  # Remove the escape, retaining preceding backslashes.
+            current.append(char)
+        else:
+            current.append(char)
+        backslashes = backslashes + 1 if char == "\\" else 0
+    cells.append("".join(current).strip())
+    if cells and not cells[0]:
+        cells.pop(0)
+    if cells and not cells[-1]:
+        cells.pop()
+    return cells
+
+
+def _fact_units(lines: Sequence[str], known_config_keys=(), known_flags=()) -> list[_FactUnit]:
     """Sentences, wrapped list items, and table rows with their header.
 
     Headings supply context but do not match alone. A colon introduction
@@ -122,7 +145,7 @@ def _fact_units(lines: Sequence[str]) -> list[_FactUnit]:
         nonlocal pending, intro, literals_overlong
         raw = " ".join(pending)
         pending = []
-        if is_item and re.fullmatch(r"[ `]*[\w-]+[ `.]*", raw) and (intro or heading):
+        if is_item and re.fullmatch(r"[ `]*[\w-]+[ `.,;]*", raw) and (intro or heading):
             if not literals_overlong:
                 if (
                     len(heading)
@@ -134,7 +157,7 @@ def _fact_units(lines: Sequence[str]) -> list[_FactUnit]:
                 ):
                     literals_overlong = True
                 else:
-                    literals.append(raw)
+                    literals.append(raw.rstrip(" .,;"))
             return
         finish_literals()
         if not raw or (is_item and len(raw) > MAX_FACT_UNIT):
@@ -142,13 +165,16 @@ def _fact_units(lines: Sequence[str]) -> list[_FactUnit]:
             return
         # Keep identifiers and decimals intact. A list item retains its own
         # explanatory sentences, but not separate outcome/value clauses.
-        outcome_split = r";\s*(?=(?:success|exhaustion|invalid)\b)|,?\s+(?:and\s+)?(?=[024]\s+(?:for|on|after)\b)"
+        outcome_split = r";\s*(?=(?:success|exhaustion|invalid)\b)|,?\s+(?:and\s+)?(?=[024]\s+(?:for|on|after|if|when|with|otherwise)\b)"
         split = outcome_split if is_item else r"(?<=[.!?])\s+|" + outcome_split
         for part in re.split(split, raw, flags=re.I):
             add(" ".join((heading, intro, part)))
         if raw.endswith(":"):
             intro = raw
-        elif re.fullmatch(r"[`\w.]+ selects the worker\.", raw):
+        elif not is_item and any(
+            token in set(_KEY.findall(raw)) | set(_FLAG.findall(raw))
+            for token in (*known_config_keys, *known_flags)
+        ):
             # A key followed by a literal-only enum list is an introduction.
             intro = raw
 
@@ -164,13 +190,13 @@ def _fact_units(lines: Sequence[str]) -> list[_FactUnit]:
             flush()
             finish_literals()
             is_item = False
-            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            cells = [c.strip() for c in _table_cells(line)]
             if all(re.fullmatch(r"[: -]+", c) for c in cells):
                 continue
             next_line = lines[index + 1].strip() if index + 1 < len(lines) else ""
             has_rule = next_line.startswith("|") and all(
                 re.fullmatch(r":?-{3,}:?", cell.strip())
-                for cell in next_line.strip("|").split("|")
+                for cell in _table_cells(next_line)
             )
             if has_rule:
                 header = cells
@@ -384,7 +410,7 @@ def checks(
         # never a verifier timeout. Task patterns must also avoid chained wildcards.
         return records
     windows = _fact_windows(lines)
-    units = _fact_units(lines)
+    units = _fact_units(lines, known_config_keys, known_flags)
     paragraphs = _fact_paragraphs(lines)
     options = re.MULTILINE | re.IGNORECASE
     for name, patterns in required_facts.items():

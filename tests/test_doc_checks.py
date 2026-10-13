@@ -361,3 +361,35 @@ def test_section_scope_keeps_clause_reject():
         scope="section",
         reject=["no update"],
     )
+
+
+@pytest.mark.parametrize("verb", ["specifies the worker", "controls worker dispatch"])
+def test_declared_key_introduces_punctuated_enum(verb):
+    text = f"`roles.worker` {verb}.\n- plan,\n- codex;\n- claude-code."
+    assert not failures(
+        text,
+        known_config_keys=["roles.worker"],
+        required_facts={"values": {"scope": "unit", "patterns": [
+            r"roles\.worker", r"plan codex claude-code"
+        ]}},
+        forbidden_claims={},
+    )
+
+
+def test_escaped_table_pipe_keeps_default_column_aligned():
+    text = "| Key | Values | Default |\n| --- | --- | --- |\n| cache.mode | low\\|high | 20 |"
+    assert not failures(
+        text,
+        known_config_keys=["cache.mode"],
+        required_facts={"default": {"scope": "unit", "default_column": True,
+                                    "patterns": [r"cache\.mode default 20"]}},
+        forbidden_claims={},
+    )
+
+
+@pytest.mark.parametrize("condition", ["if", "when", "with", "otherwise"])
+def test_outcome_conditions_do_not_join_swapped_codes(condition):
+    assert "fact:claim" in unit_failures(
+        f"exit codes 0 on invalid and 2 {condition} success",
+        [r"0.*success"],
+    )
