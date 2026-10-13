@@ -1,5 +1,5 @@
 id = "docs-config-loader-keys"
-task_version = 1
+task_version = 2
 title = "Document config-loader-keys"
 suite = "docs"
 persona = "codex"

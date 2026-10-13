@@ -3,20 +3,47 @@ from gym_doc_checks import check_document
 
 CONTRACT = {
     "required_facts": {
-        "levels": [
-            "\\A(?=.*(?:--reasoning-level\\b))(?=.*(?:\\blow\\b))(?=.*(?:\\bmedium\\b))(?=.*(?:\\bhigh\\b))(?=.*(?:\\bxhigh\\b))",
-            r"\bmax\b.{0,80}?(?:alias|normaliz|map)\w*.{0,40}?\bxhigh\b|\bxhigh\b.{0,80}?alias\w*.{0,40}?\bmax\b",
-        ],
-        "omitted": [
-            "\\A(?=.*(?:omit\\w*|without|not "
-            "(?:set|supplied)))(?=.*(?:--reasoning-level\\b))(?=.*(?:preserv\\w*|unchanged|retain\\w*))(?=.*(?:keys))"
-        ],
-        "cohort": [
-            "\\A(?=.*(?:@effort:<level>|@effort:(?:low|medium|high|xhigh)))(?=.*(?:after "
-            "(?:the )?model))(?=.*(?:before (?:the )?skill))"
-        ],
+        "levels": {
+            "patterns": [
+                "--reasoning-level\\b",
+                "\\blow\\b",
+                "\\bmedium\\b",
+                "\\bhigh\\b",
+                "\\bxhigh\\b",
+            ],
+            "scope": "section",
+        },
+        "alias": {
+            "patterns": [
+                "\\bmax\\b",
+                "\\bxhigh\\b",
+                "alias\\w*|normaliz\\w*|map\\w*|[|=→]|->",
+            ],
+            "scope": "unit",
+        },
+        "omitted": {
+            "patterns": [
+                "--reasoning-level\\b|reasoning|level",
+                "omit\\w*|without|unset|not (?:set|supplied|specified)|unspecified",
+                "preserv\\w*|unchanged|retain\\w*|same|keep\\w*",
+                "\\bkeys?\\b|slice|identity|cohort",
+            ],
+            "scope": "paragraph",
+        },
+        "cohort": {
+            "patterns": [
+                "effort:",
+                "(?:model[^@]{0,20}@effort:|effort:[^.]{0,100}after\\s+(?:the\\s+)?[`\"\\']*(?:model|<?task(?:_id)?>?@<?model>?))",
+                "(?:@effort:[^@]{0,70}@(?:[<{]?skill[-_ ]digest)|(?:before|ahead "
+                "of|preceding|precedes)\\s+(?:any |the )?(?:optional )?[`\"\\']*skill[-_ "
+                "]digest|effort[^.]{0,60}(?:first tail segment|tail is added first))",
+            ],
+            "scope": "paragraph",
+        },
     },
-    "forbidden_claims": {"bad_alias": [r"\bmax\b[ `]*(?:normalizes to|means|aliases)[ `]*high\b"]},
+    "forbidden_claims": {
+        "bad_alias": ["\\bmax\\b[ `]*(?:normalizes to|means|aliases)[ `]*high\\b"]
+    },
     "known_flags": [
         "--task",
         "--results-dir",

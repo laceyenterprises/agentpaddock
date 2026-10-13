@@ -12,7 +12,9 @@ from gym.schema import load_task
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFESTS = tuple(sorted((ROOT / "tasks").glob("*/task.toml")))
-FORBIDDEN = json.loads((ROOT / "tests/fixtures/private_review_forbidden_strings.json").read_text())
+FORBIDDEN = json.loads(
+    (ROOT / "tests/fixtures/private_review_forbidden_strings.json").read_text()
+)
 SCRUBBED = frozenset(FORBIDDEN["tasks"])
 DECLARED = re.compile(r"^task_version = ([1-9][0-9]*)$", re.MULTILINE)
 
@@ -46,7 +48,11 @@ def test_every_task_declares_task_version(manifest):
     declared = DECLARED.findall(text)
     assert len(declared) == 1, "task.toml must declare task_version literally, once"
     assert tomllib.loads(text)["task_version"] == int(declared[0])
-    assert int(declared[0]) == (2 if manifest.parent.name in SCRUBBED else 1)
+    assert int(declared[0]) == (
+        2
+        if manifest.parent.name in SCRUBBED or manifest.parent.name.startswith("docs-")
+        else 1
+    )
     assert load_task(manifest.parent).task_version == int(declared[0])
 
 
@@ -73,5 +79,7 @@ def test_scrubbed_task_contains_no_original_review_text(task):
         if windows(words, size) & shingles:
             leaks.append((name, "verbatim review text"))
         for width, table in phrases.items():
-            leaks.extend((name, table[hit]) for hit in windows(words, width) & table.keys())
+            leaks.extend(
+                (name, table[hit]) for hit in windows(words, width) & table.keys()
+            )
     assert not leaks

@@ -111,6 +111,14 @@
       "id": "ZAIPRICE-02",
       "kind": "pricing",
       "summary": "glm-5.2 cache reads are priced at Z.ai's published $0.26 per million again. The provider's charges for the period were higher than the recorded tokens cost even at the full input rate, so no cache rate explains them; the proxy's records omit failed and abandoned calls, which a provider may still bill."
+    },
+    {
+      "id": "DOCSCHECK-01",
+      "date": "2026-10-13",
+      "kind": "grading",
+      "excludes": null,
+      "summary": "All six docs tasks move to task_version 2. Required facts accept ordinary equivalent technical wording, and independent facts have separate entries.",
+      "boundary": "Docs task_version 1 results measured narrower phrasing and are not comparable with task_version 2 results. Saved submissions can be re-checked under version 2; old results retain their original version."
     }
   ],
   "schema": "paddock-changelog/v1"

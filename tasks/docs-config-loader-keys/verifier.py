@@ -3,15 +3,29 @@ from gym_doc_checks import check_document
 
 CONTRACT = {
     "required_facts": {
-        "values": [
-            "\\A(?=.*(?:roles\\.build_pack_default_worker_class\\b))(?=.*(?:\\bplan\\b))",
-            "\\A(?=.*(?:roles\\.build_pack_default_worker_class\\b))(?=.*(?:\\bcodex\\b))",
-            "\\A(?=.*(?:roles\\.build_pack_default_worker_class\\b))(?=.*(?:\\bclaude-code\\b))",
-        ],
-        "default": [
-            "\\bdefault\\b\\s*(?:is\\s+|:\\s*|=\\s*)?[ "
-            "`]*plan\\b|roles\\.build_pack_default_worker_class`?\\s*\\|\\s*`?plan`?\\s*\\|"
-        ],
+        "values": {
+            "patterns": [
+                "build_pack_default_worker_class\\b|allowed values|__enum",
+                "\\bplan\\b",
+                "\\bcodex\\b",
+                "\\bclaude-code\\b",
+            ],
+            "scope": "unit",
+        },
+        "default": {
+            "patterns": [
+                "default\\w*|__default|build_pack_default_worker_class\\b",
+                "\\bplan\\b",
+                "\\bdefaults?\\b|__default|[=:|]",
+            ],
+            "scope": "unit",
+            "reject": [
+                "default\\w*\\s*[ `\"\\']*(?:is|to|:|=)?\\s*[ "
+                "`\"\\']*(?:codex|claude-code)\\b",
+                "\\|[^|]*\\b(?:codex|none)\\b[^|]*\\|",
+            ],
+            "default_column": True,
+        },
     },
     "forbidden_claims": {"old_default": ["default [ `]*(?:codex|claude-code)"]},
     "known_flags": [],
