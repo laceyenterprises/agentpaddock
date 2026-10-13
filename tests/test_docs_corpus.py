@@ -104,6 +104,30 @@ def test_alternate_format_doc_passes(task_dir, tmp_path):
     assert cell.outcome == "passed", cell.reason
 
 
+@pytest.mark.parametrize(
+    "task_id,old,new",
+    [
+        (
+            "docs-config-loader-keys",
+            "| `roles.build_pack_default_worker_class` | `plan` | `claude-code`, `codex`, `plan` |",
+            "`roles.build_pack_default_worker_class` selects the worker.\n"
+            "Allowed values:\n- plan.\n- codex.\n- claude-code.\nThe default is plan.",
+        ),
+        (
+            "docs-cache-config",
+            "Setting `cache.ttl_seconds`: 0 disables caching.",
+            "To disable caching, set cache.ttl_seconds to 0.",
+        ),
+    ],
+)
+def test_punctuated_values_and_outcome_first_instructions_pass(
+    task_id, old, new, tmp_path
+):
+    text = ALTERNATE_DOCS[task_id].replace(old, new)
+    cell = run_doc(TASKS / task_id, text, tmp_path)
+    assert cell.outcome == "passed", cell.reason
+
+
 @pytest.mark.parametrize("task_dir", DOCS, ids=lambda d: d.name)
 def test_correct_doc_with_prose_and_filenames_passes(task_dir, tmp_path):
     text = (task_dir / "expected/reference.md").read_text()
@@ -448,6 +472,9 @@ FACT_FORMS = {
             "| cache.ttl_seconds | 0 | no caching |",
             "cache.ttl_seconds: 0 disables caching.",
             "- cache.ttl_seconds: 0 (disables caching)",
+            "To disable caching, set cache.ttl_seconds to 0.",
+            "Disable caching with ttl_seconds = 0.",
+            'For no caching, set `cache.ttl_seconds` to "0".',
             "cache.ttl_seconds=1 disables caching.",
         ),
         "invalid": (
@@ -477,6 +504,8 @@ FACT_FORMS = {
             "roles.build_pack_default_worker_class accepts plan, codex, claude-code.",
             "| roles.build_pack_default_worker_class | plan, codex, claude-code |",
             'roles.build_pack_default_worker_class allows "claude-code", `plan`, and "codex".',
+            "roles.build_pack_default_worker_class selects the worker. Allowed values: plan; codex; claude-code.",
+            "roles.build_pack_default_worker_class selects the worker.\n- plan.\n- codex.\n- claude-code.",
             "roles.build_pack_default_worker_class accepts plan and codex.",
         ),
         "default": (
@@ -743,6 +772,28 @@ def test_independent_facts_can_use_separate_headings(task_dir):
             "default",
             "| roles.build_pack_default_worker_class | string | codex | plan, codex, claude-code |",
         ),
+        (
+            "docs-config-loader-keys",
+            "values",
+            "## Key\nroles.build_pack_default_worker_class\n## Other\nplan, codex, claude-code.",
+        ),
+        (
+            "docs-config-loader-keys",
+            "values",
+            "roles.build_pack_default_worker_class "
+            + "x" * 101
+            + " plan, codex, claude-code.",
+        ),
+        (
+            "docs-cache-config",
+            "disabled",
+            "Disable caching. Another option sets ttl_seconds to 0.",
+        ),
+        (
+            "docs-cache-config",
+            "disabled",
+            "Disable caching " + "x" * 101 + " ttl_seconds = 0.",
+        ),
     ],
 )
 def test_unrelated_correct_values_do_not_satisfy_fact(task_id, fact, text):
@@ -811,6 +862,18 @@ def test_unrelated_correct_values_do_not_satisfy_fact(task_id, fact, text):
             "docs-cache-config",
             "disabled",
             "cache.ttl_seconds: 0.5 disables caching.",
+            False,
+        ),
+        (
+            "docs-cache-config",
+            "disabled",
+            "Disable caching with ttl_seconds = 0.5.",
+            False,
+        ),
+        (
+            "docs-cache-config",
+            "disabled",
+            "Disable caching with ttl_seconds = 1.",
             False,
         ),
         ("docs-cache-config", "entries", "cache.max_entries defaults to 128.5.", False),

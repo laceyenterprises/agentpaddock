@@ -10,10 +10,10 @@ CONTRACT = {
             "cache\\.ttl_seconds\\b(?:[ `\"']*\\s*\\|\\s*(?:[ `\"']*(?:string|str|integer|int|number|enum)[ `\"']*\\s*\\|\\s*)?[ `\"']*|[^.;]{0,100}\\bdefault(?:s)?\\s*(?:is|to|:|=)?\\s*[ `\"']*|[ `\"']*\\s*(?:=|:)\\s*[ `\"']*)60\\b(?!\\.\\d)|\\bdefault(?: value)?\\s+(?:for|of)\\s+[ `\"']*cache\\.ttl_seconds\\b[ `\"']*\\s*(?:is|:|=)\\s*[ `\"']*60\\b(?!\\.\\d)"
         ],
         "disabled": [
-            "(?:cache\\.)?ttl_seconds\\b[ `\"']*\\s*(?:=|:|to|is|\\|)\\s*[ `\"']*0\\b(?!\\.\\d)[^.;]{0,100}(?:disabl\\w*\\s+cach\\w*|(?:no|without)\\s+cach\\w*)"
+            "(?:cache\\.)?ttl_seconds\\b[ `\"']*\\s*(?:=|:|to|is|\\|)\\s*[ `\"']*0\\b(?!\\.\\d)[^.;]{0,100}(?:disabl\\w*\\s+cach\\w*|(?:no|without)\\s+cach\\w*)|(?:disabl\\w*\\s+cach\\w*|(?:no|without)\\s+cach\\w*)[^.;]{0,100}(?:cache\\.)?ttl_seconds\\b[ `\"']*\\s*(?:=|:|to|is|\\|)\\s*[ `\"']*0\\b(?!\\.\\d)"
         ],
         "invalid": [
-            "(?:negative\\b(?:(?!\\b(?:returns?|exits?|success|exhaustion)\\b)[^|]){0,100}?(?:\\b(?:returns?|exits?)(?:\\s+(?:with|exit))?(?:\\s+(?:code|status))?\\s*(?:is|:|=)?\\s*[ `\"']*2\\b(?!\\.\\d)|[ `\"']*\\s*\\|\\s*[ `\"']*2\\b(?!\\.\\d))|\\b2\\b(?!\\.\\d)[ `\"']*\\s*(?:on|for)\\s+negative\\b)"
+            "(?:negative\\b(?:(?!\\b(?:returns?|exits?|success)\\b)[^|]){0,100}?(?:\\b(?:returns?|exits?)(?:\\s+(?:with|exit))?(?:\\s+(?:code|status))?\\s*(?:is|:|=)?\\s*[ `\"']*2\\b(?!\\.\\d)|[ `\"']*\\s*\\|\\s*[ `\"']*2\\b(?!\\.\\d))|\\b2\\b(?!\\.\\d)[ `\"']*\\s*(?:on|for)\\s+negative\\b)"
         ],
         "eviction": [
             "(?:evict\\w*|replacement)[^.;]{0,100}(?:least[ -]recently[ -]used|\\bLRU\\b)|(?:least[ -]recently[ -]used|\\bLRU\\b)[^.;]{0,100}(?:evict\\w*|replacement)"
