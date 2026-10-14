@@ -1,5 +1,5 @@
 id = "docs-retry-behavior-diff"
-task_version = 2
+task_version = 3
 title = "Document retry-behavior-diff"
 suite = "docs"
 persona = "codex"

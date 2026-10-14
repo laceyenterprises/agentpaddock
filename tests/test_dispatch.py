@@ -1655,7 +1655,7 @@ def test_run_headroom_refusal_is_suite_harness_error(monkeypatch, tmp_path, paus
     assert not list((source.hq_root / "workers").iterdir())
 
 
-def test_headroom_wait_resamples_before_dispatch(monkeypatch):
+def test_headroom_wait_resamples_before_dispatch(monkeypatch, tmp_path):
     samples = iter(["CPU headroom exhausted", None])
     sleeps = []
     monkeypatch.setattr(
@@ -1668,22 +1668,26 @@ def test_headroom_wait_resamples_before_dispatch(monkeypatch):
         lambda *_a, **_kw: (_ for _ in ()).throw(RuntimeError("reached dispatch")),
     )
     with pytest.raises(RuntimeError, match="reached dispatch"):
-        WorkerPoolTrajectorySource(drain_wait_timeout_seconds=2)._dispatch(_task())
+        WorkerPoolTrajectorySource(
+            hq_root=_hq_root(tmp_path), drain_wait_timeout_seconds=2
+        )._dispatch(_task())
     assert len(sleeps) == 1
 
 
-def test_headroom_sensor_error_fails_open(monkeypatch, caplog):
+def test_headroom_sensor_error_fails_open(monkeypatch, caplog, tmp_path):
     def broken_sensor():
         raise ImportError("sensor dependency unavailable")
 
-    monkeypatch.setattr("cwp_dispatch.resource_admission.sample_headroom_pause", broken_sensor)
+    monkeypatch.setattr(
+        "cwp_dispatch.resource_admission.sample_headroom_pause", broken_sensor
+    )
     monkeypatch.setattr(
         subprocess,
         "run",
         lambda *_a, **_kw: (_ for _ in ()).throw(RuntimeError("reached dispatch")),
     )
     with pytest.raises(RuntimeError, match="reached dispatch"):
-        WorkerPoolTrajectorySource()._dispatch(_task())
+        WorkerPoolTrajectorySource(hq_root=_hq_root(tmp_path))._dispatch(_task())
     assert "headroom unavailable" in caplog.text
 
 

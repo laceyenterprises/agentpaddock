@@ -1,5 +1,5 @@
 id = "docs-snapshot-new-command"
-task_version = 2
+task_version = 3
 title = "Document snapshot-new-command"
 suite = "docs"
 persona = "codex"

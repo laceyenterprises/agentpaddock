@@ -658,11 +658,6 @@ SAVED_FAIL = [
         "Delivery retries every exception indefinitely and exits 0 on exhaustion.",
     ),
     ("docs-snapshot-new-command", "limit", "hq snapshot inspect [--limit N] [--json]"),
-    (
-        "docs-snapshot-new-command",
-        "json",
-        "| `--json` | flag (no value) | off | Boolean flag; takes no argument. |",
-    ),
     ("docs-snapshot-new-command", "success", "| `0` | Empty list. |"),
     ("docs-snapshot-new-command", "success", "- `--limit 0` returns no rows."),
     (
@@ -1348,3 +1343,506 @@ def test_saved_adjacent_blocks(task, fact, text, ok):
         known_flags=contract["known_flags"],
     )
     assert next(c["ok"] for c in records if c["name"] == f"fact:{fact}") is ok
+
+
+FACT_V3_PASS = {
+    ("docs-retry-behavior-diff", "exit"): [
+        "- Only `TimeoutError` is caught and retried. A `TimeoutError` on the first or second attempt is retried; a `TimeoutError` on the third (final) attempt causes `deliver` to return 4.",
+        "- **Exhaustion:** if all 3 attempts raise `TimeoutError`, `deliver` returns `4` (it does not return `0`).",
+        "- **Exhaustion:** if all 3 attempts raise `TimeoutError`, `deliver` returns `4`. It does not return `0` on exhaustion.",
+        "- Exhaustion returns 4; it never returns 0.",
+        "- Exhaustion returns 4 instead of returning 0.",
+        "- Exhaustion returns 4 rather than returns 0.",
+        "- Exhaustion returns 4; it doesn't return 0.",
+        "- Exhaustion returns 4; success returns 0.",
+    ],
+    ("docs-snapshot-new-command", "invalid"): [
+        "The surface states exit status `0` for successful inspection and `2` for invalid arguments. Argparse provides invalid-argument handling when parsing is invoked; this file contains no command runner implementing the inspection exit status.",
+        "The surface documents exit status `0` for successful inspection and `2` for invalid arguments. The parser declares the options, but this file does not call `parse_args()`, obtain rows, invoke `inspect`, render results, or explicitly exit.",
+        "| Code | Meaning |\n|------|---------|\n| `0` | The inspection succeeded. |\n| `2` | The arguments were invalid. For example, a non-integer `--limit` or an unknown flag. |",
+    ],
+    ("docs-snapshot-new-command", "json"): [
+        "| `--json` | flag (no value) | off | Boolean flag; takes no argument. |",
+        "| Flag | Type | Default | Description |\n|------|------|---------|-------------|\n| `--json` | boolean switch | off | Accepted by the argument parser. `surface.py` defines the flag but does not read it, so it has no documented effect on the output. |",
+        "| Flag | Type | Default | Description |\n| --- | --- | --- | --- |\n| `--json` | flag (no value) | off | Boolean flag; takes no argument. |",
+        "### `--json`\n- **Type:** boolean flag (`store_true`)\n- **Default:** `false` (when absent)\n- **Behavior:** Recognized by the argument parser. The `inspect` function is governed by `rows` and `--limit` only; `--json` does not alter the filtering or sorting logic.",
+        "| Flag | Type | Default | Description |\n| --- | --- | --- | --- |\n| `--json` | boolean flag | off (`false`) | Store-true toggle. When omitted, the option parses as `false`; when present, it parses as `true`. This surface defines only the flag parsing; no other rendering behavior is specified here. |",
+        "| Flag | Type | Default | Description |\n|------|------|---------|-------------|\n| `--json` | boolean switch | off | Accepted by the argument parser. `surface.py` defines no behavior for it, so don't rely on it to change the output. |",
+        "--json emits JSON.",
+        "--json is off by default.",
+        "--json takes no value.",
+        "--json is a store-true switch.",
+    ],
+    ("docs-gym-baseline-keys", "pinned"): [
+        "| Case | Key |\n| --- | --- |\n| Unmodelled (`model` is `None` or an empty string) | `<task_id>` (the bare task id) |\n| Model resolved, from a task pin or the run-level model | `<task_id>@<model>` |",
+        "| Resolved model | Baseline key | Example |\n| --- | --- | --- |\n| No model (missing or falsey) | Bare task ID | `example-task` |\n| Non-empty model | Task ID, `@`, then model | `example-task@model-a` |",
+        "- **Model-pinned task** — a model is associated with the cell: the key is\n  `task_id` + `@` + model, e.g. `example-task@model-a`.",
+        "When a task gains a pinned model (either via its `dispatch` config or a\nsuite-level `model`), the key for that task's cells changes from the bare\ntask id to `task_id@model`:",
+        '- With no model, the key is the bare task id.\n- With a model, the key is `task_id@model`. The separator is\n  `VERDICT_KEY_SEPARATOR = "@"`.',
+        "With a model, the key joins the task id, `@`, then the model.",
+        "A model-pinned task uses `task_id` + `@` + model.",
+        "| Model resolved | Task ID, `@`, then model |",
+        "A pinned model uses the task id followed by `@` followed by the model.",
+    ],
+}
+
+# Each fact is checked in isolation so an unrelated correct assertion cannot
+# hide a false rejection or rescue a contradictory value in the same unit.
+FACT_V3_PASS[("docs-snapshot-new-command", "json")].extend(
+    [
+        "The default value for --json is false.",
+        "The default for --json is false.",
+        "The default of --json is off.",
+        "--json is a boolean flag; its default value is false.",
+        "--json is a switch whose default setting is false.",
+        "--json is a boolean flag, while --limit defaults to 20.",
+        "The --json flag is a boolean switch, while --limit requires an argument.",
+        "--limit takes a value, whereas --json is a boolean flag.",
+        "--json is a switch, and --limit accepts an operand.",
+        "| Flag | Description |\n| --- | --- |\n| `--json` | Output JSON |\n| `--limit` | Row count |",
+        "| Flag | Default | Type | Description |\n| --- | --- | --- | --- |\n| `--json` | off | boolean | Output JSON |\n| `--limit` | 20 | integer | Row count |",
+        "| Flag | Description | Type | Default |\n| --- | --- | --- | --- |\n| `--json` | Output JSON | boolean | false |",
+        "| Flag | Description |\n| --- | --- |\n| --json | Boolean flag; default is false |",
+        "| Flag | Description |\n| --- | --- |\n| --json | Boolean flag; --limit defaults to 20 |",
+    ]
+)
+FACT_V3_PASS[("docs-retry-behavior-diff", "exit")].extend(
+    [
+        "Normally returns 0, but on exhaustion returns 4.",
+        "Normally returns 0, whereas on exhaustion returns 4.",
+        "Normally returns 0, while on exhaustion returns 4.",
+        "On exhaustion returns 4, but normally returns 0.",
+        "It returns 0 normally, but returns 4 if all 3 attempts raise TimeoutError.",
+        "It returns 4 if all 3 attempts raise TimeoutError.",
+        "It returns 4 when TimeoutError occurs on the final attempt.",
+    ]
+)
+FACT_V3_PASS[("docs-gym-baseline-keys", "pinned")].extend(
+    [
+        "Tasks with a model use task_id@model.",
+        "Cells with a model use task_id@model.",
+        "| Task ID | Model | Key | Case |\n| --- | --- | --- | --- |\n| task_id | model | task_id@model | Model-pinned |",
+        "|Task ID|Model|Key|Case|\n|---|---|---|---|\n|task_id|model|task_id@model|Model-pinned|",
+    ]
+)
+FACT_V3_PASS[("docs-snapshot-new-command", "invalid")].append(
+    "| Code | Meaning |\n| --- | --- |\n| 2 | Argument error |"
+)
+
+
+FACT_V3_PASS[("docs-snapshot-new-command", "json")].extend(
+    [
+        "| Flag | Type | Default | Description |\n| --json | flag | Disabled | Requests JSON-formatted output. |",
+        "`--json`: Output inspection results as JSON (flag, default: disabled).",
+        "| --json | boolean (flag) | off | Emit the result as JSON instead of the default human-readable listing. |",
+        "| --json | flag (boolean) | off (False) | Emit output as JSON instead of the default format. |",
+        *[
+            f"--json is a boolean flag; its default is {value}."
+            for value in (
+                "Disabled",
+                "unset",
+                "not set",
+                "absent",
+                "omitted",
+                "FALSE",
+                "False",
+                "false",
+            )
+        ],
+        "--json emits JSON instead of the default table layout.",
+        "--json emits JSON instead of the default format.",
+        "--json emits JSON instead of the default format",
+    ]
+)
+FACT_V3_PASS[("docs-gym-baseline-keys", "pinned")].extend(
+    [
+        "**Model-pinned run** (a model resolved for the task): the key is the task id, the separator `@` (`VERDICT_KEY_SEPARATOR`), then the model, e.g. `my-task@gpt-4o`.",
+        "| Resolved model | Baseline key |\n| Model supplied | <task_id>@<model> |",
+        "Keys only change (gaining the `@model` suffix) once a model is pinned for a task.",
+        "For example, task `example` uses `example` when unmodelled and `example@model-a` when pinned to `model-a`.",
+        "A model resolved for the task gives the key task_id@model.",
+        "When the model is pinned, the key is task_id@model.",
+        "A model-pinned task uses example@model-a as its key.",
+        "When pinned to `model-a`, task `example` uses `example@model-a`.",
+    ]
+)
+
+FACT_V3_FAIL = [
+    (
+        "docs-retry-behavior-diff",
+        "exit",
+        "The attempt count (3) and the return codes (`0`, `4`) are hard-coded. This surface has no flags, environment variables or configuration keys to change them.",
+    ),
+    (
+        "docs-retry-behavior-diff",
+        "exit",
+        "## Delivery\nDelivery retries every exception indefinitely and exits 0 on exhaustion.",
+    ),
+    (
+        "docs-retry-behavior-diff",
+        "exit",
+        "- On success, `deliver` returns 0. This applies on the first attempt or on any retry that succeeds.",
+    ),
+    (
+        "docs-retry-behavior-diff",
+        "exit",
+        "- Exhaustion returns 5; an earlier return code was 4.",
+    ),
+    (
+        "docs-retry-behavior-diff",
+        "exit",
+        "- All 3 attempts raise TimeoutError, deliver returns 5 instead of 4.",
+    ),
+    (
+        "docs-retry-behavior-diff",
+        "exit",
+        "- A TimeoutError on the third attempt returns 5; the old code was 4.",
+    ),
+    ("docs-snapshot-new-command", "invalid", "Inspection succeeds with exit status 2."),
+    (
+        "docs-snapshot-new-command",
+        "invalid",
+        "- Invalid arguments exit 3; an earlier code was 2.",
+    ),
+    (
+        "docs-snapshot-new-command",
+        "invalid",
+        "Exit status 2 for success and 3 for invalid arguments.",
+    ),
+    (
+        "docs-snapshot-new-command",
+        "invalid",
+        "| Code | Meaning |\n| --- | --- |\n| 3 | Invalid arguments; 2 was the old code. |",
+    ),
+    (
+        "docs-snapshot-new-command",
+        "json",
+        "```sh\nhq snapshot inspect [--limit N] [--json]\n```",
+    ),
+    ("docs-snapshot-new-command", "json", "### `--json`"),
+    ("docs-snapshot-new-command", "json", "The command produces JSON output."),
+    ("docs-snapshot-new-command", "json", "--json VALUE is a boolean flag."),
+    ("docs-snapshot-new-command", "json", "--json=true selects JSON output."),
+    (
+        "docs-snapshot-new-command",
+        "json",
+        "--json is a boolean flag that takes a value.",
+    ),
+    (
+        "docs-snapshot-new-command",
+        "json",
+        "--json is a boolean flag; its default is true.",
+    ),
+    (
+        "docs-snapshot-new-command",
+        "json",
+        "| Flag | Type | Default |\n| --- | --- | --- |\n| --json | boolean | on |",
+    ),
+    ("docs-gym-baseline-keys", "pinned", "- Unmodelled tasks use the bare task id."),
+    ("docs-gym-baseline-keys", "pinned", "- Model-pinned tasks use task_id:model."),
+    ("docs-gym-baseline-keys", "pinned", "- Model-pinned tasks use the bare id."),
+    (
+        "docs-gym-baseline-keys",
+        "pinned",
+        "- Model-pinned tasks: the key is the bare task id; task_id@model is the old form.",
+    ),
+    (
+        "docs-gym-baseline-keys",
+        "pinned",
+        "- With a model, the key is task_id:model; task_id@model is the old form.",
+    ),
+    ("docs-retry-behavior-diff", "exit", "- Exhaustion returns 4 and returns 5."),
+    ("docs-snapshot-new-command", "invalid", "- Invalid arguments exit 2 and exit 3."),
+    (
+        "docs-snapshot-new-command",
+        "json",
+        "--json is a boolean flag that defaults to 20.",
+    ),
+    (
+        "docs-snapshot-new-command",
+        "json",
+        "--json is a boolean flag with default None.",
+    ),
+]
+
+FACT_V3_FAIL.extend(
+    [
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "| Flag | Default | Description |\n| --- | --- | --- |\n| --json | off | Boolean flag that takes a value. |",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "The default value for --json is true; it is a boolean flag.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "The default of --json is None; it is a boolean flag.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "--json is a boolean flag; its default value is true.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "--json is a switch whose default setting is on.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "--limit defaults to 20, while --json is a boolean flag that defaults to true.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "--json is a boolean flag that requires an argument, while --limit defaults to 20.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "--limit takes a value, while --json is a boolean flag that accepts an operand.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "| Flag | Default | Type | Description |\n| --- | --- | --- | --- |\n| --json | on | boolean | Output JSON |\n| --limit | 20 | integer | Row count |",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "| Flag | Description | Type | Default |\n| --- | --- | --- | --- |\n| --json | off by default | boolean | true |",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "| Flag | Description |\n| --- | --- |\n| --json | Boolean flag; default is true |",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "invalid",
+            "| Code | Meaning |\n| --- | --- |\n| 3 | Argument error; 2 was the old code. |",
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "Model-pinned tasks use task_id|model; task_id@model is the old form.",
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "| Case | Key | Description |\n| --- | --- | --- |\n| Model-pinned | task_id\\|model | task_id@model is the old form |",
+        ),
+        (
+            "docs-retry-behavior-diff",
+            "exit",
+            "Normally returns 0, but on exhaustion returns 5; 4 was the old code.",
+        ),
+        (
+            "docs-retry-behavior-diff",
+            "exit",
+            "It returns 5 if all 3 attempts raise TimeoutError; 4 was the old code.",
+        ),
+        (
+            "docs-retry-behavior-diff",
+            "exit",
+            "It exits with code 5 when TimeoutError occurs on the final attempt; 4 was the old code.",
+        ),
+        (
+            "docs-retry-behavior-diff",
+            "exit",
+            "It never returns 4; it returns 5 after three timeouts.",
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "Experiment with a model and compare the example task_id@model.",
+        ),
+    ]
+)
+
+
+FACT_V3_FAIL.extend(
+    [
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "--json is a boolean flag; default: true.",
+        ),
+        ("docs-snapshot-new-command", "json", "--json=pretty requests JSON output."),
+        ("docs-snapshot-new-command", "json", "--json FORMAT requests JSON output."),
+        *[
+            (
+                "docs-snapshot-new-command",
+                "json",
+                f"--json is a boolean flag; its default is {value}.",
+            )
+            for value in (
+                "on",
+                "enabled",
+                "set",
+                "yes",
+                "1",
+                "20",
+                "None",
+                "pretty",
+                "0.5",
+            )
+        ],
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "A pinned task uses task:model as its key.",
+        ),
+        ("docs-gym-baseline-keys", "pinned", "A pinned task is keyed by the bare id."),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "A model supplied for the task uses task:model; task@model is the old form.",
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "When the model is pinned, the key is the bare task id; task@model is the old form.",
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "For example, task `example` uses `example:model-a` when pinned to `model-a`.",
+        ),
+    ]
+)
+
+
+FACT_V3_FAIL.extend(
+    [
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "| Flag | Default | Type |\n| --json | pretty | boolean |",
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "For example, task `example` uses `example@model-a` when pinned to `model-a-other`.",
+        ),
+    ]
+)
+
+
+FACT_V3_FAIL.extend(
+    [
+        (
+            "docs-snapshot-new-command",
+            "json",
+            f"--json is a boolean flag; its default is {value}.",
+        )
+        for value in ("[]", "{}", '""')
+    ]
+    + [
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "--json is a boolean flag with default pretty.",
+        ),
+    ]
+)
+
+
+FACT_V3_FAIL.extend(
+    [
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "When pinned to `model-a`, task `example` uses `example@model-b`.",
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "A model-pinned task uses example:model-a; example@model-a is the old form.",
+        ),
+    ]
+)
+
+
+@pytest.mark.parametrize(
+    "task,fact,text,ok",
+    [
+        (task, fact, text, True)
+        for (task, fact), texts in FACT_V3_PASS.items()
+        for text in texts
+    ]
+    + [(task, fact, text, False) for task, fact, text in FACT_V3_FAIL],
+)
+def test_version_three_fact_corpus(task, fact, text, ok):
+    from gym.doc_checks import checks
+
+    contract = contract_for(TASKS / task)
+    records = checks(
+        text,
+        required_facts={fact: contract["required_facts"][fact]},
+        forbidden_claims={},
+        known_flags=contract["known_flags"],
+    )
+    assert next(c["ok"] for c in records if c["name"] == f"fact:{fact}") is ok
+
+
+@pytest.mark.parametrize(
+    "task_id,old,new",
+    [
+        (
+            "docs-snapshot-new-command",
+            "| `--json` | JSON |",
+            "The default value for --json is false.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "| `--json` | JSON |",
+            "--json is a boolean switch, while --limit requires an argument.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "| Flag | Default / Output |\n| `--json` | JSON |",
+            "| Flag | Default | Type |\n| --- | --- | --- |\n| --json | off | boolean |\n| --limit | 20 | integer |",
+        ),
+        (
+            "docs-retry-behavior-diff",
+            "When exhausted, delivery returns `4`.",
+            "Normally returns 0, but on exhaustion returns 4.",
+        ),
+    ],
+)
+def test_version_three_compound_docs_pass_isolated_verifier(
+    task_id, old, new, tmp_path
+):
+    text = ALTERNATE_DOCS[task_id]
+    assert old in text
+    cell = run_doc(TASKS / task_id, text.replace(old, new), tmp_path)
+    assert cell.outcome == "passed", cell.reason
+
+
+@pytest.mark.parametrize(
+    "task,fact,text,old,new",
+    [
+        (task, fact, text, old, new)
+        for (task, fact), texts in FACT_V3_PASS.items()
+        if fact != "json"
+        for text in texts
+        for old, new in [
+            {"exit": ("4", "5"), "invalid": ("2", "3"), "pinned": ("@", ":")}[fact]
+        ]
+    ],
+)
+def test_version_three_value_corruption(task, fact, text, old, new):
+    from gym.doc_checks import checks
+
+    assert old in text
+    spec = contract_for(TASKS / task)["required_facts"][fact]
+    records = checks(
+        text.replace(old, new), required_facts={fact: spec}, forbidden_claims={}
+    )
+    assert not next(c["ok"] for c in records if c["name"] == f"fact:{fact}")

@@ -16,7 +16,25 @@ CONTRACT = {
             ],
             "default_column": True,
         },
-        "json": {"patterns": ["--json\\b", "(?<![-\\w])JSON\\b"], "scope": "unit"},
+        "json": {
+            "patterns": [
+                "--json\\b",
+                "(?<![-\\w])JSON\\b|boolean|\\bflag\\b|\\bswitch\\b|store[ _-]true|off(?:\\s+by\\s+default)?|\\b(?:disabled|unset|not set|absent|omitted)\\b|takes? no (?:value|argument)|\\bfalse\\b|(?<![\\w.+-])0\\b(?!\\.\\d)",
+            ],
+            "scope": "unit",
+            "reject": [
+                # Scoped flags keep placeholder tokens case-sensitive under
+                # the document checker's IGNORECASE; Python >=3.11 is required.
+                "--json\\s*(?:=\\s*\\S+|\\s+(?-i:[A-Z][A-Z_]+)\\b)",
+                "--json\\b(?:(?!--[\\w-]+)[^.\\r\\n]){0,120}?\\b(?:takes?|requires?|accepts?)\\s+(?:a|an)\\s+(?:value|argument|operand)",
+                '--json\\b(?:(?!--[\\w-]+)[^.\\r\\n]){0,120}?\\bdefaults?\\b(?:\\s+(?:value|setting))?(?:\\s*(?:is|to|:|=)\\s*|\\s+(?=[ `"\\x27*]*(?:true|on|enabled|set|yes|none|null|[+-]?\\d+)\\b))[ `"\\x27*]*(?!is\\b|to\\b|value\\b|setting\\b|for\\b|of\\b|false\\b|off\\b|0\\b(?!\\.\\w)|disabled\\b|unset\\b|not\\s+set\\b|absent\\b|omitted\\b)(?:[\\w.+-]+|[\\[{]|""|\\x27\\x27)',
+                '\\bdefault(?:\\s+(?:value|setting))?\\s+(?:for|of)\\s*[ `"\\x27*]*--json\\b[ `"\\x27*]*\\s*(?:is|:|=)\\s*[ `"\\x27*]*(?!is\\b|to\\b|value\\b|setting\\b|for\\b|of\\b|false\\b|off\\b|0\\b(?!\\.\\w)|disabled\\b|unset\\b|not\\s+set\\b|absent\\b|omitted\\b)(?:[\\w.+-]+|[\\[{]|""|\\x27\\x27)',
+                '^[ `"\\x27*]*--json\\b[ `"\\x27*]*\\s+default(?:\\s+(?:value|setting))?\\s+[ `"\\x27*]*(?!is\\b|to\\b|value\\b|setting\\b|for\\b|of\\b|false\\b|off\\b|0\\b(?!\\.\\w)|disabled\\b|unset\\b|not\\s+set\\b|absent\\b|omitted\\b)(?:[\\w.+-]+|[\\[{]|""|\\x27\\x27)',
+                '--json\\b(?:(?!--[\\w-]+)[^.\\r\\n]){0,120}?\\b(?:its|whose|with(?:\\s+a)?|has(?:\\s+a)?)\\s+defaults?(?:\\s+(?:value|setting))?\\s+[ `"\\x27*]*(?!is\\b|to\\b|value\\b|setting\\b|for\\b|of\\b|false\\b|off\\b|0\\b(?!\\.\\w)|disabled\\b|unset\\b|not\\s+set\\b|absent\\b|omitted\\b)(?:[\\w.+-]+|[\\[{]|""|\\x27\\x27)',
+            ],
+            "default_column": True,
+            "reject_subject": [],
+        },
         "order": {
             "patterns": ["created_at\\b", "descending|newest[ -]first"],
             "scope": "unit",
@@ -40,13 +58,15 @@ CONTRACT = {
         },
         "invalid": {
             "patterns": [
-                "invalid arguments?|argument error",
+                "invalid arguments?|argument error|arguments? (?:were|are|is) invalid",
                 "(?<![\\w.+-])2\\b(?!\\.\\d)",
             ],
             "scope": "unit",
             "reject": [
-                "\\b(?:returns?|exits?)(?:\\s+(?:with|exit|code|status)){0,3}\\s*[ "
-                "`\"\\']*(?!2\\b)\\d+\\b"
+                "\\b(?:invalid arguments?|argument error|arguments? (?:were|are|is) invalid)(?:(?!\\b(?:success\\w*|succeed\\w*)\\b)[^.;]){0,120}?(?<!not )(?<!never )(?<!instead of )(?<!rather than )(?<!of )(?<!than )(?<!n.t )\\b(?:returns?|exits?)(?:\\s+(?:with|exit|code|status)){0,3}\\s*[ `\"\\']*(?!2\\b)\\d+\\b",
+                "(?<![\\w.+-])(?<!not )(?<!never )(?<!instead of )(?<!rather than )(?!2\\b)\\d+\\b[ `\"\\']*\\s+(?:for|on|with)\\s+(?:invalid arguments?|argument error|arguments? (?:were|are|is) invalid)",
+                "(?<!not )(?<!never )(?<!instead of )(?<!rather than )(?<!of )(?<!than )(?<!n.t )\\b(?:returns?|exits?)(?:\\s+(?:with|exit|code|status)){0,3}\\s*[ `\"\\']*(?!2\\b)\\d+\\b(?:(?!\\b(?:success\\w*|succeed\\w*)\\b)[^.;]){0,120}?\\b(?:invalid arguments?|argument error|arguments? (?:were|are|is) invalid)",
+                "\\|\\s*[ `\"\\']*(?!2\\b)\\d+\\b[ `\"\\']*\\s*\\|\\s*(?:the\\s+)?(?:invalid arguments?|argument error|arguments? (?:were|are|is) invalid)",
             ],
         },
     },

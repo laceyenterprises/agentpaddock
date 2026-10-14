@@ -49,7 +49,14 @@ def test_every_task_declares_task_version(manifest):
     assert len(declared) == 1, "task.toml must declare task_version literally, once"
     assert tomllib.loads(text)["task_version"] == int(declared[0])
     assert int(declared[0]) == (
-        2
+        3
+        if manifest.parent.name
+        in {
+            "docs-retry-behavior-diff",
+            "docs-snapshot-new-command",
+            "docs-gym-baseline-keys",
+        }
+        else 2
         if manifest.parent.name in SCRUBBED or manifest.parent.name.startswith("docs-")
         else 1
     )
