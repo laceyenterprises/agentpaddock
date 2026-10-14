@@ -19,14 +19,16 @@ CONTRACT = {
         "json": {
             "patterns": [
                 "--json\\b",
-                "(?<![-\\w])JSON\\b|boolean|\\bflag\\b|\\bswitch\\b|store[ _-]true|off(?:\\s+by\\s+default)?|takes? no (?:value|argument)|\\bfalse\\b|(?<![\\w.+-])0\\b(?!\\.\\d)",
+                "(?<![-\\w])JSON\\b|boolean|\\bflag\\b|\\bswitch\\b|store[ _-]true|off(?:\\s+by\\s+default)?|\\b(?:disabled|unset|not set|absent|omitted)\\b|takes? no (?:value|argument)|\\bfalse\\b|(?<![\\w.+-])0\\b(?!\\.\\d)",
             ],
             "scope": "unit",
             "reject": [
                 "--json\\s*(?:=\\s*\\S+|\\s+(?-i:[A-Z][A-Z_]+)\\b)",
                 "--json\\b(?:(?!--[\\w-]+)[^.\\r\\n]){0,120}?\\b(?:takes?|requires?|accepts?)\\s+(?:a|an)\\s+(?:value|argument|operand)",
-                '--json\\b(?:(?!--[\\w-]+)[^.\\r\\n]){0,120}?\\bdefaults?\\b(?:\\s+(?:value|setting))?\\s*(?:is|to|:|=)?\\s*[ `"\\x27*]*(?!is\\b|to\\b|value\\b|setting\\b|for\\b|of\\b|false\\b|off\\b|0\\b)[\\w-]+(?:\\.\\w+)*',
-                '\\bdefault(?:\\s+(?:value|setting))?\\s+(?:for|of)\\s*[ `"\\x27*]*--json\\b[ `"\\x27*]*\\s*(?:is|:|=)\\s*[ `"\\x27*]*(?!is\\b|to\\b|value\\b|setting\\b|for\\b|of\\b|false\\b|off\\b|0\\b)[\\w-]+(?:\\.\\w+)*',
+                '--json\\b(?:(?!--[\\w-]+)[^.\\r\\n]){0,120}?\\bdefaults?\\b(?:\\s+(?:value|setting))?(?:\\s*(?:is|to|:|=)\\s*|\\s+(?=[ `"\\x27*]*(?:true|on|enabled|set|yes|none|null|[+-]?\\d+)\\b))[ `"\\x27*]*(?!is\\b|to\\b|value\\b|setting\\b|for\\b|of\\b|false\\b|off\\b|0\\b(?!\\.\\w)|disabled\\b|unset\\b|not\\s+set\\b|absent\\b|omitted\\b)(?:[\\w.+-]+|[\\[{]|""|\\x27\\x27)',
+                '\\bdefault(?:\\s+(?:value|setting))?\\s+(?:for|of)\\s*[ `"\\x27*]*--json\\b[ `"\\x27*]*\\s*(?:is|:|=)\\s*[ `"\\x27*]*(?!is\\b|to\\b|value\\b|setting\\b|for\\b|of\\b|false\\b|off\\b|0\\b(?!\\.\\w)|disabled\\b|unset\\b|not\\s+set\\b|absent\\b|omitted\\b)(?:[\\w.+-]+|[\\[{]|""|\\x27\\x27)',
+                '^[ `"\\x27*]*--json\\b[ `"\\x27*]*\\s+default(?:\\s+(?:value|setting))?\\s+[ `"\\x27*]*(?!is\\b|to\\b|value\\b|setting\\b|for\\b|of\\b|false\\b|off\\b|0\\b(?!\\.\\w)|disabled\\b|unset\\b|not\\s+set\\b|absent\\b|omitted\\b)(?:[\\w.+-]+|[\\[{]|""|\\x27\\x27)',
+                '--json\\b(?:(?!--[\\w-]+)[^.\\r\\n]){0,120}?\\b(?:its|whose|with(?:\\s+a)?|has(?:\\s+a)?)\\s+defaults?(?:\\s+(?:value|setting))?\\s+[ `"\\x27*]*(?!is\\b|to\\b|value\\b|setting\\b|for\\b|of\\b|false\\b|off\\b|0\\b(?!\\.\\w)|disabled\\b|unset\\b|not\\s+set\\b|absent\\b|omitted\\b)(?:[\\w.+-]+|[\\[{]|""|\\x27\\x27)',
             ],
             "default_column": True,
             "reject_subject": [],

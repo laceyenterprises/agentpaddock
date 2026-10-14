@@ -1429,6 +1429,44 @@ FACT_V3_PASS[("docs-snapshot-new-command", "invalid")].append(
     "| Code | Meaning |\n| --- | --- |\n| 2 | Argument error |"
 )
 
+
+FACT_V3_PASS[("docs-snapshot-new-command", "json")].extend(
+    [
+        "| Flag | Type | Default | Description |\n| --json | flag | Disabled | Requests JSON-formatted output. |",
+        "`--json`: Output inspection results as JSON (flag, default: disabled).",
+        "| --json | boolean (flag) | off | Emit the result as JSON instead of the default human-readable listing. |",
+        "| --json | flag (boolean) | off (False) | Emit output as JSON instead of the default format. |",
+        *[
+            f"--json is a boolean flag; its default is {value}."
+            for value in (
+                "Disabled",
+                "unset",
+                "not set",
+                "absent",
+                "omitted",
+                "FALSE",
+                "False",
+                "false",
+            )
+        ],
+        "--json emits JSON instead of the default table layout.",
+        "--json emits JSON instead of the default format.",
+        "--json emits JSON instead of the default format",
+    ]
+)
+FACT_V3_PASS[("docs-gym-baseline-keys", "pinned")].extend(
+    [
+        "**Model-pinned run** (a model resolved for the task): the key is the task id, the separator `@` (`VERDICT_KEY_SEPARATOR`), then the model, e.g. `my-task@gpt-4o`.",
+        "| Resolved model | Baseline key |\n| Model supplied | <task_id>@<model> |",
+        "Keys only change (gaining the `@model` suffix) once a model is pinned for a task.",
+        "For example, task `example` uses `example` when unmodelled and `example@model-a` when pinned to `model-a`.",
+        "A model resolved for the task gives the key task_id@model.",
+        "When the model is pinned, the key is task_id@model.",
+        "A model-pinned task uses example@model-a as its key.",
+        "When pinned to `model-a`, task `example` uses `example@model-a`.",
+    ]
+)
+
 FACT_V3_FAIL = [
     (
         "docs-retry-behavior-diff",
@@ -1623,6 +1661,109 @@ FACT_V3_FAIL.extend(
             "docs-gym-baseline-keys",
             "pinned",
             "Experiment with a model and compare the example task_id@model.",
+        ),
+    ]
+)
+
+
+FACT_V3_FAIL.extend(
+    [
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "--json is a boolean flag; default: true.",
+        ),
+        ("docs-snapshot-new-command", "json", "--json=pretty requests JSON output."),
+        ("docs-snapshot-new-command", "json", "--json FORMAT requests JSON output."),
+        *[
+            (
+                "docs-snapshot-new-command",
+                "json",
+                f"--json is a boolean flag; its default is {value}.",
+            )
+            for value in (
+                "on",
+                "enabled",
+                "set",
+                "yes",
+                "1",
+                "20",
+                "None",
+                "pretty",
+                "0.5",
+            )
+        ],
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "A pinned task uses task:model as its key.",
+        ),
+        ("docs-gym-baseline-keys", "pinned", "A pinned task is keyed by the bare id."),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "A model supplied for the task uses task:model; task@model is the old form.",
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "When the model is pinned, the key is the bare task id; task@model is the old form.",
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "For example, task `example` uses `example:model-a` when pinned to `model-a`.",
+        ),
+    ]
+)
+
+
+FACT_V3_FAIL.extend(
+    [
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "| Flag | Default | Type |\n| --json | pretty | boolean |",
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "For example, task `example` uses `example@model-a` when pinned to `model-a-other`.",
+        ),
+    ]
+)
+
+
+FACT_V3_FAIL.extend(
+    [
+        (
+            "docs-snapshot-new-command",
+            "json",
+            f"--json is a boolean flag; its default is {value}.",
+        )
+        for value in ("[]", "{}", '""')
+    ]
+    + [
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "--json is a boolean flag with default pretty.",
+        ),
+    ]
+)
+
+
+FACT_V3_FAIL.extend(
+    [
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "When pinned to `model-a`, task `example` uses `example@model-b`.",
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "A model-pinned task uses example:model-a; example@model-a is the old form.",
         ),
     ]
 )
