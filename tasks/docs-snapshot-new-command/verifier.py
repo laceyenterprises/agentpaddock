@@ -16,7 +16,20 @@ CONTRACT = {
             ],
             "default_column": True,
         },
-        "json": {"patterns": ["--json\\b", "(?<![-\\w])JSON\\b"], "scope": "unit"},
+        "json": {
+            "patterns": [
+                "--json\\b",
+                "(?<![-\\w])JSON\\b|boolean|\\bflag\\b|\\bswitch\\b|store[ _-]true|off(?:\\s+by\\s+default)?|takes? no (?:value|argument)",
+            ],
+            "scope": "unit",
+            "reject": [
+                "--json\\s*(?:=\\s*\\S+|\\s+(?-i:[A-Z][A-Z_]+)\\b)",
+                "\\b(?:takes?|requires?|accepts?)\\s+(?:a|an)\\s+(?:value|argument|operand)",
+                "\\bdefaults?\\b\\s*(?:is|to|:|=)?\\s*[ `\"\\'*]*(?!is\\b|to\\b|false\\b|off\\b|0\\b)[\\w-]+(?:\\.\\w+)*",
+                "--json[^|;]*\\|[^|;]*\\|\\s*[ `\"\\'*]*(?!false\\b|off\\b|0\\b)[\\w-]+(?:\\.\\w+)*",
+            ],
+            "reject_subject": [],
+        },
         "order": {
             "patterns": ["created_at\\b", "descending|newest[ -]first"],
             "scope": "unit",
@@ -40,13 +53,15 @@ CONTRACT = {
         },
         "invalid": {
             "patterns": [
-                "invalid arguments?|argument error",
+                "invalid arguments?|argument error|arguments? (?:were|are|is) invalid",
                 "(?<![\\w.+-])2\\b(?!\\.\\d)",
             ],
             "scope": "unit",
             "reject": [
-                "\\b(?:returns?|exits?)(?:\\s+(?:with|exit|code|status)){0,3}\\s*[ "
-                "`\"\\']*(?!2\\b)\\d+\\b"
+                "\\b(?:invalid arguments?|argument error|arguments? (?:were|are|is) invalid)(?:(?!\\b(?:success\\w*|succeed\\w*)\\b)[^.;]){0,120}?(?<!not )(?<!never )(?<!instead of )(?<!rather than )(?<!of )(?<!than )(?<!n.t )\\b(?:returns?|exits?)(?:\\s+(?:with|exit|code|status)){0,3}\\s*[ `\"\\']*(?!2\\b)\\d+\\b",
+                "(?<![\\w.+-])(?<!not )(?<!never )(?<!instead of )(?<!rather than )(?!2\\b)\\d+\\b[ `\"\\']*\\s+(?:for|on|with)\\s+(?:invalid arguments?|argument error|arguments? (?:were|are|is) invalid)",
+                "(?<!not )(?<!never )(?<!instead of )(?<!rather than )(?<!of )(?<!than )(?<!n.t )\\b(?:returns?|exits?)(?:\\s+(?:with|exit|code|status)){0,3}\\s*[ `\"\\']*(?!2\\b)\\d+\\b(?:(?!\\b(?:success\\w*|succeed\\w*)\\b)[^.;]){0,120}?\\b(?:invalid arguments?|argument error|arguments? (?:were|are|is) invalid)",
+                "\\|\\s*[ `\"\\']*(?!2\\b)\\d+\\b[ `\"\\']*\\s*\\|\\s*(?:the\\s+)?(?:invalid arguments?|arguments? (?:were|are|is) invalid)",
             ],
         },
     },

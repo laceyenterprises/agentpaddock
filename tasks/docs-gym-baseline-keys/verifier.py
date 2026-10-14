@@ -12,12 +12,15 @@ CONTRACT = {
         },
         "pinned": {
             "patterns": [
-                "pinned to a model|tasks? that resolve to a model|model[ -]pinned|task[ -](?:pinned|level)|model "
-                "(?:selected|specified|provided)",
-                "(?:[<{]?task(?:_id)?[>}]*@[<{]?model[>}]*|task ID "
-                "followed by\\s*[`\\']*@|separated by\\s*[`\\']*@)",
+                "pinned to a model|tasks? that resolve to a model|model[ -]pinned|task[ -](?:pinned|level|pin)|pinned model|with a model|model (?:resolved|selected|specified|provided)|non[ -]empty model",
+                "[<{]?task(?:_id)?[>}]*@[<{]?model[>}]*|task[ _]id[ `\"\\']*(?:\\s*\\+|\\s*,|\\s+followed by)?\\s*[ `\"\\']*@[ `\"\\']*(?:\\s*\\+|\\s*,)?\\s*(?:then|and|followed by)?\\s*(?:the\\s+)?[ `\"\\']*model|separated by\\s*[`\\']*@",
             ],
             "scope": "unit",
+            "reject": [
+                "\\b(?:key (?:is|remains)|keys? (?:use|keep)|keyed by)\\s+(?:the\\s+)?bare\\s+(?:task\\s+)?id",
+                "task(?:_id)?[>}]*\\s*[:/|]\\s*[<{]?model",
+                "\\bseparator\\s+(?:is|=)\\s*[ `\"\\']*[:/|]",
+            ],
         },
         "migration": {
             "patterns": [

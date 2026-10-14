@@ -132,6 +132,7 @@ Grading changes need their own pull request and a changelog entry. A change to a
 task's content bumps its `task_version` in `task.toml`; results compare only
 within one version, so the new version starts its own board.
 
-The six `docs-*` tasks use version 2 for meaning-based wording checks. Their
-version 1 scores used narrower phrasing checks and cannot be compared with
-version 2 scores; re-check saved submissions under the new version.
+The six `docs-*` tasks use meaning-based wording checks. The retry behavior,
+snapshot command and baseline key tasks use version 3; the other three use
+version 2. Scores compare only within a task version. Regrade saved submissions
+when grading changes; keep old results at their original version.
