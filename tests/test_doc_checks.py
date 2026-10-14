@@ -226,7 +226,8 @@ def test_table_header_context_and_default_cell_are_local():
     )
 
 
-def test_default_cell_keeps_its_label_and_row_rejections():
+@pytest.mark.parametrize("reject_subject", [[], ()], ids=["list", "tuple"])
+def test_default_cell_keeps_its_label_and_row_rejections(reject_subject):
     text = "| Flag | Default / Output |\n| mode | JSON |"
     assert not unit_failures(
         text,
@@ -240,7 +241,7 @@ def test_default_cell_keeps_its_label_and_row_rejections():
         ["mode", "off"],
         default_column=True,
         reject=[r"mode.*takes a value"],
-        reject_subject=[],
+        reject_subject=reject_subject,
     )
 
 

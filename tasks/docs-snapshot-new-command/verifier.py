@@ -25,7 +25,7 @@ CONTRACT = {
             "reject": [
                 "--json\\s*(?:=\\s*\\S+|\\s+(?-i:[A-Z][A-Z_]+)\\b)",
                 "--json\\b(?:(?!--[\\w-]+)[^.\\r\\n]){0,120}?\\b(?:takes?|requires?|accepts?)\\s+(?:a|an)\\s+(?:value|argument|operand)",
-                '--json\\b(?:(?!--[\\w-]+)[^|.\\r\\n]){0,120}?\\bdefaults?\\b(?:\\s+(?:value|setting))?\\s*(?:is|to|:|=)?\\s*[ `"\\x27*]*(?!is\\b|to\\b|value\\b|setting\\b|for\\b|of\\b|false\\b|off\\b|0\\b)[\\w-]+(?:\\.\\w+)*',
+                '--json\\b(?:(?!--[\\w-]+)[^.\\r\\n]){0,120}?\\bdefaults?\\b(?:\\s+(?:value|setting))?\\s*(?:is|to|:|=)?\\s*[ `"\\x27*]*(?!is\\b|to\\b|value\\b|setting\\b|for\\b|of\\b|false\\b|off\\b|0\\b)[\\w-]+(?:\\.\\w+)*',
                 '\\bdefault(?:\\s+(?:value|setting))?\\s+(?:for|of)\\s*[ `"\\x27*]*--json\\b[ `"\\x27*]*\\s*(?:is|:|=)\\s*[ `"\\x27*]*(?!is\\b|to\\b|value\\b|setting\\b|for\\b|of\\b|false\\b|off\\b|0\\b)[\\w-]+(?:\\.\\w+)*',
             ],
             "default_column": True,
@@ -62,7 +62,7 @@ CONTRACT = {
                 "\\b(?:invalid arguments?|argument error|arguments? (?:were|are|is) invalid)(?:(?!\\b(?:success\\w*|succeed\\w*)\\b)[^.;]){0,120}?(?<!not )(?<!never )(?<!instead of )(?<!rather than )(?<!of )(?<!than )(?<!n.t )\\b(?:returns?|exits?)(?:\\s+(?:with|exit|code|status)){0,3}\\s*[ `\"\\']*(?!2\\b)\\d+\\b",
                 "(?<![\\w.+-])(?<!not )(?<!never )(?<!instead of )(?<!rather than )(?!2\\b)\\d+\\b[ `\"\\']*\\s+(?:for|on|with)\\s+(?:invalid arguments?|argument error|arguments? (?:were|are|is) invalid)",
                 "(?<!not )(?<!never )(?<!instead of )(?<!rather than )(?<!of )(?<!than )(?<!n.t )\\b(?:returns?|exits?)(?:\\s+(?:with|exit|code|status)){0,3}\\s*[ `\"\\']*(?!2\\b)\\d+\\b(?:(?!\\b(?:success\\w*|succeed\\w*)\\b)[^.;]){0,120}?\\b(?:invalid arguments?|argument error|arguments? (?:were|are|is) invalid)",
-                "\\|\\s*[ `\"\\']*(?!2\\b)\\d+\\b[ `\"\\']*\\s*\\|\\s*(?:the\\s+)?(?:invalid arguments?|arguments? (?:were|are|is) invalid)",
+                "\\|\\s*[ `\"\\']*(?!2\\b)\\d+\\b[ `\"\\']*\\s*\\|\\s*(?:the\\s+)?(?:invalid arguments?|argument error|arguments? (?:were|are|is) invalid)",
             ],
         },
     },

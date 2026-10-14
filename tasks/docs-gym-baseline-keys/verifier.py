@@ -18,7 +18,7 @@ CONTRACT = {
             "scope": "unit",
             "reject": [
                 "\\b(?:key (?:is|remains)|keys? (?:use|keep)|keyed by)\\s+(?:the\\s+)?bare\\s+(?:task\\s+)?id",
-                "task(?:_id)?[>}]*\\s*[:/|]\\s*[<{]?model",
+                "task(?:_id)?[>}]*(?:\\s*[:/]\\s*|\\|)[<{]?model",
                 "\\bseparator\\s+(?:is|=)\\s*[ `\"\\']*[:/|]",
             ],
         },

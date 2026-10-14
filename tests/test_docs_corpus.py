@@ -1402,6 +1402,8 @@ FACT_V3_PASS[("docs-snapshot-new-command", "json")].extend(
         "| Flag | Description |\n| --- | --- |\n| `--json` | Output JSON |\n| `--limit` | Row count |",
         "| Flag | Default | Type | Description |\n| --- | --- | --- | --- |\n| `--json` | off | boolean | Output JSON |\n| `--limit` | 20 | integer | Row count |",
         "| Flag | Description | Type | Default |\n| --- | --- | --- | --- |\n| `--json` | Output JSON | boolean | false |",
+        "| Flag | Description |\n| --- | --- |\n| --json | Boolean flag; default is false |",
+        "| Flag | Description |\n| --- | --- |\n| --json | Boolean flag; --limit defaults to 20 |",
     ]
 )
 FACT_V3_PASS[("docs-retry-behavior-diff", "exit")].extend(
@@ -1419,7 +1421,12 @@ FACT_V3_PASS[("docs-gym-baseline-keys", "pinned")].extend(
     [
         "Tasks with a model use task_id@model.",
         "Cells with a model use task_id@model.",
+        "| Task ID | Model | Key | Case |\n| --- | --- | --- | --- |\n| task_id | model | task_id@model | Model-pinned |",
+        "|Task ID|Model|Key|Case|\n|---|---|---|---|\n|task_id|model|task_id@model|Model-pinned|",
     ]
+)
+FACT_V3_PASS[("docs-snapshot-new-command", "invalid")].append(
+    "| Code | Meaning |\n| --- | --- |\n| 2 | Argument error |"
 )
 
 FACT_V3_FAIL = [
@@ -1571,6 +1578,26 @@ FACT_V3_FAIL.extend(
             "docs-snapshot-new-command",
             "json",
             "| Flag | Description | Type | Default |\n| --- | --- | --- | --- |\n| --json | off by default | boolean | true |",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "| Flag | Description |\n| --- | --- |\n| --json | Boolean flag; default is true |",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "invalid",
+            "| Code | Meaning |\n| --- | --- |\n| 3 | Argument error; 2 was the old code. |",
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "Model-pinned tasks use task_id|model; task_id@model is the old form.",
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "| Case | Key | Description |\n| --- | --- | --- |\n| Model-pinned | task_id\\|model | task_id@model is the old form |",
         ),
         (
             "docs-retry-behavior-diff",

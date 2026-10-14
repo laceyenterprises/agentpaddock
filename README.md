@@ -507,7 +507,7 @@ wrapped list items or table rows), accepting equivalent technical wording.
 For `default_column` facts, table headers select the default cell regardless
 of column order and retain mixed labels such as `Default / Output`.
 By default, rejection subjects must occur in the same clause as the rejected
-predicate; `reject_subject: []` instead applies
+predicate; an empty `reject_subject` sequence (`[]` or `()`) instead applies
 self-scoped reject patterns to the complete unit, including the full table
 row when `default_column` selects a cell. Those patterns must bind
 their own subject and stop before another option or contrasting outcome.
