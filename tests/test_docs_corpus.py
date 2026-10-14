@@ -1386,6 +1386,42 @@ FACT_V3_PASS = {
     ],
 }
 
+# Each fact is checked in isolation so an unrelated correct assertion cannot
+# hide a false rejection or rescue a contradictory value in the same unit.
+FACT_V3_PASS[("docs-snapshot-new-command", "json")].extend(
+    [
+        "The default value for --json is false.",
+        "The default for --json is false.",
+        "The default of --json is off.",
+        "--json is a boolean flag; its default value is false.",
+        "--json is a switch whose default setting is false.",
+        "--json is a boolean flag, while --limit defaults to 20.",
+        "The --json flag is a boolean switch, while --limit requires an argument.",
+        "--limit takes a value, whereas --json is a boolean flag.",
+        "--json is a switch, and --limit accepts an operand.",
+        "| Flag | Description |\n| --- | --- |\n| `--json` | Output JSON |\n| `--limit` | Row count |",
+        "| Flag | Default | Type | Description |\n| --- | --- | --- | --- |\n| `--json` | off | boolean | Output JSON |\n| `--limit` | 20 | integer | Row count |",
+        "| Flag | Description | Type | Default |\n| --- | --- | --- | --- |\n| `--json` | Output JSON | boolean | false |",
+    ]
+)
+FACT_V3_PASS[("docs-retry-behavior-diff", "exit")].extend(
+    [
+        "Normally returns 0, but on exhaustion returns 4.",
+        "Normally returns 0, whereas on exhaustion returns 4.",
+        "Normally returns 0, while on exhaustion returns 4.",
+        "On exhaustion returns 4, but normally returns 0.",
+        "It returns 0 normally, but returns 4 if all 3 attempts raise TimeoutError.",
+        "It returns 4 if all 3 attempts raise TimeoutError.",
+        "It returns 4 when TimeoutError occurs on the final attempt.",
+    ]
+)
+FACT_V3_PASS[("docs-gym-baseline-keys", "pinned")].extend(
+    [
+        "Tasks with a model use task_id@model.",
+        "Cells with a model use task_id@model.",
+    ]
+)
+
 FACT_V3_FAIL = [
     (
         "docs-retry-behavior-diff",
@@ -1484,6 +1520,86 @@ FACT_V3_FAIL = [
     ),
 ]
 
+FACT_V3_FAIL.extend(
+    [
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "| Flag | Default | Description |\n| --- | --- | --- |\n| --json | off | Boolean flag that takes a value. |",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "The default value for --json is true; it is a boolean flag.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "The default of --json is None; it is a boolean flag.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "--json is a boolean flag; its default value is true.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "--json is a switch whose default setting is on.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "--limit defaults to 20, while --json is a boolean flag that defaults to true.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "--json is a boolean flag that requires an argument, while --limit defaults to 20.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "--limit takes a value, while --json is a boolean flag that accepts an operand.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "| Flag | Default | Type | Description |\n| --- | --- | --- | --- |\n| --json | on | boolean | Output JSON |\n| --limit | 20 | integer | Row count |",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "json",
+            "| Flag | Description | Type | Default |\n| --- | --- | --- | --- |\n| --json | off by default | boolean | true |",
+        ),
+        (
+            "docs-retry-behavior-diff",
+            "exit",
+            "Normally returns 0, but on exhaustion returns 5; 4 was the old code.",
+        ),
+        (
+            "docs-retry-behavior-diff",
+            "exit",
+            "It returns 5 if all 3 attempts raise TimeoutError; 4 was the old code.",
+        ),
+        (
+            "docs-retry-behavior-diff",
+            "exit",
+            "It exits with code 5 when TimeoutError occurs on the final attempt; 4 was the old code.",
+        ),
+        (
+            "docs-retry-behavior-diff",
+            "exit",
+            "It never returns 4; it returns 5 after three timeouts.",
+        ),
+        (
+            "docs-gym-baseline-keys",
+            "pinned",
+            "Experiment with a model and compare the example task_id@model.",
+        ),
+    ]
+)
+
 
 @pytest.mark.parametrize(
     "task,fact,text,ok",
@@ -1505,6 +1621,40 @@ def test_version_three_fact_corpus(task, fact, text, ok):
         known_flags=contract["known_flags"],
     )
     assert next(c["ok"] for c in records if c["name"] == f"fact:{fact}") is ok
+
+
+@pytest.mark.parametrize(
+    "task_id,old,new",
+    [
+        (
+            "docs-snapshot-new-command",
+            "| `--json` | JSON |",
+            "The default value for --json is false.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "| `--json` | JSON |",
+            "--json is a boolean switch, while --limit requires an argument.",
+        ),
+        (
+            "docs-snapshot-new-command",
+            "| Flag | Default / Output |\n| `--json` | JSON |",
+            "| Flag | Default | Type |\n| --- | --- | --- |\n| --json | off | boolean |\n| --limit | 20 | integer |",
+        ),
+        (
+            "docs-retry-behavior-diff",
+            "When exhausted, delivery returns `4`.",
+            "Normally returns 0, but on exhaustion returns 4.",
+        ),
+    ],
+)
+def test_version_three_compound_docs_pass_isolated_verifier(
+    task_id, old, new, tmp_path
+):
+    text = ALTERNATE_DOCS[task_id]
+    assert old in text
+    cell = run_doc(TASKS / task_id, text.replace(old, new), tmp_path)
+    assert cell.outcome == "passed", cell.reason
 
 
 @pytest.mark.parametrize(

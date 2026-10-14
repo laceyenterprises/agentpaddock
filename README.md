@@ -502,8 +502,15 @@ gv.passed()
 ## Documentation checks
 
 The six `docs-*` tasks capture `guide.md` and grade it with `gym.doc_checks`.
-Facts bind values to their subject on the same line, accepting prose and
-Markdown tables rather than requiring the reference document's wording.
+Facts bind values to their subject within bounded Markdown units (sentences,
+wrapped list items or table rows), accepting equivalent technical wording.
+For `default_column` facts, table headers select the default cell regardless
+of column order and retain mixed labels such as `Default / Output`.
+By default, rejection subjects must occur in the same clause as the rejected
+predicate; `reject_subject: []` instead applies
+self-scoped reject patterns to the complete unit, including the full table
+row when `default_column` selects a cell. Those patterns must bind
+their own subject and stop before another option or contrasting outcome.
 Task authors should use anchored, independent lookaheads for unordered values
 and avoid chained greedy wildcards. Before evaluating regexes, the checker
 rejects any line over 2,048 characters with a required `document_shape` check;

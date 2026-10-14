@@ -166,6 +166,21 @@ def unit_failures(text, patterns, **spec):
     )
 
 
+def test_self_scoped_rejection_retains_subject_across_semicolon():
+    spec = dict(
+        reject=[r"--json\b(?:(?!--[\w-]+)[^|.])*\bdefault is true"],
+        reject_subject=[],
+    )
+    assert "fact:claim" in unit_failures(
+        "--json is boolean; its default is true.", ["--json", "boolean"], **spec
+    )
+    assert "fact:claim" not in unit_failures(
+        "--json is boolean; --limit default is true.",
+        ["--json", "boolean"],
+        **spec,
+    )
+
+
 @pytest.mark.parametrize(
     "text",
     [
@@ -208,6 +223,24 @@ def test_table_header_context_and_default_cell_are_local():
     # A named default in one table does not suppress another headerless table.
     assert not unit_failures(
         text + "\n\n| other | plan |", ["other", "plan"], default_column=True
+    )
+
+
+def test_default_cell_keeps_its_label_and_row_rejections():
+    text = "| Flag | Default / Output |\n| mode | JSON |"
+    assert not unit_failures(
+        text,
+        ["mode", "JSON"],
+        default_column=True,
+        reject=[r"mode default JSON"],
+    )
+    text = "| Flag | Default | Description |\n| mode | off | takes a value |"
+    assert "fact:claim" in unit_failures(
+        text,
+        ["mode", "off"],
+        default_column=True,
+        reject=[r"mode.*takes a value"],
+        reject_subject=[],
     )
 
 
@@ -369,9 +402,12 @@ def test_declared_key_introduces_punctuated_enum(verb):
     assert not failures(
         text,
         known_config_keys=["roles.worker"],
-        required_facts={"values": {"scope": "unit", "patterns": [
-            r"roles\.worker", r"plan codex claude-code"
-        ]}},
+        required_facts={
+            "values": {
+                "scope": "unit",
+                "patterns": [r"roles\.worker", r"plan codex claude-code"],
+            }
+        },
         forbidden_claims={},
     )
 
@@ -381,8 +417,13 @@ def test_escaped_table_pipe_keeps_default_column_aligned():
     assert not failures(
         text,
         known_config_keys=["cache.mode"],
-        required_facts={"default": {"scope": "unit", "default_column": True,
-                                    "patterns": [r"cache\.mode default 20"]}},
+        required_facts={
+            "default": {
+                "scope": "unit",
+                "default_column": True,
+                "patterns": [r"cache\.mode default 20"],
+            }
+        },
         forbidden_claims={},
     )
 

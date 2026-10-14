@@ -12,7 +12,7 @@ CONTRACT = {
         },
         "pinned": {
             "patterns": [
-                "pinned to a model|tasks? that resolve to a model|model[ -]pinned|task[ -](?:pinned|level|pin)|pinned model|with a model|model (?:resolved|selected|specified|provided)|non[ -]empty model",
+                "pinned to a model|tasks? that resolve to a model|model[ -]pinned|task[ -](?:pinned|level|pin)|pinned model|(?:tasks?|cells?|runs?)\\s+with a model|with a model,?\\s+(?:the\\s+)?(?:baseline\\s+)?key|model (?:resolved|selected|specified|provided)|non[ -]empty model",
                 "[<{]?task(?:_id)?[>}]*@[<{]?model[>}]*|task[ _]id[ `\"\\']*(?:\\s*\\+|\\s*,|\\s+followed by)?\\s*[ `\"\\']*@[ `\"\\']*(?:\\s*\\+|\\s*,)?\\s*(?:then|and|followed by)?\\s*(?:the\\s+)?[ `\"\\']*model|separated by\\s*[`\\']*@",
             ],
             "scope": "unit",

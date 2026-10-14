@@ -110,7 +110,9 @@ def _table_cells(line: str) -> list[str]:
     return cells
 
 
-def _fact_units(lines: Sequence[str], known_config_keys=(), known_flags=()) -> list[_FactUnit]:
+def _fact_units(
+    lines: Sequence[str], known_config_keys=(), known_flags=()
+) -> list[_FactUnit]:
     """Sentences, wrapped list items, and table rows with their header.
 
     Headings supply context but do not match alone. A colon introduction
@@ -217,7 +219,7 @@ def _fact_units(lines: Sequence[str], known_config_keys=(), known_flags=()) -> l
             default_text = None
             for i, label in enumerate(header):
                 if re.search(r"\bdefault\b", label, re.I) and i < len(cells):
-                    default_text = cells[0] + " default " + cells[i]
+                    default_text = cells[0] + " " + label + " " + cells[i]
             add(row, default_text)
         elif not line.strip():
             flush()
@@ -329,10 +331,13 @@ def _fact_paragraphs(lines: Sequence[str]) -> list[str]:
 
 
 def _rejected(spec, candidate, patterns, options):
+    subjects = spec.get("reject_subject", patterns[:1])
+    # Self-scoped reject patterns can follow the subject across clauses.
+    if not subjects:
+        return any(re.search(p, candidate, options) for p in spec.get("reject", ()))
     # Negative statements about a different subject cannot veto a paragraph.
     for clause in re.split(r"(?<=[.!?;])\s+", candidate):
         if any(re.search(p, clause, options) for p in spec.get("reject", ())):
-            subjects = spec.get("reject_subject", patterns[:1])
             if all(re.search(p, clause, options) for p in subjects):
                 return True
     return False
@@ -346,27 +351,39 @@ def _matches_fact(spec, windows, units, paragraphs, options):
             raise ValueError("unknown fact scope")
         candidates = (
             [
-                u.default_text
-                if spec.get("default_column") and u.default_text is not None
-                else u.text
+                (
+                    u.default_text
+                    if spec.get("default_column") and u.default_text is not None
+                    else u.text,
+                    u.text if spec.get("reject_subject") == [] else None,
+                )
                 for u in units
             ]
             if scope == "unit"
-            else paragraphs
+            else [(p, None) for p in paragraphs]
             if scope == "paragraph"
-            else windows
+            else [(w, None) for w in windows]
         )
         rejected = spec.get("reject", ())
     else:
         patterns = spec
-        candidates = windows
+        candidates = [(w, None) for w in windows]
         rejected = ()
     if not patterns or isinstance(patterns, str):
         raise ValueError("fact requires a nonempty regex sequence")
     return any(
         all(re.search(p, unit, options) for p in patterns)
-        and not (rejected and _rejected(spec, unit, patterns, options))
-        for unit in candidates
+        and not (
+            rejected
+            and (
+                _rejected(spec, unit, patterns, options)
+                or (
+                    full_unit is not None
+                    and _rejected(spec, full_unit, patterns, options)
+                )
+            )
+        )
+        for unit, full_unit in candidates
     )
 
 
