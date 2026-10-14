@@ -23,6 +23,8 @@ CONTRACT = {
             ],
             "scope": "unit",
             "reject": [
+                # Scoped flags keep placeholder tokens case-sensitive under
+                # the document checker's IGNORECASE; Python >=3.11 is required.
                 "--json\\s*(?:=\\s*\\S+|\\s+(?-i:[A-Z][A-Z_]+)\\b)",
                 "--json\\b(?:(?!--[\\w-]+)[^.\\r\\n]){0,120}?\\b(?:takes?|requires?|accepts?)\\s+(?:a|an)\\s+(?:value|argument|operand)",
                 '--json\\b(?:(?!--[\\w-]+)[^.\\r\\n]){0,120}?\\bdefaults?\\b(?:\\s+(?:value|setting))?(?:\\s*(?:is|to|:|=)\\s*|\\s+(?=[ `"\\x27*]*(?:true|on|enabled|set|yes|none|null|[+-]?\\d+)\\b))[ `"\\x27*]*(?!is\\b|to\\b|value\\b|setting\\b|for\\b|of\\b|false\\b|off\\b|0\\b(?!\\.\\w)|disabled\\b|unset\\b|not\\s+set\\b|absent\\b|omitted\\b)(?:[\\w.+-]+|[\\[{]|""|\\x27\\x27)',

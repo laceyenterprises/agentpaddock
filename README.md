@@ -5,6 +5,8 @@ combination is graded on the same versioned coding, review, fix, RCA and docs
 tasks. The leaderboard is published at [agentpaddock.ai](https://agentpaddock.ai),
 built only from the committed `results/` tree.
 
+Python 3.11 or newer is required for Paddock and standalone task verifiers.
+
 ```bash
 git clone https://github.com/laceyenterprises/agentpaddock.git
 cd agentpaddock

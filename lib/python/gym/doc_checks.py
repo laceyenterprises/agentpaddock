@@ -355,7 +355,14 @@ def _matches_fact(spec, windows, units, paragraphs, options):
                     u.default_text
                     if spec.get("default_column") and u.default_text is not None
                     else u.text,
-                    u.text if not spec.get("reject_subject", True) else None,
+                    u.text
+                    if (
+                        spec.get("default_column")
+                        and u.default_text is not None
+                        and u.default_text != u.text
+                        and not spec.get("reject_subject", True)
+                    )
+                    else None,
                 )
                 for u in units
             ]

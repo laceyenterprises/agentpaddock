@@ -181,6 +181,29 @@ def test_self_scoped_rejection_retains_subject_across_semicolon():
     )
 
 
+@pytest.mark.parametrize("default_column", [False, True])
+@pytest.mark.parametrize("text", ["mode off.", "- mode off."])
+def test_self_scoped_prose_rejection_runs_once(monkeypatch, default_column, text):
+    from gym import doc_checks
+
+    candidates = []
+    reject = doc_checks._rejected
+
+    def track_rejection(spec, candidate, patterns, options):
+        candidates.append(candidate)
+        return reject(spec, candidate, patterns, options)
+
+    monkeypatch.setattr(doc_checks, "_rejected", track_rejection)
+    assert not unit_failures(
+        text,
+        ["mode", "off"],
+        reject=[r"mode.*on"],
+        reject_subject=[],
+        default_column=default_column,
+    )
+    assert len(candidates) == 1
+
+
 @pytest.mark.parametrize(
     "text",
     [
