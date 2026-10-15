@@ -24,6 +24,11 @@ from gym_test_support import checkout_root
 
 MODULE = Path(__file__).resolve().parents[1]
 REPO = checkout_root(MODULE)
+if REPO == MODULE:
+    pytest.skip(
+        "host activation plans are not shipped in a standalone checkout",
+        allow_module_level=True,
+    )
 ACTIVATION = REPO / "projects/gym-hard-review-fix/activation"
 SPEC_REF = "gym-hard-review-fix@b3689f1ea261"
 DOCUMENT = yaml.safe_load((ACTIVATION / "hrf.yaml").read_text())
