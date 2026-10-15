@@ -1,0 +1,4 @@
+- **A newsletter list sends duplicate messages**
+  - **File:** `subscribers.py`
+  - **Problem:** Imports leave differently spelled copies of one address in a send. The duplicate entries survive subscriber selection.
+  - **Recommended fix:** Normalize each subscriber's email before comparing addresses, and add a regression test for the send.

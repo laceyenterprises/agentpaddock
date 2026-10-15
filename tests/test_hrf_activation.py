@@ -24,6 +24,11 @@ from gym_test_support import checkout_root
 
 MODULE = Path(__file__).resolve().parents[1]
 REPO = checkout_root(MODULE)
+if REPO == MODULE:
+    pytest.skip(
+        "host activation plans are not shipped in a standalone checkout",
+        allow_module_level=True,
+    )
 ACTIVATION = REPO / "projects/gym-hard-review-fix/activation"
 SPEC_REF = "gym-hard-review-fix@b3689f1ea261"
 DOCUMENT = yaml.safe_load((ACTIVATION / "hrf.yaml").read_text())
@@ -32,8 +37,8 @@ ASSERTIONS = parse_activation_yaml_document(
 ).assertions
 SUITES = ("hard-review", "hard-fix", "review", "fix")
 # HRX-02 adds three hard-review -v2 tasks and HRX-03 adds five hard-fix -v2
-# tasks beside the six HRF originals of each suite.
-DISCOVERED = {"hard-review": 9, "hard-fix": 11, "review": 6, "fix": 6}
+# tasks beside the six HRF originals of each suite; HARDFIX-01 adds five -v3 tasks.
+DISCOVERED = {"hard-review": 9, "hard-fix": 16, "review": 6, "fix": 6}
 
 
 def probe_program(index):

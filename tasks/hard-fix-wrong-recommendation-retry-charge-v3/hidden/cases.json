@@ -1,0 +1,148 @@
+[
+  {
+    "call": "import billing, gateway, plans\nclass Fake:\n    def __init__(self, script=()):\n        self.script, self.charges, self.keys, self.calls, self.arguments = list(script), [], {}, 0, []\n    def create_charge(self, order_id, amount_cents, description='', idempotency_key=None):\n        self.calls += 1\n        self.arguments.append([order_id, amount_cents, description])\n        step = self.script.pop(0) if self.script else 'ok'\n        if isinstance(step, Exception):\n            raise step\n        if step == 'lost':\n            raise gateway.GatewayTimeout('before')\n        if idempotency_key is not None and idempotency_key in self.keys:\n            charge_id = self.keys[idempotency_key]\n        else:\n            charge_id = 'ch_%d' % (len(self.charges) + 1)\n            self.charges.append([order_id, amount_cents, description])\n            if idempotency_key is not None:\n                self.keys[idempotency_key] = charge_id\n        if step == 'late':\n            raise gateway.GatewayTimeout('after')\n        return charge_id\ndef order(order_id, *payments):\n    return {'id':order_id, 'payments':[{'id':i, 'amount_cents':a, 'purpose':p, 'status':'due'} for i,a,p in payments]}\ndef seen(order):\n    return [[p['status'],p.get('charge_id')] for p in order['payments']]\ng = Fake(['late','ok','lost','lost','ok'])\no = plans.collect(g, order('oak', ('a',700,'installment'), ('b',700,'installment')))\nresult = [seen(o),g.calls,len(g.charges)]\n",
+    "expected": {
+      "ok": [
+        [
+          [
+            "charged",
+            "ch_1"
+          ],
+          [
+            "charged",
+            "ch_2"
+          ]
+        ],
+        5,
+        2
+      ]
+    }
+  },
+  {
+    "call": "import billing, gateway, plans\nclass Fake:\n    def __init__(self, script=()):\n        self.script, self.charges, self.keys, self.calls, self.arguments = list(script), [], {}, 0, []\n    def create_charge(self, order_id, amount_cents, description='', idempotency_key=None):\n        self.calls += 1\n        self.arguments.append([order_id, amount_cents, description])\n        step = self.script.pop(0) if self.script else 'ok'\n        if isinstance(step, Exception):\n            raise step\n        if step == 'lost':\n            raise gateway.GatewayTimeout('before')\n        if idempotency_key is not None and idempotency_key in self.keys:\n            charge_id = self.keys[idempotency_key]\n        else:\n            charge_id = 'ch_%d' % (len(self.charges) + 1)\n            self.charges.append([order_id, amount_cents, description])\n            if idempotency_key is not None:\n                self.keys[idempotency_key] = charge_id\n        if step == 'late':\n            raise gateway.GatewayTimeout('after')\n        return charge_id\ndef order(order_id, *payments):\n    return {'id':order_id, 'payments':[{'id':i, 'amount_cents':a, 'purpose':p, 'status':'due'} for i,a,p in payments]}\ndef seen(order):\n    return [[p['status'],p.get('charge_id')] for p in order['payments']]\ng = Fake(['late','lost','lost'])\no = plans.collect(g, order('oak', ('a',700,'initial wording'), ('b',900,'balance')))\nfirst = seen(o)\no['payments'][0]['status'] = 'due'\no['payments'][0]['purpose'] = 'reconciled wording'\n# Reimport the payment module to model a collector process restart.\nimport importlib, sys\ndel sys.modules['billing']\nbilling = importlib.import_module('billing')\nplans.charge = billing.charge\nplans.collect(g,o)\nresult = [first,seen(o),len(g.charges)]\n",
+    "expected": {
+      "ok": [
+        [
+          [
+            "unknown",
+            null
+          ],
+          [
+            "due",
+            null
+          ]
+        ],
+        [
+          [
+            "charged",
+            "ch_1"
+          ],
+          [
+            "charged",
+            "ch_2"
+          ]
+        ],
+        2
+      ]
+    }
+  },
+  {
+    "call": "import billing, gateway, plans\nclass Fake:\n    def __init__(self, script=()):\n        self.script, self.charges, self.keys, self.calls, self.arguments = list(script), [], {}, 0, []\n    def create_charge(self, order_id, amount_cents, description='', idempotency_key=None):\n        self.calls += 1\n        self.arguments.append([order_id, amount_cents, description])\n        step = self.script.pop(0) if self.script else 'ok'\n        if isinstance(step, Exception):\n            raise step\n        if step == 'lost':\n            raise gateway.GatewayTimeout('before')\n        if idempotency_key is not None and idempotency_key in self.keys:\n            charge_id = self.keys[idempotency_key]\n        else:\n            charge_id = 'ch_%d' % (len(self.charges) + 1)\n            self.charges.append([order_id, amount_cents, description])\n            if idempotency_key is not None:\n                self.keys[idempotency_key] = charge_id\n        if step == 'late':\n            raise gateway.GatewayTimeout('after')\n        return charge_id\ndef order(order_id, *payments):\n    return {'id':order_id, 'payments':[{'id':i, 'amount_cents':a, 'purpose':p, 'status':'due'} for i,a,p in payments]}\ndef seen(order):\n    return [[p['status'],p.get('charge_id')] for p in order['payments']]\ng = Fake()\nids = [billing.charge(g,oid,100,'same',pid) for oid,pid in [('oak:branch','leaf'),('oak','branch:leaf'),('birch','leaf'),('oak:branch','leaf')]]\nresult = [ids,len(g.charges)]\n",
+    "expected": {
+      "ok": [
+        [
+          "ch_1",
+          "ch_2",
+          "ch_3",
+          "ch_1"
+        ],
+        3
+      ]
+    }
+  },
+  {
+    "call": "import billing, gateway, plans\nclass Fake:\n    def __init__(self, script=()):\n        self.script, self.charges, self.keys, self.calls, self.arguments = list(script), [], {}, 0, []\n    def create_charge(self, order_id, amount_cents, description='', idempotency_key=None):\n        self.calls += 1\n        self.arguments.append([order_id, amount_cents, description])\n        step = self.script.pop(0) if self.script else 'ok'\n        if isinstance(step, Exception):\n            raise step\n        if step == 'lost':\n            raise gateway.GatewayTimeout('before')\n        if idempotency_key is not None and idempotency_key in self.keys:\n            charge_id = self.keys[idempotency_key]\n        else:\n            charge_id = 'ch_%d' % (len(self.charges) + 1)\n            self.charges.append([order_id, amount_cents, description])\n            if idempotency_key is not None:\n                self.keys[idempotency_key] = charge_id\n        if step == 'late':\n            raise gateway.GatewayTimeout('after')\n        return charge_id\ndef order(order_id, *payments):\n    return {'id':order_id, 'payments':[{'id':i, 'amount_cents':a, 'purpose':p, 'status':'due'} for i,a,p in payments]}\ndef seen(order):\n    return [[p['status'],p.get('charge_id')] for p in order['payments']]\ng = Fake(['late','lost','lost','ok'])\no = plans.collect(g, order('oak', ('a',100,'deposit'), ('b',200,'balance')))\nresult = [seen(o),g.calls,len(g.charges),len(g.script)]\n",
+    "expected": {
+      "ok": [
+        [
+          [
+            "unknown",
+            null
+          ],
+          [
+            "due",
+            null
+          ]
+        ],
+        3,
+        1,
+        1
+      ]
+    }
+  },
+  {
+    "call": "import billing, gateway, plans\nclass Fake:\n    def __init__(self, script=()):\n        self.script, self.charges, self.keys, self.calls, self.arguments = list(script), [], {}, 0, []\n    def create_charge(self, order_id, amount_cents, description='', idempotency_key=None):\n        self.calls += 1\n        self.arguments.append([order_id, amount_cents, description])\n        step = self.script.pop(0) if self.script else 'ok'\n        if isinstance(step, Exception):\n            raise step\n        if step == 'lost':\n            raise gateway.GatewayTimeout('before')\n        if idempotency_key is not None and idempotency_key in self.keys:\n            charge_id = self.keys[idempotency_key]\n        else:\n            charge_id = 'ch_%d' % (len(self.charges) + 1)\n            self.charges.append([order_id, amount_cents, description])\n            if idempotency_key is not None:\n                self.keys[idempotency_key] = charge_id\n        if step == 'late':\n            raise gateway.GatewayTimeout('after')\n        return charge_id\ndef order(order_id, *payments):\n    return {'id':order_id, 'payments':[{'id':i, 'amount_cents':a, 'purpose':p, 'status':'due'} for i,a,p in payments]}\ndef seen(order):\n    return [[p['status'],p.get('charge_id')] for p in order['payments']]\ng = Fake(['lost','lost','ok'])\no = plans.collect(g, order('oak', ('a',100,'deposit')))\nresult = [seen(o),g.calls,g.charges]\n",
+    "expected": {
+      "ok": [
+        [
+          [
+            "charged",
+            "ch_1"
+          ]
+        ],
+        3,
+        [
+          [
+            "oak",
+            100,
+            "deposit"
+          ]
+        ]
+      ]
+    }
+  },
+  {
+    "call": "import billing, gateway, plans\nclass Fake:\n    def __init__(self, script=()):\n        self.script, self.charges, self.keys, self.calls, self.arguments = list(script), [], {}, 0, []\n    def create_charge(self, order_id, amount_cents, description='', idempotency_key=None):\n        self.calls += 1\n        self.arguments.append([order_id, amount_cents, description])\n        step = self.script.pop(0) if self.script else 'ok'\n        if isinstance(step, Exception):\n            raise step\n        if step == 'lost':\n            raise gateway.GatewayTimeout('before')\n        if idempotency_key is not None and idempotency_key in self.keys:\n            charge_id = self.keys[idempotency_key]\n        else:\n            charge_id = 'ch_%d' % (len(self.charges) + 1)\n            self.charges.append([order_id, amount_cents, description])\n            if idempotency_key is not None:\n                self.keys[idempotency_key] = charge_id\n        if step == 'late':\n            raise gateway.GatewayTimeout('after')\n        return charge_id\ndef order(order_id, *payments):\n    return {'id':order_id, 'payments':[{'id':i, 'amount_cents':a, 'purpose':p, 'status':'due'} for i,a,p in payments]}\ndef seen(order):\n    return [[p['status'],p.get('charge_id')] for p in order['payments']]\nfailure = ValueError('declined')\ng = Fake([failure,'ok'])\ntry:\n    billing.charge(g,'oak',100,'deposit','a')\nexcept ValueError as exc:\n    result = [exc is failure,g.calls,len(g.charges)]\nelse:\n    result = [False,g.calls,len(g.charges)]\n",
+    "expected": {
+      "ok": [
+        true,
+        1,
+        0
+      ]
+    }
+  },
+  {
+    "call": "import billing, gateway, plans\nclass Fake:\n    def __init__(self, script=()):\n        self.script, self.charges, self.keys, self.calls, self.arguments = list(script), [], {}, 0, []\n    def create_charge(self, order_id, amount_cents, description='', idempotency_key=None):\n        self.calls += 1\n        self.arguments.append([order_id, amount_cents, description])\n        step = self.script.pop(0) if self.script else 'ok'\n        if isinstance(step, Exception):\n            raise step\n        if step == 'lost':\n            raise gateway.GatewayTimeout('before')\n        if idempotency_key is not None and idempotency_key in self.keys:\n            charge_id = self.keys[idempotency_key]\n        else:\n            charge_id = 'ch_%d' % (len(self.charges) + 1)\n            self.charges.append([order_id, amount_cents, description])\n            if idempotency_key is not None:\n                self.keys[idempotency_key] = charge_id\n        if step == 'late':\n            raise gateway.GatewayTimeout('after')\n        return charge_id\ndef order(order_id, *payments):\n    return {'id':order_id, 'payments':[{'id':i, 'amount_cents':a, 'purpose':p, 'status':'due'} for i,a,p in payments]}\ndef seen(order):\n    return [[p['status'],p.get('charge_id')] for p in order['payments']]\ng = Fake()\nfirst = billing.charge(g,'oak',300,'deposit','a')\nother = Fake()\nsecond = billing.charge(other,'oak',300,'deposit','a')\nresult = [first,second,len(g.charges),len(other.charges),g.arguments,other.arguments]\n",
+    "expected": {
+      "ok": [
+        "ch_1",
+        "ch_1",
+        1,
+        1,
+        [
+          [
+            "oak",
+            300,
+            "deposit"
+          ]
+        ],
+        [
+          [
+            "oak",
+            300,
+            "deposit"
+          ]
+        ]
+      ]
+    }
+  },
+  {
+    "call": "import billing, gateway, plans\nclass Fake:\n    def __init__(self, script=()):\n        self.script, self.charges, self.keys, self.calls, self.arguments = list(script), [], {}, 0, []\n    def create_charge(self, order_id, amount_cents, description='', idempotency_key=None):\n        self.calls += 1\n        self.arguments.append([order_id, amount_cents, description])\n        step = self.script.pop(0) if self.script else 'ok'\n        if isinstance(step, Exception):\n            raise step\n        if step == 'lost':\n            raise gateway.GatewayTimeout('before')\n        if idempotency_key is not None and idempotency_key in self.keys:\n            charge_id = self.keys[idempotency_key]\n        else:\n            charge_id = 'ch_%d' % (len(self.charges) + 1)\n            self.charges.append([order_id, amount_cents, description])\n            if idempotency_key is not None:\n                self.keys[idempotency_key] = charge_id\n        if step == 'late':\n            raise gateway.GatewayTimeout('after')\n        return charge_id\ndef order(order_id, *payments):\n    return {'id':order_id, 'payments':[{'id':i, 'amount_cents':a, 'purpose':p, 'status':'due'} for i,a,p in payments]}\ndef seen(order):\n    return [[p['status'],p.get('charge_id')] for p in order['payments']]\nlast = gateway.GatewayTimeout('final')\ng = Fake(['lost','lost',last])\ntry:\n    billing.charge(g,'oak',300,'deposit','a')\nexcept gateway.GatewayTimeout as exc:\n    result = [exc is last,g.calls]\nelse:\n    result = [False,g.calls]\n",
+    "expected": {
+      "ok": [
+        true,
+        3
+      ]
+    }
+  }
+]

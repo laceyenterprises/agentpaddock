@@ -1,0 +1,27 @@
+import plugins
+import settings
+from backend import Unavailable
+
+
+def reconcile(client, accounts):
+    """Deactivate local accounts whose user no longer exists in the directory.
+
+    Returns {"deactivated": [...], "kept": [...], "skipped": [...]}, each in
+    input order. An account whose presence check cannot be answered
+    (backend.Unavailable) is skipped, never deactivated, and the run carries on
+    with the next account.
+    """
+    check = plugins.resolve(settings.PRESENCE_CHECK)
+    report = {"deactivated": [], "kept": [], "skipped": []}
+    for start in range(0, len(accounts), settings.BATCH_SIZE):
+        for account in accounts[start : start + settings.BATCH_SIZE]:
+            try:
+                entry = check(client, account)
+            except Unavailable:
+                report["skipped"].append(account)
+                continue
+            if not entry:
+                report["deactivated"].append(account)
+            else:
+                report["kept"].append(account)
+    return report

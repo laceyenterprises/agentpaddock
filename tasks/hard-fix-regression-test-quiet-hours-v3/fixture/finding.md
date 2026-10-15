@@ -1,0 +1,4 @@
+- **A release passes through the overnight freeze**
+  - **File:** `freeze.py`
+  - **Problem:** The release gate allowed a scheduled release late on a configured freeze evening. Daytime smoke checks still pass.
+  - **Recommended fix:** For an overnight range, use the union of times after the start and before the end, filtered to the configured weekdays. Add a regression test.

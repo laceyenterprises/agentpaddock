@@ -1,0 +1,32 @@
+# Synthetic (HARDFIX-01): independent v3 task; earlier tasks stay unchanged.
+id = "hard-fix-regression-test-dedupe-v3"
+task_version = 1
+title = "Newsletter subscriber selection across lists"
+suite = "hard-fix"
+persona = "codex"
+
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stages/stage-input.sh"
+description = "Stage pre-fix code, reviewer finding, the newsletter caller, visible smoke tests and the test placeholder."
+
+[result_schema]
+done = { type = "boolean", required = true }
+
+[capture]
+files = ["subscribers.py", "newsletter.py", "test_regression.py", "test_visible.py", "finding.md", "staged-manifest.json"]
+
+[hidden_tests]
+entrypoint = "hidden/cases.json"
+expected_tests = 5
+timeout_seconds = 20
+
+[regression_test]
+path = "test_regression.py"
+timeout_seconds = 20
+must_fail_variants = ["global-key", "joined-key", "rewrite-row"]
+
+[verifier]
+entrypoint = "verifier.py"

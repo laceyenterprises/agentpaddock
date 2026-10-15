@@ -1,0 +1,140 @@
+[
+  {
+    "call": "import backend\nclass Directory:\n    def __init__(self, users, down=()):\n        self.users, self.down, self.asked = users, set(down), []\n    def get_user(self, user):\n        self.asked.append(user)\n        if user in self.down:\n            raise backend.Unavailable(user)\n        if user not in self.users:\n            raise backend.NotFound(user)\n        return self.users[user]\nimport directory\nresult = directory.lookup(Directory({}, ['ash']), 'ash')\n",
+    "expected": {
+      "raised": "backend.Unavailable"
+    }
+  },
+  {
+    "call": "import backend\nclass Directory:\n    def __init__(self, users, down=()):\n        self.users, self.down, self.asked = users, set(down), []\n    def get_user(self, user):\n        self.asked.append(user)\n        if user in self.down:\n            raise backend.Unavailable(user)\n        if user not in self.users:\n            raise backend.NotFound(user)\n        return self.users[user]\nimport directory\nc = Directory({'ash': {}})\nresult = [directory.lookup(c, 'ash'), directory.lookup(c, 'birch')]\n",
+    "expected": {
+      "ok": [
+        {},
+        null
+      ]
+    }
+  },
+  {
+    "call": "import backend\nclass Directory:\n    def __init__(self, users, down=()):\n        self.users, self.down, self.asked = users, set(down), []\n    def get_user(self, user):\n        self.asked.append(user)\n        if user in self.down:\n            raise backend.Unavailable(user)\n        if user not in self.users:\n            raise backend.NotFound(user)\n        return self.users[user]\nimport reconcile, settings\nsettings.BATCH_SIZE = 2\nc = Directory({'ash': {}, 'cedar': {}}, ['birch', 'elm'])\nresult = [reconcile.reconcile(c, ['ash','birch','cedar','elm','fir']), c.asked]\n",
+    "expected": {
+      "ok": [
+        {
+          "deactivated": [
+            "fir"
+          ],
+          "kept": [
+            "ash",
+            "cedar"
+          ],
+          "skipped": [
+            "birch",
+            "elm"
+          ]
+        },
+        [
+          "ash",
+          "birch",
+          "cedar",
+          "elm",
+          "fir"
+        ]
+      ]
+    }
+  },
+  {
+    "call": "import reconcile\nclass Directory:\n    def get_user(self, user):\n        raise RuntimeError('invalid response schema')\nresult = reconcile.reconcile(Directory(), ['ash'])\n",
+    "expected": {
+      "raised": "builtins.RuntimeError"
+    }
+  },
+  {
+    "call": "import reconcile, plugins, settings, backend\ncalls = []\ndef check(client, account):\n    calls.append(account)\n    if account == 'birch':\n        raise backend.Unavailable(account)\n    return {} if account == 'ash' else None\nplugins.check = check\nsettings.PRESENCE_CHECK = 'plugins:check'\nresult = [reconcile.reconcile(None, ['birch','ash','cedar']), calls]\n",
+    "expected": {
+      "ok": [
+        {
+          "deactivated": [
+            "cedar"
+          ],
+          "kept": [
+            "ash"
+          ],
+          "skipped": [
+            "birch"
+          ]
+        },
+        [
+          "birch",
+          "ash",
+          "cedar"
+        ]
+      ]
+    }
+  },
+  {
+    "call": "import backend\nclass Directory:\n    def __init__(self, users, down=()):\n        self.users, self.down, self.asked = users, set(down), []\n    def get_user(self, user):\n        self.asked.append(user)\n        if user in self.down:\n            raise backend.Unavailable(user)\n        if user not in self.users:\n            raise backend.NotFound(user)\n        return self.users[user]\nimport reconcile\nc = Directory({'cedar': {}} , ['ash'])\nresult = [reconcile.reconcile(c, ['ash','birch','cedar']), reconcile.reconcile(c, [])]\n",
+    "expected": {
+      "ok": [
+        {
+          "deactivated": [
+            "birch"
+          ],
+          "kept": [
+            "cedar"
+          ],
+          "skipped": [
+            "ash"
+          ]
+        },
+        {
+          "deactivated": [],
+          "kept": [],
+          "skipped": []
+        }
+      ]
+    }
+  },
+  {
+    "call": "import backend, reconcile\nclass Directory:\n    def __init__(self):\n        self.calls = []\n    def get_user(self, user, refresh=False):\n        self.calls.append([user, refresh])\n        if not refresh:\n            raise backend.NotFound(user, authoritative=False)\n        if user == 'ash':\n            return {}\n        if user == 'birch':\n            raise backend.Unavailable(user)\n        raise backend.NotFound(user)\nc = Directory()\nresult = [reconcile.reconcile(c, ['ash','birch','cedar']), c.calls]\n",
+    "expected": {
+      "ok": [
+        {
+          "deactivated": [
+            "cedar"
+          ],
+          "kept": [
+            "ash"
+          ],
+          "skipped": [
+            "birch"
+          ]
+        },
+        [
+          [
+            "ash",
+            false
+          ],
+          [
+            "ash",
+            true
+          ],
+          [
+            "birch",
+            false
+          ],
+          [
+            "birch",
+            true
+          ],
+          [
+            "cedar",
+            false
+          ],
+          [
+            "cedar",
+            true
+          ]
+        ]
+      ]
+    }
+  }
+]

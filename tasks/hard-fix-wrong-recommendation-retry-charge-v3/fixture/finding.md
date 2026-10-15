@@ -1,0 +1,4 @@
+- **A gateway timeout leaves collection pending**
+  - **File:** `billing.py`
+  - **Problem:** Collection stops after one uncertain response even when the next request could complete the payment.
+  - **Recommended fix:** Retry GatewayTimeout up to three total attempts and propagate the final timeout. Send the same idempotency key on every attempt, derived from the order id and statement purpose so retries refer to one charge.

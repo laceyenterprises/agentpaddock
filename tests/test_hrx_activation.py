@@ -24,6 +24,11 @@ from gym_test_support import checkout_root
 
 MODULE = Path(__file__).resolve().parents[1]
 REPO = checkout_root(MODULE)
+if REPO == MODULE:
+    pytest.skip(
+        "host activation plans are not shipped in a standalone checkout",
+        allow_module_level=True,
+    )
 ACTIVATION = REPO / "projects/gym-hard-review-fix-rework/activation"
 SPEC_REF = json.loads((ACTIVATION.parent / "plan.json").read_text())["specRef"]
 DOCUMENT = yaml.safe_load((ACTIVATION / "hrx.yaml").read_text())
@@ -146,7 +151,7 @@ def test_must_fail_variants_match_recorded_sample():
     declared = {
         task.id: list(task.regression_test_must_fail_variants)
         for task in discover_tasks(MODULE / "tasks", suite="hard-fix")
-        if task.regression_test_must_fail_variants
+        if task.id.endswith("-v2") and task.regression_test_must_fail_variants
     }
     assert declared == json.loads(sample())["must_fail_variants"] == MUST_FAIL
 
