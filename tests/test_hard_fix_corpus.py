@@ -281,15 +281,11 @@ def test_correct_fix_passes(manifest, variant, tmp_path, protocol_backend):
     if manifest in REGRESSION:
         expected |= set(REGRESSION_SUBCHECKS.values())
     expected |= {
-        f"regression_test_fails_on_{variant}"
-        for variant in load_task(manifest.parent).regression_test_must_fail_variants
+        f"regression_test_fails_on_{name}"
+        for name in load_task(manifest.parent).regression_test_must_fail_variants
     }
     assert set(checks(cell)) == expected
     assert all(checks(cell).values())
-    if manifest in V3_TASKS:
-        print(
-            f"{manifest.parent.name} {variant}: {cell.outcome}; all verifier subchecks=true"
-        )
 
 
 @pytest.mark.parametrize("manifest", LITERAL, ids=ids)
@@ -594,9 +590,6 @@ def test_v3_declared_wrong_fix_fails_real_verifier(
     assert caught and all(
         observed[index]["outcome"] in {"failed", "raised"} for index in caught
     )
-    print(
-        f"{manifest.parent.name} {variant}: {cell.outcome}; hidden_tests_pass=false; cases={caught}"
-    )
 
 
 def v3_wrong_tests():
@@ -617,4 +610,3 @@ def test_v3_declared_wrong_test_fails_real_verifier(
     assert checks(cell)["hidden_tests_pass"]
     assert {name for name, passed in checks(cell).items() if not passed} == set(failing)
     assert cell.outcome == outcomes.FAILED, cell.reason
-    print(f"{manifest.parent.name} {submission}+{test}: {cell.outcome}; {failing}")

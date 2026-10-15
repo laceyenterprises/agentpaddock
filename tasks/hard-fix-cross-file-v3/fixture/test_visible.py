@@ -8,7 +8,7 @@ class Directory:
     def __init__(self, users):
         self.users = users
 
-    def get_user(self, user):
+    def get_user(self, user, refresh=False):
         if user not in self.users:
             raise NotFound(user)
         return self.users[user]

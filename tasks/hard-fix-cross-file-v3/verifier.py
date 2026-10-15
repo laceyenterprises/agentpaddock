@@ -73,7 +73,7 @@ PROTECTED = {
     "    def __init__(self, users):\n"
     "        self.users = users\n"
     "\n"
-    "    def get_user(self, user):\n"
+    "    def get_user(self, user, refresh=False):\n"
     "        if user not in self.users:\n"
     "            raise NotFound(user)\n"
     "        return self.users[user]\n"
