@@ -1,0 +1,20 @@
+{
+  "fixes": {
+    "insufficient": [
+      2
+    ],
+    "broad-catch": [
+      3
+    ],
+    "truthy-entry": [
+      2
+    ],
+    "batch-catch": [
+      5
+    ],
+    "unconfirmed-miss": [
+      6
+    ]
+  },
+  "tests": {}
+}

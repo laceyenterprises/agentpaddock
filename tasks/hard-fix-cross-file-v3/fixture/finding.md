@@ -1,0 +1,4 @@
+- **Accounts disappear during a directory incident**
+  - **File:** `directory.py`
+  - **Problem:** The account job removed active accounts while the directory was unavailable. A lookup that could not complete was treated as evidence that the account had departed.
+  - **Recommended fix:** Revise the lookup error handling and check the account job's behavior during partial failures.

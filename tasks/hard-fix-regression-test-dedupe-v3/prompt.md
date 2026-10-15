@@ -1,0 +1,11 @@
+Resolve the review findings in finding.md using the staged repository. Preserve the public behavior required by its callers and contracts. Only paths marked editable in staged-manifest.json may change. Run `python3 -m unittest test_visible` before submitting.
+
+Write a behavioral stdlib unittest module in test_regression.py. The verifier runs it on your submission and a separate correct implementation, where it must pass, and on the original and several incomplete or incorrect implementations, where it must fail. Use public functions; do not read, list, hash or introspect source files.
+
+Save your changes and write bench-result.json in the workspace root with this submission shape:
+
+```json
+{"done": true}
+```
+
+This required boolean signals completion; the captured files determine correctness. The submission JSON is the only permitted new output file.

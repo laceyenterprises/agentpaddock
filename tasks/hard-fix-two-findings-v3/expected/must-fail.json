@@ -1,0 +1,17 @@
+{
+  "fixes": {
+    "insufficient": [
+      2
+    ],
+    "literal-advice": [
+      0
+    ],
+    "floor-seconds": [
+      2
+    ],
+    "float-ceiling": [
+      2
+    ]
+  },
+  "tests": {}
+}

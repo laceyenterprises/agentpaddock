@@ -32,8 +32,8 @@ ASSERTIONS = parse_activation_yaml_document(
 ).assertions
 SUITES = ("hard-review", "hard-fix", "review", "fix")
 # HRX-02 adds three hard-review -v2 tasks and HRX-03 adds five hard-fix -v2
-# tasks beside the six HRF originals of each suite.
-DISCOVERED = {"hard-review": 9, "hard-fix": 11, "review": 6, "fix": 6}
+# tasks beside the six HRF originals of each suite; HARDFIX-01 adds five -v3 tasks.
+DISCOVERED = {"hard-review": 9, "hard-fix": 16, "review": 6, "fix": 6}
 
 
 def probe_program(index):

@@ -1,0 +1,102 @@
+[
+  {
+    "call": "from limiter import Limiter\nlim = Limiter(5, 1000)\nresult = [lim.allow('a',t,c) for t,c in [(0,2),(100,2),(200,1),(300,4),(1000,4),(1100,4),(1200,1)]]\n",
+    "expected": {
+      "ok": [
+        0,
+        0,
+        0,
+        800,
+        100,
+        0,
+        0
+      ]
+    }
+  },
+  {
+    "call": "from limiter import Limiter\nlim = Limiter(3, 1000)\nresult = [lim.allow(client,t,c) for client,t,c in [('a',0,2),('a',100,2),('a',200,1),('a',500,3),('b',500,3),('a',1000,2),('a',1100,1),('a',1200,1)]]\n",
+    "expected": {
+      "ok": [
+        0,
+        900,
+        0,
+        700,
+        0,
+        0,
+        100,
+        0
+      ]
+    }
+  },
+  {
+    "call": "from headers import rejection_headers\nresult = [rejection_headers(wait) for wait in (1,999,1000,1001,2000,1000*(2**53)+1)]\n",
+    "expected": {
+      "ok": [
+        {
+          "Retry-After": "1"
+        },
+        {
+          "Retry-After": "1"
+        },
+        {
+          "Retry-After": "1"
+        },
+        {
+          "Retry-After": "2"
+        },
+        {
+          "Retry-After": "2"
+        },
+        {
+          "Retry-After": "9007199254740993"
+        }
+      ]
+    }
+  },
+  {
+    "call": "from limiter import Limiter\nfrom proxy import handle\nlim = Limiter(5, 2000)\nfirst = [handle(lim,'a',t,c) for t,c in [(0,2),(700,2),(900,1)]]\nblocked = handle(lim,'a',1000,4)\nretry = handle(lim,'a',1000+int(blocked[1]['Retry-After'])*1000,4)\nresult = [first,blocked,retry]\n",
+    "expected": {
+      "ok": [
+        [
+          [
+            200,
+            {}
+          ],
+          [
+            200,
+            {}
+          ],
+          [
+            200,
+            {}
+          ]
+        ],
+        [
+          429,
+          {
+            "Retry-After": "2"
+          }
+        ],
+        [
+          200,
+          {}
+        ]
+      ]
+    }
+  },
+  {
+    "call": "from limiter import Limiter\nlim = Limiter(4, 10)\nresult = [lim.allow('a',t,c) for t,c in [(0,1),(0,2),(1,1),(2,4),(9,4),(10,4),(11,4),(12,1)]]\n",
+    "expected": {
+      "ok": [
+        0,
+        0,
+        0,
+        9,
+        2,
+        1,
+        0,
+        9
+      ]
+    }
+  }
+]

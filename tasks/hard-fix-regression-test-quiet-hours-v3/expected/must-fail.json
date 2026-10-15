@@ -1,0 +1,24 @@
+{
+  "fixes": {
+    "insufficient": [
+      0
+    ],
+    "literal-advice": [
+      0
+    ],
+    "all-days": [
+      0
+    ],
+    "inclusive-end": [
+      2
+    ]
+  },
+  "tests": {
+    "symptom-only.py": [
+      "regression_test_fails_on_insufficient",
+      "regression_test_fails_on_literal-advice",
+      "regression_test_fails_on_all-days",
+      "regression_test_fails_on_inclusive-end"
+    ]
+  }
+}

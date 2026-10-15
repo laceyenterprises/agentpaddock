@@ -2,8 +2,14 @@ id = "hrf-pilot"
 levels = ["high"]
 suites = ["hard-review", "hard-fix"]
 # The pilot stays the six HRF tasks per suite (144 cells); HRX-05 calibrates
-# the reworked -v2 tasks separately.
+# the reworked -v2 tasks separately. HARDFIX-01 -v3 tasks also require separate calibration.
 exclude_tasks = [
+  "hard-fix-cross-file-v3",
+  "hard-fix-regression-test-dedupe-v3",
+  "hard-fix-regression-test-quiet-hours-v3",
+  "hard-fix-two-findings-v3",
+  "hard-fix-wrong-recommendation-retry-charge-v3",
+
   "hard-review-cross-file-v2",
   "hard-review-multi-defect-outbox-v2",
   "hard-review-multi-defect-tool-calls-v2",

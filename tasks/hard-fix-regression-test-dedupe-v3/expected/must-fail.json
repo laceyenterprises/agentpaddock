@@ -1,0 +1,23 @@
+{
+  "fixes": {
+    "insufficient": [
+      0
+    ],
+    "global-key": [
+      1
+    ],
+    "joined-key": [
+      2
+    ],
+    "rewrite-row": [
+      0
+    ]
+  },
+  "tests": {
+    "symptom-only.py": [
+      "regression_test_fails_on_global-key",
+      "regression_test_fails_on_joined-key",
+      "regression_test_fails_on_rewrite-row"
+    ]
+  }
+}

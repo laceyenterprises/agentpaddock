@@ -1,0 +1,22 @@
+{
+  "fixes": {
+    "insufficient": [
+      0
+    ],
+    "literal-advice": [
+      0,
+      1
+    ],
+    "joined-key": [
+      2
+    ],
+    "broad-retry": [
+      5
+    ],
+    "two-attempts": [
+      4,
+      7
+    ]
+  },
+  "tests": {}
+}

@@ -127,6 +127,14 @@
       "excludes": null,
       "summary": "docs-retry-behavior-diff, docs-snapshot-new-command and docs-gym-baseline-keys move to task_version 3. Fact checks accept negated alternatives, contrasting outcome-specific exit codes, subject-scoped boolean --json documentation, header-selected table defaults and equivalent model-qualified key forms. Table descriptions reject conflicting --json defaults and argument-error codes; table column delimiters do not count as baseline key separators.",
       "boundary": "Version 2 results for these three tasks are not comparable with version 3 results. Saved submissions can be regraded under version 3; old results retain their original version. The other three docs tasks remain at version 2."
+    },
+    {
+      "id": "HARDFIX-01",
+      "date": "2026-10-15",
+      "kind": "task",
+      "excludes": null,
+      "summary": "Five new hard-fix -v3 task ids add contract interactions and declared plausible wrong fixes, checked through the task verifier. The regression tasks require submitted tests to distinguish three additional wrong implementations.",
+      "boundary": "The new -v3 ids start at task_version 1 on separate boards. Original and -v2 tasks, versions and published results stay unchanged; no previous row is regraded or excluded."
     }
   ],
   "schema": "paddock-changelog/v1"

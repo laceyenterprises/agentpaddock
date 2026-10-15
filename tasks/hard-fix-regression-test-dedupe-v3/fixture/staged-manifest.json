@@ -1,0 +1,13 @@
+{
+  "editable": [
+    "subscribers.py",
+    "test_regression.py"
+  ],
+  "files": [
+    "subscribers.py",
+    "newsletter.py",
+    "test_regression.py",
+    "test_visible.py",
+    "finding.md"
+  ]
+}

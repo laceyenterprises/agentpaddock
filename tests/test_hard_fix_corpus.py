@@ -20,6 +20,8 @@ from gym.schema import load_task
 
 ROOT = Path(__file__).resolve().parents[1]
 TASKS = tuple(sorted((ROOT / "tasks").glob("hard-fix-*/task.toml")))
+V3_TASKS = tuple(path for path in TASKS if path.parent.name.endswith("-v3"))
+LEGACY_TASKS = tuple(path for path in TASKS if path not in V3_TASKS)
 REGRESSION = tuple(path for path in TASKS if "-regression-test-" in path.parent.name)
 NAMES = {path.parent.name for path in TASKS}
 
@@ -63,8 +65,14 @@ TWO_FILE = (
     "hard-fix-cross-file-v2",
     "hard-fix-two-findings",
     "hard-fix-two-findings-v2",
+    "hard-fix-cross-file-v3",
+    "hard-fix-two-findings-v3",
 )
-TWO_CARDS = {"hard-fix-two-findings", "hard-fix-two-findings-v2"}
+TWO_CARDS = {
+    "hard-fix-two-findings",
+    "hard-fix-two-findings-v2",
+    "hard-fix-two-findings-v3",
+}
 
 # (checked-in test, submission variant, regression subchecks it must fail)
 REGRESSION_GRADES = [
@@ -76,7 +84,11 @@ REGRESSION_GRADES = [
         {"regression_test_fails_on_original", "regression_test_fails_on_insufficient"},
     ),
     ("source-changed.py", "reference", {"regression_test_fails_on_insufficient"}),
-    ("keyed-to-implementation.py", "alternative", {"regression_test_passes_on_reference"}),
+    (
+        "keyed-to-implementation.py",
+        "alternative",
+        {"regression_test_passes_on_reference"},
+    ),
 ]
 
 
@@ -140,7 +152,8 @@ def apply(manifest, directory, variant, test="good.py"):
 
 def grade(manifest, directory):
     return grader.grade(
-        load_task(manifest.parent), Trajectory("succeeded", {"done": True}, sandbox_root=directory)
+        load_task(manifest.parent),
+        Trajectory("succeeded", {"done": True}, sandbox_root=directory),
     )
 
 
@@ -168,15 +181,17 @@ def cards(manifest):
     return [line for line in finding.splitlines() if line.startswith("- **")]
 
 
-def test_eleven_hard_fix_contracts():
-    assert len(TASKS) == 11
-    assert len(REGRESSION) == 4
+def test_hard_fix_contracts():
+    assert len(TASKS) == 16
+    assert len(LEGACY_TASKS) == 11
+    assert len(V3_TASKS) == 5
+    assert len(REGRESSION) == 6
     assert len(LITERAL) == 4
     assert set(TWO_FILE) | TWO_CARDS <= NAMES
     assert set(LITERAL_CASES) == {path.parent.name for path in LITERAL}
     assert set(PLAUSIBLE_CASES) == {path.parent.name for path in PLAUSIBLE}
-    assert set(INSUFFICIENT_CASES) == NAMES
-    for manifest in TASKS:
+    assert set(INSUFFICIENT_CASES) == {path.parent.name for path in LEGACY_TASKS}
+    for manifest in LEGACY_TASKS:
         task = load_task(manifest.parent)
         assert task.suite == "hard-fix"
         ticket = "HRX-03" if manifest.parent.name.endswith("-v2") else "HRF-05"
@@ -187,7 +202,9 @@ def test_eleven_hard_fix_contracts():
             ("plausible-wrong",) if manifest in PLAUSIBLE else ()
         )
         cases = json.loads((manifest.parent / task.hidden_tests_entrypoint).read_text())
-        expected_tests = 4 if manifest.parent.name == "hard-fix-regression-test-dedupe-v2" else 3
+        expected_tests = (
+            4 if manifest.parent.name == "hard-fix-regression-test-dedupe-v2" else 3
+        )
         assert len(cases) == task.hidden_tests_expected_tests == expected_tests
         staged = staged_manifest(manifest)
         assert set(task.capture_files) == {*staged["files"], "staged-manifest.json"}
@@ -195,7 +212,11 @@ def test_eleven_hard_fix_contracts():
         assert "test_visible.py" not in staged["editable"]
         assert 1 <= len(sources(manifest)) <= 3
         assert (task.regression_test_path is not None) == (manifest in REGRESSION)
-        variants = {path.name for path in (manifest.parent / "expected").iterdir() if path.is_dir()}
+        variants = {
+            path.name
+            for path in (manifest.parent / "expected").iterdir()
+            if path.is_dir()
+        }
         expected = {"reference", "insufficient", "alternative"}
         if manifest in LITERAL:
             expected.add("literal-advice")
@@ -205,7 +226,9 @@ def test_eleven_hard_fix_contracts():
             expected.add("regression-tests")
         assert variants == expected
         for variant in expected - {"regression-tests"}:
-            shipped = {path.name for path in (manifest.parent / "expected" / variant).iterdir()}
+            shipped = {
+                path.name for path in (manifest.parent / "expected" / variant).iterdir()
+            }
             assert shipped == set(sources(manifest)), (manifest.parent.name, variant)
 
 
@@ -257,10 +280,16 @@ def test_correct_fix_passes(manifest, variant, tmp_path, protocol_backend):
     expected = {"edited_only_allowed_files", "hidden_tests_pass", "small_diff"}
     if manifest in REGRESSION:
         expected |= set(REGRESSION_SUBCHECKS.values())
-    if manifest in PLAUSIBLE:
-        expected.add(PLAUSIBLE_SUBCHECK)
+    expected |= {
+        f"regression_test_fails_on_{variant}"
+        for variant in load_task(manifest.parent).regression_test_must_fail_variants
+    }
     assert set(checks(cell)) == expected
     assert all(checks(cell).values())
+    if manifest in V3_TASKS:
+        print(
+            f"{manifest.parent.name} {variant}: {cell.outcome}; all verifier subchecks=true"
+        )
 
 
 @pytest.mark.parametrize("manifest", LITERAL, ids=ids)
@@ -278,7 +307,9 @@ def test_literal_advice_fails(manifest, tmp_path, protocol_backend, monkeypatch)
 @pytest.mark.parametrize("manifest", PLAUSIBLE, ids=ids)
 def test_plausible_wrong_fails(manifest, tmp_path, protocol_backend, monkeypatch):
     results = recorded_cases(monkeypatch)
-    cell = grade(manifest, apply(manifest, stage(manifest, tmp_path), "plausible-wrong"))
+    cell = grade(
+        manifest, apply(manifest, stage(manifest, tmp_path), "plausible-wrong")
+    )
     assert cell.outcome == outcomes.FAILED
     assert checks(cell)["edited_only_allowed_files"]
     assert not checks(cell)["hidden_tests_pass"]
@@ -287,8 +318,10 @@ def test_plausible_wrong_fails(manifest, tmp_path, protocol_backend, monkeypatch
     )
 
 
-@pytest.mark.parametrize("manifest", TASKS, ids=ids)
-def test_insufficient_fails_a_hidden_case(manifest, tmp_path, protocol_backend, monkeypatch):
+@pytest.mark.parametrize("manifest", LEGACY_TASKS, ids=ids)
+def test_insufficient_fails_a_hidden_case(
+    manifest, tmp_path, protocol_backend, monkeypatch
+):
     results = recorded_cases(monkeypatch)
     grade(manifest, apply(manifest, stage(manifest, tmp_path), "insufficient"))
     observed = [case["outcome"] for case in results[0]["audit_cases"]]
@@ -314,7 +347,9 @@ def protected_inputs():
 
 
 @pytest.mark.parametrize("manifest, protected", list(protected_inputs()))
-def test_reference_cannot_edit_protected_input(manifest, protected, tmp_path, protocol_backend):
+def test_reference_cannot_edit_protected_input(
+    manifest, protected, tmp_path, protocol_backend
+):
     apply(manifest, stage(manifest, tmp_path), "reference")
     with (tmp_path / protected).open("a") as handle:
         handle.write("\n# unauthorized edit\n")
@@ -336,6 +371,10 @@ def test_staging_and_visible_tests_on_every_variant(manifest, tmp_path):
         variants.append("literal-advice")
     if manifest in PLAUSIBLE:
         variants.append("plausible-wrong")
+    if manifest in V3_TASKS:
+        variants.extend(
+            v for v in wrong_variants(manifest)["fixes"] if v not in variants
+        )
     for variant in variants:
         if variant != "original":
             apply(manifest, tmp_path, variant, test=None)
@@ -357,12 +396,17 @@ def test_checked_in_regression_tests(
     assert checks(cell)["edited_only_allowed_files"]
     assert checks(cell)["hidden_tests_pass"]
     regression = {name: checks(cell)[name] for name in REGRESSION_SUBCHECKS.values()}
-    if manifest in PLAUSIBLE:
-        regression[PLAUSIBLE_SUBCHECK] = checks(cell)[PLAUSIBLE_SUBCHECK]
-        if test in {"asserts-nothing.py", "source-changed.py"}:
-            failing = failing | {PLAUSIBLE_SUBCHECK}
+    extra = {
+        f"regression_test_fails_on_{name}"
+        for name in load_task(manifest.parent).regression_test_must_fail_variants
+    }
+    regression.update({name: checks(cell)[name] for name in extra})
+    if test in {"asserts-nothing.py", "source-changed.py"}:
+        failing = failing | extra
     assert {name for name, ok in regression.items() if not ok} == failing
-    assert cell.outcome == (outcomes.FAILED if failing else outcomes.PASSED), cell.reason
+    assert cell.outcome == (outcomes.FAILED if failing else outcomes.PASSED), (
+        cell.reason
+    )
 
 
 @pytest.mark.parametrize("submission", ["reference", "alternative"])
@@ -372,7 +416,8 @@ def test_symptom_only_regression_test_misses_the_plausible_fix(
 ):
     # A test of the reported symptom alone passes on the plausible-wrong fix.
     cell = grade(
-        manifest, apply(manifest, stage(manifest, tmp_path), submission, "symptom-only.py")
+        manifest,
+        apply(manifest, stage(manifest, tmp_path), submission, "symptom-only.py"),
     )
     assert checks(cell)["edited_only_allowed_files"]
     assert checks(cell)["hidden_tests_pass"]
@@ -382,12 +427,16 @@ def test_symptom_only_regression_test_misses_the_plausible_fix(
 
 @pytest.mark.parametrize("manifest", REGRESSION, ids=ids)
 def test_sniffing_regression_test_is_held(manifest, tmp_path, protocol_backend):
-    cell = grade(manifest, apply(manifest, stage(manifest, tmp_path), "reference", "sniffing.py"))
+    cell = grade(
+        manifest, apply(manifest, stage(manifest, tmp_path), "reference", "sniffing.py")
+    )
     assert cell.outcome == outcomes.INTEGRITY_HOLD
 
 
 @pytest.mark.parametrize("manifest", REGRESSION, ids=ids)
-def test_regression_test_without_the_fix_is_not_run(manifest, tmp_path, protocol_backend):
+def test_regression_test_without_the_fix_is_not_run(
+    manifest, tmp_path, protocol_backend
+):
     # A good test alone does not grade the test: the hidden cases gate it.
     cell = grade(manifest, apply(manifest, stage(manifest, tmp_path), "insufficient"))
     assert cell.outcome == outcomes.FAILED
@@ -445,3 +494,127 @@ def test_generated_inputs_are_current(manifest, pinned_ruff):
     from regenerate_hard_fix import regenerate
 
     assert regenerate(manifest.parent) == []
+
+
+# HARDFIX-01: declarations are maintained with each task, never staged or
+# inferred from the reference implementation. All grading uses the production
+# grader, verifier and hidden runner with the synthetic protocol backend.
+def wrong_variants(manifest):
+    return json.loads((manifest.parent / "expected/must-fail.json").read_text())
+
+
+V3_IDS = {
+    "hard-fix-cross-file-v3",
+    "hard-fix-regression-test-dedupe-v3",
+    "hard-fix-regression-test-quiet-hours-v3",
+    "hard-fix-two-findings-v3",
+    "hard-fix-wrong-recommendation-retry-charge-v3",
+}
+
+
+def test_v3_discovery_and_pilot_membership():
+    from gym.suite import discover_tasks
+    import tomllib
+
+    discovered = discover_tasks(ROOT / "tasks", suite="hard-fix")
+    assert len(discovered) == 16
+    assert {task.id for task in discovered if task.id.endswith("-v3")} == V3_IDS
+    by_id = {task.id: task for task in discovered}
+    for slug in V3_IDS:
+        assert by_id[slug].task_version == 1
+        assert slug.removesuffix("-v3") in by_id
+        assert slug.removesuffix("-v3") + "-v2" in by_id
+    battery = tomllib.loads((ROOT / "batteries/hrf-pilot.toml").read_text())
+    selected = [
+        task
+        for task in discover_tasks(ROOT / "tasks")
+        if task.suite in battery["suites"] and task.id not in battery["exclude_tasks"]
+    ]
+    models = sum(len(family["models"]) for family in battery["families"].values())
+    assert (
+        len(selected) * models * len(battery["levels"]) * battery["repetitions"]
+        == battery["budget"]["max_cells"]
+        == 144
+    )
+    assert V3_IDS <= set(battery["exclude_tasks"])
+
+
+@pytest.mark.parametrize("manifest", V3_TASKS, ids=ids)
+def test_v3_authoring_contract(manifest):
+    task = load_task(manifest.parent)
+    declaration = wrong_variants(manifest)
+    assert len(declaration["fixes"]) >= 2
+    assert set(declaration) == {"fixes", "tests"}
+    assert set(task.regression_test_must_fail_variants) <= set(declaration["fixes"])
+    if task.regression_test_path:
+        assert len(task.regression_test_must_fail_variants) >= 2
+        assert declaration["tests"]
+    variants = {p.name for p in (manifest.parent / "expected").iterdir() if p.is_dir()}
+    assert variants == {"reference", "alternative", *declaration["fixes"]} | (
+        {"regression-tests"} if task.regression_test_path else set()
+    )
+    for variant in variants - {"regression-tests"}:
+        assert {
+            p.name for p in (manifest.parent / "expected" / variant).iterdir()
+        } == set(sources(manifest))
+    staged = staged_manifest(manifest)
+    assert set(task.capture_files) == {*staged["files"], "staged-manifest.json"}
+    assert "test_visible.py" not in staged["editable"]
+    assert 1 <= len(sources(manifest)) <= 3
+    assert task.hidden_tests_timeout_seconds == 20
+    assert (
+        len(json.loads((manifest.parent / task.hidden_tests_entrypoint).read_text()))
+        == task.hidden_tests_expected_tests
+    )
+
+
+def v3_wrong_fixes():
+    for manifest in V3_TASKS:
+        for variant, caught in wrong_variants(manifest)["fixes"].items():
+            yield pytest.param(
+                manifest, variant, caught, id=f"{manifest.parent.name}:{variant}"
+            )
+
+
+@pytest.mark.parametrize("manifest, variant, caught", list(v3_wrong_fixes()))
+def test_v3_declared_wrong_fix_fails_real_verifier(
+    manifest, variant, caught, tmp_path, protocol_backend, monkeypatch
+):
+    results = recorded_cases(monkeypatch)
+    cell = grade(manifest, apply(manifest, stage(manifest, tmp_path), variant))
+    assert cell.outcome == outcomes.FAILED, cell.reason
+    assert checks(cell)["edited_only_allowed_files"]
+    assert not checks(cell)["hidden_tests_pass"]
+    observed = results[0]["audit_cases"]
+    assert len(observed) == load_task(manifest.parent).hidden_tests_expected_tests
+    assert all(
+        case["executed"] and case["outcome"] in {"passed", "failed", "raised"}
+        for case in observed
+    )
+    assert caught and all(
+        observed[index]["outcome"] in {"failed", "raised"} for index in caught
+    )
+    print(
+        f"{manifest.parent.name} {variant}: {cell.outcome}; hidden_tests_pass=false; cases={caught}"
+    )
+
+
+def v3_wrong_tests():
+    for manifest in V3_TASKS:
+        for test, failing in wrong_variants(manifest)["tests"].items():
+            yield pytest.param(
+                manifest, test, failing, id=f"{manifest.parent.name}:{test}"
+            )
+
+
+@pytest.mark.parametrize("manifest, test, failing", list(v3_wrong_tests()))
+@pytest.mark.parametrize("submission", ["reference", "alternative"])
+def test_v3_declared_wrong_test_fails_real_verifier(
+    manifest, test, failing, submission, tmp_path, protocol_backend
+):
+    cell = grade(manifest, apply(manifest, stage(manifest, tmp_path), submission, test))
+    assert checks(cell)["edited_only_allowed_files"]
+    assert checks(cell)["hidden_tests_pass"]
+    assert {name for name, passed in checks(cell).items() if not passed} == set(failing)
+    assert cell.outcome == outcomes.FAILED, cell.reason
+    print(f"{manifest.parent.name} {submission}+{test}: {cell.outcome}; {failing}")

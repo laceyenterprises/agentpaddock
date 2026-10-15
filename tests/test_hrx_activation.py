@@ -146,7 +146,7 @@ def test_must_fail_variants_match_recorded_sample():
     declared = {
         task.id: list(task.regression_test_must_fail_variants)
         for task in discover_tasks(MODULE / "tasks", suite="hard-fix")
-        if task.regression_test_must_fail_variants
+        if task.id.endswith("-v2") and task.regression_test_must_fail_variants
     }
     assert declared == json.loads(sample())["must_fail_variants"] == MUST_FAIL
 

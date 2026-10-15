@@ -1511,7 +1511,7 @@ Ordinary gym tasks omit this optional OS-integration field.
 
 ### Hard review and hard fix (HRF)
 
-`hard-review` discovers nine tasks and `hard-fix` eleven. They exist because every
+`hard-review` discovers nine tasks and `hard-fix` sixteen. They exist because every
 frontier combo passes all six RFD review tasks and every measured model passes
 the RFD fix tasks. Task ids start with `hard-review-` and `hard-fix-`, so they
 never match RFD's `review-*` and `fix-*` globs; `--suite review|fix` still
@@ -1534,6 +1534,34 @@ so earlier results remain comparable.
 | `hard-fix-two-findings-v2` | Trusting both cards: one recommended fix is subtly wrong, as a different staged file shows; ships `literal-advice` |
 | `hard-fix-wrong-recommendation-retry-charge-v2` | Evidence next to the finding: the proof the advice is wrong sits in a staged caller and gateway contract; ships `literal-advice` |
 | `hard-fix-cross-file-v2` | Name search: the second edit reaches the changed function only through a configured `module:function` name |
+
+The five hard-fix `-v3` tasks retain the earlier tasks under their existing
+ids and versions. The v2 findings largely spelled out the repair, and their
+small hidden examples did not exercise several interacting caller contracts:
+list scope, weekly window ownership, weighted capacity, retry identity and
+per-account failure scope. The added scenarios extend those contracts rather
+than changing the historical tasks. Passing a symptom test was too close to completing
+the task. The v3 prompts describe outcomes; the staged contracts determine
+correct behavior.
+
+| New task | Contracts exercised together |
+|---|---|
+| `hard-fix-cross-file-v3` | Authoritative lookup after cache misses, configured calls, per-account continuation and batch boundaries |
+| `hard-fix-regression-test-dedupe-v3` | Independent list subscriptions, opaque compound identity, raw spelling, row identity and one-shot input |
+| `hard-fix-regression-test-quiet-hours-v3` | Weekly opening-day ownership, overnight spill, precise boundaries and empty windows |
+| `hard-fix-two-findings-v3` | Weighted admission, multiple expirations, minimum retry delay and exact integer conversion |
+| `hard-fix-wrong-recommendation-retry-charge-v3` | Stable payment identity, mutable descriptions, compound-key collisions and uncertain retry outcomes |
+
+Design rule: declare at least two plausible wrong fixes in each v3 task's
+`expected/must-fail.json`, including the hidden case indices expected to catch
+each. Every wrong fix must pass the protected visible tests and fail through
+the normal grader and verifier. A separate correct implementation must pass
+as well. Regression tasks also declare three `must_fail_variants` in
+`task.toml`, and check a symptom-only submitted test against those variants.
+These files are never staged. The existing capture, hidden execution,
+timeouts and deterministic synthetic-input conventions apply unchanged.
+Cross-harness/model calibration is a separate operator step after merge;
+wrong-variant rejection is authoring evidence, not measured model discrimination.
 
 #### Review grading: recall, decoys and any-of windows
 
@@ -1655,23 +1683,25 @@ parameters below. RFD verifiers pass none of them and grade byte-identically
   `keyed-to-implementation`, `sniffing`).
 - Pin the task in `tests/test_hard_review_corpus.py` or
   `tests/test_hard_fix_corpus.py`; both list the corpus explicitly. Adding a
-  task also changes the task-count expectation in `hrf.yaml` and its discovery
-  sample, so update them together. A new `-v2` task also changes the id list
-  in `hrx.yaml` and its sample.
+  task also changes discovery counts and any pilot exclusions in this repository.
+  Host-owned activation files (`hrf.yaml`, `hrx.yaml` and their samples) live
+  outside this public checkout; the operator must synchronize them when deploying
+  a corpus expansion. The HRX v2 probe continues to cover only v2 tasks.
 
 #### Battery and activation
 
 `batteries/hrf-pilot.toml` selects both suites, codex (`gpt-6.1-sol`,
 `gpt-6-astra`) and claude-code (`claude-opus-5-5`, `claude-sonnet-5-5`) at
-`high`, three repetitions (144 cells). It excludes the `-v2` tasks, which are
+`high`, three repetitions (144 cells). It excludes the `-v2` and `-v3` tasks, which are
 calibrated separately. Set its token budget before a real run.
 
 `projects/gym-hard-review-fix/activation/hrf.yaml` holds two PMA probes, run
 after a deploy that touches the pack. RFD's `rfd.yaml` is unchanged and must
 still pass.
 
-- `hrf-task-discovery` asserts nine `hard-review` tasks, eleven `hard-fix`
-  tasks, and six in each of `review` and `fix` in the resolved deploy checkout.
+- `hrf-task-discovery` must count nine `hard-review` tasks, sixteen `hard-fix`
+  tasks, and six in each of `review` and `fix` after the operator synchronizes
+  the host-owned probe and its recorded sample for the expanded corpus.
 - `hrf-regression-test-containment` builds a synthetic one-target `hard-fix`
   task under the shared HQ scratch root and calls `run_regression_test` twice.
   A trivial test must pass all four subchecks. A socket-opening test must see a

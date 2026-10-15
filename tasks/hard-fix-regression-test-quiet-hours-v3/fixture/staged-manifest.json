@@ -1,0 +1,14 @@
+{
+  "editable": [
+    "freeze.py",
+    "test_regression.py"
+  ],
+  "files": [
+    "freeze.py",
+    "deployer.py",
+    "policy.py",
+    "test_regression.py",
+    "test_visible.py",
+    "finding.md"
+  ]
+}

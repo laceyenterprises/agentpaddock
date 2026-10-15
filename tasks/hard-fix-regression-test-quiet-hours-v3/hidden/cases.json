@@ -1,0 +1,132 @@
+[
+  {
+    "call": "from datetime import datetime\nimport deployer\nresult = [deployer.may_deploy('maple', datetime(2026,10,day,hour))\n          for day, hour in [(5,23),(6,2),(10,2),(10,23),(11,2),(12,2)]]\n",
+    "expected": {
+      "ok": [
+        false,
+        false,
+        false,
+        true,
+        true,
+        true
+      ]
+    }
+  },
+  {
+    "call": "from datetime import datetime, time\nfrom freeze import in_freeze\nresult = [in_freeze(datetime(2026,10,day,hour),time(22),time(6),(6,))\n          for day,hour in [(11,23),(12,2),(12,6),(12,23),(11,2)]]\n",
+    "expected": {
+      "ok": [
+        true,
+        true,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  {
+    "call": "from datetime import datetime, time\nfrom freeze import in_freeze\nresult = [\n    in_freeze(datetime(2026,10,6,6),time(22),time(6),(0,)),\n    in_freeze(datetime(2026,10,6,5,59,59,999999),time(22),time(6),(0,)),\n    in_freeze(datetime(2026,10,5,22),time(22),time(6),(0,)),\n    in_freeze(datetime(2026,10,5,14),time(12),time(14),(0,)),\n    in_freeze(datetime(2026,10,5,13),time(12),time(14),()),\n    in_freeze(datetime(2026,10,5,12),time(12),time(12),(0,)),\n]\n",
+    "expected": {
+      "ok": [
+        false,
+        true,
+        true,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  {
+    "call": "from datetime import datetime, timedelta, time\nfrom freeze import in_freeze\norigin = datetime(2026,10,5)\nresult = [in_freeze(origin + timedelta(minutes=minute), time(22), time(6), (0,4,6))\n          for minute in range(0, 7*1440, 137)]\n",
+    "expected": {
+      "ok": [
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ]
+    }
+  },
+  {
+    "call": "from datetime import datetime\nimport deployer\nresult = [deployer.may_deploy(team, datetime(2026,10,day,hour), hotfix=hotfix)\n          for team,day,hour,hotfix in [('maple',10,2,False),('maple',10,2,True),('birch',5,0,False),('cedar',10,13,False)]]\n",
+    "expected": {
+      "ok": [
+        false,
+        true,
+        true,
+        true
+      ]
+    }
+  }
+]
