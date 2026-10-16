@@ -277,3 +277,132 @@ def test_smv_sandbox_required_failure_and_host_unavailable():
     host = harness["run"](mode="host")
     assert host["verdict"] == "fail"
     assert all(s["verdict"] == "unavailable" for s in host["steps"])
+
+
+def _smoke_harness():
+    import runpy
+    from pathlib import Path
+
+    return runpy.run_path(str(Path(__file__).resolve().parents[1] / "scripts/smoke.py"))
+
+
+def test_smv_verifiers_run_in_owned_groups_with_closed_stdin():
+    import os
+    import signal
+    import subprocess
+    from unittest.mock import patch
+
+    harness = _smoke_harness()
+    with (
+        patch.object(subprocess, "Popen", wraps=subprocess.Popen) as spawn,
+        patch.object(os, "killpg", wraps=os.killpg) as kill,
+    ):
+        report = harness["run"]()
+    assert report["verdict"] == "pass", report
+    assert spawn.call_count == 2
+    assert kill.call_count == spawn.call_count
+    for call in spawn.call_args_list:
+        assert call.args[0][1:] == ["-S", "verifier.py"]
+        assert call.kwargs["stdin"] == subprocess.DEVNULL
+        assert call.kwargs["start_new_session"] is True
+    assert all(call.args[1] == signal.SIGKILL for call in kill.call_args_list)
+
+
+@pytest.mark.parametrize("failure", [None, "child-timeout", "invocation-timeout"])
+def test_smv_verifier_cleanup_on_success_and_timeouts(failure):
+    import os
+    import signal
+    import subprocess
+    from unittest.mock import Mock, patch
+
+    harness = _smoke_harness()
+    proc = Mock(pid=123, returncode=0)
+    proc.communicate.return_value = ("verdict", "")
+    error = {
+        None: None,
+        "child-timeout": subprocess.TimeoutExpired("verifier.py", 15),
+        "invocation-timeout": harness["InvocationTimeout"]("budget exceeded"),
+    }[failure]
+    proc.communicate.side_effect = error
+
+    def invoke():
+        return harness["verifier_process"](
+            ["python", "-S", "verifier.py"],
+            cwd="gym-verify-fixture",
+            env={},
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    with (
+        patch.object(subprocess, "Popen", return_value=proc),
+        patch.object(os, "killpg") as kill,
+    ):
+        if error is None:
+            assert invoke().stdout == "verdict"
+        else:
+            with pytest.raises(type(error)):
+                invoke()
+    proc.communicate.assert_called_once_with(timeout=15)
+    kill.assert_called_once_with(proc.pid, signal.SIGKILL)
+    proc.wait.assert_called_once_with(timeout=3)
+
+
+def test_smv_invocation_alarm_aborts_steps_and_restores_state(monkeypatch):
+    import os
+    import signal
+    from unittest.mock import Mock
+
+    harness = _smoke_harness()
+    previous = signal.getsignal(signal.SIGALRM)
+    monkeypatch.setenv("SMV_COMMIT", "synthetic")
+
+    def expire(*args):
+        signal.raise_signal(signal.SIGALRM)
+
+    exercise = Mock(side_effect=expire)
+    monkeypatch.setitem(harness["main"].__globals__, "exercise", exercise)
+    with pytest.raises(
+        harness["InvocationTimeout"], match="invocation budget exceeded"
+    ):
+        harness["main"]()
+    assert exercise.call_count == 1
+    assert signal.getsignal(signal.SIGALRM) == previous
+    assert signal.getitimer(signal.ITIMER_REAL) == (0, 0)
+    assert os.environ["SMV_COMMIT"] == "synthetic"
+
+
+def test_smv_entrypoint_leaves_parent_stdin_open(monkeypatch, capsys):
+    import io
+    import runpy
+    import sys
+    from pathlib import Path
+
+    stdin = io.StringIO("")
+    monkeypatch.setattr(sys, "stdin", stdin)
+    monkeypatch.setenv("SMV_COMMIT", "synthetic")
+    with pytest.raises(SystemExit) as exited:
+        runpy.run_path(
+            str(Path(__file__).resolve().parents[1] / "scripts/smoke.py"),
+            run_name="__main__",
+        )
+    assert exited.value.code == 0
+    assert not stdin.closed
+    assert '"verdict": "pass"' in capsys.readouterr().out
+
+
+def test_smv_terminal_states_cannot_resume_other_states():
+    from smv_sources import definition, verify
+
+    doc = definition()
+    endpoint = next(obj for obj in doc["objects"] if obj["id"] == "paddock.endpoint")
+    assert {
+        edge["to"] for edge in endpoint["transitions"] if edge["from"] == "closed"
+    } == {"closed", "[*]"}
+    grade = next(obj for obj in doc["objects"] if obj["id"] == "paddock.grade")
+    next(state for state in grade["states"] if state["name"] == "passed")[
+        "terminal"
+    ] = True
+    with pytest.raises(AssertionError, match="terminal state cannot transition"):
+        verify(doc)

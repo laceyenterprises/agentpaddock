@@ -17,6 +17,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "lib/python"))
 
 
+class InvocationTimeout(BaseException):
+    """Abort the invocation through step and owner-level exception handlers."""
+
+
 def exercise(step, scratch):
     from gym import host_services, taint
     from gym.grader import Trajectory
@@ -166,6 +170,7 @@ def run(mode="sandbox", commit="synthetic", fail_step=None):
     with (
         tempfile.TemporaryDirectory(prefix="paddock-smv-") as tmp,
         patch.object(socket.socket, "connect", deny),
+        patch.object(subprocess, "run", verifier_process),
     ):
         for step in doc["steps"]:
             tick = time.monotonic()
@@ -225,7 +230,7 @@ def main():
     }
 
     def overdue(*_):
-        raise TimeoutError("180-second invocation budget exceeded")
+        raise InvocationTimeout("180-second invocation budget exceeded")
 
     previous = signal.signal(signal.SIGALRM, overdue)
     signal.setitimer(signal.ITIMER_REAL, 175)
@@ -251,5 +256,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.stdin.close()
     raise SystemExit(main())

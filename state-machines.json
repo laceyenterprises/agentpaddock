@@ -5,7 +5,8 @@
       "id": "paddock.grade",
       "owner": "tools/paddock",
       "codeSources": [
-        "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade",
+        "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch"
       ],
       "states": [
         {
@@ -14,27 +15,57 @@
         },
         {
           "name": "error",
-          "terminal": true
+          "terminal": false,
+          "exitOwner": "gym.suite.run_suite caller",
+          "maxDurationSeconds": 180,
+          "overdueRecipient": "paddock maintainer",
+          "enforcement": "missing",
+          "deadEndEvidence": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch: inline suite normalization; no mandatory total suite deadline"
         },
         {
           "name": "failed",
-          "terminal": true
+          "terminal": false,
+          "exitOwner": "gym.suite.run_suite caller",
+          "maxDurationSeconds": 180,
+          "overdueRecipient": "paddock maintainer",
+          "enforcement": "missing",
+          "deadEndEvidence": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch: inline suite normalization; no mandatory total suite deadline"
         },
         {
           "name": "format_failed",
-          "terminal": true
+          "terminal": false,
+          "exitOwner": "gym.suite.run_suite caller",
+          "maxDurationSeconds": 180,
+          "overdueRecipient": "paddock maintainer",
+          "enforcement": "missing",
+          "deadEndEvidence": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch: inline suite normalization; no mandatory total suite deadline"
         },
         {
           "name": "integrity_hold",
-          "terminal": true
+          "terminal": false,
+          "exitOwner": "gym.suite.run_suite caller",
+          "maxDurationSeconds": 180,
+          "overdueRecipient": "paddock maintainer",
+          "enforcement": "missing",
+          "deadEndEvidence": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch: inline suite normalization; no mandatory total suite deadline"
         },
         {
           "name": "no_submission",
-          "terminal": true
+          "terminal": false,
+          "exitOwner": "gym.suite.run_suite caller",
+          "maxDurationSeconds": 180,
+          "overdueRecipient": "paddock maintainer",
+          "enforcement": "missing",
+          "deadEndEvidence": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch: inline suite normalization; no mandatory total suite deadline"
         },
         {
           "name": "passed",
-          "terminal": true
+          "terminal": false,
+          "exitOwner": "gym.suite.run_suite caller",
+          "maxDurationSeconds": 180,
+          "overdueRecipient": "paddock maintainer",
+          "enforcement": "missing",
+          "deadEndEvidence": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch: inline suite normalization; no mandatory total suite deadline"
         },
         {
           "name": "skipped_no_taint_gate",
@@ -177,42 +208,42 @@
           "from": "error",
           "to": "agent_error",
           "trigger": "level.error",
-          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+          "codeSource": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch"
         },
         {
           "id": "paddock.grade.level.failed",
           "from": "failed",
           "to": "agent_error",
           "trigger": "level.failed",
-          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+          "codeSource": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch"
         },
         {
           "id": "paddock.grade.level.format_failed",
           "from": "format_failed",
           "to": "agent_error",
           "trigger": "level.format_failed",
-          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+          "codeSource": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch"
         },
         {
           "id": "paddock.grade.level.integrity_hold",
           "from": "integrity_hold",
           "to": "agent_error",
           "trigger": "level.integrity_hold",
-          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+          "codeSource": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch"
         },
         {
           "id": "paddock.grade.level.no_submission",
           "from": "no_submission",
           "to": "agent_error",
           "trigger": "level.no_submission",
-          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+          "codeSource": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch"
         },
         {
           "id": "paddock.grade.level.passed",
           "from": "passed",
           "to": "agent_error",
           "trigger": "level.passed",
-          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+          "codeSource": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch"
         }
       ]
     },
@@ -284,13 +315,6 @@
           "from": "warming",
           "to": "ready",
           "trigger": "register",
-          "codeSource": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap"
-        },
-        {
-          "id": "paddock.endpoint.down.closed",
-          "from": "closed",
-          "to": "closing",
-          "trigger": "down.closed",
           "codeSource": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap"
         },
         {

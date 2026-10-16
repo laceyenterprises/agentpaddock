@@ -58,13 +58,20 @@ def audit(src):
         for k, v in zip(n.keys, n.values)
         if isinstance(k, ast.Constant) and k.value == "state" and isinstance(v, ast.Constant)
     }
-    assert initial == {"creating"} and written == {"warming", "ready", "closing", "closed"}
+    assert initial == {"creating"} and written == {
+        "warming",
+        "ready",
+        "closing",
+        "closed",
+    }
     result["paddock.endpoint"] = [
         ("create", "[*]", next(iter(initial))),
         ("warm", "creating", "warming"),
         ("register", "warming", "ready"),
     ]
-    result["paddock.endpoint"] += [("down." + s, s, "closing") for s in sorted(initial | written)]
+    result["paddock.endpoint"] += [
+        ("down." + s, s, "closing") for s in sorted((initial | written) - {"closed"})
+    ]
     result["paddock.endpoint"] += [
         ("delete", "closing", "closed"),
         ("replay", "closed", "closed"),
@@ -156,6 +163,12 @@ def verify(doc, src=None):
             "[*]"
         }
         for state in obj["states"]:
+            if state["terminal"]:
+                assert all(
+                    e["to"] in {state["name"], "[*]"}
+                    for e in obj["transitions"]
+                    if e["from"] == state["name"]
+                ), "terminal state cannot transition to another state"
             if not state["terminal"]:
                 assert state["exitOwner"] and state["overdueRecipient"]
                 assert 0 < state["maxDurationSeconds"] < float("inf")

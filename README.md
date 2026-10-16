@@ -1771,7 +1771,7 @@ and `output_limit_exceeded`, never grading partial evidence.
 - `owned-lease-cleanup` (`lease.lifecycle`): Create/admit/close a disposable endpoint lease through real Manager methods with a synthetic provider API.
 - `deadline-is-not-success` (`suite.timeout`): A synthetic timed-out trajectory remains a non-passing agent error; no model, container or host dispatch runs.
 
-The harness uses disposable stores and synthetic external boundaries. Required missing, failed or unavailable evidence exits nonzero. No ambient credentials or endpoints are accepted by the CLI. Host mode is unavailable until a safe canary is approved; SRE instead inspects installed version and authoritative recent tool receipts read-only after deployment. SRE verifies service owner, launchd domain and documented restart path before any separately authorized activation. The existing main-catchup declaration lane owns page-once module/step/commit failures, with no revert and no later-deploy hold. No scheduled workflow changes.
+The harness uses disposable stores and synthetic external boundaries. Verifier children use closed stdin (`DEVNULL`), isolated process groups and a 15-second timeout; each group is killed and its child reaped on return or failure. The invocation alarm aborts the whole run after 175 seconds, leaving cleanup time within the 180-second budget. Required missing, failed or unavailable evidence exits nonzero. No ambient credentials or endpoints are accepted by the CLI. Host mode is unavailable until a safe canary is approved; SRE instead inspects installed version and authoritative recent tool receipts read-only after deployment. SRE verifies service owner, launchd domain and documented restart path before any separately authorized activation. The existing main-catchup declaration lane owns page-once module/step/commit failures, with no revert and no later-deploy hold. No scheduled workflow changes.
 
 <!-- smv:state-machines:start -->
 
@@ -1781,6 +1781,11 @@ Generated from `state-machines.json`. Missing enforcement describes existing dea
 the listed owners and durations are proposed contracts, not implemented repairs.
 
 #### paddock.grade
+
+Cell verdicts remain provisional until inline suite reasoning-level validation
+finishes. The six verdicts with `level.*` edges can be invalidated to
+`agent_error`; their end edges represent accepting the verdict unchanged.
+`agent_error` and the two undispatched gate outcomes are terminal.
 
 ```mermaid
 stateDiagram-v2
@@ -1831,7 +1836,6 @@ stateDiagram-v2
     [*] --> s_6372656174696e67: paddock.endpoint.create
     s_6372656174696e67 --> s_7761726d696e67: paddock.endpoint.warm
     s_7761726d696e67 --> s_7265616479: paddock.endpoint.register
-    s_636c6f736564 --> s_636c6f73696e67: paddock.endpoint.down.closed
     s_636c6f73696e67 --> s_636c6f73696e67: paddock.endpoint.down.closing
     s_6372656174696e67 --> s_636c6f73696e67: paddock.endpoint.down.creating
     s_7265616479 --> s_636c6f73696e67: paddock.endpoint.down.ready
@@ -1872,6 +1876,12 @@ stateDiagram-v2
 
 | Object | Non-terminal states | Proposed exit owner | Proposed maximum | Recipient | Enforcement |
 |---|---|---|---|---|---|
+| paddock.grade | `error` | gym.suite.run_suite caller | 180s | paddock maintainer | missing |
+| paddock.grade | `failed` | gym.suite.run_suite caller | 180s | paddock maintainer | missing |
+| paddock.grade | `format_failed` | gym.suite.run_suite caller | 180s | paddock maintainer | missing |
+| paddock.grade | `integrity_hold` | gym.suite.run_suite caller | 180s | paddock maintainer | missing |
+| paddock.grade | `no_submission` | gym.suite.run_suite caller | 180s | paddock maintainer | missing |
+| paddock.grade | `passed` | gym.suite.run_suite caller | 180s | paddock maintainer | missing |
 | paddock.endpoint | `closing` | paddock maintainer/caller | 180s | paddock maintainer | missing |
 | paddock.endpoint | `creating` | paddock maintainer/caller | 180s | paddock maintainer | missing |
 | paddock.endpoint | `ready` | paddock maintainer/caller | 180s | paddock maintainer | missing |
