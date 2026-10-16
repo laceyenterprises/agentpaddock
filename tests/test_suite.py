@@ -76,12 +76,10 @@ def test_discover_unknown_suite_raises():
 
 def test_lock_scope_uses_the_effective_dispatch_class():
     tasks = discover_tasks(MINI_SUITE, task="mini-pass")
-    assert in_scope_agents(tasks, taint.ENFORCE, worker_class="oss-codex") == [
-        "oss-codex"
+    assert in_scope_agents(tasks, taint.ENFORCE, worker_class="oss-codex") == ["oss-codex"]
+    assert in_scope_agents(tasks, taint.ENFORCE, model="local/qwen2.5-coder-32b-q5") == [
+        "oss-local"
     ]
-    assert in_scope_agents(
-        tasks, taint.ENFORCE, model="local/qwen2.5-coder-32b-q5"
-    ) == ["oss-local"]
 
 
 def test_run_suite_summary_shape_matches_spec_mockup():
@@ -119,12 +117,8 @@ def test_a_poll_deadline_cell_carries_its_terminal_status():
         launch_request_id="lrq-q",
         error="did not reach terminal",
     )
-    source = MappingSource(
-        {"mini-pass": timed_out, "mini-fail": _result_trajectory("bad")}
-    )
-    summary = run_suite(
-        tasks, source, suite=ALL_SUITE, taint_mode=taint.ENFORCE
-    ).summary_dict()
+    source = MappingSource({"mini-pass": timed_out, "mini-fail": _result_trajectory("bad")})
+    summary = run_suite(tasks, source, suite=ALL_SUITE, taint_mode=taint.ENFORCE).summary_dict()
     by_task = {c["task"]: c for c in summary["cells"]}
     assert by_task["mini-pass"]["verdict"] == outcomes.AGENT_ERROR
     assert by_task["mini-pass"]["terminalStatus"] == "timeout"
@@ -170,9 +164,7 @@ def test_an_unmodelled_run_keys_verdicts_on_the_bare_task_id():
     # default run has to keep producing keys that compare against them.
     from gym.suite import SuiteResult
 
-    result = SuiteResult(
-        suite="coding", graded=[_graded("coding-missing-commit", outcomes.PASSED)]
-    )
+    result = SuiteResult(suite="coding", graded=[_graded("coding-missing-commit", outcomes.PASSED)])
     assert result.verdicts() == {"coding-missing-commit": outcomes.PASSED}
 
 
@@ -267,9 +259,7 @@ def test_smv_sandbox_required_failure_and_host_unavailable():
     import runpy
     from pathlib import Path
 
-    harness = runpy.run_path(
-        str(Path(__file__).resolve().parents[1] / "scripts/smoke.py")
-    )
+    harness = runpy.run_path(str(Path(__file__).resolve().parents[1] / "scripts/smoke.py"))
     report = harness["run"]()
     assert report["verdict"] == "pass", report
     assert report["durationSeconds"] < 180
@@ -349,7 +339,7 @@ def test_smv_verifier_cleanup_on_success_and_timeouts(failure):
     proc.wait.assert_called_once_with(timeout=3)
 
 
-def test_smv_invocation_alarm_aborts_steps_and_restores_state(monkeypatch):
+def test_smv_invocation_alarm_aborts_steps_and_restores_state(monkeypatch, capsys):
     import os
     import signal
     from unittest.mock import Mock
@@ -363,10 +353,12 @@ def test_smv_invocation_alarm_aborts_steps_and_restores_state(monkeypatch):
 
     exercise = Mock(side_effect=expire)
     monkeypatch.setitem(harness["main"].__globals__, "exercise", exercise)
-    with pytest.raises(
-        harness["InvocationTimeout"], match="invocation budget exceeded"
-    ):
-        harness["main"]()
+    assert harness["main"]() == 1
+    import json
+
+    report = json.loads(capsys.readouterr().out.splitlines()[-1])
+    assert report["steps"][0]["verdict"] == "fail"
+    assert all(s["verdict"] == "unavailable" for s in report["steps"][1:])
     assert exercise.call_count == 1
     assert signal.getsignal(signal.SIGALRM) == previous
     assert signal.getitimer(signal.ITIMER_REAL) == (0, 0)
@@ -397,12 +389,11 @@ def test_smv_terminal_states_cannot_resume_other_states():
 
     doc = definition()
     endpoint = next(obj for obj in doc["objects"] if obj["id"] == "paddock.endpoint")
-    assert {
-        edge["to"] for edge in endpoint["transitions"] if edge["from"] == "closed"
-    } == {"closed", "[*]"}
+    assert {edge["to"] for edge in endpoint["transitions"] if edge["from"] == "closed"} == {
+        "closed",
+        "[*]",
+    }
     grade = next(obj for obj in doc["objects"] if obj["id"] == "paddock.grade")
-    next(state for state in grade["states"] if state["name"] == "passed")[
-        "terminal"
-    ] = True
+    next(state for state in grade["states"] if state["name"] == "passed")["terminal"] = True
     with pytest.raises(AssertionError, match="terminal state cannot transition"):
         verify(doc)

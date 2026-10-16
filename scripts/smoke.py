@@ -17,10 +17,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "lib/python"))
 
 
-class InvocationTimeout(BaseException):
-    """Abort the invocation through step and owner-level exception handlers."""
-
-
 def exercise(step, scratch):
     from gym import host_services, taint
     from gym.grader import Trajectory
@@ -43,9 +39,7 @@ def exercise(step, scratch):
             host_services.StandaloneServices(env={}, config={}, root=scratch)
         )
         try:
-            result = run_suite(
-                tasks, Source(), suite=ALL_SUITE, taint_mode=taint.ENFORCE
-            )
+            result = run_suite(tasks, Source(), suite=ALL_SUITE, taint_mode=taint.ENFORCE)
             verdicts = result.verdicts()
             if step == "suite.grade":
                 assert verdicts == {"mini-pass": "passed", "mini-fail": "failed"}
@@ -159,6 +153,35 @@ def verifier_process(argv, *, cwd, env, capture_output, text, timeout):
         proc.wait(timeout=3)
 
 
+class InvocationDeadline(BaseException):
+    """Invocation cancellation must bypass ordinary per-step error handlers."""
+
+
+InvocationTimeout = InvocationDeadline
+
+
+def incomplete_rows(doc, rows, mode, tick, error):
+    if len(rows) == len(doc["steps"]):
+        rows[-1].update(
+            verdict="fail", observed="teardown interrupted", durationSeconds=time.monotonic() - tick
+        )
+        rows[-1]["evidence"]["deadline"] = str(error)
+        return
+    for offset, step in enumerate(doc["steps"][len(rows) :]):
+        evidence = {"error": str(error), "remainingStepsStopped": True}
+        rows.append(
+            {
+                **{k: step[k] for k in ("id", "promise", "edges")},
+                "verdict": "fail" if offset == 0 else "unavailable",
+                "observed": evidence,
+                "expected": "README entry-point assertions",
+                "evidence": evidence,
+                "durationSeconds": time.monotonic() - tick if offset == 0 else 0,
+                "exclusions": doc["modes"].get(mode, doc["modes"]["host"])["exclusions"],
+            }
+        )
+
+
 def run(mode="sandbox", commit="synthetic", fail_step=None):
     doc = json.loads((ROOT / "post-merge-verify.json").read_text())
     started = time.monotonic()
@@ -167,36 +190,38 @@ def run(mode="sandbox", commit="synthetic", fail_step=None):
     def deny(*args, **kwargs):
         raise RuntimeError("sandbox attempted network")
 
-    with (
-        tempfile.TemporaryDirectory(prefix="paddock-smv-") as tmp,
-        patch.object(socket.socket, "connect", deny),
-        patch.object(subprocess, "run", verifier_process),
-    ):
-        for step in doc["steps"]:
-            tick = time.monotonic()
-            verdict = "pass" if mode == "sandbox" else "unavailable"
-            try:
-                if mode != "sandbox":
-                    evidence = {"reason": doc["modes"]["host"]["exclusions"][0]}
-                elif fail_step == step["id"]:
-                    raise RuntimeError("synthetic required-step failure")
-                else:
-                    evidence = exercise(step["id"], Path(tmp))
-            except Exception as exc:
-                verdict, evidence = "fail", {"error": f"{type(exc).__name__}: {exc}"}
-            rows.append(
-                {
-                    **{k: step[k] for k in ("id", "promise", "edges")},
-                    "verdict": verdict,
-                    "observed": evidence,
-                    "expected": "README entry-point assertions",
-                    "evidence": evidence,
-                    "durationSeconds": time.monotonic() - tick,
-                    "exclusions": doc["modes"].get(mode, doc["modes"]["host"])[
-                        "exclusions"
-                    ],
-                }
-            )
+    tick = started
+    try:
+        with (
+            tempfile.TemporaryDirectory(prefix="paddock-smv-") as tmp,
+            patch.object(socket.socket, "connect", deny),
+            patch.object(subprocess, "run", verifier_process),
+        ):
+            for step in doc["steps"]:
+                tick = time.monotonic()
+                verdict = "pass" if mode == "sandbox" else "unavailable"
+                try:
+                    if mode != "sandbox":
+                        evidence = {"reason": doc["modes"]["host"]["exclusions"][0]}
+                    elif fail_step == step["id"]:
+                        raise RuntimeError("synthetic required-step failure")
+                    else:
+                        evidence = exercise(step["id"], Path(tmp))
+                except Exception as exc:
+                    verdict, evidence = "fail", {"error": f"{type(exc).__name__}: {exc}"}
+                rows.append(
+                    {
+                        **{k: step[k] for k in ("id", "promise", "edges")},
+                        "verdict": verdict,
+                        "observed": evidence,
+                        "expected": "README entry-point assertions",
+                        "evidence": evidence,
+                        "durationSeconds": time.monotonic() - tick,
+                        "exclusions": doc["modes"].get(mode, doc["modes"]["host"])["exclusions"],
+                    }
+                )
+    except InvocationDeadline as exc:
+        incomplete_rows(doc, rows, mode, tick, exc)
     return {
         "module": doc["module"],
         "mode": mode,
@@ -209,31 +234,32 @@ def run(mode="sandbox", commit="synthetic", fail_step=None):
 
 def main():
     mode = os.environ.get("SMV_MODE", "sandbox")
-    commit = (
-        os.environ.get("SMV_COMMIT")
-        or subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=ROOT,
-            stdin=subprocess.DEVNULL,
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=3,
-        ).stdout.strip()
-    )
+    commit = os.environ.get("SMV_COMMIT")
+    if not commit:
+        try:
+            commit = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=ROOT,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=3,
+            ).stdout.strip()
+        except (subprocess.SubprocessError, OSError):
+            commit = "synthetic"
     # Allowlist before importing owner code. The harness itself never inherits
     # DSNs, provider/model keys, notification URLs or an operator HOME.
     clean = {
-        k: os.environ[k]
-        for k in ("PATH", "LANG", "LC_ALL", "PYTHONUSERBASE")
-        if k in os.environ
+        k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL", "PYTHONUSERBASE") if k in os.environ
     }
 
     def overdue(*_):
-        raise InvocationTimeout("180-second invocation budget exceeded")
+        raise InvocationDeadline("invocation deadline exceeded")
 
     previous = signal.signal(signal.SIGALRM, overdue)
-    signal.setitimer(signal.ITIMER_REAL, 175)
+    previous_term = signal.signal(signal.SIGTERM, overdue)
+    signal.setitimer(signal.ITIMER_REAL, 170)
     try:
         with (
             tempfile.TemporaryDirectory(prefix="paddock-home-") as home,
@@ -253,6 +279,7 @@ def main():
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, previous)
+        signal.signal(signal.SIGTERM, previous_term)
 
 
 if __name__ == "__main__":

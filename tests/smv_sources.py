@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def sources():
-    return {p.name: p.read_text() for p in (ROOT / "lib/python/gym").glob("*.py")}
+    return {p.name: p.read_text(encoding="utf-8") for p in (ROOT / "lib/python/gym").glob("*.py")}
 
 
 def constants(text):
@@ -146,7 +146,7 @@ def inventory(src=None):
 
 
 def definition():
-    return json.loads((ROOT / "state-machines.json").read_text())
+    return json.loads((ROOT / "state-machines.json").read_text(encoding="utf-8"))
 
 
 def verify(doc, src=None):

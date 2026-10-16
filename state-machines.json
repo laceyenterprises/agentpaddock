@@ -5,8 +5,7 @@
       "id": "paddock.grade",
       "owner": "tools/paddock",
       "codeSources": [
-        "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade",
-        "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch"
+        "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
       ],
       "states": [
         {
@@ -16,56 +15,56 @@
         {
           "name": "error",
           "terminal": false,
-          "exitOwner": "gym.suite.run_suite caller",
+          "exitOwner": "Suite caller: _invalidate_level_mismatch",
           "maxDurationSeconds": 180,
-          "overdueRecipient": "paddock maintainer",
+          "overdueRecipient": "Paddock maintainer",
           "enforcement": "missing",
-          "deadEndEvidence": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch: inline suite normalization; no mandatory total suite deadline"
+          "deadEndEvidence": "lib/python/gym/suite.py:_invalidate_level_mismatch; raw grades may be reclassified before final consumption; no mandatory standalone grade lifetime"
         },
         {
           "name": "failed",
           "terminal": false,
-          "exitOwner": "gym.suite.run_suite caller",
+          "exitOwner": "Suite caller: _invalidate_level_mismatch",
           "maxDurationSeconds": 180,
-          "overdueRecipient": "paddock maintainer",
+          "overdueRecipient": "Paddock maintainer",
           "enforcement": "missing",
-          "deadEndEvidence": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch: inline suite normalization; no mandatory total suite deadline"
+          "deadEndEvidence": "lib/python/gym/suite.py:_invalidate_level_mismatch; raw grades may be reclassified before final consumption; no mandatory standalone grade lifetime"
         },
         {
           "name": "format_failed",
           "terminal": false,
-          "exitOwner": "gym.suite.run_suite caller",
+          "exitOwner": "Suite caller: _invalidate_level_mismatch",
           "maxDurationSeconds": 180,
-          "overdueRecipient": "paddock maintainer",
+          "overdueRecipient": "Paddock maintainer",
           "enforcement": "missing",
-          "deadEndEvidence": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch: inline suite normalization; no mandatory total suite deadline"
+          "deadEndEvidence": "lib/python/gym/suite.py:_invalidate_level_mismatch; raw grades may be reclassified before final consumption; no mandatory standalone grade lifetime"
         },
         {
           "name": "integrity_hold",
           "terminal": false,
-          "exitOwner": "gym.suite.run_suite caller",
+          "exitOwner": "Suite caller: _invalidate_level_mismatch",
           "maxDurationSeconds": 180,
-          "overdueRecipient": "paddock maintainer",
+          "overdueRecipient": "Paddock maintainer",
           "enforcement": "missing",
-          "deadEndEvidence": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch: inline suite normalization; no mandatory total suite deadline"
+          "deadEndEvidence": "lib/python/gym/suite.py:_invalidate_level_mismatch; raw grades may be reclassified before final consumption; no mandatory standalone grade lifetime"
         },
         {
           "name": "no_submission",
           "terminal": false,
-          "exitOwner": "gym.suite.run_suite caller",
+          "exitOwner": "Suite caller: _invalidate_level_mismatch",
           "maxDurationSeconds": 180,
-          "overdueRecipient": "paddock maintainer",
+          "overdueRecipient": "Paddock maintainer",
           "enforcement": "missing",
-          "deadEndEvidence": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch: inline suite normalization; no mandatory total suite deadline"
+          "deadEndEvidence": "lib/python/gym/suite.py:_invalidate_level_mismatch; raw grades may be reclassified before final consumption; no mandatory standalone grade lifetime"
         },
         {
           "name": "passed",
           "terminal": false,
-          "exitOwner": "gym.suite.run_suite caller",
+          "exitOwner": "Suite caller: _invalidate_level_mismatch",
           "maxDurationSeconds": 180,
-          "overdueRecipient": "paddock maintainer",
+          "overdueRecipient": "Paddock maintainer",
           "enforcement": "missing",
-          "deadEndEvidence": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch: inline suite normalization; no mandatory total suite deadline"
+          "deadEndEvidence": "lib/python/gym/suite.py:_invalidate_level_mismatch; raw grades may be reclassified before final consumption; no mandatory standalone grade lifetime"
         },
         {
           "name": "skipped_no_taint_gate",
@@ -208,42 +207,42 @@
           "from": "error",
           "to": "agent_error",
           "trigger": "level.error",
-          "codeSource": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch"
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
         },
         {
           "id": "paddock.grade.level.failed",
           "from": "failed",
           "to": "agent_error",
           "trigger": "level.failed",
-          "codeSource": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch"
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
         },
         {
           "id": "paddock.grade.level.format_failed",
           "from": "format_failed",
           "to": "agent_error",
           "trigger": "level.format_failed",
-          "codeSource": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch"
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
         },
         {
           "id": "paddock.grade.level.integrity_hold",
           "from": "integrity_hold",
           "to": "agent_error",
           "trigger": "level.integrity_hold",
-          "codeSource": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch"
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
         },
         {
           "id": "paddock.grade.level.no_submission",
           "from": "no_submission",
           "to": "agent_error",
           "trigger": "level.no_submission",
-          "codeSource": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch"
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
         },
         {
           "id": "paddock.grade.level.passed",
           "from": "passed",
           "to": "agent_error",
           "trigger": "level.passed",
-          "codeSource": "lib/python/gym/suite.py:run_suite/_invalidate_level_mismatch"
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
         }
       ]
     },
@@ -516,7 +515,7 @@
       "field": "grader.Cell.outcome; outcomes.OUTCOMES/PASSING; taint.GATE_OUTCOMES",
       "owner": "tools/paddock",
       "disposition": "owned",
-      "reason": "Terminal per-cell decisions include gating outcomes, not green skips. Grader mutation sites include _grade, _grade_with_audit and suite level/model/price checks; exact predicates are independently inventoried."
+      "reason": "Per-cell outcomes include gating decisions. Raw grade values remain provisional through suite-level normalization. Source predicates and all sibling writers are independently inventoried."
     },
     {
       "field": "lease state; lease.cells admissions/bindings/accounting; endpoint_results finalization",
@@ -691,5 +690,9 @@
       "status = str(event.get('error_status', ''))",
       "status == '408'"
     ]
-  }
+  },
+  "inventoryNotes": [
+    "The Python source inventory independently reads outcome constants, status writers and mutation guards.",
+    "Normal-suite mutations reject renamed outcomes, altered lease edges and missing contract fields."
+  ]
 }

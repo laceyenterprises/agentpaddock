@@ -1771,7 +1771,7 @@ and `output_limit_exceeded`, never grading partial evidence.
 - `owned-lease-cleanup` (`lease.lifecycle`): Create/admit/close a disposable endpoint lease through real Manager methods with a synthetic provider API.
 - `deadline-is-not-success` (`suite.timeout`): A synthetic timed-out trajectory remains a non-passing agent error; no model, container or host dispatch runs.
 
-The harness uses disposable stores and synthetic external boundaries. Verifier children use closed stdin (`DEVNULL`), isolated process groups and a 15-second timeout; each group is killed and its child reaped on return or failure. The invocation alarm aborts the whole run after 175 seconds, leaving cleanup time within the 180-second budget. Required missing, failed or unavailable evidence exits nonzero. No ambient credentials or endpoints are accepted by the CLI. Host mode is unavailable until a safe canary is approved; SRE instead inspects installed version and authoritative recent tool receipts read-only after deployment. SRE verifies service owner, launchd domain and documented restart path before any separately authorized activation. The existing main-catchup declaration lane owns page-once module/step/commit failures, with no revert and no later-deploy hold. No scheduled workflow changes.
+The harness uses disposable stores and synthetic external boundaries. Required missing, failed or unavailable evidence exits nonzero. No ambient credentials or endpoints are accepted by the CLI. Host mode is unavailable until a safe canary is approved; SRE instead inspects installed version and authoritative recent tool receipts read-only after deployment. SRE verifies service owner, launchd domain and documented restart path before any separately authorized activation. The existing main-catchup declaration lane owns page-once module/step/commit failures, with no revert and no later-deploy hold. No scheduled workflow changes.
 
 <!-- smv:state-machines:start -->
 
@@ -1781,11 +1781,6 @@ Generated from `state-machines.json`. Missing enforcement describes existing dea
 the listed owners and durations are proposed contracts, not implemented repairs.
 
 #### paddock.grade
-
-Cell verdicts remain provisional until inline suite reasoning-level validation
-finishes. The six verdicts with `level.*` edges can be invalidated to
-`agent_error`; their end edges represent accepting the verdict unchanged.
-`agent_error` and the two undispatched gate outcomes are terminal.
 
 ```mermaid
 stateDiagram-v2
@@ -1876,12 +1871,12 @@ stateDiagram-v2
 
 | Object | Non-terminal states | Proposed exit owner | Proposed maximum | Recipient | Enforcement |
 |---|---|---|---|---|---|
-| paddock.grade | `error` | gym.suite.run_suite caller | 180s | paddock maintainer | missing |
-| paddock.grade | `failed` | gym.suite.run_suite caller | 180s | paddock maintainer | missing |
-| paddock.grade | `format_failed` | gym.suite.run_suite caller | 180s | paddock maintainer | missing |
-| paddock.grade | `integrity_hold` | gym.suite.run_suite caller | 180s | paddock maintainer | missing |
-| paddock.grade | `no_submission` | gym.suite.run_suite caller | 180s | paddock maintainer | missing |
-| paddock.grade | `passed` | gym.suite.run_suite caller | 180s | paddock maintainer | missing |
+| paddock.grade | `error` | Suite caller: _invalidate_level_mismatch | 180s | Paddock maintainer | missing |
+| paddock.grade | `failed` | Suite caller: _invalidate_level_mismatch | 180s | Paddock maintainer | missing |
+| paddock.grade | `format_failed` | Suite caller: _invalidate_level_mismatch | 180s | Paddock maintainer | missing |
+| paddock.grade | `integrity_hold` | Suite caller: _invalidate_level_mismatch | 180s | Paddock maintainer | missing |
+| paddock.grade | `no_submission` | Suite caller: _invalidate_level_mismatch | 180s | Paddock maintainer | missing |
+| paddock.grade | `passed` | Suite caller: _invalidate_level_mismatch | 180s | Paddock maintainer | missing |
 | paddock.endpoint | `closing` | paddock maintainer/caller | 180s | paddock maintainer | missing |
 | paddock.endpoint | `creating` | paddock maintainer/caller | 180s | paddock maintainer | missing |
 | paddock.endpoint | `ready` | paddock maintainer/caller | 180s | paddock maintainer | missing |
@@ -1895,14 +1890,14 @@ Proposed lifetime/expiry bounds above are not repairs. See each state deadEndEvi
 
 | Field | Owner | Disposition | Evidence |
 |---|---|---|---|
-| `grader.Cell.outcome; outcomes.OUTCOMES/PASSING; taint.GATE_OUTCOMES` | tools/paddock | owned | Terminal per-cell decisions include gating outcomes, not green skips. Grader mutation sites include _grade, _grade_with_audit and suite level/model/price checks; exact predicates are independently inventoried. |
+| `grader.Cell.outcome; outcomes.OUTCOMES/PASSING; taint.GATE_OUTCOMES` | tools/paddock | owned | Per-cell outcomes include gating decisions. Raw grade values remain provisional through suite-level normalization. Source predicates and all sibling writers are independently inventoried. |
 | `lease state; lease.cells admissions/bindings/accounting; endpoint_results finalization` | tools/paddock | owned | Manager owns lease JSON and save/load/audit. Creating/warming have inline deadline checks; ready/closing require a caller/reaper. No mandatory background lifetime enforcer, enforcement=missing; proposed periodic reaper within 180s. Admission/accounted fields are timestamps and derived cost snapshots, not status enums. |
 | `provider READY/FAILED/DELETED/DELETING/STATE_DELETED; RESOURCE_EXHAUSTED; provider_health; cost/quota status` | provider | reference | Provider lifecycle is external; endpoint_api normalizes responses. Economics/health states are derived observations, not an owned deployment engine. |
 | `binding_recovery dispatching/in_flight/done; toc_matrix host run/resume/status` | host matrix runner | reference | Binding quarantine consumes host-owned cell input. The public adapter delegates matrix execution; no copied host matrix state machine. |
 | `hidden_tests status passed/failed/not_run/completed; integrity/taint/locks/baseline/alerting schemas` | tools/paddock | derived/configuration | Verifier subprocess snapshots and taint modes are derived judgments/configuration. Host delivery is delegated. Stateless tool-call, schema and staging helpers own no additional job/agent lifecycle. Existing host/Docker smokes remain manual. |
 
-The SQL source inventory records checks, constants and mutation guards (including bound values).
-The unit suite independently reads those source statements and enums; changing a state or edge fixture must fail.
+The Python source inventory independently reads outcome constants, status writers and mutation guards.
+Normal-suite mutations reject renamed outcomes, altered lease edges and missing contract fields.
 Snapshots/observations do not transfer ownership from the referenced runtime. Synthetic smoke evidence does not prove live dispatch or provider behavior.
 
 <!-- smv:state-machines:end -->
