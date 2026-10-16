@@ -339,6 +339,86 @@ def test_smv_verifier_cleanup_on_success_and_timeouts(failure):
     proc.wait.assert_called_once_with(timeout=3)
 
 
+@pytest.mark.parametrize(
+    "timeout, expected",
+    [({}, 15), ({"timeout": None}, 15), ({"timeout": 60}, 15), ({"timeout": 2}, 2)],
+)
+def test_smv_verifier_timeout_defaults_and_cap(timeout, expected):
+    import os
+    import subprocess
+    from unittest.mock import Mock, patch
+
+    harness = _smoke_harness()
+    proc = Mock(pid=123, returncode=0)
+    proc.communicate.return_value = ("verdict", "")
+    with (
+        patch.object(subprocess, "Popen", return_value=proc),
+        patch.object(os, "killpg"),
+    ):
+        result = harness["verifier_process"](
+            ["python", "-S", "verifier.py"], cwd="gym-verify-fixture", **timeout
+        )
+    assert result.stdout == "verdict"
+    proc.communicate.assert_called_once_with(timeout=expected)
+
+
+@pytest.mark.parametrize("returncode", [0, 7])
+def test_smv_verifier_accepts_runner_keywords(tmp_path, returncode):
+    import subprocess
+    import sys
+
+    harness = _smoke_harness()
+    cwd = tmp_path / "gym-verify-fixture"
+    cwd.mkdir()
+    (cwd / "verifier.py").write_text(
+        "import sys\nsys.stdout.buffer.write(b'caf\\xc3\\xa9')\n"
+        f"sys.stderr.write('diagnostic')\nsys.exit({returncode})\n"
+    )
+
+    def invoke():
+        return harness["verifier_process"](
+            [sys.executable, "-S", "verifier.py"],
+            cwd=cwd,
+            check=True,
+            shell=False,
+            encoding="utf-8",
+            errors="strict",
+        )
+
+    if returncode:
+        with pytest.raises(subprocess.CalledProcessError) as raised:
+            invoke()
+        result = raised.value
+    else:
+        result = invoke()
+    assert result.returncode == returncode
+    assert result.stdout == "caf\u00e9"
+    assert result.stderr == "diagnostic"
+
+
+def test_smv_teardown_deadline_keeps_structured_observations(monkeypatch):
+    harness = _smoke_harness()
+    original = harness["run"].__globals__["tempfile"].TemporaryDirectory
+
+    class InterruptedTeardown(original):
+        def __exit__(self, *args):
+            super().__exit__(*args)
+            raise harness["InvocationDeadline"]("teardown deadline")
+
+    monkeypatch.setattr(
+        harness["run"].__globals__["tempfile"],
+        "TemporaryDirectory",
+        InterruptedTeardown,
+    )
+    report = harness["run"](mode="host")
+    assert report["verdict"] == "fail"
+    assert all(isinstance(row["observed"], dict) for row in report["steps"])
+    last = report["steps"][-1]
+    assert last["verdict"] == "fail"
+    assert last["observed"] == {"error": "teardown interrupted"}
+    assert last["evidence"]["deadline"] == "teardown deadline"
+
+
 def test_smv_invocation_alarm_aborts_steps_and_restores_state(monkeypatch, capsys):
     import os
     import signal

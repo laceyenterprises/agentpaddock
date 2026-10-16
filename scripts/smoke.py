@@ -128,7 +128,19 @@ def exercise(step, scratch):
     raise ValueError("missing step: " + step)
 
 
-def verifier_process(argv, *, cwd, env, capture_output, text, timeout):
+def verifier_process(
+    argv,
+    *,
+    cwd,
+    env=None,
+    capture_output=True,
+    text=True,
+    timeout=None,
+    check=False,
+    encoding=None,
+    errors=None,
+    **_kwargs,
+):
     """Bound only the real synthetic verifier process; no Docker/host commands."""
     assert argv[1:] == ["-S", "verifier.py"]
     assert Path(cwd).name.startswith("gym-verify-")
@@ -140,10 +152,15 @@ def verifier_process(argv, *, cwd, env, capture_output, text, timeout):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=text,
+        encoding=encoding,
+        errors=errors,
         start_new_session=True,
     )
     try:
-        stdout, stderr = proc.communicate(timeout=min(timeout, 15))
+        effective_timeout = 15 if timeout is None else min(timeout, 15)
+        stdout, stderr = proc.communicate(timeout=effective_timeout)
+        if check and proc.returncode:
+            raise subprocess.CalledProcessError(proc.returncode, argv, stdout, stderr)
         return subprocess.CompletedProcess(argv, proc.returncode, stdout, stderr)
     finally:
         try:
@@ -163,7 +180,9 @@ InvocationTimeout = InvocationDeadline
 def incomplete_rows(doc, rows, mode, tick, error):
     if len(rows) == len(doc["steps"]):
         rows[-1].update(
-            verdict="fail", observed="teardown interrupted", durationSeconds=time.monotonic() - tick
+            verdict="fail",
+            observed={"error": "teardown interrupted"},
+            durationSeconds=time.monotonic() - tick,
         )
         rows[-1]["evidence"]["deadline"] = str(error)
         return

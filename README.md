@@ -1773,6 +1773,13 @@ and `output_limit_exceeded`, never grading partial evidence.
 
 The harness uses disposable stores and synthetic external boundaries. Required missing, failed or unavailable evidence exits nonzero. No ambient credentials or endpoints are accepted by the CLI. Host mode is unavailable until a safe canary is approved; SRE instead inspects installed version and authoritative recent tool receipts read-only after deployment. SRE verifies service owner, launchd domain and documented restart path before any separately authorized activation. The existing main-catchup declaration lane owns page-once module/step/commit failures, with no revert and no later-deploy hold. No scheduled workflow changes.
 
+Synthetic verifiers run with closed stdin in owned process groups, with a
+15-second timeout cap even when the runner omits its timeout or passes `None`.
+The adapter accepts extra runner keywords while retaining captured output and
+process isolation; `check`, `encoding` and `errors` retain their subprocess
+semantics. Every step's JSON `observed` value is an object, including when an
+invocation deadline interrupts teardown after the steps have finished.
+
 <!-- smv:state-machines:start -->
 
 ### State machine contracts
