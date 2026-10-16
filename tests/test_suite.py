@@ -113,7 +113,9 @@ def test_a_poll_deadline_cell_carries_its_terminal_status():
     # cannot tell a queue wait from a model failure.
     tasks = discover_tasks(MINI_SUITE, suite=ALL_SUITE)
     timed_out = Trajectory(
-        terminal_status="timeout", launch_request_id="lrq-q", error="did not reach terminal"
+        terminal_status="timeout",
+        launch_request_id="lrq-q",
+        error="did not reach terminal",
     )
     source = MappingSource({"mini-pass": timed_out, "mini-fail": _result_trajectory("bad")})
     summary = run_suite(tasks, source, suite=ALL_SUITE, taint_mode=taint.ENFORCE).summary_dict()
@@ -129,7 +131,10 @@ def test_run_suite_verdicts_map():
         {"mini-pass": _result_trajectory("ok"), "mini-fail": _result_trajectory("bad")}
     )
     result = run_suite(tasks, source, suite=ALL_SUITE, taint_mode=taint.ENFORCE)
-    assert result.verdicts() == {"mini-pass": outcomes.PASSED, "mini-fail": outcomes.FAILED}
+    assert result.verdicts() == {
+        "mini-pass": outcomes.PASSED,
+        "mini-fail": outcomes.FAILED,
+    }
 
 
 def test_injection_task_gated_without_dispatch_when_taint_unavailable():
@@ -226,3 +231,249 @@ def test_a_model_sweep_records_only_unpinned_tasks_in_the_sweep_slice():
         f"pinned-qwen@{model}": None,
         f"sweep-qwen@{model}": model,
     }
+
+
+def test_smv_exact_states_writers_and_mutations():
+    from smv_sources import definition, sources, verify
+
+    doc, src = definition(), sources()
+    verify(doc, src)
+    renamed = dict(src)
+    renamed["outcomes.py"] = renamed["outcomes.py"].replace(
+        'PASSED = "passed"', 'PASSED = "renamed"'
+    )
+    with pytest.raises(AssertionError):
+        verify(doc, renamed)
+    changed = dict(src)
+    changed["endpoints.py"] = changed["endpoints.py"].replace(
+        'lease["state"] = "ready"', 'lease["state"] = "closing"'
+    )
+    with pytest.raises(AssertionError):
+        verify(doc, changed)
+    del next(s for s in doc["objects"][1]["states"] if not s["terminal"])["exitOwner"]
+    with pytest.raises((KeyError, AssertionError)):
+        verify(doc, src)
+
+
+def test_smv_sandbox_required_failure_and_host_unavailable():
+    import runpy
+    from pathlib import Path
+
+    harness = runpy.run_path(str(Path(__file__).resolve().parents[1] / "scripts/smoke.py"))
+    report = harness["run"]()
+    assert report["verdict"] == "pass", report
+    assert report["durationSeconds"] < 180
+    assert harness["run"](fail_step="lease.lifecycle")["verdict"] == "fail"
+    host = harness["run"](mode="host")
+    assert host["verdict"] == "fail"
+    assert all(s["verdict"] == "unavailable" for s in host["steps"])
+
+
+def _smoke_harness():
+    import runpy
+    from pathlib import Path
+
+    return runpy.run_path(str(Path(__file__).resolve().parents[1] / "scripts/smoke.py"))
+
+
+def test_smv_verifiers_run_in_owned_groups_with_closed_stdin():
+    import os
+    import signal
+    import subprocess
+    from unittest.mock import patch
+
+    harness = _smoke_harness()
+    with (
+        patch.object(subprocess, "Popen", wraps=subprocess.Popen) as spawn,
+        patch.object(os, "killpg", wraps=os.killpg) as kill,
+    ):
+        report = harness["run"]()
+    assert report["verdict"] == "pass", report
+    assert spawn.call_count == 2
+    assert kill.call_count == spawn.call_count
+    for call in spawn.call_args_list:
+        assert call.args[0][1:] == ["-S", "verifier.py"]
+        assert call.kwargs["stdin"] == subprocess.DEVNULL
+        assert call.kwargs["start_new_session"] is True
+    assert all(call.args[1] == signal.SIGKILL for call in kill.call_args_list)
+
+
+@pytest.mark.parametrize("failure", [None, "child-timeout", "invocation-timeout"])
+def test_smv_verifier_cleanup_on_success_and_timeouts(failure):
+    import os
+    import signal
+    import subprocess
+    from unittest.mock import Mock, patch
+
+    harness = _smoke_harness()
+    proc = Mock(pid=123, returncode=0)
+    proc.communicate.return_value = ("verdict", "")
+    error = {
+        None: None,
+        "child-timeout": subprocess.TimeoutExpired("verifier.py", 15),
+        "invocation-timeout": harness["InvocationTimeout"]("budget exceeded"),
+    }[failure]
+    proc.communicate.side_effect = error
+
+    def invoke():
+        return harness["verifier_process"](
+            ["python", "-S", "verifier.py"],
+            cwd="gym-verify-fixture",
+            env={},
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    with (
+        patch.object(subprocess, "Popen", return_value=proc),
+        patch.object(os, "killpg") as kill,
+    ):
+        if error is None:
+            assert invoke().stdout == "verdict"
+        else:
+            with pytest.raises(type(error)):
+                invoke()
+    proc.communicate.assert_called_once_with(timeout=15)
+    kill.assert_called_once_with(proc.pid, signal.SIGKILL)
+    proc.wait.assert_called_once_with(timeout=3)
+
+
+@pytest.mark.parametrize(
+    "timeout, expected",
+    [({}, 15), ({"timeout": None}, 15), ({"timeout": 60}, 15), ({"timeout": 2}, 2)],
+)
+def test_smv_verifier_timeout_defaults_and_cap(timeout, expected):
+    import os
+    import subprocess
+    from unittest.mock import Mock, patch
+
+    harness = _smoke_harness()
+    proc = Mock(pid=123, returncode=0)
+    proc.communicate.return_value = ("verdict", "")
+    with (
+        patch.object(subprocess, "Popen", return_value=proc),
+        patch.object(os, "killpg"),
+    ):
+        result = harness["verifier_process"](
+            ["python", "-S", "verifier.py"], cwd="gym-verify-fixture", **timeout
+        )
+    assert result.stdout == "verdict"
+    proc.communicate.assert_called_once_with(timeout=expected)
+
+
+@pytest.mark.parametrize("returncode", [0, 7])
+def test_smv_verifier_accepts_runner_keywords(tmp_path, returncode):
+    import subprocess
+    import sys
+
+    harness = _smoke_harness()
+    cwd = tmp_path / "gym-verify-fixture"
+    cwd.mkdir()
+    (cwd / "verifier.py").write_text(
+        "import sys\nsys.stdout.buffer.write(b'caf\\xc3\\xa9')\n"
+        f"sys.stderr.write('diagnostic')\nsys.exit({returncode})\n"
+    )
+
+    def invoke():
+        return harness["verifier_process"](
+            [sys.executable, "-S", "verifier.py"],
+            cwd=cwd,
+            check=True,
+            shell=False,
+            encoding="utf-8",
+            errors="strict",
+        )
+
+    if returncode:
+        with pytest.raises(subprocess.CalledProcessError) as raised:
+            invoke()
+        result = raised.value
+    else:
+        result = invoke()
+    assert result.returncode == returncode
+    assert result.stdout == "caf\u00e9"
+    assert result.stderr == "diagnostic"
+
+
+def test_smv_teardown_deadline_keeps_structured_observations(monkeypatch):
+    harness = _smoke_harness()
+    original = harness["run"].__globals__["tempfile"].TemporaryDirectory
+
+    class InterruptedTeardown(original):
+        def __exit__(self, *args):
+            super().__exit__(*args)
+            raise harness["InvocationDeadline"]("teardown deadline")
+
+    monkeypatch.setattr(
+        harness["run"].__globals__["tempfile"],
+        "TemporaryDirectory",
+        InterruptedTeardown,
+    )
+    report = harness["run"](mode="host")
+    assert report["verdict"] == "fail"
+    assert all(isinstance(row["observed"], dict) for row in report["steps"])
+    last = report["steps"][-1]
+    assert last["verdict"] == "fail"
+    assert last["observed"] == {"error": "teardown interrupted"}
+    assert last["evidence"]["deadline"] == "teardown deadline"
+
+
+def test_smv_invocation_alarm_aborts_steps_and_restores_state(monkeypatch, capsys):
+    import os
+    import signal
+    from unittest.mock import Mock
+
+    harness = _smoke_harness()
+    previous = signal.getsignal(signal.SIGALRM)
+    monkeypatch.setenv("SMV_COMMIT", "synthetic")
+
+    def expire(*args):
+        signal.raise_signal(signal.SIGALRM)
+
+    exercise = Mock(side_effect=expire)
+    monkeypatch.setitem(harness["main"].__globals__, "exercise", exercise)
+    assert harness["main"]() == 1
+    import json
+
+    report = json.loads(capsys.readouterr().out.splitlines()[-1])
+    assert report["steps"][0]["verdict"] == "fail"
+    assert all(s["verdict"] == "unavailable" for s in report["steps"][1:])
+    assert exercise.call_count == 1
+    assert signal.getsignal(signal.SIGALRM) == previous
+    assert signal.getitimer(signal.ITIMER_REAL) == (0, 0)
+    assert os.environ["SMV_COMMIT"] == "synthetic"
+
+
+def test_smv_entrypoint_leaves_parent_stdin_open(monkeypatch, capsys):
+    import io
+    import runpy
+    import sys
+    from pathlib import Path
+
+    stdin = io.StringIO("")
+    monkeypatch.setattr(sys, "stdin", stdin)
+    monkeypatch.setenv("SMV_COMMIT", "synthetic")
+    with pytest.raises(SystemExit) as exited:
+        runpy.run_path(
+            str(Path(__file__).resolve().parents[1] / "scripts/smoke.py"),
+            run_name="__main__",
+        )
+    assert exited.value.code == 0
+    assert not stdin.closed
+    assert '"verdict": "pass"' in capsys.readouterr().out
+
+
+def test_smv_terminal_states_cannot_resume_other_states():
+    from smv_sources import definition, verify
+
+    doc = definition()
+    endpoint = next(obj for obj in doc["objects"] if obj["id"] == "paddock.endpoint")
+    assert {edge["to"] for edge in endpoint["transitions"] if edge["from"] == "closed"} == {
+        "closed",
+        "[*]",
+    }
+    grade = next(obj for obj in doc["objects"] if obj["id"] == "paddock.grade")
+    next(state for state in grade["states"] if state["name"] == "passed")["terminal"] = True
+    with pytest.raises(AssertionError, match="terminal state cannot transition"):
+        verify(doc)
