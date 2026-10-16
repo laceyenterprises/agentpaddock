@@ -1,0 +1,671 @@
+{
+  "version": 1,
+  "objects": [
+    {
+      "id": "paddock.grade",
+      "owner": "tools/paddock",
+      "codeSources": [
+        "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+      ],
+      "states": [
+        {
+          "name": "agent_error",
+          "terminal": true
+        },
+        {
+          "name": "error",
+          "terminal": true
+        },
+        {
+          "name": "failed",
+          "terminal": true
+        },
+        {
+          "name": "format_failed",
+          "terminal": true
+        },
+        {
+          "name": "integrity_hold",
+          "terminal": true
+        },
+        {
+          "name": "no_submission",
+          "terminal": true
+        },
+        {
+          "name": "passed",
+          "terminal": true
+        },
+        {
+          "name": "skipped_no_taint_gate",
+          "terminal": true
+        },
+        {
+          "name": "xfail_taint_shadow",
+          "terminal": true
+        }
+      ],
+      "transitions": [
+        {
+          "id": "paddock.grade.agent_error",
+          "from": "[*]",
+          "to": "agent_error",
+          "trigger": "agent_error",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.error",
+          "from": "[*]",
+          "to": "error",
+          "trigger": "error",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.failed",
+          "from": "[*]",
+          "to": "failed",
+          "trigger": "failed",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.format_failed",
+          "from": "[*]",
+          "to": "format_failed",
+          "trigger": "format_failed",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.integrity_hold",
+          "from": "[*]",
+          "to": "integrity_hold",
+          "trigger": "integrity_hold",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.no_submission",
+          "from": "[*]",
+          "to": "no_submission",
+          "trigger": "no_submission",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.passed",
+          "from": "[*]",
+          "to": "passed",
+          "trigger": "passed",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.skipped_no_taint_gate",
+          "from": "[*]",
+          "to": "skipped_no_taint_gate",
+          "trigger": "skipped_no_taint_gate",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.xfail_taint_shadow",
+          "from": "[*]",
+          "to": "xfail_taint_shadow",
+          "trigger": "xfail_taint_shadow",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.end.agent_error",
+          "from": "agent_error",
+          "to": "[*]",
+          "trigger": "end.agent_error",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.end.error",
+          "from": "error",
+          "to": "[*]",
+          "trigger": "end.error",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.end.failed",
+          "from": "failed",
+          "to": "[*]",
+          "trigger": "end.failed",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.end.format_failed",
+          "from": "format_failed",
+          "to": "[*]",
+          "trigger": "end.format_failed",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.end.integrity_hold",
+          "from": "integrity_hold",
+          "to": "[*]",
+          "trigger": "end.integrity_hold",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.end.no_submission",
+          "from": "no_submission",
+          "to": "[*]",
+          "trigger": "end.no_submission",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.end.passed",
+          "from": "passed",
+          "to": "[*]",
+          "trigger": "end.passed",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.end.skipped_no_taint_gate",
+          "from": "skipped_no_taint_gate",
+          "to": "[*]",
+          "trigger": "end.skipped_no_taint_gate",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.end.xfail_taint_shadow",
+          "from": "xfail_taint_shadow",
+          "to": "[*]",
+          "trigger": "end.xfail_taint_shadow",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.level.error",
+          "from": "error",
+          "to": "agent_error",
+          "trigger": "level.error",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.level.failed",
+          "from": "failed",
+          "to": "agent_error",
+          "trigger": "level.failed",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.level.format_failed",
+          "from": "format_failed",
+          "to": "agent_error",
+          "trigger": "level.format_failed",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.level.integrity_hold",
+          "from": "integrity_hold",
+          "to": "agent_error",
+          "trigger": "level.integrity_hold",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.level.no_submission",
+          "from": "no_submission",
+          "to": "agent_error",
+          "trigger": "level.no_submission",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        },
+        {
+          "id": "paddock.grade.level.passed",
+          "from": "passed",
+          "to": "agent_error",
+          "trigger": "level.passed",
+          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
+        }
+      ]
+    },
+    {
+      "id": "paddock.endpoint",
+      "owner": "tools/paddock",
+      "codeSources": [
+        "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap"
+      ],
+      "states": [
+        {
+          "name": "closed",
+          "terminal": true
+        },
+        {
+          "name": "closing",
+          "terminal": false,
+          "exitOwner": "paddock maintainer/caller",
+          "maxDurationSeconds": 180,
+          "overdueRecipient": "paddock maintainer",
+          "enforcement": "missing",
+          "deadEndEvidence": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap: no mandatory caller lifetime/expiry enforcement"
+        },
+        {
+          "name": "creating",
+          "terminal": false,
+          "exitOwner": "paddock maintainer/caller",
+          "maxDurationSeconds": 180,
+          "overdueRecipient": "paddock maintainer",
+          "enforcement": "missing",
+          "deadEndEvidence": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap: no mandatory caller lifetime/expiry enforcement"
+        },
+        {
+          "name": "ready",
+          "terminal": false,
+          "exitOwner": "paddock maintainer/caller",
+          "maxDurationSeconds": 180,
+          "overdueRecipient": "paddock maintainer",
+          "enforcement": "missing",
+          "deadEndEvidence": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap: no mandatory caller lifetime/expiry enforcement"
+        },
+        {
+          "name": "warming",
+          "terminal": false,
+          "exitOwner": "paddock maintainer/caller",
+          "maxDurationSeconds": 180,
+          "overdueRecipient": "paddock maintainer",
+          "enforcement": "missing",
+          "deadEndEvidence": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap: no mandatory caller lifetime/expiry enforcement"
+        }
+      ],
+      "transitions": [
+        {
+          "id": "paddock.endpoint.create",
+          "from": "[*]",
+          "to": "creating",
+          "trigger": "create",
+          "codeSource": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap"
+        },
+        {
+          "id": "paddock.endpoint.warm",
+          "from": "creating",
+          "to": "warming",
+          "trigger": "warm",
+          "codeSource": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap"
+        },
+        {
+          "id": "paddock.endpoint.register",
+          "from": "warming",
+          "to": "ready",
+          "trigger": "register",
+          "codeSource": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap"
+        },
+        {
+          "id": "paddock.endpoint.down.closed",
+          "from": "closed",
+          "to": "closing",
+          "trigger": "down.closed",
+          "codeSource": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap"
+        },
+        {
+          "id": "paddock.endpoint.down.closing",
+          "from": "closing",
+          "to": "closing",
+          "trigger": "down.closing",
+          "codeSource": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap"
+        },
+        {
+          "id": "paddock.endpoint.down.creating",
+          "from": "creating",
+          "to": "closing",
+          "trigger": "down.creating",
+          "codeSource": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap"
+        },
+        {
+          "id": "paddock.endpoint.down.ready",
+          "from": "ready",
+          "to": "closing",
+          "trigger": "down.ready",
+          "codeSource": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap"
+        },
+        {
+          "id": "paddock.endpoint.down.warming",
+          "from": "warming",
+          "to": "closing",
+          "trigger": "down.warming",
+          "codeSource": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap"
+        },
+        {
+          "id": "paddock.endpoint.delete",
+          "from": "closing",
+          "to": "closed",
+          "trigger": "delete",
+          "codeSource": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap"
+        },
+        {
+          "id": "paddock.endpoint.replay",
+          "from": "closed",
+          "to": "closed",
+          "trigger": "replay",
+          "codeSource": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap"
+        },
+        {
+          "id": "paddock.endpoint.end",
+          "from": "closed",
+          "to": "[*]",
+          "trigger": "end",
+          "codeSource": "lib/python/gym/endpoints.py:Manager.up/_down/down/guard/reap"
+        }
+      ]
+    },
+    {
+      "id": "paddock.process",
+      "owner": "tools/paddock",
+      "codeSources": [
+        "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close"
+      ],
+      "states": [
+        {
+          "name": "canceled",
+          "terminal": true
+        },
+        {
+          "name": "failed",
+          "terminal": true
+        },
+        {
+          "name": "input_fixtures_missing",
+          "terminal": true
+        },
+        {
+          "name": "output_limit_exceeded",
+          "terminal": true
+        },
+        {
+          "name": "running",
+          "terminal": false,
+          "exitOwner": "paddock maintainer/caller",
+          "maxDurationSeconds": 180,
+          "overdueRecipient": "paddock maintainer",
+          "enforcement": "missing",
+          "deadEndEvidence": "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close: no mandatory caller lifetime/expiry enforcement"
+        },
+        {
+          "name": "succeeded",
+          "terminal": true
+        },
+        {
+          "name": "timeout",
+          "terminal": true
+        }
+      ],
+      "transitions": [
+        {
+          "id": "paddock.process.spawn",
+          "from": "[*]",
+          "to": "running",
+          "trigger": "spawn",
+          "codeSource": "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close"
+        },
+        {
+          "id": "paddock.process.canceled",
+          "from": "running",
+          "to": "canceled",
+          "trigger": "canceled",
+          "codeSource": "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close"
+        },
+        {
+          "id": "paddock.process.failed",
+          "from": "running",
+          "to": "failed",
+          "trigger": "failed",
+          "codeSource": "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close"
+        },
+        {
+          "id": "paddock.process.output_limit_exceeded",
+          "from": "running",
+          "to": "output_limit_exceeded",
+          "trigger": "output_limit_exceeded",
+          "codeSource": "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close"
+        },
+        {
+          "id": "paddock.process.succeeded",
+          "from": "running",
+          "to": "succeeded",
+          "trigger": "succeeded",
+          "codeSource": "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close"
+        },
+        {
+          "id": "paddock.process.timeout",
+          "from": "running",
+          "to": "timeout",
+          "trigger": "timeout",
+          "codeSource": "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close"
+        },
+        {
+          "id": "paddock.process.staging",
+          "from": "[*]",
+          "to": "input_fixtures_missing",
+          "trigger": "staging",
+          "codeSource": "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close"
+        },
+        {
+          "id": "paddock.process.halted",
+          "from": "[*]",
+          "to": "canceled",
+          "trigger": "halted",
+          "codeSource": "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close"
+        },
+        {
+          "id": "paddock.process.end.canceled",
+          "from": "canceled",
+          "to": "[*]",
+          "trigger": "end.canceled",
+          "codeSource": "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close"
+        },
+        {
+          "id": "paddock.process.end.failed",
+          "from": "failed",
+          "to": "[*]",
+          "trigger": "end.failed",
+          "codeSource": "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close"
+        },
+        {
+          "id": "paddock.process.end.input_fixtures_missing",
+          "from": "input_fixtures_missing",
+          "to": "[*]",
+          "trigger": "end.input_fixtures_missing",
+          "codeSource": "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close"
+        },
+        {
+          "id": "paddock.process.end.output_limit_exceeded",
+          "from": "output_limit_exceeded",
+          "to": "[*]",
+          "trigger": "end.output_limit_exceeded",
+          "codeSource": "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close"
+        },
+        {
+          "id": "paddock.process.end.succeeded",
+          "from": "succeeded",
+          "to": "[*]",
+          "trigger": "end.succeeded",
+          "codeSource": "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close"
+        },
+        {
+          "id": "paddock.process.end.timeout",
+          "from": "timeout",
+          "to": "[*]",
+          "trigger": "end.timeout",
+          "codeSource": "lib/python/gym/standalone.py:StandaloneTrajectorySource.run/finish/close"
+        }
+      ]
+    }
+  ],
+  "dispositions": [
+    {
+      "field": "grader.Cell.outcome; outcomes.OUTCOMES/PASSING; taint.GATE_OUTCOMES",
+      "owner": "tools/paddock",
+      "disposition": "owned",
+      "reason": "Terminal per-cell decisions include gating outcomes, not green skips. Grader mutation sites include _grade, _grade_with_audit and suite level/model/price checks; exact predicates are independently inventoried."
+    },
+    {
+      "field": "lease state; lease.cells admissions/bindings/accounting; endpoint_results finalization",
+      "owner": "tools/paddock",
+      "disposition": "owned",
+      "reason": "Manager owns lease JSON and save/load/audit. Creating/warming have inline deadline checks; ready/closing require a caller/reaper. No mandatory background lifetime enforcer, enforcement=missing; proposed periodic reaper within 180s. Admission/accounted fields are timestamps and derived cost snapshots, not status enums."
+    },
+    {
+      "field": "provider READY/FAILED/DELETED/DELETING/STATE_DELETED; RESOURCE_EXHAUSTED; provider_health; cost/quota status",
+      "owner": "provider",
+      "disposition": "reference",
+      "reason": "Provider lifecycle is external; endpoint_api normalizes responses. Economics/health states are derived observations, not an owned deployment engine."
+    },
+    {
+      "field": "binding_recovery dispatching/in_flight/done; toc_matrix host run/resume/status",
+      "owner": "host matrix runner",
+      "disposition": "reference",
+      "reason": "Binding quarantine consumes host-owned cell input. The public adapter delegates matrix execution; no copied host matrix state machine."
+    },
+    {
+      "field": "hidden_tests status passed/failed/not_run/completed; integrity/taint/locks/baseline/alerting schemas",
+      "owner": "tools/paddock",
+      "disposition": "derived/configuration",
+      "reason": "Verifier subprocess snapshots and taint modes are derived judgments/configuration. Host delivery is delegated. Stateless tool-call, schema and staging helpers own no additional job/agent lifecycle. Existing host/Docker smokes remain manual."
+    }
+  ],
+  "deadEndNotes": [
+    "Proposed lifetime/expiry bounds above are not repairs. See each state deadEndEvidence selector."
+  ],
+  "ownershipNotes": [
+    "Snapshots/observations do not transfer ownership from the referenced runtime. Synthetic smoke evidence does not prove live dispatch or provider behavior."
+  ],
+  "sourceInventory": {
+    "endpoint_api.py": [
+      "state: 'DELETED'"
+    ],
+    "taint.py": [
+      "GATE_OUTCOMES: frozenset[str] = frozenset({XFAIL_SHADOW, SKIPPED_NO_TAINT_GATE})",
+      "outcome: str | None",
+      "outcome=None",
+      "outcome=SKIPPED_NO_TAINT_GATE",
+      "outcome=XFAIL_SHADOW",
+      "outcome=decision.outcome or SKIPPED_NO_TAINT_GATE"
+    ],
+    "standalone.py": [
+      "state = subprocess.run([self.docker_bin, 'inspect', '--format={{.State.Running}}', name], env=dict(client_env), capture_output=True, text=True, timeout=_CONTROL_TIMEOUT_SECONDS)",
+      "state.returncode != 0",
+      "state.returncode == 0",
+      "state.stdout.strip() == 'false'",
+      "status = 'canceled'",
+      "status = 'output_limit_exceeded'",
+      "status = 'timeout'",
+      "status = None",
+      "status is not None",
+      "terminal_status=status"
+    ],
+    "grader.py": [
+      "_OK_TERMINAL_STATUSES: frozenset[str] = frozenset({'succeeded', 'completed'})",
+      "hidden_result['status'] == 'passed'",
+      "outcome == outcomes.PASSED",
+      "outcome, reason = (outcomes.FAILED, '; '.join(failed))",
+      "outcome, reason = (verdict.outcome, verdict.reason)",
+      "outcome: 'error'",
+      "outcome: 'not_run'",
+      "outcome: str",
+      "outcome=outcomes.AGENT_ERROR",
+      "outcome=outcomes.FORMAT_FAILED",
+      "outcome=outcomes.INTEGRITY_HOLD if flags else verdict.outcome",
+      "outcome=outcomes.NO_SUBMISSION",
+      "status == 'captured'",
+      "terminalStatus: self.terminal_status",
+      "terminal_status: str",
+      "terminal_status: str | None = None",
+      "trajectory.terminal_status not in _OK_TERMINAL_STATUSES"
+    ],
+    "suite.py": [
+      "TIMEOUT_TERMINAL_STATUS = 'timeout'",
+      "c.outcome == outcomes.INTEGRITY_HOLD",
+      "cell.outcome != outcomes.AGENT_ERROR",
+      "cell.outcome = outcomes.AGENT_ERROR",
+      "cell.outcome == outcomes.PASSED",
+      "cell.terminal_status == 'provider_unavailable'",
+      "cell.terminal_status in {TIMEOUT_TERMINAL_STATUS, 'provider_unavailable'}",
+      "g.cell.outcome == outcome",
+      "g.cell.outcome == outcomes.ERROR",
+      "outcome=outcomes.AGENT_ERROR",
+      "outcome=outcomes.ERROR",
+      "view['terminalStatus'] = cell.terminal_status"
+    ],
+    "toc_matrix.py": [
+      "_STATE_EXHAUSTED = 'exhausted'",
+      "state != 'ok'",
+      "state = str(row.get('state') or '').lower()",
+      "state in ('exhausted', 'suspended')",
+      "state: str",
+      "statuses = payload.get('providerStatuses')",
+      "statuses = selected",
+      "str(row.get('state') or '').lower() == _STATE_EXHAUSTED"
+    ],
+    "doc_checks.py": [
+      "outcome_split = ';\\\\s*(?=(?:success|exhaustion|invalid)\\\\b)|,?\\\\s+(?:and\\\\s+)?(?=[024]\\\\s+(?:for|on|after|if|when|with|otherwise)\\\\b)'"
+    ],
+    "binding_recovery.py": [
+      "cell['status'] != 'done'",
+      "cell['status'] in {'dispatching', 'in_flight'}"
+    ],
+    "verifier_runtime.py": [
+      "status == 'captured'"
+    ],
+    "budget_amendment.py": [
+      "cell['status'] == 'in_flight'"
+    ],
+    "cli.py": [
+      "cell.outcome == outcomes.AGENT_ERROR"
+    ],
+    "outcomes.py": [
+      "OUTCOMES: frozenset[str] = frozenset({PASSED, FAILED, FORMAT_FAILED, NO_SUBMISSION, AGENT_ERROR, ERROR, INTEGRITY_HOLD})",
+      "outcome in PASSING"
+    ],
+    "endpoint_results.py": [
+      "'outcome' in node"
+    ],
+    "cost.py": [
+      "proof.get('status') == 'calibrating'",
+      "status = 'estimated'",
+      "status = str(component['basis'])"
+    ],
+    "hidden_tests.py": [
+      "audit_cases[i]['outcome'] = 'timed_out'",
+      "outcome = 'timed_out' if timeout else 'error' if response is None else 'passed' if matches else 'failed'",
+      "outcome: 'error'",
+      "outcome: 'not_run'",
+      "outcome: outcome",
+      "record['outcome'] = 'raised'",
+      "record['outcome'] == expected",
+      "record['outcome'], record['counts'] = _regression_outcome(response, timeout)",
+      "status: 'completed'",
+      "status: 'not_run'",
+      "status: 'passed' if passed == len(cases) and (not errors) else 'failed'"
+    ],
+    "harness_toolcalls.py": [
+      "state = part.get('state')",
+      "step.get('state') != 'DONE'"
+    ],
+    "endpoints.py": [
+      "current['state'] == 'closed'",
+      "current['state'] == 'closing'",
+      "deployment.get('state') not in {'DELETED', 'STATE_DELETED', 'DELETING', 'STATE_DELETING'}",
+      "item['state'] != 'closed'",
+      "lease['state'] != 'closed'",
+      "lease['state'] != 'ready'",
+      "lease['state'] = 'closed'",
+      "lease['state'] = 'closing'",
+      "lease['state'] = 'ready'",
+      "lease['state'] = 'warming'",
+      "lease['state'] == 'closed'",
+      "lease['state'] == 'closing'",
+      "outcome: outcome",
+      "self.load(ident)['state'] in {'closing', 'closed'}",
+      "state = api.get(lease['deployment'])",
+      "state = api.get(lease['deployment']).get('state')",
+      "state = self.api_factory(lease['settings']).get(lease['deployment']).get('state') if lease['state'] != 'closed' else 'DELETED'",
+      "state not in {'DELETED', 'STATE_DELETED'}",
+      "state not in {'DELETING', 'STATE_DELETING'}",
+      "state.get('state') == 'READY'",
+      "state.get('state') in {'FAILED', 'DELETED'}",
+      "state.get('status', {}).get('code') in {'RESOURCE_EXHAUSTED', 8, '8'}",
+      "state: 'creating'"
+    ],
+    "provider_health.py": [
+      "status = re.search('HTTP (408|5\\\\d\\\\d)\\\\b', self.cause or '')",
+      "status = str(event.get('error_status', ''))",
+      "status == '408'"
+    ]
+  }
+}

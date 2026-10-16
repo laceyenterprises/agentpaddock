@@ -76,10 +76,12 @@ def test_discover_unknown_suite_raises():
 
 def test_lock_scope_uses_the_effective_dispatch_class():
     tasks = discover_tasks(MINI_SUITE, task="mini-pass")
-    assert in_scope_agents(tasks, taint.ENFORCE, worker_class="oss-codex") == ["oss-codex"]
-    assert in_scope_agents(tasks, taint.ENFORCE, model="local/qwen2.5-coder-32b-q5") == [
-        "oss-local"
+    assert in_scope_agents(tasks, taint.ENFORCE, worker_class="oss-codex") == [
+        "oss-codex"
     ]
+    assert in_scope_agents(
+        tasks, taint.ENFORCE, model="local/qwen2.5-coder-32b-q5"
+    ) == ["oss-local"]
 
 
 def test_run_suite_summary_shape_matches_spec_mockup():
@@ -113,10 +115,16 @@ def test_a_poll_deadline_cell_carries_its_terminal_status():
     # cannot tell a queue wait from a model failure.
     tasks = discover_tasks(MINI_SUITE, suite=ALL_SUITE)
     timed_out = Trajectory(
-        terminal_status="timeout", launch_request_id="lrq-q", error="did not reach terminal"
+        terminal_status="timeout",
+        launch_request_id="lrq-q",
+        error="did not reach terminal",
     )
-    source = MappingSource({"mini-pass": timed_out, "mini-fail": _result_trajectory("bad")})
-    summary = run_suite(tasks, source, suite=ALL_SUITE, taint_mode=taint.ENFORCE).summary_dict()
+    source = MappingSource(
+        {"mini-pass": timed_out, "mini-fail": _result_trajectory("bad")}
+    )
+    summary = run_suite(
+        tasks, source, suite=ALL_SUITE, taint_mode=taint.ENFORCE
+    ).summary_dict()
     by_task = {c["task"]: c for c in summary["cells"]}
     assert by_task["mini-pass"]["verdict"] == outcomes.AGENT_ERROR
     assert by_task["mini-pass"]["terminalStatus"] == "timeout"
@@ -129,7 +137,10 @@ def test_run_suite_verdicts_map():
         {"mini-pass": _result_trajectory("ok"), "mini-fail": _result_trajectory("bad")}
     )
     result = run_suite(tasks, source, suite=ALL_SUITE, taint_mode=taint.ENFORCE)
-    assert result.verdicts() == {"mini-pass": outcomes.PASSED, "mini-fail": outcomes.FAILED}
+    assert result.verdicts() == {
+        "mini-pass": outcomes.PASSED,
+        "mini-fail": outcomes.FAILED,
+    }
 
 
 def test_injection_task_gated_without_dispatch_when_taint_unavailable():
@@ -159,7 +170,9 @@ def test_an_unmodelled_run_keys_verdicts_on_the_bare_task_id():
     # default run has to keep producing keys that compare against them.
     from gym.suite import SuiteResult
 
-    result = SuiteResult(suite="coding", graded=[_graded("coding-missing-commit", outcomes.PASSED)])
+    result = SuiteResult(
+        suite="coding", graded=[_graded("coding-missing-commit", outcomes.PASSED)]
+    )
     assert result.verdicts() == {"coding-missing-commit": outcomes.PASSED}
 
 
@@ -226,3 +239,41 @@ def test_a_model_sweep_records_only_unpinned_tasks_in_the_sweep_slice():
         f"pinned-qwen@{model}": None,
         f"sweep-qwen@{model}": model,
     }
+
+
+def test_smv_exact_states_writers_and_mutations():
+    from smv_sources import definition, sources, verify
+
+    doc, src = definition(), sources()
+    verify(doc, src)
+    renamed = dict(src)
+    renamed["outcomes.py"] = renamed["outcomes.py"].replace(
+        'PASSED = "passed"', 'PASSED = "renamed"'
+    )
+    with pytest.raises(AssertionError):
+        verify(doc, renamed)
+    changed = dict(src)
+    changed["endpoints.py"] = changed["endpoints.py"].replace(
+        'lease["state"] = "ready"', 'lease["state"] = "closing"'
+    )
+    with pytest.raises(AssertionError):
+        verify(doc, changed)
+    del next(s for s in doc["objects"][1]["states"] if not s["terminal"])["exitOwner"]
+    with pytest.raises((KeyError, AssertionError)):
+        verify(doc, src)
+
+
+def test_smv_sandbox_required_failure_and_host_unavailable():
+    import runpy
+    from pathlib import Path
+
+    harness = runpy.run_path(
+        str(Path(__file__).resolve().parents[1] / "scripts/smoke.py")
+    )
+    report = harness["run"]()
+    assert report["verdict"] == "pass", report
+    assert report["durationSeconds"] < 180
+    assert harness["run"](fail_step="lease.lifecycle")["verdict"] == "fail"
+    host = harness["run"](mode="host")
+    assert host["verdict"] == "fail"
+    assert all(s["verdict"] == "unavailable" for s in host["steps"])

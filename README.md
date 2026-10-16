@@ -1763,3 +1763,136 @@ after grading; workspace files remain intact for verifier correctness. Both
 container streams are drained continuously with an 8 MiB combined output budget
 and a 1 MiB event/line budget. Overflow triggers confirmed container containment
 and `output_limit_exceeded`, never grading partial evidence.
+## What this module promises
+
+`python3 scripts/smoke.py` is the canonical sandbox command, forwarded by installed `hq smoke paddock`.
+
+- `real-out-of-band-grading` (`suite.grade`): Grade the existing synthetic mini-suite through real suite and verifier entry points; check pass/fail outcomes.
+- `owned-lease-cleanup` (`lease.lifecycle`): Create/admit/close a disposable endpoint lease through real Manager methods with a synthetic provider API.
+- `deadline-is-not-success` (`suite.timeout`): A synthetic timed-out trajectory remains a non-passing agent error; no model, container or host dispatch runs.
+
+The harness uses disposable stores and synthetic external boundaries. Required missing, failed or unavailable evidence exits nonzero. No ambient credentials or endpoints are accepted by the CLI. Host mode is unavailable until a safe canary is approved; SRE instead inspects installed version and authoritative recent tool receipts read-only after deployment. SRE verifies service owner, launchd domain and documented restart path before any separately authorized activation. The existing main-catchup declaration lane owns page-once module/step/commit failures, with no revert and no later-deploy hold. No scheduled workflow changes.
+
+<!-- smv:state-machines:start -->
+
+### State machine contracts
+
+Generated from `state-machines.json`. Missing enforcement describes existing dead ends;
+the listed owners and durations are proposed contracts, not implemented repairs.
+
+#### paddock.grade
+
+```mermaid
+stateDiagram-v2
+    state "agent_error" as s_6167656e745f6572726f72
+    state "error" as s_6572726f72
+    state "failed" as s_6661696c6564
+    state "format_failed" as s_666f726d61745f6661696c6564
+    state "integrity_hold" as s_696e746567726974795f686f6c64
+    state "no_submission" as s_6e6f5f7375626d697373696f6e
+    state "passed" as s_706173736564
+    state "skipped_no_taint_gate" as s_736b69707065645f6e6f5f7461696e745f67617465
+    state "xfail_taint_shadow" as s_786661696c5f7461696e745f736861646f77
+    [*] --> s_6167656e745f6572726f72: paddock.grade.agent_error
+    [*] --> s_6572726f72: paddock.grade.error
+    [*] --> s_6661696c6564: paddock.grade.failed
+    [*] --> s_666f726d61745f6661696c6564: paddock.grade.format_failed
+    [*] --> s_696e746567726974795f686f6c64: paddock.grade.integrity_hold
+    [*] --> s_6e6f5f7375626d697373696f6e: paddock.grade.no_submission
+    [*] --> s_706173736564: paddock.grade.passed
+    [*] --> s_736b69707065645f6e6f5f7461696e745f67617465: paddock.grade.skipped_no_taint_gate
+    [*] --> s_786661696c5f7461696e745f736861646f77: paddock.grade.xfail_taint_shadow
+    s_6167656e745f6572726f72 --> [*]: paddock.grade.end.agent_error
+    s_6572726f72 --> [*]: paddock.grade.end.error
+    s_6661696c6564 --> [*]: paddock.grade.end.failed
+    s_666f726d61745f6661696c6564 --> [*]: paddock.grade.end.format_failed
+    s_696e746567726974795f686f6c64 --> [*]: paddock.grade.end.integrity_hold
+    s_6e6f5f7375626d697373696f6e --> [*]: paddock.grade.end.no_submission
+    s_706173736564 --> [*]: paddock.grade.end.passed
+    s_736b69707065645f6e6f5f7461696e745f67617465 --> [*]: paddock.grade.end.skipped_no_taint_gate
+    s_786661696c5f7461696e745f736861646f77 --> [*]: paddock.grade.end.xfail_taint_shadow
+    s_6572726f72 --> s_6167656e745f6572726f72: paddock.grade.level.error
+    s_6661696c6564 --> s_6167656e745f6572726f72: paddock.grade.level.failed
+    s_666f726d61745f6661696c6564 --> s_6167656e745f6572726f72: paddock.grade.level.format_failed
+    s_696e746567726974795f686f6c64 --> s_6167656e745f6572726f72: paddock.grade.level.integrity_hold
+    s_6e6f5f7375626d697373696f6e --> s_6167656e745f6572726f72: paddock.grade.level.no_submission
+    s_706173736564 --> s_6167656e745f6572726f72: paddock.grade.level.passed
+```
+
+#### paddock.endpoint
+
+```mermaid
+stateDiagram-v2
+    state "closed" as s_636c6f736564
+    state "closing" as s_636c6f73696e67
+    state "creating" as s_6372656174696e67
+    state "ready" as s_7265616479
+    state "warming" as s_7761726d696e67
+    [*] --> s_6372656174696e67: paddock.endpoint.create
+    s_6372656174696e67 --> s_7761726d696e67: paddock.endpoint.warm
+    s_7761726d696e67 --> s_7265616479: paddock.endpoint.register
+    s_636c6f736564 --> s_636c6f73696e67: paddock.endpoint.down.closed
+    s_636c6f73696e67 --> s_636c6f73696e67: paddock.endpoint.down.closing
+    s_6372656174696e67 --> s_636c6f73696e67: paddock.endpoint.down.creating
+    s_7265616479 --> s_636c6f73696e67: paddock.endpoint.down.ready
+    s_7761726d696e67 --> s_636c6f73696e67: paddock.endpoint.down.warming
+    s_636c6f73696e67 --> s_636c6f736564: paddock.endpoint.delete
+    s_636c6f736564 --> s_636c6f736564: paddock.endpoint.replay
+    s_636c6f736564 --> [*]: paddock.endpoint.end
+```
+
+#### paddock.process
+
+```mermaid
+stateDiagram-v2
+    state "canceled" as s_63616e63656c6564
+    state "failed" as s_6661696c6564
+    state "input_fixtures_missing" as s_696e7075745f66697874757265735f6d697373696e67
+    state "output_limit_exceeded" as s_6f75747075745f6c696d69745f6578636565646564
+    state "running" as s_72756e6e696e67
+    state "succeeded" as s_737563636565646564
+    state "timeout" as s_74696d656f7574
+    [*] --> s_72756e6e696e67: paddock.process.spawn
+    s_72756e6e696e67 --> s_63616e63656c6564: paddock.process.canceled
+    s_72756e6e696e67 --> s_6661696c6564: paddock.process.failed
+    s_72756e6e696e67 --> s_6f75747075745f6c696d69745f6578636565646564: paddock.process.output_limit_exceeded
+    s_72756e6e696e67 --> s_737563636565646564: paddock.process.succeeded
+    s_72756e6e696e67 --> s_74696d656f7574: paddock.process.timeout
+    [*] --> s_696e7075745f66697874757265735f6d697373696e67: paddock.process.staging
+    [*] --> s_63616e63656c6564: paddock.process.halted
+    s_63616e63656c6564 --> [*]: paddock.process.end.canceled
+    s_6661696c6564 --> [*]: paddock.process.end.failed
+    s_696e7075745f66697874757265735f6d697373696e67 --> [*]: paddock.process.end.input_fixtures_missing
+    s_6f75747075745f6c696d69745f6578636565646564 --> [*]: paddock.process.end.output_limit_exceeded
+    s_737563636565646564 --> [*]: paddock.process.end.succeeded
+    s_74696d656f7574 --> [*]: paddock.process.end.timeout
+```
+
+### Exit owners and known dead ends
+
+| Object | Non-terminal states | Proposed exit owner | Proposed maximum | Recipient | Enforcement |
+|---|---|---|---|---|---|
+| paddock.endpoint | `closing` | paddock maintainer/caller | 180s | paddock maintainer | missing |
+| paddock.endpoint | `creating` | paddock maintainer/caller | 180s | paddock maintainer | missing |
+| paddock.endpoint | `ready` | paddock maintainer/caller | 180s | paddock maintainer | missing |
+| paddock.endpoint | `warming` | paddock maintainer/caller | 180s | paddock maintainer | missing |
+| paddock.process | `running` | paddock maintainer/caller | 180s | paddock maintainer | missing |
+
+Each missing row has source evidence in its definition. No general overdue enforcer is added here.
+Proposed lifetime/expiry bounds above are not repairs. See each state deadEndEvidence selector.
+
+### Ownership dispositions
+
+| Field | Owner | Disposition | Evidence |
+|---|---|---|---|
+| `grader.Cell.outcome; outcomes.OUTCOMES/PASSING; taint.GATE_OUTCOMES` | tools/paddock | owned | Terminal per-cell decisions include gating outcomes, not green skips. Grader mutation sites include _grade, _grade_with_audit and suite level/model/price checks; exact predicates are independently inventoried. |
+| `lease state; lease.cells admissions/bindings/accounting; endpoint_results finalization` | tools/paddock | owned | Manager owns lease JSON and save/load/audit. Creating/warming have inline deadline checks; ready/closing require a caller/reaper. No mandatory background lifetime enforcer, enforcement=missing; proposed periodic reaper within 180s. Admission/accounted fields are timestamps and derived cost snapshots, not status enums. |
+| `provider READY/FAILED/DELETED/DELETING/STATE_DELETED; RESOURCE_EXHAUSTED; provider_health; cost/quota status` | provider | reference | Provider lifecycle is external; endpoint_api normalizes responses. Economics/health states are derived observations, not an owned deployment engine. |
+| `binding_recovery dispatching/in_flight/done; toc_matrix host run/resume/status` | host matrix runner | reference | Binding quarantine consumes host-owned cell input. The public adapter delegates matrix execution; no copied host matrix state machine. |
+| `hidden_tests status passed/failed/not_run/completed; integrity/taint/locks/baseline/alerting schemas` | tools/paddock | derived/configuration | Verifier subprocess snapshots and taint modes are derived judgments/configuration. Host delivery is delegated. Stateless tool-call, schema and staging helpers own no additional job/agent lifecycle. Existing host/Docker smokes remain manual. |
+
+The SQL source inventory records checks, constants and mutation guards (including bound values).
+The unit suite independently reads those source statements and enums; changing a state or edge fixture must fail.
+Snapshots/observations do not transfer ownership from the referenced runtime. Synthetic smoke evidence does not prove live dispatch or provider behavior.
+
+<!-- smv:state-machines:end -->

@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "module": "paddock",
+  "implementationOwner": "tools/paddock",
+  "changedPaths": [
+    "tools/paddock/**"
+  ],
+  "sharedPaths": [
+    "modules/worker-pool/lib/python/cwp_dispatch/smv/**"
+  ],
+  "command": [
+    "python3",
+    "tools/paddock/scripts/smoke.py"
+  ],
+  "modes": {
+    "sandbox": {
+      "prerequisites": [
+        "Python >=3.11 with package dependencies; disposable stores and synthetic external boundaries"
+      ],
+      "exclusions": [
+        "No live model/provider/ledger/message transport; no runtime activation"
+      ]
+    },
+    "host": {
+      "prerequisites": [
+        "SRE after deploy verifies service owner/domain/restart path before separately authorized activation"
+      ],
+      "exclusions": [
+        "host-unavailable: no approved canary; inspect installed version and recent authoritative tool receipts read-only"
+      ]
+    }
+  },
+  "deployMode": "sandbox",
+  "totalBudgetSeconds": 180,
+  "onFailure": "page",
+  "steps": [
+    {
+      "id": "suite.grade",
+      "promise": "real-out-of-band-grading",
+      "edges": [
+        "paddock.grade.passed",
+        "paddock.grade.failed"
+      ],
+      "budgetSeconds": 40,
+      "acceptance": {
+        "verdict": "pass",
+        "evidenceRequired": true
+      }
+    },
+    {
+      "id": "lease.lifecycle",
+      "promise": "owned-lease-cleanup",
+      "edges": [
+        "paddock.endpoint.create",
+        "paddock.endpoint.warm",
+        "paddock.endpoint.register",
+        "paddock.endpoint.down.ready",
+        "paddock.endpoint.delete"
+      ],
+      "budgetSeconds": 40,
+      "acceptance": {
+        "verdict": "pass",
+        "evidenceRequired": true
+      }
+    },
+    {
+      "id": "suite.timeout",
+      "promise": "deadline-is-not-success",
+      "edges": [
+        "paddock.grade.agent_error",
+        "paddock.process.halted"
+      ],
+      "budgetSeconds": 40,
+      "acceptance": {
+        "verdict": "pass",
+        "evidenceRequired": true
+      }
+    }
+  ]
+}
