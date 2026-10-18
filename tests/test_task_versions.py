@@ -86,7 +86,11 @@ def test_every_task_declares_task_version(manifest):
             "docs-gym-baseline-keys",
         }
         else 2
-        if manifest.parent.name in SCRUBBED or manifest.parent.name.startswith("docs-")
+        if (
+            manifest.parent.name in SCRUBBED
+            or manifest.parent.name.startswith("docs-")
+            or manifest.parent.name == "coding-toc-large-output"
+        )
         else 1
     ) + (manifest.parent.name in READ_EVIDENCE_REGRADED)
     assert load_task(manifest.parent).task_version == int(declared[0])
