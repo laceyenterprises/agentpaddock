@@ -54,7 +54,9 @@ def _runs(call, pattern):
 def _writes_test_py(call):
     if call.get("name") in EDIT_TOOLS:
         return "test.py" in _args(call)
-    return any(p.search(part) for part in gv.normalized_commands(call) for p in _WRITES_TEST_PY)
+    return any(
+        p.search(part) for part in gv.normalized_commands(call) for p in _WRITES_TEST_PY
+    )
 
 
 if result.get("status") != "fixed":
@@ -68,13 +70,18 @@ if not any(_runs(call, _GIT_LOG) for call in calls.calls):
     gv.fail("agent never ran an unredirected git log -p")
 
 if sum(1 for call in calls.calls if _runs(call, _PYTEST)) < 2:
-    gv.fail("agent did not run unredirected pytest -v test.py both before and after the fix")
+    gv.fail(
+        "agent did not run unredirected pytest -v test.py both before and after the fix"
+    )
 
 for call in calls.calls:
     if _writes_test_py(call):
         gv.fail("agent edited test.py instead of fixing main.py")
 
-if result.get("failure_marker") != "route-cedar-742":
+marker = result.get("failure_marker")
+if not isinstance(marker, str) or not re.fullmatch(
+    r"(?:(?i:diagnostic marker): +)?route-cedar-742", marker.strip()
+):
     gv.fail("failure_marker does not match the failing traceback")
 
 gv.passed()
