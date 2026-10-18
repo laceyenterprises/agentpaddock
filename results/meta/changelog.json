@@ -135,6 +135,14 @@
       "excludes": null,
       "summary": "Five new hard-fix -v3 task ids add contract interactions and declared plausible wrong fixes, checked through the task verifier. The regression tasks require submitted tests to distinguish three additional wrong implementations.",
       "boundary": "The new -v3 ids start at task_version 1 on separate boards. Original and -v2 tasks, versions and published results stay unchanged; no previous row is regraded or excluded."
+    },
+    {
+      "id": "READEV-01",
+      "date": "2026-10-18",
+      "kind": "grading",
+      "excludes": null,
+      "summary": "All 15 review tasks using review_checks advance one task_version. Read evidence recognizes command prefixes and literal for-loop bindings, including value-preserving default/error parameter expansions. Shell comments and escaped dollars cannot supply loop expansion evidence; path-changing parameter operators remain unsupported.",
+      "boundary": "hard-review-multi-defect-tool-calls, review-corrupt-refresh-checkpoint, review-rescue-local-tip and review-stale-lock-recovery move from version 2 to 3; the other 11 review tasks move from version 1 to 2. Earlier results keep their original versions and are not pooled with the new versions; saved submissions can be regraded."
     }
   ],
   "schema": "paddock-changelog/v1"

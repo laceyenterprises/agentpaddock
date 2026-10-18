@@ -200,6 +200,56 @@ def test_read_evidence_credits_a_loop_inside_a_nested_shell():
     assert credited(command) == set(TARGETS)
 
 
+@pytest.mark.parametrize(
+    "expansion", ["${f:-missing}", "${f-missing}", "${f:?missing}", "${f?missing}"]
+)
+def test_read_evidence_credits_value_preserving_parameter_operators(expansion):
+    assert credited(
+        f'for f in src/store.py src/lease.py; do cat "{expansion}"; done'
+    ) == set(TARGETS)
+
+
+@pytest.mark.parametrize(
+    "expansion", ["${f%.*}", "${f##*/}", "${f:+other.py}", "${f/store/other}"]
+)
+def test_read_evidence_does_not_infer_original_path_from_transformations(expansion):
+    assert credited(f'for f in src/store.py; do cat "{expansion}"; done') == set()
+
+
+@pytest.mark.parametrize("quote", ["", '"'])
+@pytest.mark.parametrize("backslashes", [1, 2, 3, 4])
+@pytest.mark.parametrize("reference", ["$f", "${f}", "${f:?missing}"])
+def test_read_evidence_respects_dollar_escape_parity(quote, backslashes, reference):
+    body = "cat " + quote + "\\" * backslashes + reference + quote
+    expected = {"src/store.py"} if backslashes % 2 == 0 else set()
+    assert credited(f"for f in src/store.py; do {body}; done") == expected
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "cat src/lease.py # inspect $f; done",
+        "cat src/lease.py # inspect ${f}; done",
+        "cat src/lease.py # src/store.py; cat $f; done",
+        "cat src/lease.py # quoted comment ' $f; cat src/store.py; done",
+    ],
+)
+def test_read_evidence_ignores_commented_paths_and_loop_references(body):
+    assert credited(f"for f in src/store.py; do {body}\ndone") == {"src/lease.py"}
+
+
+def test_read_evidence_preserves_quoted_hash_and_resumes_after_comments():
+    assert credited('for f in src/store.py; do grep "#pattern" "$f"; done') == {
+        "src/store.py"
+    }
+    assert credited(
+        'for f in src/store.py; do # ignore $f; cat src/lease.py\ncat "$f"; done'
+    ) == {"src/store.py"}
+    assert credited("bash -c 'cat src/lease.py # src/store.py; cat src/store.py'") == {
+        "src/lease.py"
+    }
+
+
 def test_read_evidence_credits_command_prefix_and_compound_bodies():
     assert credited("command cat -n src/store.py src/lease.py") == set(TARGETS)
     assert credited("command command /bin/cat src/store.py") == {"src/store.py"}

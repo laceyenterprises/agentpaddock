@@ -98,7 +98,7 @@ def _strings(value):
 
 
 def _outside_single_quotes(command):
-    """Return command without single-quoted text, where ``$NAME`` stays literal."""
+    """Mask single-quoted text and escaped dollars, where ``$NAME`` stays literal."""
     kept, quote, escaped = [], None, False
     for char in command:
         if quote == "'":
@@ -107,6 +107,8 @@ def _outside_single_quotes(command):
             continue
         if escaped:
             escaped = False
+            kept.append(" " if char == "$" else char)
+            continue
         elif char == "\\":
             escaped = True
         elif char == "'" and quote is None:
@@ -169,7 +171,11 @@ def _read_arguments(call):
                 yield command
                 expanded = _outside_single_quotes(command)
                 for name, bound in loops.items():
-                    reference = r"\$(?:" + name + r"(?!\w)|\{" + name + r"\})"
+                    # Default/error operators preserve a nonempty loop item;
+                    # trimming/replacement operators can name a different file.
+                    reference = (
+                        r"\$(?:" + name + r"(?!\w)|\{" + name + r"(?::?[-?][^{}]*)?\})"
+                    )
                     if re.search(reference, expanded):
                         yield from bound
 

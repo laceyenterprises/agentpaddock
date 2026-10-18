@@ -115,9 +115,19 @@ def _shell_segments(command: str) -> list[str]:
     start = 0
     quote = None
     escaped = False
+    comment = False
+    word_start = True
     for i, char in enumerate(command):
+        if comment:
+            if char == "\n":
+                comment = False
+                start = i + 1
+                word_start = True
+            continue
         if escaped:
             escaped = False
+            if char != "\n":
+                word_start = False
         elif char == "\\" and quote != "'":
             escaped = True
         elif quote:
@@ -125,6 +135,10 @@ def _shell_segments(command: str) -> list[str]:
                 quote = None
         elif char in "\"'":
             quote = char
+            word_start = False
+        elif char == "#" and word_start:
+            parts.append(command[start:i].strip())
+            comment = True
         elif char in ";|&\n":
             if char == "&" and (
                 (i > 0 and command[i - 1] in "><")
@@ -135,7 +149,11 @@ def _shell_segments(command: str) -> list[str]:
                 continue
             parts.append(command[start:i].strip())
             start = i + 1
-    parts.append(command[start:].strip())
+            word_start = True
+        else:
+            word_start = char.isspace() or char in "()<>"
+    if not comment:
+        parts.append(command[start:].strip())
     return [part for part in parts if part]
 
 
