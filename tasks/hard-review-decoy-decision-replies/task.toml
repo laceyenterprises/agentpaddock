@@ -1,6 +1,6 @@
 # Source PR/review: synthetic; authored hard-review fixture for HRF-04. Decoys port disputed findings from PR 7695, PR 7704, PR 7674, PR 7864, PR 7546 and PR 7615 (see expected/PROVENANCE.md).
 id = "hard-review-decoy-decision-replies"
-task_version = 1
+task_version = 2
 title = "Decision replies, replay and deadline pages with decoys"
 suite = "hard-review"
 persona = "codex"

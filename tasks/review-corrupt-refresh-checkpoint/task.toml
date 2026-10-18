@@ -1,6 +1,6 @@
 # Source PR: none public; derived from a private review.
 id = "review-corrupt-refresh-checkpoint"
-task_version = 2
+task_version = 3
 title = "Resume refresh from a per-file progress journal"
 suite = "review"
 persona = "codex"

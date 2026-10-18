@@ -1,6 +1,6 @@
 # Source PR/review: synthetic; authored hard-review fixture for HRF-04.
 id = "hard-review-multi-defect-outbox"
-task_version = 1
+task_version = 2
 title = "Outbox retries, dead letters and parallel dispatchers"
 suite = "hard-review"
 persona = "codex"

@@ -1,6 +1,6 @@
 # Source PR/review: synthetic; authored hard-review fixture for HRF-04. Decoys port disputed findings from PR 7516, PR 7522, PR 7663 and PR 7644 (see expected/PROVENANCE.md).
 id = "hard-review-decoy-job-leases"
-task_version = 1
+task_version = 2
 title = "Job leases and lease sweeper with decoys"
 suite = "hard-review"
 persona = "codex"

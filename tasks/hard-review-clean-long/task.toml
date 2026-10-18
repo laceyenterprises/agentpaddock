@@ -1,6 +1,6 @@
 # Source PR/review: synthetic; authored hard-review clean control for HRF-04. No defects; decoys only (see expected/PROVENANCE.md).
 id = "hard-review-clean-long"
-task_version = 1
+task_version = 2
 title = "Quiet hours, held-alert digest and dedupe (clean control)"
 suite = "hard-review"
 persona = "codex"

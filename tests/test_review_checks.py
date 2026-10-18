@@ -1,5 +1,5 @@
 import pytest
-from gym.review_checks import evaluate, CATEGORIES, result_schema_snippet
+from gym.review_checks import evaluate, CATEGORIES, result_schema_snippet, _read_arguments
 
 WINDOW = dict(file="src/store.py", line_start=10, line_end=12)
 CALLS = {"calls": [{"name": "exec", "arguments": {"cmd": "cat src/store.py"}}]}
@@ -161,3 +161,84 @@ def test_overlapping_windows_have_order_independent_distinct_credit():
     result = evaluate(findings, CALLS, defects=windows, max_false_blocking=0)
     assert result[0]["ok"]
     assert next(c for c in result if c["name"] == "precision")["ok"]
+
+
+TARGETS = ("src/store.py", "src/lease.py")
+
+
+def credited(*commands):
+    """Target files credited by read_evidence, one shell tool call per command."""
+    calls = [{"name": "bash", "arguments": {"command": command}} for command in commands]
+    return {
+        path
+        for path in TARGETS
+        if evaluate([], calls, clean_control=True, read_files=[path])[-1]["ok"]
+    }
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        'cat -n "$f"',
+        "cat -n $f",
+        "cat -n ${f}",
+        'nl -ba "$f"',
+        "nl -ba $f",
+        'nl -ba "${f}"',
+        'sed -n 1,200p "$f"',
+        "sed -n 1,200p $f",
+        "sed -n '1,200p' ${f}",
+    ],
+)
+def test_read_evidence_credits_every_word_of_a_for_loop(body):
+    assert credited(f"for f in src/store.py src/lease.py; do {body}; done") == set(TARGETS)
+    assert credited(f"for f in src/store.py src/lease.py\ndo\n  {body}\ndone") == set(TARGETS)
+
+
+def test_read_evidence_credits_a_loop_inside_a_nested_shell():
+    command = "bash -lc 'for f in src/store.py src/lease.py; do cat -n \"$f\"; done'"
+    assert credited(command) == set(TARGETS)
+
+
+def test_read_evidence_credits_command_prefix_and_compound_bodies():
+    assert credited("command cat -n src/store.py src/lease.py") == set(TARGETS)
+    assert credited("command command /bin/cat src/store.py") == {"src/store.py"}
+    assert credited(
+        'if [ -n "$X" ]; then cat src/store.py; else nl -ba src/lease.py; fi'
+    ) == set(TARGETS)
+
+
+@pytest.mark.parametrize(
+    "commands,expected",
+    [
+        (['for f in src/store.py src/lease.py; do echo "$f"; done'], set()),
+        (["for f in src/store.py; do cat src/lease.py; done"], {"src/lease.py"}),
+        (["command -v cat src/store.py src/lease.py"], set()),
+        (["for f in src/store.py src/lease.py", 'cat -n "$f"'], set()),
+        (["for f in src/store.py src/lease.py; do :; done"], set()),
+        (["for f in src/store.py src/lease.py"], set()),
+        (['for f in src/store.py; do cat "$file"; done'], set()),
+        (["for f in src/store.py; do grep -n '$f' src/lease.py; done"], {"src/lease.py"}),
+    ],
+)
+def test_read_evidence_does_not_credit_unread_loop_words(commands, expected):
+    assert credited(*commands) == expected
+
+
+def test_read_evidence_keeps_existing_credited_forms_unchanged():
+    calls = [
+        {"name": "exec", "arguments": {"cmd": "cat src/store.py"}},
+        {"name": "Read", "arguments": {"path": "src/lease.py"}},
+        {"name": "bash", "arguments": {"command": "echo x; sed -n 1,9p src/store.py"}},
+        {"name": "shell", "arguments": {"command": "rg -n lease src/lease.py | head -5"}},
+        {"name": "exec_command", "arguments": {"cmd": "/usr/bin/nl -ba src/store.py"}},
+    ]
+    assert [s for call in calls for s in _read_arguments(call)] == [
+        "cat src/store.py",
+        "src/lease.py",
+        "sed -n 1,9p src/store.py",
+        "rg -n lease src/lease.py",
+        "head -5",
+        "/usr/bin/nl -ba src/store.py",
+    ]
+    assert credited("cat src/store.py src/lease.py") == set(TARGETS)

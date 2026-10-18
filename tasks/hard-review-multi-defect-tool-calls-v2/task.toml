@@ -1,6 +1,6 @@
 # Source PR/review: synthetic; authored hard-review fixture for HRX-02.
 id = "hard-review-multi-defect-tool-calls-v2"
-task_version = 1
+task_version = 2
 title = "Tool calls v2: OpenAI tool calling for the local chat bridge"
 suite = "hard-review"
 persona = "codex"

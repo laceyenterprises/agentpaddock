@@ -1,6 +1,6 @@
 # Source PR/review: none; authored synthetic review fixture for RFD-04.
 id = "review-retry-empty-page"
-task_version = 1
+task_version = 2
 title = "Keep refresh responsive during upstream outages"
 suite = "review"
 persona = "codex"

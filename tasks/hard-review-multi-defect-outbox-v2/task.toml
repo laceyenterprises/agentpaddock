@@ -1,6 +1,6 @@
 # Source PR/review: synthetic; authored hard-review fixture for HRX-02.
 id = "hard-review-multi-defect-outbox-v2"
-task_version = 1
+task_version = 2
 title = "Outbox v2: parallel dispatchers, bounded retries and dead-letter commands"
 suite = "hard-review"
 persona = "codex"
