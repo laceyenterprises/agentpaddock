@@ -3,7 +3,7 @@
 # task whose correct path runs the eligible command classes.
 
 id = "coding-toc-large-output"
-task_version = 1
+task_version = 2
 title = "Find the regressing commit and fix the failing test"
 suite = "coding"
 persona = "claude-code"
