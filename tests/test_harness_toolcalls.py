@@ -501,6 +501,25 @@ def test_normalized_commands_preserves_raw_and_quoted_non_commands():
 
 
 @pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("cat a.py # $f; cat b.py", ["cat a.py"]),
+        ("cat a.py # unbalanced ' quote; cat b.py\ncat c.py", ["cat a.py", "cat c.py"]),
+        ("# cat a.py; cat b.py", []),
+        ("cat a.py;# cat b.py\ncat c.py", ["cat a.py", "cat c.py"]),
+        ("cat \"a#b\" '#c' d#e \\#f", ["cat \"a#b\" '#c' d#e \\#f"]),
+        (r"cat a\ #b", [r"cat a\ #b"]),
+        ("bash -c 'cat a.py # cat b.py; cat c.py'", ["cat a.py"]),
+        ("cat ${f#prefix}", ["cat ${f#prefix}"]),
+    ],
+)
+def test_normalized_commands_strips_only_shell_comments(raw, expected):
+    call = {"arguments": {"command": raw}}
+    assert h.normalized_commands(call) == expected
+    assert call["arguments"]["command"] == raw
+
+
+@pytest.mark.parametrize(
     "prefix",
     [
         'FOO="bar baz"',

@@ -97,6 +97,29 @@ def _strings(value):
             yield from _strings(item)
 
 
+def _outside_single_quotes(command):
+    """Mask single-quoted text and escaped dollars, where ``$NAME`` stays literal."""
+    kept, quote, escaped = [], None, False
+    for char in command:
+        if quote == "'":
+            if char == "'":
+                quote = None
+            continue
+        if escaped:
+            escaped = False
+            kept.append(" " if char == "$" else char)
+            continue
+        elif char == "\\":
+            escaped = True
+        elif char == "'" and quote is None:
+            quote = "'"
+            continue
+        elif char == '"':
+            quote = None if quote == '"' else '"'
+        kept.append(char)
+    return "".join(kept)
+
+
 def _read_arguments(call):
     name = str(call.get("name", "")).lower().rsplit(".", 1)[-1]
     if name in ("read", "read_file", "readfile", "open_file", "get_file"):
@@ -115,10 +138,24 @@ def _read_arguments(call):
             from gym_commands import normalized_commands
         except ModuleNotFoundError:
             from gym.harness_toolcalls import normalized_commands
+        # A ``for NAME in WORD ...`` segment binds NAME for later segments of
+        # this call only, so a loop body reading "$NAME" names every WORD.
+        loops = {}
         for command in normalized_commands(call):
             try:
                 words = shlex.split(command)
             except ValueError:
+                continue
+            # ``command`` bypasses an alias; do/then/else open a compound body.
+            while words and words[0] in ("command", "do", "then", "else"):
+                words = words[1:]
+            if (
+                len(words) >= 3
+                and words[0] == "for"
+                and words[2] == "in"
+                and re.fullmatch(r"[A-Za-z_]\w*", words[1])
+            ):
+                loops[words[1]] = words[3:]
                 continue
             if words and words[0].rsplit("/", 1)[-1] in (
                 "cat",
@@ -132,6 +169,15 @@ def _read_arguments(call):
                 "nl",
             ):
                 yield command
+                expanded = _outside_single_quotes(command)
+                for name, bound in loops.items():
+                    # Default/error operators preserve a nonempty loop item;
+                    # trimming/replacement operators can name a different file.
+                    reference = (
+                        r"\$(?:" + name + r"(?!\w)|\{" + name + r"(?::?[-?][^{}]*)?\})"
+                    )
+                    if re.search(reference, expanded):
+                        yield from bound
 
 
 def evaluate(

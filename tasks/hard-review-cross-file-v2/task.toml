@@ -1,6 +1,6 @@
 # Source PR/review: synthetic; authored hard-review fixture for HRX-02.
 id = "hard-review-cross-file-v2"
-task_version = 1
+task_version = 2
 title = "Cross-file v2: registry change snapshots and a consumer behind a subscriber table"
 suite = "hard-review"
 persona = "codex"

@@ -1,6 +1,6 @@
 # Source PR/review: none; authored synthetic review fixture for RFD-04.
 id = "review-publish-guard-order"
-task_version = 1
+task_version = 2
 title = "Unify publishing with receipt collection"
 suite = "review"
 persona = "codex"

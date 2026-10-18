@@ -430,6 +430,14 @@ windows and parameters still raise a verifier error. A defect window awards cred
 to at most one blocking finding; excess hits count against precision. Each window
 needs a distinct finding. Read evidence requires a read-like tool or a normalized
 read command segment; echoing a path or writing it earns no read credit.
+Within one shell call, `for f in path ...` binds literal paths for read commands
+using `$f` or `${f}` (including behind `command`, `do`, `then`, or `else`).
+Single-quoted or backslash-escaped dollars and shell comments earn no expansion
+credit. Default/error forms `${f:-fallback}`, `${f-fallback}`, `${f:?error}` and
+`${f?error}` preserve a nonempty bound path and also count. Transformations such
+as `${f%.*}` and `${f:+other}` do not credit the original bound path: they can
+read a different file. This static heuristic does not evaluate arbitrary shell
+parameter expansions or prove that a command succeeded.
 
 Hard-review tasks may pass `min_recall` to `evaluate()` or `record()` to replace
 `defect_found` with a required `recall` check. A defect can use
@@ -461,7 +469,9 @@ For shell-command assertions, use `gv.normalized_commands(call)`. The shared
 `bash`, `sh`, and `zsh` wrappers, including argv lists and `env` prefixes. It
 preserves quoted or escaped assignment values, splits outer shell operators
 before unwrapping each segment, and keeps redirections such as `2>&1` attached
-to their command. Quoted separators stay intact, and `call["arguments"]` stays
+to their command. Shell comments are discarded through the next newline;
+quoted/escaped hashes and hashes inside words stay literal. Quoted separators
+stay intact, and `call["arguments"]` stays
 unchanged for verifiers that need raw evidence. A shell wrapper's `-c` body
 must be a separate argument; trailing wrapper parameters are not commands.
 Parsing is static; it does not execute or expand commands.

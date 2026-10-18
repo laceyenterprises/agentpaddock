@@ -1,6 +1,6 @@
 # Source PR/review: synthetic; authored hard-review fixture for HRF-04.
 id = "hard-review-cross-file"
-task_version = 1
+task_version = 2
 title = "A lookup contract change breaks an unchanged caller"
 suite = "hard-review"
 persona = "codex"

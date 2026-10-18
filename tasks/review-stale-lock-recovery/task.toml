@@ -1,6 +1,6 @@
 # Source PR: none public; derived from a private review.
 id = "review-stale-lock-recovery"
-task_version = 2
+task_version = 3
 title = "Recover an abandoned registry file lock"
 suite = "review"
 persona = "codex"

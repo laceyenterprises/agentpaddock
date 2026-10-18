@@ -17,6 +17,26 @@ FORBIDDEN = json.loads(
 )
 SCRUBBED = frozenset(FORBIDDEN["tasks"])
 DECLARED = re.compile(r"^task_version = ([1-9][0-9]*)$", re.MULTILINE)
+# Regraded once when read_evidence began crediting loop and ``command`` reads.
+READ_EVIDENCE_REGRADED = frozenset(
+    {
+        "hard-review-clean-long",
+        "hard-review-cross-file",
+        "hard-review-cross-file-v2",
+        "hard-review-decoy-decision-replies",
+        "hard-review-decoy-job-leases",
+        "hard-review-multi-defect-outbox",
+        "hard-review-multi-defect-outbox-v2",
+        "hard-review-multi-defect-tool-calls",
+        "hard-review-multi-defect-tool-calls-v2",
+        "review-clean-retention-plan",
+        "review-corrupt-refresh-checkpoint",
+        "review-publish-guard-order",
+        "review-rescue-local-tip",
+        "review-retry-empty-page",
+        "review-stale-lock-recovery",
+    }
+)
 
 
 def tokens(text):
@@ -42,6 +62,15 @@ def test_corpus_is_discovered():
     assert SCRUBBED <= {manifest.parent.name for manifest in MANIFESTS}
 
 
+def test_read_evidence_regrade_covers_every_review_checks_verifier():
+    users = {
+        verifier.parent.name
+        for verifier in (ROOT / "tasks").glob("*/verifier.py")
+        if "review_checks" in verifier.read_text()
+    }
+    assert users == READ_EVIDENCE_REGRADED
+
+
 @pytest.mark.parametrize("manifest", MANIFESTS, ids=lambda p: p.parent.name)
 def test_every_task_declares_task_version(manifest):
     text = manifest.read_text()
@@ -59,7 +88,7 @@ def test_every_task_declares_task_version(manifest):
         else 2
         if manifest.parent.name in SCRUBBED or manifest.parent.name.startswith("docs-")
         else 1
-    )
+    ) + (manifest.parent.name in READ_EVIDENCE_REGRADED)
     assert load_task(manifest.parent).task_version == int(declared[0])
 
 

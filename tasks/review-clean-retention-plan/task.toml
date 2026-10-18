@@ -1,6 +1,6 @@
 # Source PR/review: none; authored synthetic review fixture for RFD-04.
 id = "review-clean-retention-plan"
-task_version = 1
+task_version = 2
 title = "Plan retention before applying destructive actions"
 suite = "review"
 persona = "codex"
