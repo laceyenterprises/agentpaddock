@@ -1918,3 +1918,7 @@ Normal-suite mutations reject renamed outcomes, altered lease edges and missing 
 Snapshots/observations do not transfer ownership from the referenced runtime. Synthetic smoke evidence does not prove live dispatch or provider behavior.
 
 <!-- smv:state-machines:end -->
+
+## License
+
+Paddock is licensed under the [MIT License](LICENSE).

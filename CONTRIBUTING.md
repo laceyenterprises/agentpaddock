@@ -136,3 +136,5 @@ The six `docs-*` tasks use meaning-based wording checks. The retry behavior,
 snapshot command and baseline key tasks use version 3; the other three use
 version 2. Scores compare only within a task version. Regrade saved submissions
 when grading changes; keep old results at their original version.
+
+Contributions are accepted under the same [MIT License](LICENSE).

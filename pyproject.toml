@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,6 +9,8 @@ name = "agentpaddock"
 version = "0.1.0"
 description = "Paddock: an open leaderboard for model x harness combinations on coding-agent tasks"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 # The GYM harness core (schema, tool-call extractor, out-of-band verifier
 # runtime, outcome resolution, grader) is pure stdlib on purpose: verifiers run
