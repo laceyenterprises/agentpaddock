@@ -14,11 +14,13 @@ reports, one results document per source:
 
 Every comparability boundary is kept: a row a report excluded keeps its
 ``excludedBecause`` tag, infrastructure rows are tagged ``infra:<verdict>``,
-and every row stays at task_version 1, the version it was graded at (the
+and every legacy row stays at task_version 1, the version it was graded at (the
 seven tasks PDK-03 scrubbed are at version 2 only from then on). The sources
 carry no token measurements or wall times, so those are null and every cost is
 ``unknown``. The frontier coding and rca aggregates in the eval-bench report
-have no published per-attempt rows, so they are not imported.
+have no published per-attempt rows in these four sources, so they are not imported.
+The per-attempt eval-bench-evidence/v2 importer preserves recorded task versions,
+tokens and wall times; its source will be registered when the export is published.
 
     python3 scripts/import_eval_bench.py --reports DIR            # write results/
     python3 scripts/import_eval_bench.py --reports DIR --check    # fail if results/ differs
@@ -56,11 +58,22 @@ MODELS: dict[str, tuple[str, str | None]] = {
     "claude-sonnet-5": ("anthropic/claude-sonnet-5", None),
     "claude-haiku-4-5": ("anthropic/claude-haiku-4-5", None),
     "gpt-6.1-sol": ("openai/gpt-6.1-sol", None),
+    "gpt-5.6-luna": ("openai/gpt-5.6-luna", None),
+    "gpt-5.6-sol": ("openai/gpt-5.6-sol", None),
+    "gpt-5.6-terra": ("openai/gpt-5.6-terra", None),
+    "gpt-6-astra": ("openai/gpt-6-astra", None),
+    "gpt-6-luna": ("openai/gpt-6-luna", None),
+    "gpt-6-sol": ("openai/gpt-6-sol", None),
     # Frontier models run in another vendor's harness through the proxy.
     "anthropic/claude-opus-5-5": ("anthropic/claude-opus-5-5", None),
     "anthropic/claude-sonnet-5-5": ("anthropic/claude-sonnet-5-5", None),
     "openai/gpt-6.1-sol": ("openai/gpt-6.1-sol", None),
     "agy:gemini-3.1-pro-high": ("google/gemini-3.1-pro", "high"),
+    "agy:gemini-3.8-flash-high": ("google/gemini-3.8-flash", "high"),
+    "agy:gemini-4-argon-high": ("google/gemini-4-argon", "high"),
+    "google/gemini-3.8-flash": ("google/gemini-3.8-flash", None),
+    "google/gemini-3.8-flash-high": ("google/gemini-3.8-flash", "high"),
+    "google/gemini-3.8-flash-low": ("google/gemini-3.8-flash", "low"),
     "fireworks/qwen3.8-max": ("fireworks/qwen3.8-max", None),
     "fireworks/qwen3.8-27b": ("fireworks/qwen3.8-27b", None),
     "fireworks/kimi-k3": ("fireworks/kimi-k3", None),
@@ -68,7 +81,11 @@ MODELS: dict[str, tuple[str, str | None]] = {
     "glm-5.2": ("zai/glm-5.2", None),
     "baseten/glm-5.3-flash": ("baseten/glm-5.3-flash", None),
     "together/deepseek-v4.1-flash": ("together/deepseek-v4.1-flash", None),
-    "local/qwen3-coder-next-80b-a3b-6bit": ("local/qwen3-coder-next-80b-a3b-6bit", None),
+    "together/qwen3.8-flash": ("together/qwen3.8-flash", None),
+    "local/qwen3-coder-next-80b-a3b-6bit": (
+        "local/qwen3-coder-next-80b-a3b-6bit",
+        None,
+    ),
 }
 
 #: The RFD export's tag for an infrastructure row, mapped to the schema's.
@@ -108,12 +125,21 @@ def descriptor(worker_class: str, **extra: str) -> dict[str, str]:
     }
 
 
-def model_of(label: str) -> dict[str, str | None]:
+def model_of(label: str, reasoning_level: str | None = None) -> dict[str, str | None]:
     name = label[len(PROXY_PREFIX) :] if label.startswith(PROXY_PREFIX) else label
+    name, separator, effort = name.partition("@")
     try:
         provider_id, reasoning = MODELS[name]
     except KeyError:
         raise SourceError(f"unknown model label {label!r}") from None
+    if separator:
+        if not effort:
+            raise SourceError(f"model label {label!r} has an empty reasoning suffix")
+        reasoning = effort
+    if reasoning_level is not None and reasoning_level != reasoning:
+        raise SourceError(
+            f"model label {label!r} contradicts reasoningLevel {reasoning_level!r}"
+        )
     return {"provider_id": provider_id, "reasoning": reasoning}
 
 
@@ -145,39 +171,56 @@ class Builder:
         verdict: str,
         score: float | None,
         excluded: str | None,
+        task_version: int = 1,
+        tokens: dict[str, int | None] | None = None,
+        wall_seconds: float | None = None,
+        reasoning_level: str | None = None,
     ) -> None:
         if not run_id:
             raise SourceError(f"{task}: a source row has no run id")
         key = leaderboard.config_hash(config)
         self.configs[key] = config
-        model = model_of(model_label)
-        tokens = {"input": None, "cache": None, "output": None}
+        model = model_of(model_label, reasoning_level)
+        if tokens is None:
+            tokens = {"input": None, "cache": None, "output": None}
         self.records.append(
             {
                 "run_id": run_id,
                 "suite": suite,
                 "task": task,
-                "task_version": 1,
+                "task_version": task_version,
                 "attempt": attempt,
-                "harness": {"name": config["harness"], "version": None, "config_hash": key},
+                "harness": {
+                    "name": config["harness"],
+                    "version": None,
+                    "config_hash": key,
+                },
                 "model": model,
                 "verdict": verdict,
                 "score": score,
                 "tokens": tokens,
-                "wall_seconds": None,
+                "wall_seconds": wall_seconds,
                 "paddock_commit": None,
                 "excludedBecause": excluded_because(verdict, excluded),
-                "cost": leaderboard.price_cost(tokens, str(model["provider_id"]), self.table),
+                "cost": leaderboard.price_cost(
+                    tokens, str(model["provider_id"]), self.table
+                ),
             }
         )
 
-    def document(self, *, id: str, date: str, description: str, evidence: str) -> dict[str, Any]:
+    def document(
+        self, *, id: str, date: str, description: str, evidence: str
+    ) -> dict[str, Any]:
         return {
             "schema": leaderboard.SCHEMA,
             "id": id,
             "date": date,
-            "source": {"kind": "import", "description": description, "evidence": evidence},
-            "price_table": PRICE_TABLE,
+            "source": {
+                "kind": "import",
+                "description": description,
+                "evidence": evidence,
+            },
+            "price_table": self.table.date,
             "harness_configs": dict(sorted(self.configs.items())),
             "records": sorted(self.records, key=lambda r: r["run_id"]),
         }
@@ -247,7 +290,9 @@ def import_hrf(path: Path, table: leaderboard.PriceTable) -> dict[str, Any]:
     )
 
 
-def _matrix_rows(builder: Builder, runs: list[dict[str, Any]], suite: str, **extra: str) -> None:
+def _matrix_rows(
+    builder: Builder, runs: list[dict[str, Any]], suite: str, **extra: str
+) -> None:
     for run in runs:
         builder.add(
             run_id=run["lrq_id"],
@@ -299,6 +344,52 @@ def import_omt(path: Path, table: leaderboard.PriceTable) -> dict[str, Any]:
     )
 
 
+def import_eval_bench(
+    path: Path, table: leaderboard.PriceTable, existing_run_ids: set[str]
+) -> tuple[dict[str, Any], int, int]:
+    """Return the document, already-published count and unrecorded-version count."""
+    raw = _load(path)
+    if raw["schema"] != "eval-bench-evidence/v2":
+        raise SourceError("expected eval-bench-evidence/v2")
+    builder = Builder(table)
+    already_published = version_unrecorded = 0
+    for row in raw["rows"]:
+        if row["runId"] in existing_run_ids:
+            already_published += 1
+            continue
+        if row["excludedBecause"] == "version-unrecorded":
+            version_unrecorded += 1
+            continue
+        tokens = row["tokens"] or {}
+        builder.add(
+            run_id=row["runId"],
+            suite=row["category"],
+            task=row["task"],
+            task_version=row["taskVersion"],
+            attempt=row["attempt"],
+            config=descriptor(row["cls"]),
+            model_label=row["model"],
+            reasoning_level=row["reasoningLevel"],
+            verdict=row["verdict"],
+            score=row["score"],
+            tokens={
+                "input": tokens.get("freshInput"),
+                "cache": tokens.get("cacheRead"),
+                "output": tokens.get("output"),
+            },
+            wall_seconds=row["wallSeconds"],
+            excluded=row["excludedBecause"],
+        )
+    document = builder.document(
+        id="eval-bench",
+        date=raw["generatedAt"],
+        description="Per-attempt eval-bench gradings with task versions, measured tokens and wall time.",
+        evidence=f"{path.name} (sanitized per-attempt rows; no submissions or hidden cases)",
+    )
+    return document, already_published, version_unrecorded
+
+
+# Add the per-attempt export to SOURCES when it is published.
 SOURCES = (
     ("REPORT-rfd-calibration-2026-10-06.raw.json", import_rfd),
     ("REPORT-hrf-calibration-2026-10-07.raw.json", import_hrf),
@@ -309,18 +400,24 @@ SOURCES = (
 
 def build(reports: Path, results: Path) -> dict[str, str]:
     """``{file name: text}`` for every imported document."""
-    raw = json.loads((results / "prices" / f"{PRICE_TABLE}.json").read_text(encoding="utf-8"))
+    raw = json.loads(
+        (results / "prices" / f"{PRICE_TABLE}.json").read_text(encoding="utf-8")
+    )
     table = leaderboard.PriceTable(raw["date"], raw["models"], raw["note"])
     out = {}
     for name, importer in SOURCES:
         document = importer(reports / name, table)
-        out[f"{document['date']}-{document['id']}.json"] = leaderboard.render_document(document)
+        out[f"{document['date']}-{document['id']}.json"] = leaderboard.render_document(
+            document
+        )
     return out
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--reports", type=Path, required=True, help="the reports directory")
+    parser.add_argument(
+        "--reports", type=Path, required=True, help="the reports directory"
+    )
     parser.add_argument("--results", type=Path, default=leaderboard.DEFAULT_RESULTS)
     parser.add_argument("--check", action="store_true", help="fail if results/ differs")
     args = parser.parse_args(argv)
@@ -333,7 +430,9 @@ def main(argv: list[str] | None = None) -> int:
             or (args.results / name).read_text(encoding="utf-8") != text
         ]
         if stale:
-            print("results/ differs from the import: " + ", ".join(stale), file=sys.stderr)
+            print(
+                "results/ differs from the import: " + ", ".join(stale), file=sys.stderr
+            )
             return 1
         print("results/ matches the import")
         return 0

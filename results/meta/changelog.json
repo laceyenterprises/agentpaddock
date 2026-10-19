@@ -143,6 +143,14 @@
       "excludes": null,
       "summary": "All 15 review tasks using review_checks advance one task_version. Read evidence recognizes command prefixes and literal for-loop bindings, including value-preserving default/error parameter expansions. Shell comments and escaped dollars cannot supply loop expansion evidence; path-changing parameter operators remain unsupported.",
       "boundary": "hard-review-multi-defect-tool-calls, review-corrupt-refresh-checkpoint, review-rescue-local-tip and review-stale-lock-recovery move from version 2 to 3; the other 11 review tasks move from version 1 to 2. Earlier results keep their original versions and are not pooled with the new versions; saved submissions can be regraded."
+    },
+    {
+      "id": "PDKRESULTS-01",
+      "date": "2026-10-18",
+      "kind": "infrastructure",
+      "excludes": null,
+      "summary": "Early gym versions did not record a task's version. Such runs are version 1 when they ran before the first version change (2026-10-10) or when the task never changed; the few that cannot be placed are not imported.",
+      "boundary": "Results from the per-attempt export carry measured tokens and wall time; earlier imports keep null tokens."
     }
   ],
   "schema": "paddock-changelog/v1"

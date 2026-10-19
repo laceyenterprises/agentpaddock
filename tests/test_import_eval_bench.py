@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import tomllib
 from collections import Counter
 from pathlib import Path
@@ -159,3 +160,190 @@ def test_cross_harness_proxy_labels_name_the_native_model(label, provider_id):
         "provider_id": provider_id,
         "reasoning": None,
     }
+
+
+V2_SAMPLE = MODULE_ROOT / "tests" / "fixtures" / "eval-bench-v2-sample.raw.json"
+
+
+def _synthetic_id(number):
+    return f"lrq_00000000-0000-4000-8000-{number:012d}"
+
+
+@pytest.fixture(scope="module")
+def v2_import():
+    table = lb.load_results().price_tables["2026-10-18"]
+    return import_eval_bench.import_eval_bench(V2_SAMPLE, table, {_synthetic_id(3)})
+
+
+def _v2_record(document, number):
+    return next(r for r in document["records"] if r["run_id"] == _synthetic_id(number))
+
+
+def test_per_attempt_tokens_wall_time_and_price(v2_import):
+    document, _, _ = v2_import
+    record = _v2_record(document, 1)
+    assert document["id"] == "eval-bench"
+    assert document["date"] == "2026-10-18"
+    assert document["price_table"] == "2026-10-18"
+    assert document["source"]["kind"] == "import"
+    assert V2_SAMPLE.name in document["source"]["evidence"]
+    assert record["suite"] == "review"
+    assert record["task"] == "review-clean-retention-plan"
+    assert record["attempt"] == 1
+    assert record["verdict"] == "passed"
+    assert record["score"] == 1.0
+    assert record["tokens"] == {"input": 1000, "cache": 2000, "output": 300}
+    assert record["wall_seconds"] == 12.5
+    assert record["paddock_commit"] is None
+    assert record["cost"] == {"usd": 0.0052, "source": "published-rate", "reason": None}
+    assert record["excludedBecause"] is None
+    config = document["harness_configs"][record["harness"]["config_hash"]]
+    assert config == import_eval_bench.descriptor("claude-code")
+
+
+def test_per_attempt_regrades_keep_both_versions(v2_import):
+    document, _, _ = v2_import
+    original = _v2_record(document, 2)
+    regrade = next(
+        r for r in document["records"] if r["run_id"] == _synthetic_id(2) + ":v2"
+    )
+    assert (original["task_version"], regrade["task_version"]) == (1, 2)
+    assert original["task"] == regrade["task"]
+    assert original["verdict"] == "failed"
+    assert regrade["verdict"] == "passed"
+    assert lb.included(original) and lb.included(regrade)
+    boards = lb.boards([original, regrade])
+    assert {board["task_version"] for board in boards} == {1, 2}
+
+
+def test_per_attempt_skips_published_and_unrecorded_versions(v2_import):
+    document, published, unrecorded = v2_import
+    assert (published, unrecorded) == (1, 1)
+    assert len(document["records"]) == 10
+    ids = {r["run_id"] for r in document["records"]}
+    assert _synthetic_id(3) not in ids
+    assert _synthetic_id(4) not in ids
+    # Inference is informational: the supplied version is retained.
+    assert _v2_record(document, 9)["task_version"] == 1
+
+
+def test_published_first_grading_does_not_skip_its_regrade():
+    table = lb.load_results().price_tables["2026-10-18"]
+    document, published, unrecorded = import_eval_bench.import_eval_bench(
+        V2_SAMPLE, table, {_synthetic_id(2)}
+    )
+    assert (published, unrecorded) == (1, 1)
+    ids = {r["run_id"] for r in document["records"]}
+    assert _synthetic_id(2) not in ids
+    assert _synthetic_id(2) + ":v2" in ids
+
+
+def test_per_attempt_exclusions_survive(v2_import):
+    document, _, _ = v2_import
+    infra = next(
+        r for r in document["records"] if r["run_id"].startswith("unlaunched:")
+    )
+    assert infra["verdict"] == "agent_error"
+    assert infra["excludedBecause"] == "infra:launch_failed"
+    assert infra["wall_seconds"] is None
+    assert _v2_record(document, 6)["excludedBecause"] == "infra:qwensys_02"
+    assert _v2_record(document, 7)["excludedBecause"] == "pre-CCMODEL-01"
+
+
+def test_per_attempt_infra_verdict_gets_default_exclusion(tmp_path):
+    raw = json.loads(V2_SAMPLE.read_text())
+    row = next(r for r in raw["rows"] if r["verdict"] == "agent_error")
+    row["excludedBecause"] = None
+    raw["rows"] = [row]
+    path = tmp_path / V2_SAMPLE.name
+    path.write_text(json.dumps(raw))
+    table = lb.load_results().price_tables["2026-10-18"]
+    document, _, _ = import_eval_bench.import_eval_bench(path, table, set())
+    assert document["records"][0]["excludedBecause"] == "infra:agent_error"
+
+
+def test_per_attempt_reasoning_and_unknown_cost(v2_import):
+    document, _, _ = v2_import
+    assert _v2_record(document, 8)["model"] == {
+        "provider_id": "openai/gpt-6.1-sol",
+        "reasoning": "xhigh",
+    }
+    unmeasured = _v2_record(document, 9)
+    assert unmeasured["tokens"] == {"input": None, "cache": None, "output": None}
+    assert unmeasured["model"]["reasoning"] is None
+    assert unmeasured["cost"] == {
+        "usd": None,
+        "source": "unknown",
+        "reason": "tokens_not_measured",
+    }
+    assert _v2_record(document, 11)["cost"] == {
+        "usd": None,
+        "source": "unknown",
+        "reason": "price_source_unknown",
+    }
+
+
+def test_per_attempt_rejects_contradictory_reasoning(tmp_path):
+    raw = json.loads(V2_SAMPLE.read_text())
+    row = next(r for r in raw["rows"] if r["model"].endswith("@xhigh"))
+    row["reasoningLevel"] = "high"
+    raw["rows"] = [row]
+    path = tmp_path / V2_SAMPLE.name
+    path.write_text(json.dumps(raw))
+    table = lb.load_results().price_tables["2026-10-18"]
+    with pytest.raises(
+        import_eval_bench.SourceError, match="contradicts reasoningLevel"
+    ):
+        import_eval_bench.import_eval_bench(path, table, set())
+
+
+@pytest.mark.parametrize(
+    ("label", "provider_id", "reasoning"),
+    [
+        ("agy:gemini-3.8-flash-high", "google/gemini-3.8-flash", "high"),
+        ("agy:gemini-4-argon-high", "google/gemini-4-argon", "high"),
+        ("google/gemini-3.8-flash", "google/gemini-3.8-flash", None),
+        ("google/gemini-3.8-flash-high", "google/gemini-3.8-flash", "high"),
+        ("google/gemini-3.8-flash-low", "google/gemini-3.8-flash", "low"),
+        ("together/qwen3.8-flash", "together/qwen3.8-flash", None),
+        *[
+            (name, "openai/" + name, None)
+            for name in (
+                "gpt-5.6-luna",
+                "gpt-5.6-sol",
+                "gpt-5.6-terra",
+                "gpt-6-astra",
+                "gpt-6-luna",
+                "gpt-6-sol",
+            )
+        ],
+        ("gpt-6.1-sol@xhigh", "openai/gpt-6.1-sol", "xhigh"),
+        ("litellm-local-openai/openai/gpt-6.1-sol@high", "openai/gpt-6.1-sol", "high"),
+    ],
+)
+def test_per_attempt_model_labels(label, provider_id, reasoning):
+    assert import_eval_bench.model_of(label) == {
+        "provider_id": provider_id,
+        "reasoning": reasoning,
+    }
+
+
+def test_per_attempt_document_validates(v2_import):
+    document, _, _ = v2_import
+    loaded = lb.load_results()
+    assert (
+        lb.validate_document(
+            "2026-10-18-eval-bench.json",
+            document,
+            price_tables=loaded.price_tables,
+            exclusion_tags={e["excludes"] for e in loaded.changelog if e["excludes"]},
+        )
+        == []
+    )
+
+
+def test_new_price_table_preserves_previous_entries_and_note():
+    tables = lb.load_results().price_tables
+    previous, current = tables["2026-10-10"], tables["2026-10-18"]
+    assert current.note == previous.note
+    assert {name: current.models[name] for name in previous.models} == previous.models
