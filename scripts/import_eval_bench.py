@@ -37,6 +37,7 @@ from typing import Any
 import leaderboard
 
 PRICE_TABLE = "2026-10-10"
+EVAL_BENCH_PRICE_TABLE = "2026-10-18"
 RUNNER = "agent-os-fleet"
 PROXY_PREFIX = "litellm-local-openai/"
 
@@ -68,9 +69,17 @@ MODELS: dict[str, tuple[str, str | None]] = {
     "anthropic/claude-opus-5-5": ("anthropic/claude-opus-5-5", None),
     "anthropic/claude-sonnet-5-5": ("anthropic/claude-sonnet-5-5", None),
     "openai/gpt-6.1-sol": ("openai/gpt-6.1-sol", None),
+    "openai/gpt-5.6-luna": ("openai/gpt-5.6-luna", None),
+    "openai/gpt-5.6-sol": ("openai/gpt-5.6-sol", None),
+    "openai/gpt-5.6-terra": ("openai/gpt-5.6-terra", None),
+    "openai/gpt-6-astra": ("openai/gpt-6-astra", None),
+    "openai/gpt-6-luna": ("openai/gpt-6-luna", None),
+    "openai/gpt-6-sol": ("openai/gpt-6-sol", None),
     "agy:gemini-3.1-pro-high": ("google/gemini-3.1-pro", "high"),
     "agy:gemini-3.8-flash-high": ("google/gemini-3.8-flash", "high"),
     "agy:gemini-4-argon-high": ("google/gemini-4-argon", "high"),
+    "gemini-4-argon": ("google/gemini-4-argon", None),
+    "google/gemini-4-argon": ("google/gemini-4-argon", None),
     "google/gemini-3.8-flash": ("google/gemini-3.8-flash", None),
     "google/gemini-3.8-flash-high": ("google/gemini-3.8-flash", "high"),
     "google/gemini-3.8-flash-low": ("google/gemini-3.8-flash", "low"),
@@ -136,6 +145,8 @@ def model_of(label: str, reasoning_level: str | None = None) -> dict[str, str | 
         if not effort:
             raise SourceError(f"model label {label!r} has an empty reasoning suffix")
         reasoning = effort
+    elif reasoning is None:
+        reasoning = reasoning_level
     if reasoning_level is not None and reasoning_level != reasoning:
         raise SourceError(
             f"model label {label!r} contradicts reasoningLevel {reasoning_level!r}"
@@ -389,7 +400,8 @@ def import_eval_bench(
     return document, already_published, version_unrecorded
 
 
-# Add the per-attempt export to SOURCES when it is published.
+# Add (published filename, import_eval_bench) when the per-attempt export is published.
+# build() handles its skip counts, deduplication and separate price table.
 SOURCES = (
     ("REPORT-rfd-calibration-2026-10-06.raw.json", import_rfd),
     ("REPORT-hrf-calibration-2026-10-07.raw.json", import_hrf),
@@ -400,17 +412,48 @@ SOURCES = (
 
 def build(reports: Path, results: Path) -> dict[str, str]:
     """``{file name: text}`` for every imported document."""
-    raw = json.loads(
-        (results / "prices" / f"{PRICE_TABLE}.json").read_text(encoding="utf-8")
-    )
-    table = leaderboard.PriceTable(raw["date"], raw["models"], raw["note"])
-    out = {}
+
+    def price_table(date: str) -> leaderboard.PriceTable:
+        raw = _load(results / "prices" / f"{date}.json")
+        return leaderboard.PriceTable(raw["date"], raw["models"], raw["note"])
+
+    table = price_table(PRICE_TABLE)
+    documents = []
     for name, importer in SOURCES:
-        document = importer(reports / name, table)
-        out[f"{document['date']}-{document['id']}.json"] = leaderboard.render_document(
+        if importer is not import_eval_bench:
+            documents.append(importer(reports / name, table))
+
+    # Import legacy sources first regardless of registration order. Exclude the
+    # v2 output itself from published ids so --check and repeated builds are stable.
+    v2_sources = [name for name, importer in SOURCES if importer is import_eval_bench]
+    if v2_sources:
+        existing_run_ids = {
+            record["run_id"] for document in documents for record in document["records"]
+        }
+        for path in results.glob("*.json"):
+            document = _load(path)
+            if document["id"] != "eval-bench":
+                existing_run_ids.update(
+                    record["run_id"] for record in document["records"]
+                )
+        table = price_table(EVAL_BENCH_PRICE_TABLE)
+        for name in v2_sources:
+            document, published, unrecorded = import_eval_bench(
+                reports / name, table, existing_run_ids
+            )
+            documents.append(document)
+            existing_run_ids.update(record["run_id"] for record in document["records"])
+            print(
+                f"{name}: skipped {published} already-published and "
+                f"{unrecorded} version-unrecorded rows",
+                file=sys.stderr,
+            )
+    return {
+        f"{document['date']}-{document['id']}.json": leaderboard.render_document(
             document
         )
-    return out
+        for document in documents
+    }
 
 
 def main(argv: list[str] | None = None) -> int:

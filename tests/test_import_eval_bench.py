@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import tomllib
 from collections import Counter
 from pathlib import Path
@@ -295,6 +296,138 @@ def test_per_attempt_rejects_contradictory_reasoning(tmp_path):
         import_eval_bench.SourceError, match="contradicts reasoningLevel"
     ):
         import_eval_bench.import_eval_bench(path, table, set())
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "gpt-5.6-luna",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-6-astra",
+        "gpt-6-luna",
+        "gpt-6-sol",
+        "gemini-4-argon",
+    ],
+)
+@pytest.mark.parametrize("route", ["native", "provider", "proxy"])
+def test_new_models_accept_native_provider_and_proxy_labels(name, route):
+    provider_id = ("google/" if name.startswith("gemini") else "openai/") + name
+    label = {
+        "native": name,
+        "provider": provider_id,
+        "proxy": import_eval_bench.PROXY_PREFIX + provider_id,
+    }[route]
+    assert import_eval_bench.model_of(label) == {
+        "provider_id": provider_id,
+        "reasoning": None,
+    }
+    assert import_eval_bench.model_of(label + "@high", "high") == {
+        "provider_id": provider_id,
+        "reasoning": "high",
+    }
+    assert import_eval_bench.model_of(label, "high") == {
+        "provider_id": provider_id,
+        "reasoning": "high",
+    }
+
+
+@pytest.mark.parametrize(
+    "label",
+    ["gpt-6.1-sol", "openai/gpt-6.1-sol", "litellm-local-openai/openai/gpt-6.1-sol"],
+)
+def test_unadorned_model_accepts_reasoning_field(label):
+    assert import_eval_bench.model_of(label, "high") == {
+        "provider_id": "openai/gpt-6.1-sol",
+        "reasoning": "high",
+    }
+
+
+@pytest.mark.parametrize("label", ["agy:gemini-4-argon-high", "gpt-6-sol@high"])
+def test_explicit_model_effort_still_rejects_conflicting_field(label):
+    with pytest.raises(
+        import_eval_bench.SourceError, match="contradicts reasoningLevel"
+    ):
+        import_eval_bench.model_of(label, "low")
+
+
+def test_registered_v2_source_builds_with_deduplication_and_current_prices(
+    tmp_path, monkeypatch, capsys
+):
+    reports, results = tmp_path / "reports", tmp_path / "results"
+    reports.mkdir()
+    shutil.copytree(lb.DEFAULT_RESULTS / "prices", results / "prices")
+    shutil.copyfile(V2_SAMPLE, reports / V2_SAMPLE.name)
+    legacy_name = "legacy.raw.json"
+    (reports / legacy_name).write_text(
+        json.dumps(
+            {
+                "rows": [
+                    {
+                        "launchRequestId": _synthetic_id(2),
+                        "suite": "docs",
+                        "task": "docs-cache-config",
+                        "harness": "codex",
+                        "model": "gpt-6.1-sol",
+                        "phase": "synthetic",
+                        "attempt": 1,
+                        "verdict": "failed",
+                        "score": 0.5,
+                        "excludedBecause": None,
+                    }
+                ]
+            }
+        )
+    )
+    # Another published bundle is not a registered source but still owns its id.
+    (results / "2026-10-17-other.json").write_text(
+        json.dumps(
+            {
+                "id": "other",
+                "records": [{"run_id": _synthetic_id(3)}],
+            }
+        )
+    )
+    # Register v2 first: deduplication must not depend on SOURCES order.
+    monkeypatch.setattr(
+        import_eval_bench,
+        "SOURCES",
+        (
+            (V2_SAMPLE.name, import_eval_bench.import_eval_bench),
+            (legacy_name, import_eval_bench.import_rfd),
+        ),
+    )
+    files = import_eval_bench.build(reports, results)
+    document = json.loads(files["2026-10-18-eval-bench.json"])
+    ids = {record["run_id"] for record in document["records"]}
+    assert _synthetic_id(2) not in ids
+    assert _synthetic_id(2) + ":v2" in ids
+    assert _synthetic_id(3) not in ids
+    assert _synthetic_id(4) not in ids
+    assert len(ids) == 9
+    assert document["price_table"] == "2026-10-18"
+    assert _v2_record(document, 1)["cost"]["usd"] == 0.0052
+    legacy = json.loads(files["2026-10-06-rfd-calibration.json"])
+    assert legacy["price_table"] == "2026-10-10"
+    assert (
+        "skipped 2 already-published and 1 version-unrecorded rows"
+        in capsys.readouterr().err
+    )
+    for name, text in files.items():
+        (results / name).write_text(text)
+    assert import_eval_bench.build(reports, results) == files
+    assert (
+        import_eval_bench.main(
+            [
+                "--reports",
+                str(reports),
+                "--results",
+                str(results),
+                "--check",
+            ]
+        )
+        == 0
+    )
 
 
 @pytest.mark.parametrize(
