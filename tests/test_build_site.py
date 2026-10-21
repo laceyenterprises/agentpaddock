@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import shutil
+from copy import deepcopy
 from pathlib import Path
 
 import build_site
@@ -42,9 +43,19 @@ def test_built_html_links_only_relatively_and_to_the_public_names():
             assert not ROOT_RELATIVE.search(page), name
             for scheme, target in ABSOLUTE_LINK.findall(page):
                 assert scheme, f"{name}: protocol-relative link //{target}"
-                assert target == "agentpaddock.ai/" or target.startswith(
+                public_link = target == "agentpaddock.ai/" or target.startswith(
                     "github.com/laceyenterprises/agentpaddock"
-                ), f"{name}: {target}"
+                )
+                vendor_evidence = name == "methodology.html" and target.startswith(
+                    (
+                        "developers.openai.com/codex/",
+                        "code.claude.com/docs/en/",
+                        "opencode.ai/docs/",
+                        "www.antigravity.google/docs/",
+                        "raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/",
+                    )
+                )
+                assert public_link or vendor_evidence, f"{name}: {target}"
             canonical = re.findall(r'rel="canonical" href="([^"]+)"', page)
             assert canonical in ([], ["https://agentpaddock.ai/"]), name
         assert "https://github.com/laceyenterprises/agentpaddock" in files["methodology.html"]
@@ -83,6 +94,51 @@ def test_pages_show_boards_matrix_tasks_changelog_and_methodology():
 def test_committed_results_chart_says_tokens_are_not_measured():
     matrix = build_site.build(lb.DEFAULT_RESULTS)["matrix.html"]
     assert "No board row in results/ has complete token measurements yet." in matrix
+
+
+def test_committed_fairness_findings_and_sources_are_rendered():
+    results = lb.load_results()
+    page = build_site.methodology_page(results)
+    for audit in results.fairness["audits"]:
+        assert f"{audit['harness']}: checklist evidence" in page
+        for item in audit["evidence"]:
+            assert f"<td>{item['id']}</td><td>{item['status']}</td>" in page
+            assert build_site.esc(item["notes"]) in page
+            for source in item["sources"]:
+                assert build_site.esc(source) in page
+    assert "maintainer sign-off" in page
+
+
+def test_audited_without_sign_off_remains_provisional_and_escapes_evidence():
+    results = deepcopy(lb.load_results(FIXTURE))
+    audit = results.fairness["audits"][0]
+    audit.update(
+        status="audited",
+        sign_off=None,
+        evidence=[
+            {
+                "id": "tools",
+                "status": "pass",
+                "notes": '<script>"finding"</script>',
+                "sources": [
+                    "https://vendor.example/defaults?a=1&b=2",
+                    "lib/python/gym/standalone.py:82",
+                    "records[model.reasoning=<unknown>]",
+                    "javascript:alert(1)",
+                ],
+            }
+        ],
+    )
+    assert "alpha-cli" in build_site.fairness_banner(results)
+    page = build_site.methodology_page(results)
+    assert "<script>" not in page
+    assert "&lt;script&gt;&quot;finding&quot;&lt;/script&gt;" in page
+    assert 'href="https://vendor.example/defaults?a=1&amp;b=2"' in page
+    assert '/blob/main/lib/python/gym/standalone.py#L82"' in page
+    assert "records[model.reasoning=&lt;unknown&gt;]" in page
+    assert 'href="javascript:' not in page
+    audit.update(status="passed", sign_off="Fixture sign-off")
+    assert "alpha-cli" not in build_site.fairness_banner(results)
 
 
 def test_cli_writes_then_checks(tmp_path: Path, capsys):

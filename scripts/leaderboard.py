@@ -63,7 +63,8 @@ PASSED = "passed"
 
 SOURCE_KINDS = ("import", "run")
 CHANGE_KINDS = ("grading", "harness", "task", "infrastructure", "pricing")
-AUDIT_STATUSES = ("pending", "passed", "failed")
+AUDIT_STATUSES = ("pending", "audited", "passed", "failed")
+CHECK_STATUSES = ("pass", "fail", "not-verifiable")
 
 RESULT_NAME = re.compile(r"^(\d{4}-\d{2}-\d{2})-([a-z0-9][a-z0-9.-]*)\.json$")
 PRICE_NAME = re.compile(r"^(\d{4}-\d{2}-\d{2})\.json$")
@@ -73,7 +74,15 @@ COMMIT = re.compile(r"^[0-9a-f]{7,40}$")
 PROVIDER_ID = re.compile(r"^[a-z0-9][a-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._:-]*$")
 INFRA_TAG = re.compile(r"^infra:[a-z0-9_]+$")
 
-DOCUMENT_KEYS = {"schema", "id", "date", "source", "price_table", "harness_configs", "records"}
+DOCUMENT_KEYS = {
+    "schema",
+    "id",
+    "date",
+    "source",
+    "price_table",
+    "harness_configs",
+    "records",
+}
 SOURCE_KEYS = {"kind", "description", "evidence"}
 RECORD_KEYS = {
     "run_id",
@@ -283,6 +292,7 @@ def validate_fairness(raw: Any) -> list[str]:
     if raw["schema"] != FAIRNESS_SCHEMA:
         errors.append(f"{where}: schema must be {FAIRNESS_SCHEMA}")
     checklist = raw["checklist"]
+    check_ids: set[str] = set()
     if not isinstance(checklist, list) or not checklist:
         errors.append(f"{where}: checklist must be a non-empty list")
     else:
@@ -290,6 +300,10 @@ def validate_fairness(raw: Any) -> list[str]:
             if _keys(f"{where}: checklist[{index}]", item, {"id", "check"}, errors):
                 if not (_text(item["id"]) and _text(item["check"])):
                     errors.append(f"{where}: checklist[{index}] needs an id and a check")
+                elif item["id"] in check_ids:
+                    errors.append(f"{where}: checklist ids must be unique")
+                else:
+                    check_ids.add(item["id"])
     audits = raw["audits"]
     if not isinstance(audits, list):
         errors.append(f"{where}: audits must be a list")
@@ -297,7 +311,9 @@ def validate_fairness(raw: Any) -> list[str]:
     harnesses = set()
     for index, audit in enumerate(audits):
         at = f"{where}: audits[{index}]"
-        if not _keys(at, audit, AUDIT_KEYS, errors):
+        # Evidence and sign-off extend v1 without invalidating legacy entries.
+        optional = {"evidence", "sign_off"} & audit.keys() if isinstance(audit, dict) else set()
+        if not _keys(at, audit, AUDIT_KEYS | optional, errors):
             continue
         if not _text(audit["harness"]):
             errors.append(f"{at}: harness must be a non-empty string")
@@ -311,6 +327,52 @@ def validate_fairness(raw: Any) -> list[str]:
             isinstance(audit["date"], str) and DATE.match(audit["date"])
         ):
             errors.append(f"{at}: a completed audit is dated")
+        elif audit["date"] is not None and not (
+            isinstance(audit["date"], str) and DATE.match(audit["date"])
+        ):
+            errors.append(f"{at}: date must be an ISO date or null")
+        if not _text(audit["notes"]):
+            errors.append(f"{at}: notes must explain the audit status")
+        sign_off = audit.get("sign_off")
+        if sign_off is not None and not _text(sign_off):
+            errors.append(f"{at}: sign_off must be non-empty text or null")
+        if sign_off is not None and audit["status"] != "passed":
+            errors.append(f"{at}: only a passed audit carries maintainer sign-off")
+        evidence = audit.get("evidence")
+        legacy = not ({"evidence", "sign_off"} & audit.keys())
+        if "evidence" not in audit and audit["status"] != "audited" and legacy:
+            continue
+        if not isinstance(evidence, list) or not evidence:
+            errors.append(f"{at}: evidence must cover every checklist item")
+            continue
+        seen_checks: set[str] = set()
+        all_pass = True
+        for number, item in enumerate(evidence):
+            check_at = f"{at}: evidence[{number}]"
+            if not _keys(check_at, item, {"id", "status", "notes", "sources"}, errors):
+                all_pass = False
+                continue
+            check_id = item["id"]
+            if not _text(check_id) or check_id not in check_ids:
+                errors.append(f"{check_at}: id must name a checklist item")
+            elif check_id in seen_checks:
+                errors.append(f"{check_at}: duplicate checklist evidence")
+            else:
+                seen_checks.add(check_id)
+            if item["status"] not in CHECK_STATUSES:
+                errors.append(f"{check_at}: status must be one of {', '.join(CHECK_STATUSES)}")
+            all_pass = all_pass and item["status"] == "pass"
+            if not _text(item["notes"]):
+                errors.append(f"{check_at}: notes must explain the finding")
+            sources = item["sources"]
+            if not isinstance(sources, list) or not sources or not all(_text(s) for s in sources):
+                errors.append(f"{check_at}: sources must contain evidence references")
+        if seen_checks != check_ids:
+            errors.append(f"{at}: evidence must cover every checklist item")
+        if audit["status"] in {"audited", "passed"} and not all_pass:
+            errors.append(f"{at}: completed audit requires every check to pass")
+        if audit["status"] == "passed" and not _text(sign_off):
+            errors.append(f"{at}: passed evidence requires maintainer sign_off")
     return errors
 
 

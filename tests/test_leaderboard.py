@@ -48,6 +48,98 @@ def test_fixture_results_validate():
     assert set(loaded.price_tables) == {"2026-01-02"}
 
 
+def _evidenced_fairness():
+    raw = json.loads((FIXTURE / "meta" / "fairness.json").read_text(encoding="utf-8"))
+    raw["audits"] = [raw["audits"][0]]
+    raw["audits"][0].update(
+        status="audited",
+        sign_off=None,
+        evidence=[
+            {
+                "id": "tools",
+                "status": "pass",
+                "notes": "Native tools match the documented default.",
+                "sources": ["https://vendor.example/defaults", "run.tools"],
+            }
+        ],
+    )
+    return raw
+
+
+def test_fairness_review_and_maintainer_sign_off_are_separate():
+    raw = _evidenced_fairness()
+    assert lb.validate_fairness(raw) == []
+    audit = raw["audits"][0]
+    audit.update(status="passed", sign_off="Fixture maintainer sign-off")
+    assert lb.validate_fairness(raw) == []
+    audit.update(status="pending", sign_off=None)
+    audit["evidence"][0]["status"] = "not-verifiable"
+    assert lb.validate_fairness(raw) == []
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda a: a.pop("evidence"), "evidence must cover every checklist item"),
+        (lambda a: a.update(evidence=None), "evidence must cover every checklist item"),
+        (lambda a: a.update(evidence=[]), "evidence must cover every checklist item"),
+        (
+            lambda a: a["evidence"].append(dict(a["evidence"][0])),
+            "duplicate checklist evidence",
+        ),
+        (
+            lambda a: a["evidence"][0].update(id="unknown"),
+            "id must name a checklist item",
+        ),
+        (lambda a: a["evidence"][0].update(status="unknown"), "status must be one of"),
+        (
+            lambda a: a["evidence"][0].update(status="fail"),
+            "requires every check to pass",
+        ),
+        (
+            lambda a: a["evidence"][0].update(status="not-verifiable"),
+            "requires every check to pass",
+        ),
+        (
+            lambda a: a["evidence"][0].update(sources=[]),
+            "sources must contain evidence",
+        ),
+        (
+            lambda a: a["evidence"][0].update(sources=[""]),
+            "sources must contain evidence",
+        ),
+        (lambda a: a["evidence"][0].update(notes=""), "notes must explain the finding"),
+        (lambda a: a["evidence"][0].pop("sources"), "missing sources"),
+        (lambda a: a.update(sign_off="Fixture sign-off"), "only a passed audit"),
+        (lambda a: a.update(status="passed"), "requires maintainer sign_off"),
+        (lambda a: a.update(sign_off=42), "sign_off must be non-empty text or null"),
+        (lambda a: a.update(date=None), "a completed audit is dated"),
+    ],
+)
+def test_fairness_evidence_rejects_incomplete_or_contradictory_audits(mutation, message):
+    raw = _evidenced_fairness()
+    mutation(raw["audits"][0])
+    assert message in "\n".join(lb.validate_fairness(raw))
+
+
+def test_fairness_evidence_covers_all_unique_checklist_ids():
+    raw = _evidenced_fairness()
+    raw["checklist"].append({"id": "model", "check": "Native model identity."})
+    assert "evidence must cover every checklist item" in "\n".join(lb.validate_fairness(raw))
+    raw["checklist"][-1]["id"] = "tools"
+    assert "checklist ids must be unique" in "\n".join(lb.validate_fairness(raw))
+
+
+def test_sign_off_cannot_bypass_evidence_and_pending_review_dates_are_validated():
+    raw = _evidenced_fairness()
+    audit = raw["audits"][0]
+    audit.update(status="passed", sign_off="Fixture sign-off")
+    audit.pop("evidence")
+    assert "evidence must cover every checklist item" in "\n".join(lb.validate_fairness(raw))
+    audit.update(status="pending", sign_off=None, date="unknown")
+    assert "date must be an ISO date or null" in "\n".join(lb.validate_fairness(raw))
+
+
 @pytest.mark.parametrize(
     ("mutate", "message"),
     [
