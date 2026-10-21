@@ -133,7 +133,10 @@ def test_audited_without_sign_off_remains_provisional_and_escapes_evidence():
     page = build_site.methodology_page(results)
     assert "<script>" not in page
     assert "&lt;script&gt;&quot;finding&quot;&lt;/script&gt;" in page
-    assert 'href="https://vendor.example/defaults?a=1&amp;b=2"' in page
+    assert (
+        'href="https://vendor.example/defaults?a=1&amp;b=2" rel="noopener noreferrer"'
+        in page
+    )
     assert '/blob/main/lib/python/gym/standalone.py#L82"' in page
     assert "records[model.reasoning=&lt;unknown&gt;]" in page
     assert 'href="javascript:' not in page

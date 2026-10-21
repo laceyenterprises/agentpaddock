@@ -418,7 +418,7 @@ def price_table_html(table: lb.PriceTable) -> str:
 def fairness_source(source: str) -> str:
     """Link vendor documentation and repository lines; escape telemetry selectors."""
     if source.startswith("https://"):
-        return f'<a href="{esc(source)}">{esc(source)}</a>'
+        return f'<a href="{esc(source)}" rel="noopener noreferrer">{esc(source)}</a>'
     match = re.match(r"^((?:results|lib|batteries|locks|scripts)/[\w./-]+):(\d+)\b", source)
     if match:
         path, line = match.groups()
