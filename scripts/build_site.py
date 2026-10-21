@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import re
 import sys
 from pathlib import Path
 from typing import Any, Mapping
@@ -418,9 +419,9 @@ def fairness_source(source: str) -> str:
     """Link vendor documentation and repository lines; escape telemetry selectors."""
     if source.startswith("https://"):
         return f'<a href="{esc(source)}" rel="noopener noreferrer">{esc(source)}</a>'
-    match = lb.fairness_repository_reference(source)
-    if match:
-        path, line = match
+    match = re.match(r"^((?:results|lib|batteries|locks|scripts)/[\w./-]+):(\d+)\b", source)
+    if match and lb.fairness_repository_reference(source):
+        path, line = match.groups()
         return f'<a href="{REPO_URL}/blob/main/{esc(path)}#L{line}">{esc(source)}</a>'
     return f"<code>{esc(source)}</code>"
 
