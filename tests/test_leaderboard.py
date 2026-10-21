@@ -48,6 +48,115 @@ def test_fixture_results_validate():
     assert set(loaded.price_tables) == {"2026-01-02"}
 
 
+def _evidenced_fairness():
+    raw = json.loads((FIXTURE / "meta" / "fairness.json").read_text(encoding="utf-8"))
+    raw["audits"] = [raw["audits"][0]]
+    raw["audits"][0].update(
+        status="audited",
+        sign_off=None,
+        evidence=[
+            {
+                "id": "tools",
+                "status": "pass",
+                "notes": "Native tools match the documented default.",
+                "sources": ["https://vendor.example/defaults", "run.tools"],
+            }
+        ],
+    )
+    return raw
+
+
+def test_fairness_review_and_maintainer_sign_off_are_separate():
+    raw = _evidenced_fairness()
+    assert lb.validate_fairness(raw) == []
+    audit = raw["audits"][0]
+    audit.update(status="passed", sign_off="Fixture maintainer sign-off")
+    assert lb.validate_fairness(raw) == []
+    audit.update(status="pending", sign_off=None)
+    audit["evidence"][0]["status"] = "not-verifiable"
+    assert lb.validate_fairness(raw) == []
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda a: a.pop("evidence"), "evidence must cover every checklist item"),
+        (lambda a: a.update(evidence=None), "evidence must cover every checklist item"),
+        (lambda a: a.update(evidence=[]), "evidence must cover every checklist item"),
+        (
+            lambda a: a["evidence"].append(dict(a["evidence"][0])),
+            "duplicate checklist evidence",
+        ),
+        (
+            lambda a: a["evidence"][0].update(id="unknown"),
+            "id must name a checklist item",
+        ),
+        (lambda a: a["evidence"][0].update(status="unknown"), "status must be one of"),
+        (
+            lambda a: a["evidence"][0].update(status="fail"),
+            "requires every check to pass",
+        ),
+        (
+            lambda a: a["evidence"][0].update(status="not-verifiable"),
+            "requires every check to pass",
+        ),
+        (
+            lambda a: a["evidence"][0].update(sources=[]),
+            "sources must contain evidence",
+        ),
+        (
+            lambda a: a["evidence"][0].update(sources=[""]),
+            "sources must contain evidence",
+        ),
+        (lambda a: a["evidence"][0].update(notes=""), "notes must explain the finding"),
+        (lambda a: a["evidence"][0].pop("sources"), "missing sources"),
+        (lambda a: a.update(sign_off="Fixture sign-off"), "only a passed audit"),
+        (lambda a: a.update(status="passed"), "requires maintainer sign_off"),
+        (lambda a: a.update(sign_off=42), "sign_off must be non-empty text or null"),
+    ],
+)
+def test_fairness_evidence_rejects_incomplete_or_contradictory_audits(mutation, message):
+    raw = _evidenced_fairness()
+    mutation(raw["audits"][0])
+    assert message in "\n".join(lb.validate_fairness(raw))
+
+
+@pytest.mark.parametrize("status", ["pending", "audited", "passed", "failed"])
+@pytest.mark.parametrize("date", [None, "", "unknown", 42, "2026-01-03"])
+def test_fairness_audit_dates(status, date):
+    raw = _evidenced_fairness()
+    raw["audits"][0].update(
+        status=status,
+        date=date,
+        sign_off="Fixture maintainer sign-off" if status == "passed" else None,
+    )
+    if date == "2026-01-03" or (status == "pending" and date is None):
+        expected = []
+    elif status == "pending":
+        expected = ["meta/fairness.json: audits[0]: date must be an ISO date or null"]
+    else:
+        expected = ["meta/fairness.json: audits[0]: a completed audit is dated"]
+    assert lb.validate_fairness(raw) == expected
+
+
+def test_fairness_evidence_covers_all_unique_checklist_ids():
+    raw = _evidenced_fairness()
+    raw["checklist"].append({"id": "model", "check": "Native model identity."})
+    assert "evidence must cover every checklist item" in "\n".join(lb.validate_fairness(raw))
+    raw["checklist"][-1]["id"] = "tools"
+    assert "checklist ids must be unique" in "\n".join(lb.validate_fairness(raw))
+
+
+def test_sign_off_cannot_bypass_evidence_and_pending_review_dates_are_validated():
+    raw = _evidenced_fairness()
+    audit = raw["audits"][0]
+    audit.update(status="passed", sign_off="Fixture sign-off")
+    audit.pop("evidence")
+    assert "evidence must cover every checklist item" in "\n".join(lb.validate_fairness(raw))
+    audit.update(status="pending", sign_off=None, date="unknown")
+    assert "date must be an ISO date or null" in "\n".join(lb.validate_fairness(raw))
+
+
 @pytest.mark.parametrize(
     ("mutate", "message"),
     [
@@ -617,3 +726,54 @@ def test_fallback_run_ids_are_namespaced_by_bundle():
     second = lb.records_from_run(summary, bundle_id="second", **kwargs)[0]
     assert first["run_id"] == "first:coding:coding-alpha:0"
     assert second["run_id"] == "second:coding:coding-alpha:0"
+
+
+@pytest.mark.parametrize("sign_off", [None, "Fixture maintainer sign-off"])
+def test_legacy_passed_audit_requires_evidence_with_or_without_sign_off(sign_off):
+    raw = _evidenced_fairness()
+    audit = raw["audits"][0]
+    audit.update(status="passed")
+    audit.pop("evidence")
+    audit.pop("sign_off")
+    if sign_off is not None:
+        audit["sign_off"] = sign_off
+    assert "evidence must cover every checklist item" in "\n".join(lb.validate_fairness(raw))
+
+
+def test_legacy_pending_audit_remains_readable():
+    raw = _evidenced_fairness()
+    audit = raw["audits"][0]
+    audit.update(status="pending")
+    audit.pop("evidence")
+    audit.pop("sign_off")
+    assert lb.validate_fairness(raw) == []
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "not a reference", "http://vendor.example/docs", "https://",
+        "https://vendor.example/bad path", "https://[invalid",
+        "scripts/../leaderboard.py:1", "scripts/./leaderboard.py:1",
+        "scripts//leaderboard.py:1", "scripts/leaderboard.py:0",
+        "scripts/leaderboard.py:1junk", "unknown.field",
+    ],
+)
+def test_fairness_rejects_malformed_source_references(source):
+    raw = _evidenced_fairness()
+    raw["audits"][0]["evidence"][0]["sources"] = [source]
+    assert "sources must use HTTPS URLs" in "\n".join(lb.validate_fairness(raw))
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "https://vendor.example/docs?a=1&b=2", "scripts/leaderboard.py:1",
+        "results/fixture.json:45 records[harness.name=codex].model.provider_id (49 records)",
+        "run.tools", "records[model.reasoning=<unknown>]", "harness_configs[sha256:abc]",
+    ],
+)
+def test_fairness_accepts_supported_source_references(source):
+    raw = _evidenced_fairness()
+    raw["audits"][0]["evidence"][0]["sources"] = [source]
+    assert lb.validate_fairness(raw) == []

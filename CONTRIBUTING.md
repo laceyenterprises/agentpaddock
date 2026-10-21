@@ -94,6 +94,26 @@ audited against before its results are published (tools, permissions, model,
 reasoning, prompt, limits, telemetry, transport and provenance). A harness
 whose audit is not signed off is shown as provisional on every page.
 
+Each audit may extend the `paddock-fairness/v1` entry with `evidence` and
+`sign_off`. Evidence is a list with one entry for every checklist `id`, each
+containing `id`, `status` (`pass`, `fail`, or `not-verifiable`), explanatory
+`notes`, and a non-empty `sources` list of vendor URLs, repository `path:line`
+references (positive line numbers, no empty, `.` or `..` path segments) or
+telemetry selectors rooted at `run.`, `records[...]` or `harness_configs[...]`.
+Repository references may include context after a space; vendor URLs use HTTPS
+with a hostname and no whitespace. Identify the results documents and
+configuration hashes covered, and distinguish current runner code from evidence
+of historical execution. Date the review; current vendor documentation cannot
+establish defaults for an unrecorded historical CLI version.
+
+Keep `status` as `pending` while any check fails or cannot be verified, with the
+reason in `notes`. `audited` requires every check to pass with evidence and
+still renders as provisional. Leave `sign_off` null for the maintainer; only
+the maintainer moves an evidenced audit to `passed` and fills in `sign_off`.
+Legacy pending v1 entries without these additive fields remain readable; completed
+audits require evidence, and passed audits always require sign-off. The methodology
+page renders the findings and their sources directly from this metadata.
+
 ## Prices
 
 `results/prices/<date>.json` is the committed price table. Each price names its

@@ -1,34 +1,655 @@
 {
   "audits": [
     {
-      "date": null,
+      "date": "2026-10-20",
       "harness": "antigravity",
-      "notes": "Audit against vendor defaults not yet signed off (SPEC R8, PDK-09).",
-      "status": "pending"
+      "notes": "Scope: all 55 imported records in 2 committed bundles, covering 1 configuration hash. Vendor documentation consulted 2026-10-20 is a current baseline, not proof of unknown historical CLI defaults. Pending: provenance fail; remaining checks are not verifiable. Current standalone findings are identified separately from historical fleet evidence. Maintainer sign-off is empty.",
+      "status": "pending",
+      "sign_off": null,
+      "evidence": [
+        {
+          "id": "tools",
+          "status": "not-verifiable",
+          "notes": "Vendor settings expose browser integration and MCP customizations. The gemini lock records only bash:safe, read and write; it is a registry declaration, not a native tool inventory. Antigravity has no standalone adapter here. No historical native tool list, web setting or extension inventory is recorded.",
+          "sources": [
+            "https://www.antigravity.google/docs/settings",
+            "lib/python/gym/standalone.py:135",
+            "lib/python/gym/locks.py:18",
+            "locks/gemini.lock.json:4",
+            "results/2026-10-06-rfd-calibration.json:4 harness_configs[sha256:034ed3a1794b154f2a8b7822a6728298c302de53b98f7eb09b24c3e666a85d4a]"
+          ]
+        },
+        {
+          "id": "permissions",
+          "status": "not-verifiable",
+          "notes": "Vendor settings distinguish review and unattended authority. The local gemini class maps to Antigravity, but the fleet launcher and its effective permissions are not in this checkout. No historical permission or container settings are recorded; the four-harness standalone container cannot establish Antigravity containment.",
+          "sources": [
+            "https://www.antigravity.google/docs/settings",
+            "lib/python/gym/standalone.py:135",
+            "lib/python/gym/standalone.py:377",
+            "lib/python/gym/hosts.py:44",
+            "results/2026-10-06-rfd-calibration.json:4 harness_configs[sha256:034ed3a1794b154f2a8b7822a6728298c302de53b98f7eb09b24c3e666a85d4a]"
+          ]
+        },
+        {
+          "id": "model",
+          "status": "not-verifiable",
+          "notes": "The 55 records contain imported model labels (google/gemini-3.1-pro: 55). The importer maps labels to provider ids, not native execution telemetry. No per-run native model event or resolved-model proof is committed, so CCMODEL-01 cannot be verified; no model mismatch is inferred.",
+          "sources": [
+            "https://www.antigravity.google/docs/models",
+            "scripts/import_eval_bench.py:137",
+            "lib/python/gym/harness_toolcalls.py:34",
+            "results/2026-10-06-rfd-calibration.json:41 records[harness.name=antigravity].model.provider_id (43 records)",
+            "results/2026-10-07-hrf-calibration.json:42 records[harness.name=antigravity].model.provider_id (12 records)"
+          ]
+        },
+        {
+          "id": "reasoning",
+          "status": "not-verifiable",
+          "notes": "All 55 rows record high, derived from the imported model-label mapping. Vendor effort is model-dependent and selectable; native resolved effort and the historical CLI version are absent. Other compared harness rows have null effort, so equivalence across comparisons is not established.",
+          "sources": [
+            "https://www.antigravity.google/docs/cli/commands/effort/",
+            "lib/python/gym/standalone.py:135",
+            "scripts/import_eval_bench.py:137",
+            "results/2026-10-06-rfd-calibration.json:41 records[harness.name=antigravity].model.reasoning (43 records)",
+            "results/2026-10-07-hrf-calibration.json:42 records[harness.name=antigravity].model.reasoning (12 records)"
+          ]
+        },
+        {
+          "id": "prompt",
+          "status": "not-verifiable",
+          "notes": "The current shared staging function constructs one task prompt plus the same workspace guard without a harness branch. Antigravity has no standalone argv here; its historical launcher is external. Imported bundles contain neither the delivered prompt/hash nor effective system, project or persona instructions; historical prompt parity is not verifiable.",
+          "sources": [
+            "https://www.antigravity.google/docs/cli/reference/",
+            "lib/python/gym/staging.py:107",
+            "lib/python/gym/standalone.py:135",
+            "lib/python/gym/hosts.py:44",
+            "results/2026-10-06-rfd-calibration.json:32",
+            "results/2026-10-07-hrf-calibration.json:32"
+          ]
+        },
+        {
+          "id": "limits",
+          "status": "not-verifiable",
+          "notes": "Current standalone defaults are 3600 seconds, 2 CPUs, 2048 MiB and 256 processes, shared by its four adapters; no per-harness turn or token cap is supplied in their argv. These are benchmark limits, not vendor defaults. Historical fleet descriptors omit timeout, CPU, memory and turn/token limits, and wall_seconds is null. Battery admission budgets do not establish per-run resource parity.",
+          "sources": [
+            "https://www.antigravity.google/docs/cli/reference/",
+            "lib/python/gym/standalone.py:53",
+            "lib/python/gym/standalone.py:377",
+            "lib/python/gym/standalone.py:135",
+            "results/2026-10-06-rfd-calibration.json:4 harness_configs[sha256:034ed3a1794b154f2a8b7822a6728298c302de53b98f7eb09b24c3e666a85d4a]",
+            "results/2026-10-06-rfd-calibration.json:41 records[harness.name=antigravity].wall_seconds (43 records)",
+            "results/2026-10-07-hrf-calibration.json:42 records[harness.name=antigravity].wall_seconds (12 records)"
+          ]
+        },
+        {
+          "id": "telemetry",
+          "status": "not-verifiable",
+          "notes": "The repository parses native harness events, but imported bundles retain verdict summaries without tool-call records or completeness evidence. Standalone output overflow is rejected before grading, which does not establish historical fleet capture. Whole-record OCEXPORT-01 compliance cannot be verified from these results.",
+          "sources": [
+            "https://www.antigravity.google/docs/cli/reference/",
+            "lib/python/gym/harness_toolcalls.py:34",
+            "lib/python/gym/standalone.py:540",
+            "results/2026-10-06-rfd-calibration.json:32",
+            "results/2026-10-07-hrf-calibration.json:32"
+          ]
+        },
+        {
+          "id": "transport",
+          "status": "not-verifiable",
+          "notes": "The only imported descriptor labels transport as vendor. The external launcher and effective endpoint/route are not recorded, so the absence of a proxy or gateway cannot be verified. No private endpoint is needed for this audit; a sanitized route and rewrite description would suffice.",
+          "sources": [
+            "https://www.antigravity.google/docs/models",
+            "scripts/import_eval_bench.py:123",
+            "lib/python/gym/standalone.py:135",
+            "results/2026-10-06-rfd-calibration.json:4 harness_configs[sha256:034ed3a1794b154f2a8b7822a6728298c302de53b98f7eb09b24c3e666a85d4a]"
+          ]
+        },
+        {
+          "id": "provenance",
+          "status": "fail",
+          "notes": "All 55 records have harness.version=null. Each record does have a config_hash with a matching descriptor, but the CLI version requirement fails. A descriptor hash does not recover the missing native version or the omitted settings.",
+          "sources": [
+            "https://www.antigravity.google/docs/cli/reference/",
+            "scripts/import_eval_bench.py:206",
+            "results/2026-10-06-rfd-calibration.json:4 harness_configs[sha256:034ed3a1794b154f2a8b7822a6728298c302de53b98f7eb09b24c3e666a85d4a]",
+            "results/2026-10-06-rfd-calibration.json:41 records[harness.name=antigravity].harness.version / harness.config_hash (43 records)",
+            "results/2026-10-07-hrf-calibration.json:42 records[harness.name=antigravity].harness.version / harness.config_hash (12 records)"
+          ]
+        }
+      ]
     },
     {
-      "date": null,
+      "date": "2026-10-20",
       "harness": "claude-code",
-      "notes": "Audit against vendor defaults not yet signed off (SPEC R8, PDK-09).",
-      "status": "pending"
+      "notes": "Scope: all 279 imported records in 4 committed bundles, covering 2 configuration hashes. Vendor documentation consulted 2026-10-20 is a current baseline, not proof of unknown historical CLI defaults. Pending: reasoning, transport, provenance fail; remaining checks are not verifiable. Current standalone findings are identified separately from historical fleet evidence. Maintainer sign-off is empty.",
+      "status": "pending",
+      "sign_off": null,
+      "evidence": [
+        {
+          "id": "tools",
+          "status": "not-verifiable",
+          "notes": "The vendor CLI supports its default built-in tools and separate MCP configuration. The standalone argv supplies no tool filters. The locks contain only registry capabilities, and imported descriptors omit the native tool inventory, web access and MCP settings; native default parity is not verifiable.",
+          "sources": [
+            "https://code.claude.com/docs/en/cli-reference#cli-flags",
+            "lib/python/gym/standalone.py:82",
+            "lib/python/gym/locks.py:18",
+            "locks/claude-code.lock.json:4",
+            "locks/oss-claude-code.lock.json:4",
+            "results/2026-10-06-rfd-calibration.json:16 harness_configs[sha256:c32a950b903e12ba3399458aa509c8f02518f8cc08a9afc4c7f853b77534b054]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:29 harness_configs[sha256:ecb67e4e298da26d48499874b7ebaf6cf9f5741aefb7786700e6ac3b4337b465]"
+          ]
+        },
+        {
+          "id": "permissions",
+          "status": "not-verifiable",
+          "notes": "Vendor -p is non-interactive. The current standalone argv selects bypassPermissions inside the common Docker boundary. Imported runs instead name the fleet runner and omit its effective permission and container settings; historical authority equivalence cannot be established.",
+          "sources": [
+            "https://code.claude.com/docs/en/headless",
+            "lib/python/gym/standalone.py:82",
+            "lib/python/gym/standalone.py:377",
+            "lib/python/gym/hosts.py:44",
+            "results/2026-10-06-rfd-calibration.json:16 harness_configs[sha256:c32a950b903e12ba3399458aa509c8f02518f8cc08a9afc4c7f853b77534b054]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:29 harness_configs[sha256:ecb67e4e298da26d48499874b7ebaf6cf9f5741aefb7786700e6ac3b4337b465]"
+          ]
+        },
+        {
+          "id": "model",
+          "status": "not-verifiable",
+          "notes": "The 279 records contain imported model labels (anthropic/claude-haiku-4-5: 12; anthropic/claude-opus-5-5: 36; anthropic/claude-sonnet-5: 18; anthropic/claude-sonnet-5-5: 30; baseten/glm-5.3-flash: 7; fireworks/kimi-k3: 7; fireworks/qwen3.8-27b: 6; fireworks/qwen3.8-max: 81; local/qwen3-coder-next-80b-a3b-6bit: 12; moonshot/kimi-k3: 7; together/deepseek-v4.1-flash: 7; zai/glm-5.2: 56). The importer maps labels to provider ids, not native execution telemetry. No per-run native model event or resolved-model proof is committed, so CCMODEL-01 cannot be verified; no model mismatch is inferred.",
+          "sources": [
+            "https://code.claude.com/docs/en/model-config",
+            "scripts/import_eval_bench.py:137",
+            "lib/python/gym/harness_toolcalls.py:37",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:52 records[harness.name=claude-code].model.provider_id (42 records)",
+            "results/2026-09-30-omt-08-local-coding.json:43 records[harness.name=claude-code].model.provider_id (12 records)",
+            "results/2026-10-06-rfd-calibration.json:38 records[harness.name=claude-code].model.provider_id (183 records)",
+            "results/2026-10-07-hrf-calibration.json:39 records[harness.name=claude-code].model.provider_id (42 records)"
+          ]
+        },
+        {
+          "id": "reasoning",
+          "status": "fail",
+          "notes": "All 279 rows have model.reasoning=null. The resolved level is therefore unrecorded, rather than evidence of a vendor default. Vendor effort defaults depend on model; current argv can set --effort and pilot batteries request high, neither of which proves historical effort.",
+          "sources": [
+            "https://code.claude.com/docs/en/model-config#adjust-effort-level",
+            "lib/python/gym/standalone.py:82",
+            "scripts/import_eval_bench.py:137",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:52 records[harness.name=claude-code].model.reasoning (42 records)",
+            "results/2026-09-30-omt-08-local-coding.json:43 records[harness.name=claude-code].model.reasoning (12 records)",
+            "results/2026-10-06-rfd-calibration.json:38 records[harness.name=claude-code].model.reasoning (183 records)",
+            "results/2026-10-07-hrf-calibration.json:39 records[harness.name=claude-code].model.reasoning (42 records)",
+            "batteries/rfd-pilot.toml:2",
+            "batteries/hrf-pilot.toml:2",
+            "batteries/meg-pilot.toml:2"
+          ]
+        },
+        {
+          "id": "prompt",
+          "status": "not-verifiable",
+          "notes": "The current shared staging function constructs one task prompt plus the same workspace guard without a harness branch. The standalone argv adds no system-prompt override. Imported bundles contain neither the delivered prompt/hash nor effective system, project or persona instructions; historical prompt parity is not verifiable.",
+          "sources": [
+            "https://code.claude.com/docs/en/cli-reference",
+            "lib/python/gym/staging.py:107",
+            "lib/python/gym/standalone.py:82",
+            "lib/python/gym/hosts.py:44",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:39",
+            "results/2026-09-30-omt-08-local-coding.json:32",
+            "results/2026-10-06-rfd-calibration.json:32",
+            "results/2026-10-07-hrf-calibration.json:32"
+          ]
+        },
+        {
+          "id": "limits",
+          "status": "not-verifiable",
+          "notes": "Current standalone defaults are 3600 seconds, 2 CPUs, 2048 MiB and 256 processes, shared by its four adapters; no per-harness turn or token cap is supplied in their argv. These are benchmark limits, not vendor defaults. Historical fleet descriptors omit timeout, CPU, memory and turn/token limits, and wall_seconds is null. Battery admission budgets do not establish per-run resource parity.",
+          "sources": [
+            "https://code.claude.com/docs/en/cli-reference",
+            "lib/python/gym/standalone.py:53",
+            "lib/python/gym/standalone.py:377",
+            "lib/python/gym/standalone.py:82",
+            "results/2026-10-06-rfd-calibration.json:16 harness_configs[sha256:c32a950b903e12ba3399458aa509c8f02518f8cc08a9afc4c7f853b77534b054]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:29 harness_configs[sha256:ecb67e4e298da26d48499874b7ebaf6cf9f5741aefb7786700e6ac3b4337b465]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:52 records[harness.name=claude-code].wall_seconds (42 records)",
+            "results/2026-09-30-omt-08-local-coding.json:43 records[harness.name=claude-code].wall_seconds (12 records)",
+            "results/2026-10-06-rfd-calibration.json:38 records[harness.name=claude-code].wall_seconds (183 records)",
+            "results/2026-10-07-hrf-calibration.json:39 records[harness.name=claude-code].wall_seconds (42 records)"
+          ]
+        },
+        {
+          "id": "telemetry",
+          "status": "not-verifiable",
+          "notes": "The repository parses native harness events, but imported bundles retain verdict summaries without tool-call records or completeness evidence. Standalone output overflow is rejected before grading, which does not establish historical fleet capture. Whole-record OCEXPORT-01 compliance cannot be verified from these results.",
+          "sources": [
+            "https://code.claude.com/docs/en/cli-reference",
+            "lib/python/gym/harness_toolcalls.py:37",
+            "lib/python/gym/standalone.py:540",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:39",
+            "results/2026-09-30-omt-08-local-coding.json:32",
+            "results/2026-10-06-rfd-calibration.json:32",
+            "results/2026-10-07-hrf-calibration.json:32"
+          ]
+        },
+        {
+          "id": "transport",
+          "status": "fail",
+          "notes": "Imported proxy configurations record model_transport=openai-compatible-proxy but no gateway version, effective rewrite rules or explicit no-rewriting statement. The required behavior is missing from the recorded configuration; a route type alone does not pass KIMIEMPTY-01.",
+          "sources": [
+            "https://code.claude.com/docs/en/model-config",
+            "scripts/import_eval_bench.py:123",
+            "lib/python/gym/standalone.py:135",
+            "results/2026-10-06-rfd-calibration.json:16 harness_configs[sha256:c32a950b903e12ba3399458aa509c8f02518f8cc08a9afc4c7f853b77534b054]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:29 harness_configs[sha256:ecb67e4e298da26d48499874b7ebaf6cf9f5741aefb7786700e6ac3b4337b465]"
+          ]
+        },
+        {
+          "id": "provenance",
+          "status": "fail",
+          "notes": "All 279 records have harness.version=null. Each record does have a config_hash with a matching descriptor, but the CLI version requirement fails. A descriptor hash does not recover the missing native version or the omitted settings.",
+          "sources": [
+            "https://code.claude.com/docs/en/cli-reference",
+            "scripts/import_eval_bench.py:206",
+            "results/2026-10-06-rfd-calibration.json:16 harness_configs[sha256:c32a950b903e12ba3399458aa509c8f02518f8cc08a9afc4c7f853b77534b054]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:29 harness_configs[sha256:ecb67e4e298da26d48499874b7ebaf6cf9f5741aefb7786700e6ac3b4337b465]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:52 records[harness.name=claude-code].harness.version / harness.config_hash (42 records)",
+            "results/2026-09-30-omt-08-local-coding.json:43 records[harness.name=claude-code].harness.version / harness.config_hash (12 records)",
+            "results/2026-10-06-rfd-calibration.json:38 records[harness.name=claude-code].harness.version / harness.config_hash (183 records)",
+            "results/2026-10-07-hrf-calibration.json:39 records[harness.name=claude-code].harness.version / harness.config_hash (42 records)"
+          ]
+        }
+      ]
     },
     {
-      "date": null,
+      "date": "2026-10-20",
       "harness": "codex",
-      "notes": "Audit against vendor defaults not yet signed off (SPEC R8, PDK-09).",
-      "status": "pending"
+      "notes": "Scope: all 109 imported records in 4 committed bundles, covering 3 configuration hashes. Vendor documentation consulted 2026-10-20 is a current baseline, not proof of unknown historical CLI defaults. Pending: reasoning, transport, provenance fail; remaining checks are not verifiable. Current standalone findings are identified separately from historical fleet evidence. Maintainer sign-off is empty.",
+      "status": "pending",
+      "sign_off": null,
+      "evidence": [
+        {
+          "id": "tools",
+          "status": "not-verifiable",
+          "notes": "Vendor configuration controls web search and additional tools. The standalone argv leaves those settings unspecified. The locks contain only registry capabilities; imported descriptors record neither native tools nor the resolved web-search mode, so default parity is not verifiable.",
+          "sources": [
+            "https://developers.openai.com/codex/config-reference/",
+            "lib/python/gym/standalone.py:93",
+            "lib/python/gym/locks.py:18",
+            "locks/codex.lock.json:4",
+            "locks/oss-codex.lock.json:4",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:4 harness_configs[sha256:3437a9e6d04d0a214fd46efffb53ea7d0617b5d6be8158647856a4e439f4e887]",
+            "results/2026-10-06-rfd-calibration.json:10 harness_configs[sha256:b2396403d5070ceacbf491e01a7b44b0ccd37e3755eedcc0154f296e96174b86]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:16 harness_configs[sha256:cb391ae903fcddac1aa7d7db54bd6a8d713c0f3ac635d5d31188d87500640832]"
+          ]
+        },
+        {
+          "id": "permissions",
+          "status": "not-verifiable",
+          "notes": "Vendor exec supports non-interactive execution and bypassing inner approvals and sandboxing inside isolation. Current standalone uses that mode in Docker. The imported fleet descriptors omit effective permissions and containment; current standalone code cannot establish historical authority equivalence.",
+          "sources": [
+            "https://developers.openai.com/codex/cli/reference/",
+            "lib/python/gym/standalone.py:93",
+            "lib/python/gym/standalone.py:377",
+            "lib/python/gym/hosts.py:44",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:4 harness_configs[sha256:3437a9e6d04d0a214fd46efffb53ea7d0617b5d6be8158647856a4e439f4e887]",
+            "results/2026-10-06-rfd-calibration.json:10 harness_configs[sha256:b2396403d5070ceacbf491e01a7b44b0ccd37e3755eedcc0154f296e96174b86]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:16 harness_configs[sha256:cb391ae903fcddac1aa7d7db54bd6a8d713c0f3ac635d5d31188d87500640832]"
+          ]
+        },
+        {
+          "id": "model",
+          "status": "not-verifiable",
+          "notes": "The 109 records contain imported model labels (baseten/glm-5.3-flash: 7; fireworks/kimi-k3: 7; fireworks/qwen3.8-max: 7; local/qwen3-coder-next-80b-a3b-6bit: 12; moonshot/kimi-k3: 14; openai/gpt-6.1-sol: 48; together/deepseek-v4.1-flash: 7; zai/glm-5.2: 7). The importer maps labels to provider ids, not native execution telemetry. No per-run native model event or resolved-model proof is committed, so CCMODEL-01 cannot be verified; no model mismatch is inferred.",
+          "sources": [
+            "https://developers.openai.com/codex/config-reference/",
+            "scripts/import_eval_bench.py:137",
+            "lib/python/gym/harness_toolcalls.py:37",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:45 records[harness.name=codex].model.provider_id (49 records)",
+            "results/2026-09-30-omt-08-local-coding.json:39 records[harness.name=codex].model.provider_id (12 records)",
+            "results/2026-10-06-rfd-calibration.json:42 records[harness.name=codex].model.provider_id (36 records)",
+            "results/2026-10-07-hrf-calibration.json:46 records[harness.name=codex].model.provider_id (12 records)"
+          ]
+        },
+        {
+          "id": "reasoning",
+          "status": "fail",
+          "notes": "All 109 rows have model.reasoning=null. The resolved level is therefore unrecorded, rather than evidence of a vendor default. Vendor model_reasoning_effort is configurable; current argv and pilot batteries can request explicit levels, neither of which proves historical effort.",
+          "sources": [
+            "https://developers.openai.com/codex/config-reference/",
+            "lib/python/gym/standalone.py:93",
+            "scripts/import_eval_bench.py:137",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:45 records[harness.name=codex].model.reasoning (49 records)",
+            "results/2026-09-30-omt-08-local-coding.json:39 records[harness.name=codex].model.reasoning (12 records)",
+            "results/2026-10-06-rfd-calibration.json:42 records[harness.name=codex].model.reasoning (36 records)",
+            "results/2026-10-07-hrf-calibration.json:46 records[harness.name=codex].model.reasoning (12 records)",
+            "batteries/rfd-pilot.toml:2",
+            "batteries/hrf-pilot.toml:2",
+            "batteries/meg-pilot.toml:2",
+            "batteries/meg-pilot-codex.toml:9"
+          ]
+        },
+        {
+          "id": "prompt",
+          "status": "not-verifiable",
+          "notes": "The current shared staging function constructs one task prompt plus the same workspace guard without a harness branch. The standalone argv adds no system-prompt override. Imported bundles contain neither the delivered prompt/hash nor effective system, project or persona instructions; historical prompt parity is not verifiable.",
+          "sources": [
+            "https://developers.openai.com/codex/cli/reference/",
+            "lib/python/gym/staging.py:107",
+            "lib/python/gym/standalone.py:93",
+            "lib/python/gym/hosts.py:44",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:39",
+            "results/2026-09-30-omt-08-local-coding.json:32",
+            "results/2026-10-06-rfd-calibration.json:32",
+            "results/2026-10-07-hrf-calibration.json:32"
+          ]
+        },
+        {
+          "id": "limits",
+          "status": "not-verifiable",
+          "notes": "Current standalone defaults are 3600 seconds, 2 CPUs, 2048 MiB and 256 processes, shared by its four adapters; no per-harness turn or token cap is supplied in their argv. These are benchmark limits, not vendor defaults. Historical fleet descriptors omit timeout, CPU, memory and turn/token limits, and wall_seconds is null. Battery admission budgets do not establish per-run resource parity.",
+          "sources": [
+            "https://developers.openai.com/codex/cli/reference/",
+            "lib/python/gym/standalone.py:53",
+            "lib/python/gym/standalone.py:377",
+            "lib/python/gym/standalone.py:93",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:4 harness_configs[sha256:3437a9e6d04d0a214fd46efffb53ea7d0617b5d6be8158647856a4e439f4e887]",
+            "results/2026-10-06-rfd-calibration.json:10 harness_configs[sha256:b2396403d5070ceacbf491e01a7b44b0ccd37e3755eedcc0154f296e96174b86]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:16 harness_configs[sha256:cb391ae903fcddac1aa7d7db54bd6a8d713c0f3ac635d5d31188d87500640832]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:45 records[harness.name=codex].wall_seconds (49 records)",
+            "results/2026-09-30-omt-08-local-coding.json:39 records[harness.name=codex].wall_seconds (12 records)",
+            "results/2026-10-06-rfd-calibration.json:42 records[harness.name=codex].wall_seconds (36 records)",
+            "results/2026-10-07-hrf-calibration.json:46 records[harness.name=codex].wall_seconds (12 records)"
+          ]
+        },
+        {
+          "id": "telemetry",
+          "status": "not-verifiable",
+          "notes": "The repository parses native harness events, but imported bundles retain verdict summaries without tool-call records or completeness evidence. Standalone output overflow is rejected before grading, which does not establish historical fleet capture. Whole-record OCEXPORT-01 compliance cannot be verified from these results.",
+          "sources": [
+            "https://developers.openai.com/codex/cli/reference/",
+            "lib/python/gym/harness_toolcalls.py:37",
+            "lib/python/gym/standalone.py:540",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:39",
+            "results/2026-09-30-omt-08-local-coding.json:32",
+            "results/2026-10-06-rfd-calibration.json:32",
+            "results/2026-10-07-hrf-calibration.json:32"
+          ]
+        },
+        {
+          "id": "transport",
+          "status": "fail",
+          "notes": "Imported proxy configurations record model_transport=openai-compatible-proxy but no gateway version, effective rewrite rules or explicit no-rewriting statement. One Codex descriptor additionally names KIMIEMPTY-01, which identifies a boundary but not the request transformation. The required behavior is missing from the recorded configuration; a route type alone does not pass KIMIEMPTY-01.",
+          "sources": [
+            "https://developers.openai.com/codex/config-reference/",
+            "scripts/import_eval_bench.py:123",
+            "lib/python/gym/standalone.py:135",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:4 harness_configs[sha256:3437a9e6d04d0a214fd46efffb53ea7d0617b5d6be8158647856a4e439f4e887]",
+            "results/2026-10-06-rfd-calibration.json:10 harness_configs[sha256:b2396403d5070ceacbf491e01a7b44b0ccd37e3755eedcc0154f296e96174b86]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:16 harness_configs[sha256:cb391ae903fcddac1aa7d7db54bd6a8d713c0f3ac635d5d31188d87500640832]"
+          ]
+        },
+        {
+          "id": "provenance",
+          "status": "fail",
+          "notes": "All 109 records have harness.version=null. Each record does have a config_hash with a matching descriptor, but the CLI version requirement fails. A descriptor hash does not recover the missing native version or the omitted settings.",
+          "sources": [
+            "https://developers.openai.com/codex/cli/reference/",
+            "scripts/import_eval_bench.py:206",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:4 harness_configs[sha256:3437a9e6d04d0a214fd46efffb53ea7d0617b5d6be8158647856a4e439f4e887]",
+            "results/2026-10-06-rfd-calibration.json:10 harness_configs[sha256:b2396403d5070ceacbf491e01a7b44b0ccd37e3755eedcc0154f296e96174b86]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:16 harness_configs[sha256:cb391ae903fcddac1aa7d7db54bd6a8d713c0f3ac635d5d31188d87500640832]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:45 records[harness.name=codex].harness.version / harness.config_hash (49 records)",
+            "results/2026-09-30-omt-08-local-coding.json:39 records[harness.name=codex].harness.version / harness.config_hash (12 records)",
+            "results/2026-10-06-rfd-calibration.json:42 records[harness.name=codex].harness.version / harness.config_hash (36 records)",
+            "results/2026-10-07-hrf-calibration.json:46 records[harness.name=codex].harness.version / harness.config_hash (12 records)"
+          ]
+        }
+      ]
     },
     {
-      "date": null,
+      "date": "2026-10-20",
       "harness": "opencode",
-      "notes": "Audit against vendor defaults not yet signed off (SPEC R8, PDK-09).",
-      "status": "pending"
+      "notes": "Scope: all 78 imported records in 3 committed bundles, covering 1 configuration hash. Vendor documentation consulted 2026-10-20 is a current baseline, not proof of unknown historical CLI defaults. Pending: reasoning, telemetry, transport, provenance fail; remaining checks are not verifiable. Current standalone findings are identified separately from historical fleet evidence. Maintainer sign-off is empty.",
+      "status": "pending",
+      "sign_off": null,
+      "evidence": [
+        {
+          "id": "tools",
+          "status": "not-verifiable",
+          "notes": "Vendor tools include webfetch; websearch availability depends on provider or environment. Standalone supplies no tool filter, but the registry lock is not a native tool inventory. Imported descriptors omit native tool, web-search and extension settings.",
+          "sources": [
+            "https://opencode.ai/docs/tools/",
+            "lib/python/gym/standalone.py:104",
+            "lib/python/gym/locks.py:18",
+            "locks/oss-opencode.lock.json:4",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:10 harness_configs[sha256:357da891ff08c6bf2db0dd39cf8a29193f0a35a9929e35d89e40e3a9d6101e30]"
+          ]
+        },
+        {
+          "id": "permissions",
+          "status": "not-verifiable",
+          "notes": "Vendor run is non-interactive, but default permissions still ask for external-directory and repeated-call approval. Standalone sets no permission override. Neither effective historical permissions nor container boundaries are recorded, so equivalent unattended authority cannot be established.",
+          "sources": [
+            "https://opencode.ai/docs/permissions/",
+            "lib/python/gym/standalone.py:104",
+            "lib/python/gym/standalone.py:377",
+            "lib/python/gym/hosts.py:44",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:10 harness_configs[sha256:357da891ff08c6bf2db0dd39cf8a29193f0a35a9929e35d89e40e3a9d6101e30]"
+          ]
+        },
+        {
+          "id": "model",
+          "status": "not-verifiable",
+          "notes": "The 78 records contain imported model labels (baseten/glm-5.3-flash: 7; fireworks/kimi-k3: 7; fireworks/qwen3.8-max: 7; local/qwen3-coder-next-80b-a3b-6bit: 12; moonshot/kimi-k3: 7; together/deepseek-v4.1-flash: 31; zai/glm-5.2: 7). The importer maps labels to provider ids, not native execution telemetry. No per-run native model event or resolved-model proof is committed, so CCMODEL-01 cannot be verified; no model mismatch is inferred.",
+          "sources": [
+            "https://opencode.ai/docs/models/",
+            "scripts/import_eval_bench.py:137",
+            "lib/python/gym/harness_toolcalls.py:37",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:46 records[harness.name=opencode].model.provider_id (42 records)",
+            "results/2026-09-30-omt-08-local-coding.json:38 records[harness.name=opencode].model.provider_id (12 records)",
+            "results/2026-10-07-hrf-calibration.json:38 records[harness.name=opencode].model.provider_id (24 records)"
+          ]
+        },
+        {
+          "id": "reasoning",
+          "status": "fail",
+          "notes": "All 78 rows have model.reasoning=null. The resolved level is therefore unrecorded, rather than evidence of a vendor default. Vendor model variants carry reasoning settings. Standalone rejects reasoning overrides and the imported descriptors do not record a resolved variant.",
+          "sources": [
+            "https://opencode.ai/docs/models/#variants",
+            "lib/python/gym/standalone.py:104",
+            "scripts/import_eval_bench.py:137",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:46 records[harness.name=opencode].model.reasoning (42 records)",
+            "results/2026-09-30-omt-08-local-coding.json:38 records[harness.name=opencode].model.reasoning (12 records)",
+            "results/2026-10-07-hrf-calibration.json:38 records[harness.name=opencode].model.reasoning (24 records)"
+          ]
+        },
+        {
+          "id": "prompt",
+          "status": "not-verifiable",
+          "notes": "The current shared staging function constructs one task prompt plus the same workspace guard without a harness branch. The standalone argv adds no system-prompt override. Imported bundles contain neither the delivered prompt/hash nor effective system, project or persona instructions; historical prompt parity is not verifiable.",
+          "sources": [
+            "https://opencode.ai/docs/cli/",
+            "lib/python/gym/staging.py:107",
+            "lib/python/gym/standalone.py:104",
+            "lib/python/gym/hosts.py:44",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:39",
+            "results/2026-09-30-omt-08-local-coding.json:32",
+            "results/2026-10-07-hrf-calibration.json:32"
+          ]
+        },
+        {
+          "id": "limits",
+          "status": "not-verifiable",
+          "notes": "Current standalone defaults are 3600 seconds, 2 CPUs, 2048 MiB and 256 processes, shared by its four adapters; no per-harness turn or token cap is supplied in their argv. These are benchmark limits, not vendor defaults. Historical fleet descriptors omit timeout, CPU, memory and turn/token limits, and wall_seconds is null. Battery admission budgets do not establish per-run resource parity.",
+          "sources": [
+            "https://opencode.ai/docs/cli/",
+            "lib/python/gym/standalone.py:53",
+            "lib/python/gym/standalone.py:377",
+            "lib/python/gym/standalone.py:104",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:10 harness_configs[sha256:357da891ff08c6bf2db0dd39cf8a29193f0a35a9929e35d89e40e3a9d6101e30]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:46 records[harness.name=opencode].wall_seconds (42 records)",
+            "results/2026-09-30-omt-08-local-coding.json:38 records[harness.name=opencode].wall_seconds (12 records)",
+            "results/2026-10-07-hrf-calibration.json:38 records[harness.name=opencode].wall_seconds (24 records)"
+          ]
+        },
+        {
+          "id": "telemetry",
+          "status": "fail",
+          "notes": "The current standalone adapter truncates every tool-argument string longer than 2000 characters after parsing, violating whole-record capture. Output-stream overflow is separately rejected before grading. Imported fleet bundles contain no whole tool-call record or completeness proof, so historical OCEXPORT-01 compliance is also unverified; the current adapter defect is not attributed to those historical runs.",
+          "sources": [
+            "https://opencode.ai/docs/cli/",
+            "lib/python/gym/standalone.py:195",
+            "lib/python/gym/standalone.py:573",
+            "lib/python/gym/standalone.py:540",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:39",
+            "results/2026-09-30-omt-08-local-coding.json:32",
+            "results/2026-10-07-hrf-calibration.json:32"
+          ]
+        },
+        {
+          "id": "transport",
+          "status": "fail",
+          "notes": "Imported proxy configurations record model_transport=openai-compatible-proxy but no gateway version, effective rewrite rules or explicit no-rewriting statement. The required behavior is missing from the recorded configuration; a route type alone does not pass KIMIEMPTY-01.",
+          "sources": [
+            "https://opencode.ai/docs/models/",
+            "scripts/import_eval_bench.py:123",
+            "lib/python/gym/standalone.py:135",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:10 harness_configs[sha256:357da891ff08c6bf2db0dd39cf8a29193f0a35a9929e35d89e40e3a9d6101e30]"
+          ]
+        },
+        {
+          "id": "provenance",
+          "status": "fail",
+          "notes": "All 78 records have harness.version=null. Each record does have a config_hash with a matching descriptor, but the CLI version requirement fails. A descriptor hash does not recover the missing native version or the omitted settings.",
+          "sources": [
+            "https://opencode.ai/docs/cli/",
+            "scripts/import_eval_bench.py:206",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:10 harness_configs[sha256:357da891ff08c6bf2db0dd39cf8a29193f0a35a9929e35d89e40e3a9d6101e30]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:46 records[harness.name=opencode].harness.version / harness.config_hash (42 records)",
+            "results/2026-09-30-omt-08-local-coding.json:38 records[harness.name=opencode].harness.version / harness.config_hash (12 records)",
+            "results/2026-10-07-hrf-calibration.json:38 records[harness.name=opencode].harness.version / harness.config_hash (24 records)"
+          ]
+        }
+      ]
     },
     {
-      "date": null,
+      "date": "2026-10-20",
       "harness": "pi",
-      "notes": "Audit against vendor defaults not yet signed off (SPEC R8, PDK-09).",
-      "status": "pending"
+      "notes": "Scope: all 54 imported records in 2 committed bundles, covering 1 configuration hash. Vendor documentation consulted 2026-10-20 is a current baseline, not proof of unknown historical CLI defaults. Pending: reasoning, telemetry, transport, provenance fail; remaining checks are not verifiable. Current standalone findings are identified separately from historical fleet evidence. Maintainer sign-off is empty.",
+      "status": "pending",
+      "sign_off": null,
+      "evidence": [
+        {
+          "id": "tools",
+          "status": "not-verifiable",
+          "notes": "Vendor CLI defaults enable read, bash, edit and write; extensions can add tools. Standalone supplies no tool filter. Imported descriptors and the registry lock do not establish the native tool inventory, extension state or native web-access default for the unknown historical version.",
+          "sources": [
+            "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/cli.md#tools",
+            "lib/python/gym/standalone.py:113",
+            "lib/python/gym/locks.py:18",
+            "locks/oss-pi.lock.json:4",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:23 harness_configs[sha256:da41c66ef7d982fd474eeb1f21329b5d88f6e4f9b268a552d125c22703a57066]"
+          ]
+        },
+        {
+          "id": "permissions",
+          "status": "not-verifiable",
+          "notes": "Vendor JSON/print mode is non-interactive and tools use process authority; an external container can bound it. Standalone uses JSON/print mode in the common Docker boundary. The imported fleet settings do not record historical authority or containment.",
+          "sources": [
+            "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/security.md",
+            "lib/python/gym/standalone.py:113",
+            "lib/python/gym/standalone.py:377",
+            "lib/python/gym/hosts.py:44",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:23 harness_configs[sha256:da41c66ef7d982fd474eeb1f21329b5d88f6e4f9b268a552d125c22703a57066]"
+          ]
+        },
+        {
+          "id": "model",
+          "status": "not-verifiable",
+          "notes": "The 54 records contain imported model labels (baseten/glm-5.3-flash: 7; fireworks/kimi-k3: 7; fireworks/qwen3.8-max: 7; local/qwen3-coder-next-80b-a3b-6bit: 12; moonshot/kimi-k3: 7; together/deepseek-v4.1-flash: 7; zai/glm-5.2: 7). The importer maps labels to provider ids, not native execution telemetry. No per-run native model event or resolved-model proof is committed, so CCMODEL-01 cannot be verified; no model mismatch is inferred.",
+          "sources": [
+            "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/cli.md#models",
+            "scripts/import_eval_bench.py:137",
+            "lib/python/gym/harness_toolcalls.py:37",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:47 records[harness.name=pi].model.provider_id (42 records)",
+            "results/2026-09-30-omt-08-local-coding.json:41 records[harness.name=pi].model.provider_id (12 records)"
+          ]
+        },
+        {
+          "id": "reasoning",
+          "status": "fail",
+          "notes": "All 54 rows have model.reasoning=null. The resolved level is therefore unrecorded, rather than evidence of a vendor default. Current vendor settings default thinking to medium, with model-specific resolution. Standalone can set --thinking; null imported telemetry cannot establish that default for an unknown historical version.",
+          "sources": [
+            "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/settings.md#model-and-thinking",
+            "lib/python/gym/standalone.py:113",
+            "scripts/import_eval_bench.py:137",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:47 records[harness.name=pi].model.reasoning (42 records)",
+            "results/2026-09-30-omt-08-local-coding.json:41 records[harness.name=pi].model.reasoning (12 records)"
+          ]
+        },
+        {
+          "id": "prompt",
+          "status": "not-verifiable",
+          "notes": "The current shared staging function constructs one task prompt plus the same workspace guard without a harness branch. The standalone argv adds no system-prompt override. Imported bundles contain neither the delivered prompt/hash nor effective system, project or persona instructions; historical prompt parity is not verifiable.",
+          "sources": [
+            "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/cli.md",
+            "lib/python/gym/staging.py:107",
+            "lib/python/gym/standalone.py:113",
+            "lib/python/gym/hosts.py:44",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:39",
+            "results/2026-09-30-omt-08-local-coding.json:32"
+          ]
+        },
+        {
+          "id": "limits",
+          "status": "not-verifiable",
+          "notes": "Current standalone defaults are 3600 seconds, 2 CPUs, 2048 MiB and 256 processes, shared by its four adapters; no per-harness turn or token cap is supplied in their argv. These are benchmark limits, not vendor defaults. Historical fleet descriptors omit timeout, CPU, memory and turn/token limits, and wall_seconds is null. Battery admission budgets do not establish per-run resource parity.",
+          "sources": [
+            "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/cli.md",
+            "lib/python/gym/standalone.py:53",
+            "lib/python/gym/standalone.py:377",
+            "lib/python/gym/standalone.py:113",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:23 harness_configs[sha256:da41c66ef7d982fd474eeb1f21329b5d88f6e4f9b268a552d125c22703a57066]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:47 records[harness.name=pi].wall_seconds (42 records)",
+            "results/2026-09-30-omt-08-local-coding.json:41 records[harness.name=pi].wall_seconds (12 records)"
+          ]
+        },
+        {
+          "id": "telemetry",
+          "status": "fail",
+          "notes": "The current standalone adapter truncates every tool-argument string longer than 2000 characters after parsing, violating whole-record capture. Output-stream overflow is separately rejected before grading. Imported fleet bundles contain no whole tool-call record or completeness proof, so historical OCEXPORT-01 compliance is also unverified; the current adapter defect is not attributed to those historical runs.",
+          "sources": [
+            "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/cli.md",
+            "lib/python/gym/standalone.py:195",
+            "lib/python/gym/standalone.py:573",
+            "lib/python/gym/standalone.py:540",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:39",
+            "results/2026-09-30-omt-08-local-coding.json:32"
+          ]
+        },
+        {
+          "id": "transport",
+          "status": "fail",
+          "notes": "Imported proxy configurations record model_transport=openai-compatible-proxy but no gateway version, effective rewrite rules or explicit no-rewriting statement. The required behavior is missing from the recorded configuration; a route type alone does not pass KIMIEMPTY-01.",
+          "sources": [
+            "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/cli.md#models",
+            "scripts/import_eval_bench.py:123",
+            "lib/python/gym/standalone.py:135",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:23 harness_configs[sha256:da41c66ef7d982fd474eeb1f21329b5d88f6e4f9b268a552d125c22703a57066]"
+          ]
+        },
+        {
+          "id": "provenance",
+          "status": "fail",
+          "notes": "All 54 records have harness.version=null. Each record does have a config_hash with a matching descriptor, but the CLI version requirement fails. A descriptor hash does not recover the missing native version or the omitted settings.",
+          "sources": [
+            "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/docs/cli.md",
+            "scripts/import_eval_bench.py:206",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:23 harness_configs[sha256:da41c66ef7d982fd474eeb1f21329b5d88f6e4f9b268a552d125c22703a57066]",
+            "results/2026-09-29-ossharn-04-coding-matrix.json:47 records[harness.name=pi].harness.version / harness.config_hash (42 records)",
+            "results/2026-09-30-omt-08-local-coding.json:41 records[harness.name=pi].harness.version / harness.config_hash (12 records)"
+          ]
+        }
+      ]
     }
   ],
   "checklist": [

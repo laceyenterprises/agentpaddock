@@ -2,8 +2,19 @@
   "audits": [
     {
       "date": "2026-01-02",
+      "evidence": [
+        {
+          "id": "tools",
+          "notes": "Fixture native tools match the vendor defaults.",
+          "sources": [
+            "run.tools"
+          ],
+          "status": "pass"
+        }
+      ],
       "harness": "alpha-cli",
       "notes": "Fixture audit.",
+      "sign_off": "Fixture maintainer sign-off",
       "status": "passed"
     },
     {

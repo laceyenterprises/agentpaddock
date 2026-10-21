@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import re
 import sys
 from pathlib import Path
 from typing import Any, Mapping
@@ -414,6 +415,34 @@ def price_table_html(table: lb.PriceTable) -> str:
     )
 
 
+def fairness_source(source: str) -> str:
+    """Link vendor documentation and repository lines; escape telemetry selectors."""
+    if source.startswith("https://"):
+        return f'<a href="{esc(source)}" rel="noopener noreferrer">{esc(source)}</a>'
+    match = re.match(r"^((?:results|lib|batteries|locks|scripts)/[\w./-]+):(\d+)\b", source)
+    if match and lb.fairness_repository_reference(source):
+        path, line = match.groups()
+        return f'<a href="{REPO_URL}/blob/main/{esc(path)}#L{line}">{esc(source)}</a>'
+    return f"<code>{esc(source)}</code>"
+
+
+def fairness_evidence(audit: Mapping[str, Any]) -> str:
+    if not audit.get("evidence"):
+        return ""
+    rows = "".join(
+        f"<tr><td>{esc(item['id'])}</td><td>{esc(item['status'])}</td>"
+        f"<td>{esc(item['notes'])}<ul>"
+        + "".join(f"<li>{fairness_source(source)}</li>" for source in item["sources"])
+        + "</ul></td></tr>"
+        for item in audit["evidence"]
+    )
+    return (
+        f"<h4>{esc(audit['harness'])}: checklist evidence</h4>"
+        '<div class="scroll"><table><thead><tr><th>check</th><th>finding</th>'
+        f"<th>evidence</th></tr></thead><tbody>{rows}</tbody></table></div>"
+    )
+
+
 def methodology_page(results: lb.Results) -> str:
     configs = "".join(
         f'<tr id="config-{esc(short_hash(key))}"><td><code>{esc(short_hash(key))}</code></td>'
@@ -432,7 +461,12 @@ def methodology_page(results: lb.Results) -> str:
     )
     audits = "".join(
         f"<tr><td>{esc(audit['harness'])}</td><td>{esc(audit['status'])}</td>"
-        f"<td>{esc(audit['date'] or '—')}</td><td>{esc(audit['notes'])}</td></tr>"
+        f"<td>{esc(audit['date'] or '—')}</td><td>{esc(audit['notes'])}</td>"
+        f"<td>{esc(audit.get('sign_off') or '—')}</td></tr>"
+        for audit in sorted(results.fairness.get("audits", []), key=lambda a: a["harness"])
+    )
+    audit_evidence = "".join(
+        fairness_evidence(audit)
         for audit in sorted(results.fairness.get("audits", []), key=lambda a: a["harness"])
     )
     prices = "".join(price_table_html(table) for _, table in sorted(results.price_tables.items()))
@@ -485,9 +519,16 @@ Gateway or proxy cost estimates are never a source.</li>
 <h3 id="fairness">Harness fairness</h3>
 <p>Before results are published, every harness's tool and permission configuration is audited
 against its vendor defaults with this checklist, and the audit is recorded here.</p>
+<p>Each finding is <code>pass</code>, <code>fail</code> or <code>not-verifiable</code>.
+An <code>audited</code> harness has evidence for every check passing; it remains provisional
+until a maintainer signs off. A <code>pending</code> harness has unresolved checks.
+The audit date records the evidence review, not sign-off. Vendor documentation describes
+the defaults on that date; without a recorded CLI version it cannot establish historical
+defaults. Current runner code does not establish how an imported run executed.</p>
 <ol>{checklist}</ol>
 <div class="scroll"><table><thead><tr><th>harness</th><th>audit</th><th>date</th><th>notes</th>
-</tr></thead><tbody>{audits}</tbody></table></div>
+<th>maintainer sign-off</th></tr></thead><tbody>{audits}</tbody></table></div>
+{audit_evidence}
 <h3>Harness configurations</h3>
 <p class="note">A row's configuration hash is the SHA-256 of this canonical JSON descriptor.</p>
 <div class="scroll"><table><thead><tr><th>hash</th><th>descriptor</th></tr></thead>
