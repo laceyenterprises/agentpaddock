@@ -113,13 +113,30 @@ def test_fairness_review_and_maintainer_sign_off_are_separate():
         (lambda a: a.update(sign_off="Fixture sign-off"), "only a passed audit"),
         (lambda a: a.update(status="passed"), "requires maintainer sign_off"),
         (lambda a: a.update(sign_off=42), "sign_off must be non-empty text or null"),
-        (lambda a: a.update(date=None), "a completed audit is dated"),
     ],
 )
 def test_fairness_evidence_rejects_incomplete_or_contradictory_audits(mutation, message):
     raw = _evidenced_fairness()
     mutation(raw["audits"][0])
     assert message in "\n".join(lb.validate_fairness(raw))
+
+
+@pytest.mark.parametrize("status", ["pending", "audited", "passed", "failed"])
+@pytest.mark.parametrize("date", [None, "", "unknown", 42, "2026-01-03"])
+def test_fairness_audit_dates(status, date):
+    raw = _evidenced_fairness()
+    raw["audits"][0].update(
+        status=status,
+        date=date,
+        sign_off="Fixture maintainer sign-off" if status == "passed" else None,
+    )
+    if date == "2026-01-03" or (status == "pending" and date is None):
+        expected = []
+    elif status == "pending":
+        expected = ["meta/fairness.json: audits[0]: date must be an ISO date or null"]
+    else:
+        expected = ["meta/fairness.json: audits[0]: a completed audit is dated"]
+    assert lb.validate_fairness(raw) == expected
 
 
 def test_fairness_evidence_covers_all_unique_checklist_ids():

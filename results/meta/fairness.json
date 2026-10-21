@@ -408,7 +408,7 @@
     {
       "date": "2026-10-20",
       "harness": "opencode",
-      "notes": "Scope: all 78 imported records in 3 committed bundles, covering 1 configuration hashes. Vendor documentation consulted 2026-10-20 is a current baseline, not proof of unknown historical CLI defaults. Pending: reasoning, telemetry, transport, provenance fail; remaining checks are not verifiable. Current standalone findings are identified separately from historical fleet evidence. Maintainer sign-off is empty.",
+      "notes": "Scope: all 78 imported records in 3 committed bundles, covering 1 configuration hash. Vendor documentation consulted 2026-10-20 is a current baseline, not proof of unknown historical CLI defaults. Pending: reasoning, telemetry, transport, provenance fail; remaining checks are not verifiable. Current standalone findings are identified separately from historical fleet evidence. Maintainer sign-off is empty.",
       "status": "pending",
       "sign_off": null,
       "evidence": [
@@ -534,7 +534,7 @@
     {
       "date": "2026-10-20",
       "harness": "pi",
-      "notes": "Scope: all 54 imported records in 2 committed bundles, covering 1 configuration hashes. Vendor documentation consulted 2026-10-20 is a current baseline, not proof of unknown historical CLI defaults. Pending: reasoning, telemetry, transport, provenance fail; remaining checks are not verifiable. Current standalone findings are identified separately from historical fleet evidence. Maintainer sign-off is empty.",
+      "notes": "Scope: all 54 imported records in 2 committed bundles, covering 1 configuration hash. Vendor documentation consulted 2026-10-20 is a current baseline, not proof of unknown historical CLI defaults. Pending: reasoning, telemetry, transport, provenance fail; remaining checks are not verifiable. Current standalone findings are identified separately from historical fleet evidence. Maintainer sign-off is empty.",
       "status": "pending",
       "sign_off": null,
       "evidence": [
