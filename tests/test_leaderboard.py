@@ -726,3 +726,54 @@ def test_fallback_run_ids_are_namespaced_by_bundle():
     second = lb.records_from_run(summary, bundle_id="second", **kwargs)[0]
     assert first["run_id"] == "first:coding:coding-alpha:0"
     assert second["run_id"] == "second:coding:coding-alpha:0"
+
+
+@pytest.mark.parametrize("sign_off", [None, "Fixture maintainer sign-off"])
+def test_legacy_passed_audit_requires_evidence_with_or_without_sign_off(sign_off):
+    raw = _evidenced_fairness()
+    audit = raw["audits"][0]
+    audit.update(status="passed")
+    audit.pop("evidence")
+    audit.pop("sign_off")
+    if sign_off is not None:
+        audit["sign_off"] = sign_off
+    assert "evidence must cover every checklist item" in "\n".join(lb.validate_fairness(raw))
+
+
+def test_legacy_pending_audit_remains_readable():
+    raw = _evidenced_fairness()
+    audit = raw["audits"][0]
+    audit.update(status="pending")
+    audit.pop("evidence")
+    audit.pop("sign_off")
+    assert lb.validate_fairness(raw) == []
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "not a reference", "http://vendor.example/docs", "https://",
+        "https://vendor.example/bad path", "https://[invalid",
+        "scripts/../leaderboard.py:1", "scripts/./leaderboard.py:1",
+        "scripts//leaderboard.py:1", "scripts/leaderboard.py:0",
+        "scripts/leaderboard.py:1junk", "unknown.field",
+    ],
+)
+def test_fairness_rejects_malformed_source_references(source):
+    raw = _evidenced_fairness()
+    raw["audits"][0]["evidence"][0]["sources"] = [source]
+    assert "sources must use HTTPS URLs" in "\n".join(lb.validate_fairness(raw))
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "https://vendor.example/docs?a=1&b=2", "scripts/leaderboard.py:1",
+        "results/fixture.json:45 records[harness.name=codex].model.provider_id (49 records)",
+        "run.tools", "records[model.reasoning=<unknown>]", "harness_configs[sha256:abc]",
+    ],
+)
+def test_fairness_accepts_supported_source_references(source):
+    raw = _evidenced_fairness()
+    raw["audits"][0]["evidence"][0]["sources"] = [source]
+    assert lb.validate_fairness(raw) == []

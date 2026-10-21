@@ -179,3 +179,22 @@ def test_short_token_bars_have_nonnegative_forward_segments(monkeypatch, values)
     forward = re.findall(r'd="M[0-9.,]+h(-?[0-9.]+)a', chart)
     assert len(forward) == 2
     assert all(float(segment) >= 0 for segment in forward)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "scripts/../../leaderboard.py:1", "scripts/./leaderboard.py:1",
+        "scripts//leaderboard.py:1", "scripts/leaderboard.py:0",
+        "scripts/leaderboard.py:1junk",
+    ],
+)
+def test_fairness_source_does_not_link_unnormalized_repository_paths(source):
+    assert build_site.fairness_source(source) == f"<code>{build_site.esc(source)}</code>"
+
+
+def test_fairness_repository_link_preserves_selector_context():
+    source = "results/fixture.json:45 records[harness.name=codex].model.provider_id"
+    rendered = build_site.fairness_source(source)
+    assert '/blob/main/results/fixture.json#L45"' in rendered
+    assert source in rendered

@@ -37,6 +37,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping
+from urllib.parse import urlsplit
 
 MODULE_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RESULTS = MODULE_ROOT / "results"
@@ -284,6 +285,34 @@ def validate_changelog(raw: Any) -> list[str]:
     return errors
 
 
+def fairness_repository_reference(source: str) -> tuple[str, str] | None:
+    """Parse a normalized repository path and positive line, with optional context."""
+    match = re.fullmatch(
+        r"((?:results|lib|batteries|locks|scripts)/[\w./-]+):([1-9]\d*)(?: [^\r\n]+)?",
+        source,
+    )
+    if match and all(part not in {"", ".", ".."} for part in match[1].split("/")):
+        return match[1], match[2]
+    return None
+
+
+def valid_fairness_source(source: str) -> bool:
+    """Accept HTTPS docs, repository lines, and known telemetry selector roots."""
+    if source.startswith("https://"):
+        try:
+            url = urlsplit(source)
+            return bool(url.hostname) and not any(c.isspace() for c in source)
+        except ValueError:
+            return False
+    return fairness_repository_reference(source) is not None or bool(
+        re.fullmatch(
+            r"(?:run\.[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*"
+            r"|(?:records|harness_configs)\[[^\r\n]+\](?:\.[A-Za-z_]\w*)*)",
+            source,
+        )
+    )
+
+
 def validate_fairness(raw: Any) -> list[str]:
     errors: list[str] = []
     where = "meta/fairness.json"
@@ -311,7 +340,7 @@ def validate_fairness(raw: Any) -> list[str]:
     harnesses = set()
     for index, audit in enumerate(audits):
         at = f"{where}: audits[{index}]"
-        # Evidence and sign-off extend v1 without invalidating legacy entries.
+        # Legacy pending entries may omit the additive evidence and sign-off fields.
         optional = {"evidence", "sign_off"} & audit.keys() if isinstance(audit, dict) else set()
         if not _keys(at, audit, AUDIT_KEYS | optional, errors):
             continue
@@ -340,7 +369,7 @@ def validate_fairness(raw: Any) -> list[str]:
             errors.append(f"{at}: only a passed audit carries maintainer sign-off")
         evidence = audit.get("evidence")
         legacy = not ({"evidence", "sign_off"} & audit.keys())
-        if "evidence" not in audit and audit["status"] != "audited" and legacy:
+        if "evidence" not in audit and audit["status"] == "pending" and legacy:
             continue
         if not isinstance(evidence, list) or not evidence:
             errors.append(f"{at}: evidence must cover every checklist item")
@@ -367,6 +396,11 @@ def validate_fairness(raw: Any) -> list[str]:
             sources = item["sources"]
             if not isinstance(sources, list) or not sources or not all(_text(s) for s in sources):
                 errors.append(f"{check_at}: sources must contain evidence references")
+            elif not all(valid_fairness_source(s) for s in sources):
+                errors.append(
+                    f"{check_at}: sources must use HTTPS URLs, repository path:line "
+                    "references, or known telemetry selectors"
+                )
         if seen_checks != check_ids:
             errors.append(f"{at}: evidence must cover every checklist item")
         if audit["status"] in {"audited", "passed"} and not all_pass:
