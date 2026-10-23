@@ -8,12 +8,21 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from conftest import FIXTURES_DIR, TASKS_DIR
 
 from gym import outcomes
-from gym.grader import Cell, GraderError, Trajectory, _parse_verdict, grade, grade_task
+from gym.grader import (
+    Cell,
+    GraderError,
+    Trajectory,
+    _parse_verdict,
+    clean_completion,
+    grade,
+    grade_task,
+)
 from gym.schema import load_task
 
 
@@ -125,6 +134,104 @@ def test_agent_error_on_failed_run(example_task):
     assert cell.outcome == outcomes.AGENT_ERROR
 
 
+# Synthetic status table. A host's producer owns the launch vocabulary; without a
+# host verdict the grader recognizes only the exact success spelling.
+_NOT_SUCCESS_STATUSES = [
+    "requested",
+    "admitted",
+    "leased",
+    "starting",
+    "running",
+    "waiting_approval",
+    "waiting_input",
+    "blocked_needs_decision",
+    "failed",
+    "operator_triage_required",
+    "canceled",
+    "cancelled",
+    "superseded",
+    "reaped_stuck_requested",
+    # Legacy aliases: unknown evidence, never success.
+    "completed",
+    "complete",
+    "done",
+    "success",
+    " succeeded",
+    "Succeeded",
+    "",
+]
+
+
+def test_only_exact_succeeded_is_clean_without_a_host_verdict():
+    assert clean_completion(Trajectory(terminal_status="succeeded"))
+    for status in _NOT_SUCCESS_STATUSES:
+        assert not clean_completion(Trajectory(terminal_status=status)), status
+
+
+@pytest.mark.parametrize("status", ["succeeded", *_NOT_SUCCESS_STATUSES])
+def test_clean_completion_accepts_objects_without_a_host_verdict_field(status):
+    trajectory = SimpleNamespace(terminal_status=status)
+    assert clean_completion(trajectory) is (status == "succeeded")
+
+
+@pytest.mark.parametrize("fields", [{}, {"launch_succeeded": None}, {"launch_succeeded": 1}])
+def test_clean_completion_rejects_missing_status_without_a_boolean_verdict(fields):
+    assert clean_completion(SimpleNamespace(**fields)) is False
+
+
+@pytest.mark.parametrize("verdict", [True, False])
+def test_clean_completion_uses_host_verdict_without_a_status(verdict):
+    assert clean_completion(SimpleNamespace(launch_succeeded=verdict)) is verdict
+
+
+@pytest.mark.parametrize("verdict", [None, 1, True, False])
+def test_grading_without_a_terminal_status_preserves_the_host_verdict(example_task, verdict):
+    fields = vars(Trajectory(terminal_status="succeeded", launch_succeeded=verdict)).copy()
+    del fields["terminal_status"]
+    cell = grade(example_task, SimpleNamespace(**fields))
+    assert cell.terminal_status is None
+    if verdict is True:
+        assert cell.outcome == outcomes.NO_SUBMISSION
+        assert cell.reason == "no result submitted"
+    else:
+        assert cell.outcome == outcomes.AGENT_ERROR
+        reason = (
+            "host reported launch_succeeded=False"
+            if verdict is False
+            else "run terminal status None is not a clean completion"
+        )
+        assert cell.reason == f"{reason} and no result was submitted"
+
+
+@pytest.mark.parametrize("status", ["succeeded", *_NOT_SUCCESS_STATUSES])
+def test_an_explicit_host_verdict_wins_over_the_status(status):
+    assert clean_completion(Trajectory(terminal_status=status, launch_succeeded=True))
+    assert not clean_completion(Trajectory(terminal_status=status, launch_succeeded=False))
+
+
+@pytest.mark.parametrize("verdict", [0, 1, "true", "false"])
+def test_a_non_boolean_host_verdict_is_missing(verdict):
+    assert clean_completion(Trajectory(terminal_status="succeeded", launch_succeeded=verdict))
+    assert not clean_completion(Trajectory(terminal_status="completed", launch_succeeded=verdict))
+
+
+@pytest.mark.parametrize("status", ["completed", "complete", "done", "blocked_needs_decision"])
+def test_an_unclean_status_without_submission_is_agent_error(example_task, status):
+    cell = grade(example_task, Trajectory(terminal_status=status, submitted_result=None))
+    assert cell.outcome == outcomes.AGENT_ERROR
+    assert f"run terminal status {status!r} is not a clean completion" in cell.reason
+
+
+@pytest.mark.parametrize("status", ["succeeded", "completed", "failed"])
+def test_an_explicit_false_verdict_reports_the_host_rejection(example_task, status):
+    cell = grade(
+        example_task,
+        Trajectory(terminal_status=status, submitted_result=None, launch_succeeded=False),
+    )
+    assert cell.outcome == outcomes.AGENT_ERROR
+    assert cell.reason == "host reported launch_succeeded=False and no result was submitted"
+
+
 def test_agent_error_on_explicit_error(example_task):
     cell = grade(
         example_task,
@@ -132,6 +239,44 @@ def test_agent_error_on_explicit_error(example_task):
     )
     assert cell.outcome == outcomes.AGENT_ERROR
     assert cell.reason == "hq dispatch failed"
+
+
+def test_legacy_positional_trajectory_retains_result_redactor(example_task):
+    from gym.standalone import redact
+
+    def clean(value):
+        return redact(value, ("sensitive-value",))
+
+    # All fifteen original arguments, including the final redaction callback.
+    trajectory = Trajectory(
+        "succeeded",
+        None,
+        [],
+        [],
+        "session-1",
+        "launch-1",
+        None,
+        None,
+        "diagnostic: sensitive-value",
+        [],
+        None,
+        [],
+        False,
+        {"runner": "sensitive-value"},
+        clean,
+    )
+    assert trajectory.result_redactor is clean
+    assert trajectory.launch_succeeded is None
+
+    cell = grade(example_task, trajectory)
+    assert cell.outcome == outcomes.AGENT_ERROR
+    assert cell.reason == "diagnostic: <redacted>"
+    assert cell.result_redactor is clean
+    # Redaction remains installed for values added after grading, too.
+    cell.execution_provenance["runner"] = "sensitive-value"
+    result = cell.to_dict()
+    assert result["execution_provenance"]["runner"] == "<redacted>"
+    assert "sensitive-value" not in json.dumps(result)
 
 
 def test_missing_verdict_preserves_multiline_stderr(example_task):
