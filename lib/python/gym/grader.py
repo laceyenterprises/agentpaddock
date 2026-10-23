@@ -217,13 +217,13 @@ class Trajectory:
     infra_attempts: list[dict[str, Any]] = field(default_factory=list)
     provider_retry_safe: bool = False
     execution_provenance: dict[str, Any] | None = None
+    # Closure retains credentials privately; they never become dataclass data.
+    result_redactor: Callable[[Any], Any] | None = field(default=None, repr=False)
     #: The host's launch-success verdict, read through its producer's status
     #: reader. An explicit boolean wins over ``terminal_status`` (false included);
     #: ``None`` falls back to the exact ``succeeded`` spelling. Success of the
     #: launch only: the grade and any published deliverable are separate facts.
     launch_succeeded: bool | None = None
-    # Closure retains credentials privately; they never become dataclass data.
-    result_redactor: Callable[[Any], Any] | None = field(default=None, repr=False)
 
 
 @dataclass

@@ -254,6 +254,10 @@ status `succeeded` is a clean run: `completed`, `complete` and `done` are
 unknown, never success. Launch success, the grade and any published
 deliverable are separate facts.
 
+`launch_succeeded` follows `result_redactor` in the `Trajectory` constructor,
+preserving the existing fifteen positional arguments, including the redaction
+callback. Sources should supply the launch verdict by keyword.
+
 The `standalone` runner (`standalone.py`) runs one harness CLI per task in
 `docker run`. Supported harnesses are `claude-code`, `codex`, `opencode` and
 `pi`; gemini is deferred. The container gets:

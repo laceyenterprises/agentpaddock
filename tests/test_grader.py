@@ -203,6 +203,44 @@ def test_agent_error_on_explicit_error(example_task):
     assert cell.reason == "hq dispatch failed"
 
 
+def test_legacy_positional_trajectory_retains_result_redactor(example_task):
+    from gym.standalone import redact
+
+    def clean(value):
+        return redact(value, ("sensitive-value",))
+
+    # All fifteen original arguments, including the final redaction callback.
+    trajectory = Trajectory(
+        "succeeded",
+        None,
+        [],
+        [],
+        "session-1",
+        "launch-1",
+        None,
+        None,
+        "diagnostic: sensitive-value",
+        [],
+        None,
+        [],
+        False,
+        {"runner": "sensitive-value"},
+        clean,
+    )
+    assert trajectory.result_redactor is clean
+    assert trajectory.launch_succeeded is None
+
+    cell = grade(example_task, trajectory)
+    assert cell.outcome == outcomes.AGENT_ERROR
+    assert cell.reason == "diagnostic: <redacted>"
+    assert cell.result_redactor is clean
+    # Redaction remains installed for values added after grading, too.
+    cell.execution_provenance["runner"] = "sensitive-value"
+    result = cell.to_dict()
+    assert result["execution_provenance"]["runner"] == "<redacted>"
+    assert "sensitive-value" not in json.dumps(result)
+
+
 def test_missing_verdict_preserves_multiline_stderr(example_task):
     stderr = 'Traceback (most recent call last):\n  File "verifier.py", line 7\nBoom'
     with pytest.raises(GraderError) as exc_info:
