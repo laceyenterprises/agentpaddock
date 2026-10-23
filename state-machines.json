@@ -589,7 +589,7 @@
       "terminalStatus: self.terminal_status",
       "terminal_status: str",
       "terminal_status: str | None = None",
-      "trajectory.terminal_status == SUCCEEDED_STATUS"
+      "getattr(trajectory, 'terminal_status', None) == SUCCEEDED_STATUS"
     ],
     "suite.py": [
       "TIMEOUT_TERMINAL_STATUS = 'timeout'",

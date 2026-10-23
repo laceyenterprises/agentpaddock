@@ -254,6 +254,11 @@ status `succeeded` is a clean run: `completed`, `complete` and `done` are
 unknown, never success. Launch success, the grade and any published
 deliverable are separate facts.
 
+A missing terminal status is unknown too. A trajectory stub without that
+attribute needs an explicit boolean host verdict to count as a clean run;
+without one and without a submission, grading returns `agent_error` and
+reports the missing status as `None`.
+
 `launch_succeeded` follows `result_redactor` in the `Trajectory` constructor,
 preserving the existing fifteen positional arguments, including the redaction
 callback. Sources should supply the launch verdict by keyword.

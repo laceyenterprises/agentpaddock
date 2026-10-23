@@ -174,6 +174,35 @@ def test_clean_completion_accepts_objects_without_a_host_verdict_field(status):
     assert clean_completion(trajectory) is (status == "succeeded")
 
 
+@pytest.mark.parametrize("fields", [{}, {"launch_succeeded": None}, {"launch_succeeded": 1}])
+def test_clean_completion_rejects_missing_status_without_a_boolean_verdict(fields):
+    assert clean_completion(SimpleNamespace(**fields)) is False
+
+
+@pytest.mark.parametrize("verdict", [True, False])
+def test_clean_completion_uses_host_verdict_without_a_status(verdict):
+    assert clean_completion(SimpleNamespace(launch_succeeded=verdict)) is verdict
+
+
+@pytest.mark.parametrize("verdict", [None, 1, True, False])
+def test_grading_without_a_terminal_status_preserves_the_host_verdict(example_task, verdict):
+    fields = vars(Trajectory(terminal_status="succeeded", launch_succeeded=verdict)).copy()
+    del fields["terminal_status"]
+    cell = grade(example_task, SimpleNamespace(**fields))
+    assert cell.terminal_status is None
+    if verdict is True:
+        assert cell.outcome == outcomes.NO_SUBMISSION
+        assert cell.reason == "no result submitted"
+    else:
+        assert cell.outcome == outcomes.AGENT_ERROR
+        reason = (
+            "host reported launch_succeeded=False"
+            if verdict is False
+            else "run terminal status None is not a clean completion"
+        )
+        assert cell.reason == f"{reason} and no result was submitted"
+
+
 @pytest.mark.parametrize("status", ["succeeded", *_NOT_SUCCESS_STATUSES])
 def test_an_explicit_host_verdict_wins_over_the_status(status):
     assert clean_completion(Trajectory(terminal_status=status, launch_succeeded=True))

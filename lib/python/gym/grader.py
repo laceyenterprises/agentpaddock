@@ -59,7 +59,7 @@ def clean_completion(trajectory: Trajectory) -> bool:
     launch_succeeded = getattr(trajectory, "launch_succeeded", None)
     if type(launch_succeeded) is bool:
         return launch_succeeded
-    return trajectory.terminal_status == SUCCEEDED_STATUS
+    return getattr(trajectory, "terminal_status", None) == SUCCEEDED_STATUS
 
 
 def snapshot_support_files(source_dir: Path) -> dict[str, bytes]:
@@ -617,6 +617,7 @@ def _grade(
         trajectory.control_rows,
         fallback_calls=trajectory.harness_calls,
     )
+    terminal_status = getattr(trajectory, "terminal_status", None)
     base = {
         "task_id": task.id,
         "task_version": task.task_version,
@@ -625,7 +626,7 @@ def _grade(
         "launch_request_id": trajectory.launch_request_id,
         "resolved_reasoning_level": trajectory.resolved_reasoning_level,
         "metrics": trajectory.metrics,
-        "terminal_status": trajectory.terminal_status,
+        "terminal_status": terminal_status,
         "infra_attempts": trajectory.infra_attempts,
     }
 
@@ -662,7 +663,7 @@ def _grade(
             reason = (
                 "host reported launch_succeeded=False"
                 if getattr(trajectory, "launch_succeeded", None) is False
-                else f"run terminal status {trajectory.terminal_status!r} is not a clean completion"
+                else f"run terminal status {terminal_status!r} is not a clean completion"
             )
             return Cell(
                 outcome=outcomes.AGENT_ERROR,
