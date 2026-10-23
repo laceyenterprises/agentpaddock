@@ -574,6 +574,7 @@
     ],
     "grader.py": [
       "SUCCEEDED_STATUS = 'succeeded'",
+      "getattr(trajectory, 'terminal_status', None) == SUCCEEDED_STATUS",
       "hidden_result['status'] == 'passed'",
       "outcome == outcomes.PASSED",
       "outcome, reason = (outcomes.FAILED, '; '.join(failed))",
@@ -587,9 +588,9 @@
       "outcome=outcomes.NO_SUBMISSION",
       "status == 'captured'",
       "terminalStatus: self.terminal_status",
+      "terminal_status = getattr(trajectory, 'terminal_status', None)",
       "terminal_status: str",
-      "terminal_status: str | None = None",
-      "getattr(trajectory, 'terminal_status', None) == SUCCEEDED_STATUS"
+      "terminal_status: str | None = None"
     ],
     "suite.py": [
       "TIMEOUT_TERMINAL_STATUS = 'timeout'",
