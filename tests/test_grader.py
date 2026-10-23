@@ -13,7 +13,15 @@ import pytest
 from conftest import FIXTURES_DIR, TASKS_DIR
 
 from gym import outcomes
-from gym.grader import Cell, GraderError, Trajectory, _parse_verdict, grade, grade_task
+from gym.grader import (
+    Cell,
+    GraderError,
+    Trajectory,
+    _parse_verdict,
+    clean_completion,
+    grade,
+    grade_task,
+)
 from gym.schema import load_task
 
 
@@ -121,6 +129,67 @@ def test_agent_error_on_failed_run(example_task):
     cell = grade(
         example_task,
         Trajectory(terminal_status="failed", submitted_result=None),
+    )
+    assert cell.outcome == outcomes.AGENT_ERROR
+
+
+# Synthetic status table. A host's producer owns the launch vocabulary; without a
+# host verdict the grader recognizes only the exact success spelling.
+_NOT_SUCCESS_STATUSES = [
+    "requested",
+    "admitted",
+    "leased",
+    "starting",
+    "running",
+    "waiting_approval",
+    "waiting_input",
+    "blocked_needs_decision",
+    "failed",
+    "operator_triage_required",
+    "canceled",
+    "cancelled",
+    "superseded",
+    "reaped_stuck_requested",
+    # Legacy aliases: unknown evidence, never success.
+    "completed",
+    "complete",
+    "done",
+    "success",
+    " succeeded",
+    "Succeeded",
+    "",
+]
+
+
+def test_only_exact_succeeded_is_clean_without_a_host_verdict():
+    assert clean_completion(Trajectory(terminal_status="succeeded"))
+    for status in _NOT_SUCCESS_STATUSES:
+        assert not clean_completion(Trajectory(terminal_status=status)), status
+
+
+@pytest.mark.parametrize("status", ["succeeded", *_NOT_SUCCESS_STATUSES])
+def test_an_explicit_host_verdict_wins_over_the_status(status):
+    assert clean_completion(Trajectory(terminal_status=status, launch_succeeded=True))
+    assert not clean_completion(Trajectory(terminal_status=status, launch_succeeded=False))
+
+
+@pytest.mark.parametrize("verdict", [0, 1, "true", "false"])
+def test_a_non_boolean_host_verdict_is_missing(verdict):
+    assert clean_completion(Trajectory(terminal_status="succeeded", launch_succeeded=verdict))
+    assert not clean_completion(Trajectory(terminal_status="completed", launch_succeeded=verdict))
+
+
+@pytest.mark.parametrize("status", ["completed", "complete", "done", "blocked_needs_decision"])
+def test_an_unclean_status_without_submission_is_agent_error(example_task, status):
+    cell = grade(example_task, Trajectory(terminal_status=status, submitted_result=None))
+    assert cell.outcome == outcomes.AGENT_ERROR
+    assert f"run terminal status {status!r} is not a clean completion" in cell.reason
+
+
+def test_an_explicit_false_verdict_makes_succeeded_unclean(example_task):
+    cell = grade(
+        example_task,
+        Trajectory(terminal_status="succeeded", submitted_result=None, launch_succeeded=False),
     )
     assert cell.outcome == outcomes.AGENT_ERROR
 

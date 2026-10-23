@@ -247,6 +247,13 @@ path does not depend on auto-detection. The `agent-os` host (`agent_os_host.py`,
 found through the in-tree fallback `hosts.IN_TREE_HOSTS`, since the agentpaddock
 distribution declares no host) builds the unchanged `WorkerPoolTrajectorySource`.
 
+A source reports launch success in `Trajectory.launch_succeeded`, using its
+host's own status reader; the gym never interprets a host's status vocabulary.
+An explicit boolean wins, false included. When it is `None`, only the exact
+status `succeeded` is a clean run: `completed`, `complete` and `done` are
+unknown, never success. Launch success, the grade and any published
+deliverable are separate facts.
+
 The `standalone` runner (`standalone.py`) runs one harness CLI per task in
 `docker run`. Supported harnesses are `claude-code`, `codex`, `opencode` and
 `pi`; gemini is deferred. The container gets:

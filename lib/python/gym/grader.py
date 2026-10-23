@@ -35,11 +35,12 @@ from typing import Any, Callable, Protocol
 from gym import outcomes, toolcalls
 from gym.schema import Task, is_fix_family, validate_result
 
-# Terminal launch-request/worker statuses that count as a clean run for grading.
-# Anything else (failed, canceled, superseded, a non-terminal status, or an
-# explicit error) resolves to agent_error. Kept in lockstep with
-# session_ledger.launch_request_terminal_statuses.
-_OK_TERMINAL_STATUSES: frozenset[str] = frozenset({"succeeded", "completed"})
+# The one status spelling that is a clean run when the host supplies no verdict
+# of its own. A host's producer owns its status vocabulary and its reader owns
+# the interpretation, so a host passes that reader's answer as
+# ``Trajectory.launch_succeeded``. Without one, only this exact spelling is
+# success; ``completed``, ``complete`` and ``done`` are unknown, never success.
+SUCCEEDED_STATUS = "succeeded"
 
 _VERIFIER_TIMEOUT_SECONDS = 120
 
@@ -51,6 +52,13 @@ SUPPORT_SOURCES: dict[str, str] = {
     "gym_doc_checks.py": "doc_checks.py",
     "gym_review_checks.py": "review_checks.py",
 }
+
+
+def clean_completion(trajectory: Trajectory) -> bool:
+    """Whether the run ended in launch success, by the host's verdict or exact spelling."""
+    if type(trajectory.launch_succeeded) is bool:
+        return trajectory.launch_succeeded
+    return trajectory.terminal_status == SUCCEEDED_STATUS
 
 
 def snapshot_support_files(source_dir: Path) -> dict[str, bytes]:
@@ -209,6 +217,11 @@ class Trajectory:
     infra_attempts: list[dict[str, Any]] = field(default_factory=list)
     provider_retry_safe: bool = False
     execution_provenance: dict[str, Any] | None = None
+    #: The host's launch-success verdict, read through its producer's status
+    #: reader. An explicit boolean wins over ``terminal_status`` (false included);
+    #: ``None`` falls back to the exact ``succeeded`` spelling. Success of the
+    #: launch only: the grade and any published deliverable are separate facts.
+    launch_succeeded: bool | None = None
     # Closure retains credentials privately; they never become dataclass data.
     result_redactor: Callable[[Any], Any] | None = field(default=None, repr=False)
 
@@ -619,7 +632,7 @@ def _grade(
     #    agent left nothing to grade.
     if trajectory.error and trajectory.submitted_result is None:
         return Cell(outcome=outcomes.AGENT_ERROR, reason=trajectory.error, **base)
-    if trajectory.terminal_status not in _OK_TERMINAL_STATUSES:
+    if not clean_completion(trajectory):
         # An unclean run with a submission is not an unanswered task. The
         # terminal status describes SUPERVISION, not the agent's work, and the
         # two fail independently: the submission is written by the agent as its
