@@ -56,8 +56,9 @@ SUPPORT_SOURCES: dict[str, str] = {
 
 def clean_completion(trajectory: Trajectory) -> bool:
     """Whether the run ended in launch success, by the host's verdict or exact spelling."""
-    if type(trajectory.launch_succeeded) is bool:
-        return trajectory.launch_succeeded
+    launch_succeeded = getattr(trajectory, "launch_succeeded", None)
+    if type(launch_succeeded) is bool:
+        return launch_succeeded
     return trajectory.terminal_status == SUCCEEDED_STATUS
 
 
@@ -658,12 +659,14 @@ def _grade(
         # truncated write fails to parse and a wrong shape fails result_schema,
         # so an agent killed mid-answer still cannot pass.
         if trajectory.submitted_result is None:
+            reason = (
+                "host reported launch_succeeded=False"
+                if getattr(trajectory, "launch_succeeded", None) is False
+                else f"run terminal status {trajectory.terminal_status!r} is not a clean completion"
+            )
             return Cell(
                 outcome=outcomes.AGENT_ERROR,
-                reason=(
-                    f"run terminal status {trajectory.terminal_status!r} is not a clean "
-                    "completion and no result was submitted"
-                ),
+                reason=f"{reason} and no result was submitted",
                 **base,
             )
 

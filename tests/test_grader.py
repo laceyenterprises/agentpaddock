@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from conftest import FIXTURES_DIR, TASKS_DIR
@@ -168,6 +169,12 @@ def test_only_exact_succeeded_is_clean_without_a_host_verdict():
 
 
 @pytest.mark.parametrize("status", ["succeeded", *_NOT_SUCCESS_STATUSES])
+def test_clean_completion_accepts_objects_without_a_host_verdict_field(status):
+    trajectory = SimpleNamespace(terminal_status=status)
+    assert clean_completion(trajectory) is (status == "succeeded")
+
+
+@pytest.mark.parametrize("status", ["succeeded", *_NOT_SUCCESS_STATUSES])
 def test_an_explicit_host_verdict_wins_over_the_status(status):
     assert clean_completion(Trajectory(terminal_status=status, launch_succeeded=True))
     assert not clean_completion(Trajectory(terminal_status=status, launch_succeeded=False))
@@ -186,12 +193,14 @@ def test_an_unclean_status_without_submission_is_agent_error(example_task, statu
     assert f"run terminal status {status!r} is not a clean completion" in cell.reason
 
 
-def test_an_explicit_false_verdict_makes_succeeded_unclean(example_task):
+@pytest.mark.parametrize("status", ["succeeded", "completed", "failed"])
+def test_an_explicit_false_verdict_reports_the_host_rejection(example_task, status):
     cell = grade(
         example_task,
-        Trajectory(terminal_status="succeeded", submitted_result=None, launch_succeeded=False),
+        Trajectory(terminal_status=status, submitted_result=None, launch_succeeded=False),
     )
     assert cell.outcome == outcomes.AGENT_ERROR
+    assert cell.reason == "host reported launch_succeeded=False and no result was submitted"
 
 
 def test_agent_error_on_explicit_error(example_task):
