@@ -37,7 +37,7 @@ from typing import Any
 import leaderboard
 
 PRICE_TABLE = "2026-10-10"
-EVAL_BENCH_PRICE_TABLE = "2026-10-18"
+EVAL_BENCH_PRICE_TABLE = "2026-10-25"
 RUNNER = "agent-os-fleet"
 PROXY_PREFIX = "litellm-local-openai/"
 
@@ -58,6 +58,7 @@ MODELS: dict[str, tuple[str, str | None]] = {
     "claude-sonnet-5-5": ("anthropic/claude-sonnet-5-5", None),
     "claude-sonnet-5": ("anthropic/claude-sonnet-5", None),
     "claude-haiku-4-5": ("anthropic/claude-haiku-4-5", None),
+    "claude-haiku-5-5": ("anthropic/claude-haiku-5-5", None),
     "gpt-6.1-sol": ("openai/gpt-6.1-sol", None),
     "gpt-5.6-luna": ("openai/gpt-5.6-luna", None),
     "gpt-5.6-sol": ("openai/gpt-5.6-sol", None),
@@ -68,6 +69,7 @@ MODELS: dict[str, tuple[str, str | None]] = {
     # Frontier models run in another vendor's harness through the proxy.
     "anthropic/claude-opus-5-5": ("anthropic/claude-opus-5-5", None),
     "anthropic/claude-sonnet-5-5": ("anthropic/claude-sonnet-5-5", None),
+    "anthropic/claude-haiku-5-5": ("anthropic/claude-haiku-5-5", None),
     "openai/gpt-6.1-sol": ("openai/gpt-6.1-sol", None),
     "openai/gpt-5.6-luna": ("openai/gpt-5.6-luna", None),
     "openai/gpt-5.6-sol": ("openai/gpt-5.6-sol", None),
@@ -77,12 +79,17 @@ MODELS: dict[str, tuple[str, str | None]] = {
     "openai/gpt-6-sol": ("openai/gpt-6-sol", None),
     "agy:gemini-3.1-pro-high": ("google/gemini-3.1-pro", "high"),
     "agy:gemini-3.8-flash-high": ("google/gemini-3.8-flash", "high"),
+    "agy:gemini-3.8-flash-low": ("google/gemini-3.8-flash", "low"),
+    "agy:gemini-3.8-flash-medium": ("google/gemini-3.8-flash", "medium"),
     "agy:gemini-4-argon-high": ("google/gemini-4-argon", "high"),
+    "agy:gemini-4-argon-low": ("google/gemini-4-argon", "low"),
+    "agy:gemini-4-argon-medium": ("google/gemini-4-argon", "medium"),
     "gemini-4-argon": ("google/gemini-4-argon", None),
     "google/gemini-4-argon": ("google/gemini-4-argon", None),
     "google/gemini-3.8-flash": ("google/gemini-3.8-flash", None),
     "google/gemini-3.8-flash-high": ("google/gemini-3.8-flash", "high"),
     "google/gemini-3.8-flash-low": ("google/gemini-3.8-flash", "low"),
+    "google/gemini-3.8-flash-medium": ("google/gemini-3.8-flash", "medium"),
     "fireworks/qwen3.8-max": ("fireworks/qwen3.8-max", None),
     "fireworks/qwen3.8-27b": ("fireworks/qwen3.8-27b", None),
     "fireworks/kimi-k3": ("fireworks/kimi-k3", None),
@@ -96,6 +103,18 @@ MODELS: dict[str, tuple[str, str | None]] = {
         None,
     ),
 }
+
+# Fixed-effort proxy routes encode their reasoning level in the route name.
+for _provider_id in (
+    "anthropic/claude-opus-5-5",
+    "anthropic/claude-sonnet-5-5",
+    "anthropic/claude-haiku-5-5",
+    "openai/gpt-6.1-sol",
+    "openai/gpt-5.6-terra",
+    "openai/gpt-6-luna",
+):
+    for _level in ("low", "medium", "high", "xhigh", "max"):
+        MODELS[f"{_provider_id}-{_level}"] = (_provider_id, _level)
 
 #: The RFD export's tag for an infrastructure row, mapped to the schema's.
 RFD_INFRA_PREFIX = "infra_or_quarantine:"
