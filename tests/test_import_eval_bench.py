@@ -163,6 +163,48 @@ def test_cross_harness_proxy_labels_name_the_native_model(label, provider_id):
     }
 
 
+@pytest.mark.parametrize(
+    "provider_id",
+    [
+        "anthropic/claude-opus-5-5",
+        "anthropic/claude-sonnet-5-5",
+        "anthropic/claude-haiku-5-5",
+        "openai/gpt-6.1-sol",
+        "openai/gpt-5.6-terra",
+        "openai/gpt-6-luna",
+    ],
+)
+@pytest.mark.parametrize("level", ["low", "medium", "high", "xhigh", "max"])
+@pytest.mark.parametrize("prefix", ["", import_eval_bench.PROXY_PREFIX])
+def test_fixed_effort_model_labels(provider_id, level, prefix):
+    label = f"{prefix}{provider_id}-{level}"
+    assert import_eval_bench.model_of(label) == {
+        "provider_id": provider_id,
+        "reasoning": level,
+    }
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "claude-haiku-5-5",
+        "anthropic/claude-haiku-5-5",
+        "litellm-local-openai/anthropic/claude-haiku-5-5",
+    ],
+)
+@pytest.mark.parametrize("suffix, reasoning", [("", None), ("@max", "max")])
+def test_haiku_model_labels(label, suffix, reasoning):
+    assert import_eval_bench.model_of(label + suffix) == {
+        "provider_id": "anthropic/claude-haiku-5-5",
+        "reasoning": reasoning,
+    }
+
+
+def test_unknown_model_label_is_rejected():
+    with pytest.raises(import_eval_bench.SourceError, match="unknown model label"):
+        import_eval_bench.model_of("synthetic/unknown-model-high")
+
+
 V2_SAMPLE = MODULE_ROOT / "tests" / "fixtures" / "eval-bench-v2-sample.raw.json"
 
 
@@ -200,6 +242,52 @@ def test_per_attempt_tokens_wall_time_and_price(v2_import):
     assert record["excludedBecause"] is None
     config = document["harness_configs"][record["harness"]["config_hash"]]
     assert config == import_eval_bench.descriptor("claude-code")
+
+
+@pytest.mark.parametrize(
+    "label, worker_class, provider_id, reasoning, usd",
+    [
+        (
+            "litellm-local-openai/anthropic/claude-opus-5-5-xhigh",
+            "oss-codex",
+            "anthropic/claude-opus-5-5",
+            "xhigh",
+            0.0104,
+        ),
+        (
+            "claude-haiku-5-5@max",
+            "claude-code",
+            "anthropic/claude-haiku-5-5",
+            "max",
+            0.00027,
+        ),
+        (
+            "agy:gemini-4-argon-medium",
+            "gemini",
+            "google/gemini-4-argon",
+            "medium",
+            0.0052,
+        ),
+    ],
+)
+def test_per_attempt_label_effort_and_published_cost(
+    tmp_path, label, worker_class, provider_id, reasoning, usd
+):
+    raw = json.loads(V2_SAMPLE.read_text())
+    row = raw["rows"][0]
+    row.update(model=label, cls=worker_class, reasoningLevel=None)
+    raw["rows"] = [row]
+    path = tmp_path / V2_SAMPLE.name
+    path.write_text(json.dumps(raw))
+    table = lb.load_results().price_tables[import_eval_bench.EVAL_BENCH_PRICE_TABLE]
+    document, published, unrecorded = import_eval_bench.import_eval_bench(
+        path, table, set()
+    )
+    assert (published, unrecorded) == (0, 0)
+    assert document["price_table"] == "2026-10-25"
+    record = _v2_record(document, 1)
+    assert record["model"] == {"provider_id": provider_id, "reasoning": reasoning}
+    assert record["cost"] == {"usd": usd, "source": "published-rate", "reason": None}
 
 
 def test_per_attempt_regrades_keep_both_versions(v2_import):
@@ -343,7 +431,14 @@ def test_unadorned_model_accepts_reasoning_field(label):
     }
 
 
-@pytest.mark.parametrize("label", ["agy:gemini-4-argon-high", "gpt-6-sol@high"])
+@pytest.mark.parametrize(
+    "label",
+    [
+        "agy:gemini-4-argon-high",
+        "gpt-6-sol@high",
+        "litellm-local-openai/anthropic/claude-opus-5-5-xhigh",
+    ],
+)
 def test_explicit_model_effort_still_rejects_conflicting_field(label):
     with pytest.raises(
         import_eval_bench.SourceError, match="contradicts reasoningLevel"
@@ -405,7 +500,7 @@ def test_registered_v2_source_builds_with_deduplication_and_current_prices(
     assert _synthetic_id(3) not in ids
     assert _synthetic_id(4) not in ids
     assert len(ids) == 9
-    assert document["price_table"] == "2026-10-18"
+    assert document["price_table"] == "2026-10-25"
     assert _v2_record(document, 1)["cost"]["usd"] == 0.0052
     legacy = json.loads(files["2026-10-06-rfd-calibration.json"])
     assert legacy["price_table"] == "2026-10-10"
@@ -434,10 +529,15 @@ def test_registered_v2_source_builds_with_deduplication_and_current_prices(
     ("label", "provider_id", "reasoning"),
     [
         ("agy:gemini-3.8-flash-high", "google/gemini-3.8-flash", "high"),
+        ("agy:gemini-3.8-flash-low", "google/gemini-3.8-flash", "low"),
+        ("agy:gemini-3.8-flash-medium", "google/gemini-3.8-flash", "medium"),
         ("agy:gemini-4-argon-high", "google/gemini-4-argon", "high"),
+        ("agy:gemini-4-argon-low", "google/gemini-4-argon", "low"),
+        ("agy:gemini-4-argon-medium", "google/gemini-4-argon", "medium"),
         ("google/gemini-3.8-flash", "google/gemini-3.8-flash", None),
         ("google/gemini-3.8-flash-high", "google/gemini-3.8-flash", "high"),
         ("google/gemini-3.8-flash-low", "google/gemini-3.8-flash", "low"),
+        ("google/gemini-3.8-flash-medium", "google/gemini-3.8-flash", "medium"),
         ("together/qwen3.8-flash", "together/qwen3.8-flash", None),
         *[
             (name, "openai/" + name, None)
@@ -480,3 +580,24 @@ def test_new_price_table_preserves_previous_entries_and_note():
     previous, current = tables["2026-10-10"], tables["2026-10-18"]
     assert current.note == previous.note
     assert {name: current.models[name] for name in previous.models} == previous.models
+
+
+def test_haiku_price_table_preserves_previous_entries_and_note():
+    tables = lb.load_results().price_tables
+    previous, current = tables["2026-10-18"], tables["2026-10-25"]
+    assert current.note == previous.note
+    assert current.models == {
+        **previous.models,
+        "anthropic/claude-haiku-5-5": {
+            "as_of": "2026-10-25",
+            "cache": 0.01,
+            "input": 0.10,
+            "note": (
+                "Published short-prompt rates; prompts over 100,000 tokens cost five "
+                "times these rates, so such runs record below their true cost."
+            ),
+            "output": 0.50,
+            "reference": "https://www.anthropic.com/claude-haiku-5-5",
+            "source": "published-rate",
+        },
+    }
