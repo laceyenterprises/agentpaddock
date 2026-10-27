@@ -69,14 +69,31 @@ class QuotaGate:
     reason: str
 
 
-def quota_gate(returncode: int, stdout: str, *, requirements=None, worker_class=None) -> QuotaGate:
+def quota_gate(
+    returncode: int, stdout: str, *, requirements=None, worker_class=None
+) -> QuotaGate:
     """Classify ``hq fleet quota status --json`` output.
 
     With requirements, only the cell's provider/auth paths and same-class
     suspended launches gate spending; each required path must explicitly be ok.
-    Without requirements, report fleet-wide suspensions for the plan.
+    Requirements accept native tuples or pairs decoded from JSON lists; leading
+    and trailing identifier whitespace is stripped without modifying the input.
+    Empty requirements select no providers but still gate same-class launches.
+    With requirements=None, report fleet-wide suspensions for the plan.
     Anything unparseable is unknown.
     """
+    if requirements is not None:
+        if not isinstance(requirements, (list, tuple)) or any(
+            not isinstance(pair, (list, tuple))
+            or len(pair) != 2
+            or any(not isinstance(value, str) or not value.strip() for value in pair)
+            for pair in requirements
+        ):
+            return QuotaGate(
+                QUOTA_UNKNOWN,
+                "malformed quota requirements: expected a list of non-empty provider/authPath pairs",
+            )
+        requirements = [tuple(value.strip() for value in pair) for pair in requirements]
     if returncode != 0:
         return QuotaGate(QUOTA_UNKNOWN, f"hq fleet quota status exited {returncode}")
     try:
@@ -96,7 +113,8 @@ def quota_gate(returncode: int, stdout: str, *, requirements=None, worker_class=
         selected = [
             row
             for row in statuses
-            if isinstance(row, dict) and (row.get("provider"), row.get("authPath")) in requirements
+            if isinstance(row, dict)
+            and (row.get("provider"), row.get("authPath")) in requirements
         ]
         for provider, auth_path in requirements:
             rows = [
@@ -105,14 +123,22 @@ def quota_gate(returncode: int, stdout: str, *, requirements=None, worker_class=
                 if (r.get("provider"), r.get("authPath")) == (provider, auth_path)
             ]
             if not rows:
-                return QuotaGate(QUOTA_UNKNOWN, f"missing quota for {provider}/{auth_path}")
+                return QuotaGate(
+                    QUOTA_UNKNOWN, f"missing quota for {provider}/{auth_path}"
+                )
             for row in rows:
                 state = str(row.get("state") or "").lower()
-                if row.get("operatorSuspendUntil") or state in ("exhausted", "suspended"):
-                    return QuotaGate(QUOTA_SUSPENDED, f"provider suspended: {provider}/{auth_path}")
+                if row.get("operatorSuspendUntil") or state in (
+                    "exhausted",
+                    "suspended",
+                ):
+                    return QuotaGate(
+                        QUOTA_SUSPENDED, f"provider suspended: {provider}/{auth_path}"
+                    )
                 if state != "ok":
                     return QuotaGate(
-                        QUOTA_UNKNOWN, f"quota {state or 'unknown'} for {provider}/{auth_path}"
+                        QUOTA_UNKNOWN,
+                        f"quota {state or 'unknown'} for {provider}/{auth_path}",
                     )
         suspended_lrqs = [
             r
@@ -133,9 +159,12 @@ def quota_gate(returncode: int, stdout: str, *, requirements=None, worker_class=
         return QuotaGate(QUOTA_SUSPENDED, "provider suspended: " + ", ".join(blocked))
     if suspended_lrqs:
         return QuotaGate(
-            QUOTA_SUSPENDED, f"{len(suspended_lrqs)} launch request(s) are quota-suspended"
+            QUOTA_SUSPENDED,
+            f"{len(suspended_lrqs)} launch request(s) are quota-suspended",
         )
-    return QuotaGate(QUOTA_HEALTHY, "no provider exhausted and no quota-suspended launches")
+    return QuotaGate(
+        QUOTA_HEALTHY, "no provider exhausted and no quota-suspended launches"
+    )
 
 
 def arm_omission_reason(arm: str, task_commands: Iterable[str] = ()) -> str | None:

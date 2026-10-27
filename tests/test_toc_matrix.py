@@ -27,6 +27,141 @@ def test_quota_gate_is_healthy_only_on_a_clean_structured_status():
     assert toc_matrix.quota_gate(0, _status()).state == toc_matrix.QUOTA_HEALTHY
 
 
+@pytest.fixture(params=[False, True], ids=["tuples", "json-lists"])
+def quota_requirements(request):
+    requirements = [("provider-a", "oauth"), ("provider-b", "oauth")]
+    return json.loads(json.dumps(requirements)) if request.param else requirements
+
+
+def test_quota_gate_accepts_serialized_requirements(quota_requirements):
+    rows = [
+        {"provider": "provider-a", "authPath": "oauth", "state": "ok"},
+        {"provider": "provider-b", "authPath": "oauth", "state": "ok"},
+        {"provider": "provider-a", "authPath": "api", "state": "exhausted"},
+        {"provider": "unrelated", "authPath": "oauth", "state": "suspended"},
+    ]
+    gate = toc_matrix.quota_gate(
+        0, _status(providerStatuses=rows), requirements=quota_requirements
+    )
+    assert gate.state == toc_matrix.QUOTA_HEALTHY
+
+
+@pytest.mark.parametrize("requirements", [[], ()], ids=["list", "tuple"])
+@pytest.mark.parametrize("suspended_class", ["class-a", "class-b"])
+def test_quota_gate_empty_requirements_stay_cell_scoped(requirements, suspended_class):
+    gate = toc_matrix.quota_gate(
+        0,
+        _status(
+            providerStatuses=[
+                {"provider": "unrelated", "authPath": "oauth", "state": "exhausted"}
+            ],
+            suspendedLaunchRequests=[{"workerClass": suspended_class}],
+        ),
+        requirements=requirements,
+        worker_class="class-a",
+    )
+    expected = (
+        toc_matrix.QUOTA_SUSPENDED
+        if suspended_class == "class-a"
+        else toc_matrix.QUOTA_HEALTHY
+    )
+    assert gate.state == expected
+
+
+@pytest.mark.parametrize("state", ["ok", "suspended"])
+def test_quota_gate_trims_requirement_identifiers(quota_requirements, state):
+    padded = [
+        type(pair)((f" \t{pair[0]} ", f" {pair[1]}\n")) for pair in quota_requirements
+    ]
+    original = [list(pair) for pair in padded]
+    rows = [
+        {"provider": provider, "authPath": auth_path, "state": state}
+        for provider, auth_path in quota_requirements
+    ]
+    gate = toc_matrix.quota_gate(0, _status(providerStatuses=rows), requirements=padded)
+    expected = toc_matrix.QUOTA_HEALTHY if state == "ok" else toc_matrix.QUOTA_SUSPENDED
+    assert gate.state == expected
+    assert [list(pair) for pair in padded] == original
+
+
+@pytest.mark.parametrize(
+    "row, expected_state, expected_reason",
+    [
+        ({"state": "suspended"}, toc_matrix.QUOTA_SUSPENDED, "provider suspended:"),
+        ({"state": "EXHAUSTED"}, toc_matrix.QUOTA_SUSPENDED, "provider suspended:"),
+        (
+            {"state": "ok", "operatorSuspendUntil": "2099-01-01"},
+            toc_matrix.QUOTA_SUSPENDED,
+            "provider suspended:",
+        ),
+        ({"state": "unknown"}, toc_matrix.QUOTA_UNKNOWN, "quota unknown for"),
+        ({}, toc_matrix.QUOTA_UNKNOWN, "quota unknown for"),
+        (None, toc_matrix.QUOTA_UNKNOWN, "missing quota for"),
+    ],
+)
+def test_quota_gate_required_path_states(
+    quota_requirements, row, expected_state, expected_reason
+):
+    rows = [{"provider": "provider-a", "authPath": "oauth", "state": "ok"}]
+    if row is not None:
+        rows.append({"provider": "provider-b", "authPath": "oauth", **row})
+    gate = toc_matrix.quota_gate(
+        0, _status(providerStatuses=rows), requirements=quota_requirements
+    )
+    assert gate.state == expected_state
+    assert gate.reason == f"{expected_reason} provider-b/oauth"
+
+
+@pytest.mark.parametrize("suspended_class", ["class-a", "class-b"])
+def test_quota_gate_only_gates_same_class_suspended_launches(
+    quota_requirements, suspended_class
+):
+    rows = [
+        {"provider": provider, "authPath": auth_path, "state": "ok"}
+        for provider, auth_path in quota_requirements
+    ]
+    gate = toc_matrix.quota_gate(
+        0,
+        _status(
+            providerStatuses=rows,
+            suspendedLaunchRequests=[{"workerClass": suspended_class}],
+        ),
+        requirements=quota_requirements,
+        worker_class="class-a",
+    )
+    expected = (
+        toc_matrix.QUOTA_SUSPENDED
+        if suspended_class == "class-a"
+        else toc_matrix.QUOTA_HEALTHY
+    )
+    assert gate.state == expected
+
+
+@pytest.mark.parametrize(
+    "requirements",
+    [
+        1,
+        "ab",
+        {},
+        [None],
+        ["ab"],
+        [{"provider": "provider-a", "authPath": "oauth"}],
+        [[]],
+        [["provider-a"]],
+        [["provider-a", "oauth", "extra"]],
+        [[None, "oauth"]],
+        [["provider-a", 1]],
+        [["", "oauth"]],
+        [["provider-a", " "]],
+        [("provider-a", "oauth"), ["provider-b"]],
+    ],
+)
+def test_quota_gate_malformed_requirements_are_unknown(requirements):
+    gate = toc_matrix.quota_gate(0, _status(), requirements=requirements)
+    assert gate.state == toc_matrix.QUOTA_UNKNOWN
+    assert gate.reason.startswith("malformed quota requirements:")
+
+
 def test_quota_gate_suspends_on_an_exhausted_provider():
     rows = [{"provider": "openai", "authPath": "oauth", "state": "EXHAUSTED"}]
     gate = toc_matrix.quota_gate(0, _status(providerStatuses=rows))
