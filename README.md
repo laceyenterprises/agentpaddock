@@ -995,7 +995,13 @@ invocations.
 
 `hq gym toc-matrix --out PATH --cell CLASS=MODEL ...` (`gym/toc_eval.py`)
 drives the matrix, and `gym/toc_matrix.py` holds its decision logic. The
-TOC-05 design is `--cell codex=gpt-6-sol --cell claude-code=claude-opus-5-5
+`quota_gate` helper accepts provider/auth-path requirement pairs as tuples or
+JSON lists and strips leading and trailing identifier whitespace. An explicit
+empty requirements list selects no providers while still checking same-class
+quota-suspended launches; `requirements=None` selects fleet-wide checks.
+Malformed pairs return an unknown quota state.
+
+The TOC-05 design is `--cell codex=gpt-6-sol --cell claude-code=claude-opus-5-5
 --arm off --arm spill` on `coding-toc-commands`, N=3 (`--attempts`) at the
 class default reasoning level, written with
 `--out projects/tool-output-compression/ab-result.json`. `--out` is required

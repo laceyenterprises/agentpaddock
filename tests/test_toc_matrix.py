@@ -46,6 +46,44 @@ def test_quota_gate_accepts_serialized_requirements(quota_requirements):
     assert gate.state == toc_matrix.QUOTA_HEALTHY
 
 
+@pytest.mark.parametrize("requirements", [[], ()], ids=["list", "tuple"])
+@pytest.mark.parametrize("suspended_class", ["class-a", "class-b"])
+def test_quota_gate_empty_requirements_stay_cell_scoped(requirements, suspended_class):
+    gate = toc_matrix.quota_gate(
+        0,
+        _status(
+            providerStatuses=[
+                {"provider": "unrelated", "authPath": "oauth", "state": "exhausted"}
+            ],
+            suspendedLaunchRequests=[{"workerClass": suspended_class}],
+        ),
+        requirements=requirements,
+        worker_class="class-a",
+    )
+    expected = (
+        toc_matrix.QUOTA_SUSPENDED
+        if suspended_class == "class-a"
+        else toc_matrix.QUOTA_HEALTHY
+    )
+    assert gate.state == expected
+
+
+@pytest.mark.parametrize("state", ["ok", "suspended"])
+def test_quota_gate_trims_requirement_identifiers(quota_requirements, state):
+    padded = [
+        type(pair)((f" \t{pair[0]} ", f" {pair[1]}\n")) for pair in quota_requirements
+    ]
+    original = [list(pair) for pair in padded]
+    rows = [
+        {"provider": provider, "authPath": auth_path, "state": state}
+        for provider, auth_path in quota_requirements
+    ]
+    gate = toc_matrix.quota_gate(0, _status(providerStatuses=rows), requirements=padded)
+    expected = toc_matrix.QUOTA_HEALTHY if state == "ok" else toc_matrix.QUOTA_SUSPENDED
+    assert gate.state == expected
+    assert [list(pair) for pair in padded] == original
+
+
 @pytest.mark.parametrize(
     "row, expected_state, expected_reason",
     [

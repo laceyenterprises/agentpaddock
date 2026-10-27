@@ -76,8 +76,10 @@ def quota_gate(
 
     With requirements, only the cell's provider/auth paths and same-class
     suspended launches gate spending; each required path must explicitly be ok.
-    Requirements accept native tuples or pairs decoded from JSON lists.
-    Without requirements, report fleet-wide suspensions for the plan.
+    Requirements accept native tuples or pairs decoded from JSON lists; leading
+    and trailing identifier whitespace is stripped without modifying the input.
+    Empty requirements select no providers but still gate same-class launches.
+    With requirements=None, report fleet-wide suspensions for the plan.
     Anything unparseable is unknown.
     """
     if requirements is not None:
@@ -91,7 +93,7 @@ def quota_gate(
                 QUOTA_UNKNOWN,
                 "malformed quota requirements: expected a list of non-empty provider/authPath pairs",
             )
-        requirements = [tuple(pair) for pair in requirements]
+        requirements = [tuple(value.strip() for value in pair) for pair in requirements]
     if returncode != 0:
         return QuotaGate(QUOTA_UNKNOWN, f"hq fleet quota status exited {returncode}")
     try:
