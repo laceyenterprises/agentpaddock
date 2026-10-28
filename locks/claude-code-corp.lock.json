@@ -1,0 +1,9 @@
+{
+  "agent": "claude-code-corp",
+  "schema": "gym-tool-surface-lock/v1",
+  "tools": [
+    "bash:safe",
+    "read",
+    "write"
+  ]
+}
