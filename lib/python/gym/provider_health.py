@@ -24,7 +24,7 @@ _log = logging.getLogger(__name__)
 
 @dataclass
 class ProviderHealth:
-    path: Path
+    path: Path | None
     consecutive_limit: int = 2
     timeout_seconds: float = 600.0
     consecutive: int = 0
@@ -34,9 +34,32 @@ class ProviderHealth:
     pending: bytes = b""
     discarding: bool = False
 
+    read_page: object = None
+    generation: str | None = None
     warned_unreadable: bool = False
 
     def _lines(self):
+        if self.read_page is not None:
+            try:
+                page = self.read_page(self.offset)
+                if page.get("status") != "found":
+                    return
+                if (
+                    page.get("reset")
+                    or self.generation is not None
+                    and self.generation != page.get("generation")
+                ):
+                    self.pending = b""
+                self.generation = page.get("generation")
+                self.offset = page["nextOffset"]
+                yield from page["text"].encode().splitlines()
+            except (OSError, RuntimeError, ValueError):
+                if not self.warned_unreadable:
+                    _log.warning("Provider monitoring evidence unavailable")
+                    self.warned_unreadable = True
+            return
+        if self.path is None:
+            return
         try:
             with self.path.open("rb") as handle:
                 # Drain a fixed file snapshot, not an unbounded growing stream.

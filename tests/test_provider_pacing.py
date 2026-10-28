@@ -862,3 +862,38 @@ def test_interrupt_timeout_uses_one_cancel_attempt(tmp_path, monkeypatch):
     reader = SimpleNamespace(worker_run_for_launch=lambda launch: {"status": "running"})
     assert source._poll_to_terminal(reader, "lrq-1") is None
     assert len(calls) == 1
+
+
+def test_provider_health_can_consume_bounded_host_pages_without_a_path():
+    pages = iter(
+        [
+            {
+                "status": "found",
+                "generation": "one",
+                "nextOffset": 20,
+                "text": '{"type":"error","message":"API Error: 503"}\n',
+            },
+            {
+                "status": "found",
+                "generation": "one",
+                "nextOffset": 40,
+                "text": '{"type":"error","message":"API Error: 503"}\n',
+            },
+        ]
+    )
+    offsets = []
+
+    def read(offset):
+        offsets.append(offset)
+        return next(pages)
+
+    health = ProviderHealth(None, read_page=read)
+    assert health.check() is None
+    assert health.check() is not None
+    assert offsets == [0, 20]
+
+
+def test_provider_health_host_outage_does_not_open_native_files():
+    health = ProviderHealth(None, read_page=lambda offset: {"status": "unavailable"})
+    assert health.check() is None
+    assert health.offset == 0

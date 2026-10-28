@@ -16,7 +16,7 @@ worker teardown:
 
 * pi and opencode keep theirs under the worker directory, which teardown
   deletes, so their adapters export the calls to
-  ``$HQ_ROOT/dispatch/<launch_request_id>/toolcalls.jsonl`` before the run
+  the host-owned tool-call export before the run
   reads as terminal (``cwp_dispatch.harness_toolcall_export``): one
   ``{"name", "arguments", "call_id"}`` object per line. The file is read only
   for the classes whose adapter owns it (:data:`TOOLCALLS_EXPORT_CLASSES`,
@@ -25,7 +25,7 @@ worker teardown:
   other class a file there is a plant and would replace the real record.
 
 * ``codex exec --json`` writes its event stream to
-  ``$HQ_ROOT/dispatch/<launch_request_id>/stdout.log``. Each finished tool use
+  the host-owned stdout stream. Each finished tool use
   is an ``item.completed`` event (``command_execution``, ``file_change``,
   ``mcp_tool_call``, ``web_search``).
 * claude-code writes ``--output-format stream-json`` to the same
@@ -593,7 +593,8 @@ _log = logging.getLogger(__name__)
 
 def collect(
     *,
-    dispatch_dir: Path | None,
+    dispatch_dir: Path | None = None,
+    log_reader=None,
     session_name: str | None = None,
     acpx_sessions_dir: Path | None = None,
     worker_class: str | None = None,
@@ -615,6 +616,26 @@ def collect(
     yield no calls rather than an error: the grader then sees what it saw
     before.
     """
+    if log_reader is not None:
+        # A host boundary is authoritative for availability. Never open a native
+        # store or a local dispatch path when its transport fails.
+        try:
+            if worker_class == "gemini":
+                calls = calls_from_agy_stream_json(log_reader("agy"))
+                if calls:
+                    return calls
+            if worker_class in TOOLCALLS_EXPORT_CLASSES:
+                calls = calls_from_toolcalls_jsonl(log_reader("toolcalls"))
+                if calls:
+                    return calls
+            stdout = log_reader("stdout")
+            calls = calls_from_codex_exec_stdout(stdout) or calls_from_claude_stream_json(stdout)
+            if calls:
+                return calls
+            return calls_from_acpx_stream(log_reader("acpx"))
+        except (OSError, RuntimeError, ValueError):
+            _log.warning("host tool-call evidence unavailable")
+            return []
     if dispatch_dir is not None:
         if worker_class == "gemini":
             calls = calls_from_agy_stream_json(_read_lines(dispatch_dir / "agy-stream.jsonl"))
