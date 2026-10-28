@@ -24,7 +24,7 @@ _log = logging.getLogger(__name__)
 
 @dataclass
 class ProviderHealth:
-    path: Path
+    path: Path | None
     consecutive_limit: int = 2
     timeout_seconds: float = 600.0
     consecutive: int = 0
@@ -34,9 +34,43 @@ class ProviderHealth:
     pending: bytes = b""
     discarding: bool = False
 
+    read_page: object = None
+    generation: str | None = None
     warned_unreadable: bool = False
 
     def _lines(self):
+        if self.read_page is not None:
+            try:
+                page = self.read_page(self.offset)
+                if not isinstance(page, dict):
+                    raise ValueError("invalid host log page")
+                if page.get("status") != "found":
+                    return
+                next_offset = page["nextOffset"]
+                text = page["text"]
+                if type(next_offset) is not int or next_offset < 0 or not isinstance(text, str):
+                    raise ValueError("invalid host log page fields")
+                chunk = text.encode()
+            except Exception:
+                # Host plugins may use their own protocol exception classes.
+                # An unreadable page must not advance the cursor or lose a fragment.
+                if not self.warned_unreadable:
+                    _log.warning("Provider monitoring evidence unavailable")
+                    self.warned_unreadable = True
+                return
+            if (
+                page.get("reset")
+                or self.generation is not None
+                and self.generation != page.get("generation")
+            ):
+                self.pending = b""
+                self.discarding = False
+            self.generation = page.get("generation")
+            self.offset = next_offset
+            yield from self._complete_lines(chunk)
+            return
+        if self.path is None:
+            return
         try:
             with self.path.open("rb") as handle:
                 # Drain a fixed file snapshot, not an unbounded growing stream.
@@ -52,23 +86,26 @@ class ProviderHealth:
                     if not chunk:
                         break
                     self.offset = handle.tell()
-                    lines = (self.pending + chunk).split(b"\n")
-                    self.pending = lines.pop()
-                    for line in lines:
-                        if self.discarding:
-                            self.discarding = False
-                            continue
-                        if len(line) <= _MAX_LINE:
-                            yield line
-                    if len(self.pending) > _MAX_LINE:
-                        self.pending = b""
-                        self.discarding = True
+                    yield from self._complete_lines(chunk)
         except FileNotFoundError:
             return
         except OSError as exc:
             if not self.warned_unreadable:
                 _log.warning("Provider monitoring cannot read %s: %s", self.path, exc)
                 self.warned_unreadable = True
+
+    def _complete_lines(self, chunk: bytes):
+        lines = (self.pending + chunk).split(b"\n")
+        self.pending = lines.pop()
+        for line in lines:
+            if self.discarding:
+                self.discarding = False
+                continue
+            if len(line) <= _MAX_LINE:
+                yield line
+        if len(self.pending) > _MAX_LINE:
+            self.pending = b""
+            self.discarding = True
 
     def check(self) -> str | None:
         for line in self._lines():

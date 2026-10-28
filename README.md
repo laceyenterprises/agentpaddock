@@ -74,16 +74,20 @@ answer. The grader:
    (+ `control_evaluations` for "a tool was NOT called"). Only the claude-code
    adapter ingests tool calls there, and only for a run whose runtime session
    got bound, which many runs never do. When a run has none, the calls come
-   from the harness's own record instead (`gym/harness_toolcalls.py`): the
-   `codex exec --json` events or Claude Code stream-json in
-   `$HQ_ROOT/dispatch/<launch_request_id>/stdout.log`, or the acpx session
-   whose `name` is the `sessionName` in that directory's `env-contract.json`
-   (under the runtime account's `~/.acpx/sessions`, resolved through
-   `agent_os_config.roots.runtime_home()` so an admin-account grader finds it).
+   from the host's authorized logical log reader (`gym/harness_toolcalls.py`).
+   Host mode requests bounded, redacted stdout, adapter exports and native
+   event projections by launch identity. It never opens the host dispatch
+   directory or native session store, including during a transport outage.
+   In host mode Gemini's agy result is authoritative even with zero calls;
+   other classes try stdout, and ACP fallback requires an explicit session name.
+   Stdout iterators are retained for both Codex and Claude parsers. Provider
+   monitoring retains incomplete lines across host pages, drops them on stream
+   reset or generation changes, and applies the same 1 MiB line limit as local
+   logs. Malformed pages and transport/protocol errors warn once and preserve
+   the cursor for a later monitoring check.
    pi and opencode keep their sessions under the worker directory, which
    teardown deletes, so their adapters export the calls to `toolcalls.jsonl`
-   in the dispatch directory first (`cwp_dispatch.harness_toolcall_export`),
-   and the gym reads that file before the others, but only when the ledger's
+   before teardown, and the host projects that logical stream before the others, but only when the ledger's
    `launch_requests.worker_class` is `pi`, `oss-pi`, `opencode`, or
    `oss-opencode`. A worker can write to its dispatch directory and no other
    adapter clears the file, so on any other class it is ignored and logged as
