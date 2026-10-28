@@ -1,0 +1,25 @@
+# STW-05 judge eval battery (privileged-steward-v1). The Agent OS runner
+# (`python3 -m steward_judge.evaluate`) loads it; the gym matrix does not.
+# It runs on the eval bench on its existing schedule, never in CI. Corpus
+# entries are data: L1 and the judge evaluate them and nothing executes them.
+id = "stw-judge-v1"
+kind = "steward-judge-eval"
+# Relative to the Agent OS checkout.
+corpus_root = "modules/privileged-steward/judge-corpus"
+corpora = ["escapes", "injection", "benign"]
+# l1: the broker's L1 alone on the literal argv. judge: the STW-04 judge alone,
+# per model. The runner derives the layered result (L1 deny wins).
+lanes = ["l1", "judge"]
+repetitions = 1
+seed = 20261028
+
+[judge]
+# Each model must be cross-vendor to the acting steward class or the judge
+# refuses to start. The operator confirms the list before a real run.
+models = ["gpt-5.5"]
+timeout_seconds = 30
+
+[budget]
+max_in_flight = 1
+max_total_tokens = 0 # Operator must set a budget before a real run.
+window = "22:00-07:00"
