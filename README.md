@@ -78,6 +78,13 @@ answer. The grader:
    Host mode requests bounded, redacted stdout, adapter exports and native
    event projections by launch identity. It never opens the host dispatch
    directory or native session store, including during a transport outage.
+   In host mode Gemini's agy result is authoritative even with zero calls;
+   other classes try stdout, and ACP fallback requires an explicit session name.
+   Stdout iterators are retained for both Codex and Claude parsers. Provider
+   monitoring retains incomplete lines across host pages, drops them on stream
+   reset or generation changes, and applies the same 1 MiB line limit as local
+   logs. Malformed pages and transport/protocol errors warn once and preserve
+   the cursor for a later monitoring check.
    pi and opencode keep their sessions under the worker directory, which
    teardown deletes, so their adapters export the calls to `toolcalls.jsonl`
    before teardown, and the host projects that logical stream before the others, but only when the ledger's

@@ -615,24 +615,28 @@ def collect(
     :func:`default_acpx_sessions_dir`). Missing or unreadable artifacts
     yield no calls rather than an error: the grader then sees what it saw
     before.
+
+    In host mode Gemini's agy stream is authoritative even when empty. ACP
+    fallback requires an explicit ``session_name``; stdout may be a single-pass
+    iterable and is materialized before trying both stdout parsers.
     """
     if log_reader is not None:
         # A host boundary is authoritative for availability. Never open a native
         # store or a local dispatch path when its transport fails.
         try:
             if worker_class == "gemini":
-                calls = calls_from_agy_stream_json(log_reader("agy"))
-                if calls:
-                    return calls
+                return calls_from_agy_stream_json(log_reader("agy"))
             if worker_class in TOOLCALLS_EXPORT_CLASSES:
                 calls = calls_from_toolcalls_jsonl(log_reader("toolcalls"))
                 if calls:
                     return calls
-            stdout = log_reader("stdout")
+            stdout = list(log_reader("stdout"))
             calls = calls_from_codex_exec_stdout(stdout) or calls_from_claude_stream_json(stdout)
             if calls:
                 return calls
-            return calls_from_acpx_stream(log_reader("acpx"))
+            if session_name:
+                return calls_from_acpx_stream(log_reader("acpx"))
+            return []
         except (OSError, RuntimeError, ValueError):
             _log.warning("host tool-call evidence unavailable")
             return []

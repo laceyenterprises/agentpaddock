@@ -687,6 +687,7 @@
       "state: 'creating'"
     ],
     "provider_health.py": [
+      "page.get('status') != 'found'",
       "status = re.search('HTTP (408|5\\\\d\\\\d)\\\\b', self.cause or '')",
       "status = str(event.get('error_status', ''))",
       "status == '408'"

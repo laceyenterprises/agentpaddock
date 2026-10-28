@@ -868,3 +868,176 @@ def test_host_log_reader_keeps_export_class_policy():
     seen.clear()
     assert h.collect(log_reader=read, worker_class="codex") == []
     assert "toolcalls" not in seen
+
+
+def test_host_stdout_generator_reaches_claude_parser():
+    line = _line(
+        {
+            "type": "assistant",
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "read-one",
+                        "name": "Read",
+                        "input": {"file_path": "fixture.txt"},
+                    }
+                ]
+            },
+        }
+    )
+    calls = h.collect(log_reader=lambda stream: iter([line]), worker_class="claude-code")
+    assert [(call["name"], call["call_id"]) for call in calls] == [("Read", "read-one")]
+
+
+@pytest.mark.parametrize("worker_class", ["gemini", "codex", "claude-code", None])
+def test_empty_host_tool_stream_does_not_read_unrelated_harness(worker_class, caplog):
+    seen = []
+
+    def read(stream):
+        seen.append(stream)
+        if stream == ("agy" if worker_class == "gemini" else "stdout"):
+            return iter([])
+        return iter([_acp({"sessionUpdate": "tool_call", "toolCallId": "foreign"})])
+
+    assert h.collect(log_reader=read, worker_class=worker_class) == []
+    assert seen == (["agy"] if worker_class == "gemini" else ["stdout"])
+    assert not caplog.records
+
+
+def test_host_acpx_fallback_requires_named_session():
+    seen = []
+
+    def read(stream):
+        seen.append(stream)
+        return iter([_acp({"sessionUpdate": "tool_call", "toolCallId": "named"})])
+
+    calls = h.collect(log_reader=read, session_name="example", worker_class="oss-codex")
+    assert [call["call_id"] for call in calls] == ["named"]
+    assert seen == ["stdout", "acpx"]
+
+
+# Keep host-page consumer regressions runnable without the optional gym.dispatch
+# integration imported by test_provider_pacing.py.
+def _host_page(text, next_offset=1, **fields):
+    return {
+        "status": "found",
+        "text": text,
+        "nextOffset": next_offset,
+        "generation": "one",
+        **fields,
+    }
+
+
+def test_provider_host_pages_buffer_partial_records():
+    from gym.provider_health import ProviderHealth
+
+    error = _line({"type": "error", "message": "API Error: 503"}) + "\r\n"
+    chunks = [error[:13], error[13:] + error[:20], error[20:-1], "\n"]
+    offsets = []
+
+    def read(offset):
+        offsets.append(offset)
+        return _host_page(chunks[offset], offset + 1)
+
+    health = ProviderHealth(None, read_page=read)
+    assert [health.check() is not None for _ in chunks] == [False, False, False, True]
+    assert health.consecutive == 2
+    assert health.pending == b""
+    assert offsets == [0, 1, 2, 3]
+
+
+@pytest.mark.parametrize(
+    "bad_page",
+    [
+        {"status": "found", "text": "ignored"},
+        {"status": "found", "nextOffset": 99},
+        _host_page(None),
+        _host_page("ignored", "99"),
+        _host_page("ignored", -1),
+        None,
+    ],
+)
+def test_provider_malformed_host_page_preserves_cursor_and_warns_once(bad_page, caplog):
+    from gym.provider_health import ProviderHealth
+
+    health = ProviderHealth(
+        None,
+        read_page=lambda offset: bad_page,
+        offset=7,
+        pending=b"fragment",
+        generation="original",
+    )
+    assert health.check() is None
+    assert health.check() is None
+    assert (health.offset, health.pending, health.generation) == (
+        7,
+        b"fragment",
+        "original",
+    )
+    assert len(caplog.records) == 1
+    assert caplog.records[0].message == "Provider monitoring evidence unavailable"
+
+
+def test_provider_protocol_exception_preserves_fragment_until_recovery(caplog):
+    from gym.provider_health import ProviderHealth
+
+    class ProtocolError(Exception):
+        pass
+
+    event = _line({"type": "error", "message": "API Error: 503"}) + "\n"
+    responses = iter([ProtocolError("private transport details"), _host_page(event[10:], 2)])
+    offsets = []
+
+    def read(offset):
+        offsets.append(offset)
+        response = next(responses)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    health = ProviderHealth(None, read_page=read, offset=1, pending=event[:10].encode())
+    assert health.check() is None
+    assert health.offset == 1
+    assert health.check() is None
+    assert health.consecutive == 1
+    assert health.pending == b""
+    assert offsets == [1, 1]
+    assert "private transport details" not in caplog.text
+
+
+@pytest.mark.parametrize("reset", [{"reset": True}, {"generation": "two"}])
+@pytest.mark.parametrize("discarding", [False, True])
+def test_provider_host_reset_drops_old_partial_line(reset, discarding):
+    from gym.provider_health import ProviderHealth
+
+    health = ProviderHealth(
+        None,
+        read_page=lambda offset: _host_page("fresh\n", **reset),
+        pending=b"old",
+        generation="one",
+        discarding=discarding,
+    )
+    assert list(health._lines()) == [b"fresh"]
+    assert health.pending == b""
+    assert not health.discarding
+
+
+@pytest.mark.parametrize("host", [False, True])
+def test_provider_line_limit_discards_whole_record_and_recovers(tmp_path, monkeypatch, host):
+    from gym import provider_health
+
+    monkeypatch.setattr(provider_health, "_MAX_LINE", 8)
+    chunks = ["x" * 9, "tail\nok\n"]
+    pages = iter(_host_page(chunk, i + 1) for i, chunk in enumerate(chunks))
+    path = tmp_path / "stdout.log"
+    health = provider_health.ProviderHealth(
+        None if host else path, read_page=(lambda offset: next(pages)) if host else None
+    )
+    for chunk, expected in zip(chunks, [[], [b"ok"]]):
+        if not host:
+            with path.open("a") as stream:
+                stream.write(chunk)
+        assert list(health._lines()) == expected
+    assert health.pending == b""
+    assert not health.discarding
