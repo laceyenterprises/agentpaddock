@@ -16,7 +16,11 @@ import pytest
 from conftest import FIXTURES_DIR, TASKS_DIR
 
 from gym import cli, outcomes
-from gym.alerting import GYM_REGRESSION_ALERT_KEY, RecordingAlerter
+from gym.alerting import (
+    GYM_LEVEL_UNRESOLVED_ALERT_KEY,
+    GYM_REGRESSION_ALERT_KEY,
+    RecordingAlerter,
+)
 from gym.baseline import (
     baseline_document,
     cohort_key,
@@ -55,6 +59,12 @@ class MappingSource:
     def run(self, task):
         self.dispatched.append(task.id)
         return self.by_task[task.id]
+
+
+class RaisingAlerter(RecordingAlerter):
+    def emit(self, *, key, message, metadata):
+        super().emit(key=key, message=message, metadata=metadata)
+        raise RuntimeError("synthetic alert unavailable")
 
 
 class FakeResolver:
@@ -252,6 +262,132 @@ def test_unresolved_dispatched_level_alerts_even_without_a_regression(tmp_path):
     assert [alert["key"] for alert in alerter.alerts] == [
         GYM_LEVEL_UNRESOLVED_ALERT_KEY
     ]
+
+
+@pytest.mark.parametrize("scenario", ["unresolved", "regressions", "both"])
+@pytest.mark.parametrize("json_output", [True, False])
+def test_run_alert_failure_preserves_results(tmp_path, capsys, scenario, json_output):
+    level = "high" if scenario != "regressions" else None
+    task_ids = ["mini-pass"] if scenario == "unresolved" else ["mini-fail", "mini-pass"]
+    baseline_path = tmp_path / "baseline.json"
+    write_baseline(
+        baseline_path,
+        baseline_document(
+            {
+                verdict_key(
+                    task, "synthetic-model", reasoning_level=level
+                ): outcomes.PASSED
+                for task in task_ids
+            },
+            generated_at=_NOW,
+        ),
+    )
+    argv = [
+        "run",
+        "--suite",
+        "all",
+        "--model",
+        "synthetic-model",
+        "--tasks-dir",
+        str(MINI_SUITE),
+        "--locks-dir",
+        str(LOCKS_FIXTURE),
+        "--baseline",
+        str(baseline_path),
+        "--results-dir",
+        str(tmp_path / "results"),
+        "--taint-mode",
+        "enforce",
+    ]
+    if scenario == "unresolved":
+        argv += ["--task", "mini-pass"]
+    if level:
+        argv += ["--reasoning-level", level]
+    if json_output:
+        argv += ["--json"]
+    args = cli.build_parser().parse_args(argv)
+    expected_keys = ([GYM_LEVEL_UNRESOLVED_ALERT_KEY] if level else []) + (
+        []
+        if scenario == "unresolved"
+        else [GYM_REGRESSION_ALERT_KEY] * (2 if level is None else 1)
+    )
+    reference = None
+    reference_alerts = None
+    for alerter in (RecordingAlerter(), RaisingAlerter()):
+        source = MappingSource(
+            {
+                task: Trajectory(
+                    terminal_status="succeeded",
+                    launch_request_id=f"synthetic-run-{index}",
+                    submitted_result={
+                        "answer": "ok" if scenario == "unresolved" else "bad"
+                    },
+                    resolved_reasoning_level=None if task == "mini-pass" else level,
+                )
+                for index, task in enumerate(task_ids)
+            }
+        )
+        out = io.StringIO()
+        code = cli.cmd_run(
+            args,
+            source=source,
+            alerter=alerter,
+            resolver=FakeResolver(_FIXTURE_SURFACE),
+            out=out,
+        )
+        assert code == (
+            cli.EXIT_ERROR if scenario == "unresolved" else cli.EXIT_REGRESSION
+        )
+        assert sorted(source.dispatched) == task_ids
+        assert [alert["key"] for alert in alerter.alerts] == expected_keys
+        undelivered = (
+            [
+                {"key": key, "reason": "synthetic alert unavailable"}
+                for key in expected_keys
+            ]
+            if isinstance(alerter, RaisingAlerter)
+            else []
+        )
+        stderr_lines = capsys.readouterr().err.splitlines()
+        assert stderr_lines == [
+            f"[hq gym] alert undelivered: {failure['key']}: {failure['reason']}"
+            for failure in undelivered
+        ]
+        if json_output:
+            payload = json.loads(out.getvalue())
+            assert payload.pop("alerts_undelivered") == undelivered
+            saved = json.loads(Path(payload.pop("result_path")).read_text())
+            assert saved["summary"]["cells"] == payload["cells"]
+            assert payload["tasks"] == len(task_ids)
+            assert payload["model"] == "synthetic-model"
+            assert payload["regression"]["established"] is True
+            assert len(payload["regression"]["regressions"]) == expected_keys.count(
+                GYM_REGRESSION_ALERT_KEY
+            )
+            observed = payload
+        else:
+            lines = out.getvalue().splitlines()
+            assert lines[0].startswith("[gym-scheduled] suite=all")
+            assert f"{len(task_ids)} tasks" in lines[0]
+            assert sum(
+                "  REGRESSION:" in line for line in lines
+            ) == expected_keys.count(GYM_REGRESSION_ALERT_KEY)
+            assert [
+                line for line in lines if line.startswith("  alert undelivered:")
+            ] == [
+                f"  alert undelivered: {failure['key']}: {failure['reason']}"
+                for failure in undelivered
+            ]
+            observed = [
+                line
+                for line in lines
+                if not line.startswith(("  alert undelivered:", "  results stored"))
+            ]
+        if reference is None:
+            reference, reference_alerts = observed, alerter.alerts
+        else:
+            assert observed == reference
+            assert alerter.alerts == reference_alerts
 
 
 def test_model_ids_with_an_effort_segment_are_refused():
