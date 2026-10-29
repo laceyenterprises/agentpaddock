@@ -257,7 +257,7 @@ class Builder:
 
 
 def _load(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(leaderboard.read_document_text(path))
 
 
 def unlaunched_id(source: str, row: dict[str, Any], *fields: str) -> str:
@@ -431,6 +431,7 @@ SOURCES = (
 
 def build(reports: Path, results: Path) -> dict[str, str]:
     """``{file name: text}`` for every imported document."""
+    paths = leaderboard.result_paths(results)
 
     def price_table(date: str) -> leaderboard.PriceTable:
         raw = _load(results / "prices" / f"{date}.json")
@@ -449,7 +450,7 @@ def build(reports: Path, results: Path) -> dict[str, str]:
         existing_run_ids = {
             record["run_id"] for document in documents for record in document["records"]
         }
-        for path in results.glob("*.json"):
+        for path in paths:
             document = _load(path)
             if document["id"] != "eval-bench":
                 existing_run_ids.update(
@@ -468,9 +469,10 @@ def build(reports: Path, results: Path) -> dict[str, str]:
                 file=sys.stderr,
             )
     return {
-        f"{document['date']}-{document['id']}.json": leaderboard.render_document(
-            document
-        )
+        f"{document['date']}-{document['id']}.json"
+        + (
+            ".gz" if document["id"] == "eval-bench" else ""
+        ): leaderboard.render_document(document)
         for document in documents
     }
 
@@ -483,13 +485,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--results", type=Path, default=leaderboard.DEFAULT_RESULTS)
     parser.add_argument("--check", action="store_true", help="fail if results/ differs")
     args = parser.parse_args(argv)
-    files = build(args.reports, args.results)
+    try:
+        files = build(args.reports, args.results)
+    except (OSError, ValueError) as exc:
+        print(f"cannot import results: {exc}", file=sys.stderr)
+        return 1
     if args.check:
         stale = [
             name
             for name, text in files.items()
             if not (args.results / name).is_file()
-            or (args.results / name).read_text(encoding="utf-8") != text
+            or _differs(args.results / name, text)
         ]
         if stale:
             print(
@@ -499,9 +505,16 @@ def main(argv: list[str] | None = None) -> int:
         print("results/ matches the import")
         return 0
     for name, text in files.items():
-        (args.results / name).write_text(text, encoding="utf-8")
+        leaderboard.write_document(args.results / name, json.loads(text))
     print("Imported: " + ", ".join(sorted(files)))
     return 0
+
+
+def _differs(path: Path, text: str) -> bool:
+    try:
+        return leaderboard.read_document_text(path) != text
+    except (OSError, ValueError):
+        return True
 
 
 if __name__ == "__main__":

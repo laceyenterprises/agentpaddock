@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import gzip
 import json
 import shutil
 import subprocess
@@ -39,13 +40,109 @@ def _errors(results: Path) -> str:
 def test_committed_results_validate():
     loaded = lb.load_results()
     assert loaded.documents and loaded.records
-    assert all(record["cost"]["source"] in lb.PRICE_SOURCES for record in loaded.records)
+    assert all(
+        record["cost"]["source"] in lb.PRICE_SOURCES for record in loaded.records
+    )
 
 
 def test_fixture_results_validate():
     loaded = lb.load_results(FIXTURE)
     assert len(loaded.records) == 14
     assert set(loaded.price_tables) == {"2026-01-02"}
+
+
+def test_gzip_results_load_equal_to_plain_results(results):
+    plain = lb.load_results(results)
+    path = results / FIXTURE_DOC
+    compressed = path.with_suffix(".json.gz")
+    lb.write_document(compressed, plain.documents[path.name])
+    path.unlink()
+    loaded = lb.load_results(results)
+    assert loaded.records == plain.records
+    assert loaded.price_tables == plain.price_tables
+    assert loaded.changelog == plain.changelog
+    assert loaded.fairness == plain.fairness
+    assert list(loaded.documents) == [compressed.name]
+    assert loaded.documents[compressed.name] == plain.documents[path.name]
+
+
+def test_both_results_storage_forms_are_rejected(results):
+    path = results / FIXTURE_DOC
+    path.with_suffix(".json.gz").write_bytes(gzip.compress(path.read_bytes()))
+    message = _errors(results)
+    assert "duplicate results document" in message
+    assert FIXTURE_DOC in message and FIXTURE_DOC + ".gz" in message
+
+
+@pytest.mark.parametrize(
+    "content", [b"not gzip", b"\x1f\x8bcorrupt", gzip.compress(b"{}")[:-1]]
+)
+def test_corrupt_gzip_results_name_the_file(results, content):
+    path = results / (FIXTURE_DOC + ".gz")
+    (results / FIXTURE_DOC).unlink()
+    path.write_bytes(content)
+    assert f"{path.name}: cannot read:" in _errors(results)
+
+
+def test_gzip_results_over_64_mib_are_rejected(results):
+    assert lb.MAX_DECOMPRESSED_BYTES == 64 * 1024 * 1024
+    path = results / (FIXTURE_DOC + ".gz")
+    (results / FIXTURE_DOC).unlink()
+    path.write_bytes(gzip.compress(b" " * (lb.MAX_DECOMPRESSED_BYTES + 1)))
+    message = _errors(results)
+    assert path.name in message and "64 MiB" in message
+
+
+def test_gzip_writer_is_deterministic_and_preserves_plain_text(tmp_path):
+    document = lb.load_results(FIXTURE).documents[FIXTURE_DOC]
+    first, second = tmp_path / "first.json.gz", tmp_path / "second.json.gz"
+    lb.write_document(first, document)
+    lb.write_document(second, document)
+    content = first.read_bytes()
+    assert content == second.read_bytes()
+    assert content[:3] == b"\x1f\x8b\x08"
+    assert content[3] & 8 == 0  # No stored file name.
+    assert content[4:8] == b"\0" * 4  # mtime zero.
+    assert content[8] == 2  # Maximum compression level.
+    plain = tmp_path / "plain.json"
+    lb.write_document(plain, document)
+    assert (
+        gzip.decompress(content)
+        == plain.read_bytes()
+        == lb.render_document(document).encode("utf-8")
+    )
+
+
+def test_duplicate_run_ids_span_plain_and_gzip_documents(results):
+    document = lb.load_results(results).documents[FIXTURE_DOC]
+    document["id"] = "fixture-copy"
+    lb.write_document(results / "2026-01-03-fixture-copy.json.gz", document)
+    assert "appears in 2 records" in _errors(results)
+
+
+def test_results_storage_forms_load_in_combined_sorted_order(results):
+    document = lb.load_results(results).documents[FIXTURE_DOC]
+    expected = []
+    for id, suffix in [("zzz", ".json"), ("aaa", ".json.gz")]:
+        other = copy.deepcopy(document)
+        other["id"] = id
+        for record in other["records"]:
+            record["run_id"] += ":" + id
+        name = f"2026-01-03-{id}{suffix}"
+        lb.write_document(results / name, other)
+        expected.append(name)
+    loaded = lb.load_results(results)
+    assert list(loaded.documents) == sorted([FIXTURE_DOC, *expected])
+
+
+def test_gzip_filename_must_match_the_document(results):
+    path = results / (FIXTURE_DOC + ".gz")
+    document = lb.load_results(results).documents[FIXTURE_DOC]
+    document["id"] = "different-id"
+    (results / FIXTURE_DOC).unlink()
+    lb.write_document(path, document)
+    message = _errors(results)
+    assert path.name in message and "file name must be" in message
 
 
 def _evidenced_fairness():

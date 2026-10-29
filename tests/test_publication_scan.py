@@ -7,12 +7,15 @@ scan refuses: it ships in the tree the scan gates.
 from __future__ import annotations
 
 import errno
+import gzip
 import json
 import shlex
 import subprocess
 from pathlib import Path
 
 import pytest
+
+import leaderboard as lb
 
 import publication_scan as scan
 
@@ -52,6 +55,75 @@ def test_each_category_is_refused(category, rule, line):
     findings = scan.scan_text(f"prefix\n{line}\n", "fixture.txt")
     assert (category, rule) in {(f.category, f.rule) for f in findings}
     assert all(f.line == 2 and f.path == "fixture.txt" for f in findings)
+
+
+@pytest.mark.parametrize(
+    ("category", "rule", "line"), OFFENDING, ids=[r for _, r, _ in OFFENDING]
+)
+def test_gzip_content_has_the_same_findings_as_plain_text(
+    tmp_path, category, rule, line
+):
+    text = f"prefix\n{line}\n"
+    path = tmp_path / "fixture.gz"
+    path.write_bytes(gzip.compress(text.encode("utf-8")))
+    assert scan.scan_tree(tmp_path) == scan.scan_text(text, path.name)
+
+
+@pytest.mark.parametrize("storage", ["tree", "index", "commit"])
+@pytest.mark.parametrize("suffix", [".gz", ".bin"])
+def test_gzip_forbidden_content_is_scanned_by_magic(tmp_path, storage, suffix):
+    path = tmp_path / ("fixture" + suffix)
+    text = "prefix\n" + "gh" + "p_" + "Q" * 40 + "\n"
+    path.write_bytes(gzip.compress(text.encode()))
+    if storage != "tree":
+        subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+        subprocess.run(["git", "-C", str(tmp_path), "add", path.name], check=True)
+        if storage == "commit":
+            _commit(tmp_path, "synthetic compressed fixture")
+            subprocess.run(
+                ["git", "-C", str(tmp_path), "rm", "-q", path.name], check=True
+            )
+            _commit(tmp_path, "remove synthetic fixture")
+        else:
+            path.unlink()
+    findings = scan.scan_tree(tmp_path, tracked_only=storage != "tree")
+    assert len(findings) == 1
+    finding = findings[0]
+    assert (
+        finding.path,
+        finding.line,
+        finding.column,
+        finding.category,
+        finding.rule,
+    ) == (path.name, 2, 1, "secret", "github-token")
+    assert (finding.blob is not None) == (storage != "tree")
+
+
+@pytest.mark.parametrize("tracked", [False, True])
+@pytest.mark.parametrize(
+    "content", [b"not gzip", b"\x1f\x8bcorrupt", gzip.compress(b"ok")[:-1]]
+)
+def test_corrupt_gzip_is_a_finding(tmp_path, content, tracked):
+    path = tmp_path / "fixture.gz"
+    path.write_bytes(content)
+    if tracked:
+        subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+        subprocess.run(["git", "-C", str(tmp_path), "add", path.name], check=True)
+    findings = scan.scan_tree(tmp_path, tracked_only=tracked)
+    assert len(findings) == 1
+    assert findings[0].category == "gzip"
+    assert findings[0].rule == "invalid-or-oversized-gzip"
+    assert (findings[0].blob is not None) == tracked
+
+
+def test_gzip_cap_covers_concatenated_members(tmp_path, monkeypatch):
+    monkeypatch.setattr(lb, "MAX_DECOMPRESSED_BYTES", 32)
+    path = tmp_path / "fixture.gz"
+    path.write_bytes(gzip.compress(b"x" * 16) + gzip.compress(b"y" * 16))
+    assert scan.scan_tree(tmp_path) == []
+    path.write_bytes(path.read_bytes() + gzip.compress(b"z"))
+    findings = scan.scan_tree(tmp_path)
+    assert len(findings) == 1 and findings[0].category == "gzip"
 
 
 @pytest.mark.parametrize(
@@ -210,11 +282,13 @@ def _commit(root, message):
 
 @pytest.mark.parametrize("script", ["publication_scan.py", "internal_note_guard.py"])
 @pytest.mark.parametrize("cleanup", ["edit", "delete", "stage", "commit"])
-def test_committed_content_cannot_be_hidden(tmp_path, script, cleanup):
+@pytest.mark.parametrize("compressed", [False, True])
+def test_committed_content_cannot_be_hidden(tmp_path, script, cleanup, compressed):
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, capture_output=True)
     path = tmp_path / "tracked\tfile\n.bin"
     payload = "gh" + "p_" + "Q" * 40 + "\nReviewer " + "verdict: approve\n"
-    path.write_bytes(b"\x00\xff" + payload.encode())
+    content = b"\x00\xff" + payload.encode()
+    path.write_bytes(gzip.compress(content) if compressed else content)
     subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
     _commit(tmp_path, "fixture")
     if cleanup == "delete":

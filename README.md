@@ -363,6 +363,7 @@ The open leaderboard is built only from the committed `results/` tree:
 | Path | What it holds |
 |---|---|
 | `results/<date>-<id>.json` | one results document per run bundle or import; each record is one cell (one graded attempt of one task by one harness configuration and model) |
+| `results/<date>-<id>.json.gz` | use for a document whose text would make a pull request diff larger than about 200 KB; write with `leaderboard.write_document` for deterministic gzip (level 9, mtime 0, no stored file name) |
 | `results/prices/<date>.json` | dated price tables; every price's `source` is `provider-invoice-reconciled`, `published-rate` or `unknown` |
 | `results/meta/changelog.json` | the grading changelog; each entry states its comparability boundary and the `excludedBecause` tag (`pre-<ID>`) it puts on voided rows |
 | `results/meta/fairness.json` | the harness-configuration fairness checklist and per-harness audit status (SPEC R8) |

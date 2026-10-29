@@ -32,6 +32,7 @@ import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from leaderboard import CompressionError, decompress_content
 from publication_scan import iter_file_contents
 
 #: ``(rule, regex)`` over file content.
@@ -84,10 +85,20 @@ def check_tree(root: Path, *, tracked_only: bool = False) -> list[Finding]:
     for path, content, oid in iter_file_contents(root, tracked_only=tracked_only):
         relative = path.relative_to(root).as_posix()
         findings.extend(
-            Finding(relative, 0, rule, oid) for rule, regex in ARTIFACT_NAMES if regex.match(path.name)
+            Finding(relative, 0, rule, oid)
+            for rule, regex in ARTIFACT_NAMES
+            if regex.match(path.name)
         )
-        text = content.decode("utf-8", errors="replace")
-        findings.extend(replace(finding, blob=oid) for finding in check_text(text, relative))
+        try:
+            text = decompress_content(
+                content, gzip_required=path.name.endswith(".gz")
+            ).decode("utf-8", errors="replace")
+        except CompressionError:
+            findings.append(Finding(relative, 0, "invalid-or-oversized-gzip", oid))
+        else:
+            findings.extend(
+                replace(finding, blob=oid) for finding in check_text(text, relative)
+            )
     return findings
 
 

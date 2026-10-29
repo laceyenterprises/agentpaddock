@@ -27,12 +27,15 @@ Stdlib only, so it runs with nothing installed.
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import importlib.util
+import io
 import json
 import math
 import re
 import sys
+import zlib
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -67,7 +70,7 @@ CHANGE_KINDS = ("grading", "harness", "task", "infrastructure", "pricing")
 AUDIT_STATUSES = ("pending", "audited", "passed", "failed")
 CHECK_STATUSES = ("pass", "fail", "not-verifiable")
 
-RESULT_NAME = re.compile(r"^(\d{4}-\d{2}-\d{2})-([a-z0-9][a-z0-9.-]*)\.json$")
+RESULT_NAME = re.compile(r"^(\d{4}-\d{2}-\d{2})-([a-z0-9][a-z0-9.-]*)\.json(?:\.gz)?$")
 PRICE_NAME = re.compile(r"^(\d{4}-\d{2}-\d{2})\.json$")
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 CONFIG_HASH = re.compile(r"^sha256:[0-9a-f]{64}$")
@@ -119,6 +122,35 @@ class ResultsError(ValueError):
 
 
 # ---------------------------------------------------------------- helpers
+
+
+MAX_DECOMPRESSED_BYTES = 64 * 1024 * 1024
+
+
+class CompressionError(ValueError):
+    """Compressed content cannot be safely read."""
+
+
+def decompress_content(content: bytes, *, gzip_required: bool = False) -> bytes:
+    """Inflate gzip by magic bytes or required suffix, with a 64 MiB output cap."""
+    if not gzip_required and not content.startswith(b"\x1f\x8b"):
+        return content
+    if not content.startswith(b"\x1f\x8b"):
+        raise CompressionError("invalid gzip header")
+    try:
+        with gzip.GzipFile(fileobj=io.BytesIO(content), mode="rb") as stream:
+            decoded = stream.read(MAX_DECOMPRESSED_BYTES + 1)
+    except (OSError, EOFError, zlib.error) as exc:
+        raise CompressionError("cannot decompress gzip content") from exc
+    if len(decoded) > MAX_DECOMPRESSED_BYTES:
+        raise CompressionError("gzip content exceeds the 64 MiB decompressed size cap")
+    return decoded
+
+
+def read_document_text(path: Path) -> str:
+    return decompress_content(
+        path.read_bytes(), gzip_required=path.name.endswith(".gz")
+    ).decode("utf-8")
 
 
 def canonical_json(value: Any) -> str:
@@ -428,16 +460,26 @@ def validate_document(
     if raw["schema"] != SCHEMA:
         errors.append(f"{name}: schema must be {SCHEMA}")
     if not match or (raw["date"], raw["id"]) != match.groups():
-        errors.append(f"{name}: file name must be <date>-<id>.json from its date and id")
+        errors.append(
+            f"{name}: file name must be <date>-<id>.json or <date>-<id>.json.gz from its date and id"
+        )
     source = raw["source"]
     if _keys(f"{name}: source", source, SOURCE_KEYS, errors):
         if source["kind"] not in SOURCE_KINDS:
-            errors.append(f"{name}: source.kind must be one of {', '.join(SOURCE_KINDS)}")
+            errors.append(
+                f"{name}: source.kind must be one of {', '.join(SOURCE_KINDS)}"
+            )
         if not (_text(source["description"]) and _text(source["evidence"])):
             errors.append(f"{name}: source needs a description and its evidence")
-    table = price_tables.get(raw["price_table"]) if isinstance(raw["price_table"], str) else None
+    table = (
+        price_tables.get(raw["price_table"])
+        if isinstance(raw["price_table"], str)
+        else None
+    )
     if table is None:
-        errors.append(f"{name}: price_table {raw['price_table']!r} is not in results/prices/")
+        errors.append(
+            f"{name}: price_table {raw['price_table']!r} is not in results/prices/"
+        )
     configs = raw["harness_configs"]
     if not isinstance(configs, dict):
         errors.append(f"{name}: harness_configs must be an object")
@@ -575,10 +617,24 @@ class Results:
 
 def _read_json(path: Path, errors: list[str], label: str) -> Any:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        return json.loads(read_document_text(path))
+    except (OSError, ValueError) as exc:
         errors.append(f"{label}: cannot read: {exc}")
         return None
+
+
+def result_paths(results_dir: Path) -> list[Path]:
+    """Sorted results paths, rejecting two storage forms of the same document."""
+    paths = sorted([*results_dir.glob("*.json"), *results_dir.glob("*.json.gz")])
+    names = {path.name for path in paths}
+    duplicates = [
+        f"{path.name} and {path.name}.gz: duplicate results document"
+        for path in paths
+        if path.name.endswith(".json") and path.name + ".gz" in names
+    ]
+    if duplicates:
+        raise ResultsError("\n".join(duplicates))
+    return paths
 
 
 def load_results(results_dir: Path = DEFAULT_RESULTS) -> Results:
@@ -598,7 +654,9 @@ def load_results(results_dir: Path = DEFAULT_RESULTS) -> Results:
     )
     if changelog_raw is not None:
         errors.extend(validate_changelog(changelog_raw))
-    changelog = changelog_raw.get("entries", []) if isinstance(changelog_raw, dict) else []
+    changelog = (
+        changelog_raw.get("entries", []) if isinstance(changelog_raw, dict) else []
+    )
     if not isinstance(changelog, list):
         changelog = []
     tags = {
@@ -606,16 +664,20 @@ def load_results(results_dir: Path = DEFAULT_RESULTS) -> Results:
         for entry in changelog
         if isinstance(entry, dict) and _text(entry.get("excludes"))
     }
-    fairness = _read_json(results_dir / "meta" / "fairness.json", errors, "meta/fairness.json")
+    fairness = _read_json(
+        results_dir / "meta" / "fairness.json", errors, "meta/fairness.json"
+    )
     if fairness is not None:
         errors.extend(validate_fairness(fairness))
     documents: dict[str, dict[str, Any]] = {}
     run_ids: Counter[str] = Counter()
-    for path in sorted(results_dir.glob("*.json")):
+    for path in result_paths(results_dir):
         raw = _read_json(path, errors, path.name)
         if raw is None:
             continue
-        problems = validate_document(path.name, raw, price_tables=tables, exclusion_tags=tags)
+        problems = validate_document(
+            path.name, raw, price_tables=tables, exclusion_tags=tags
+        )
         errors.extend(problems)
         if not problems:
             documents[path.name] = raw
@@ -629,12 +691,23 @@ def load_results(results_dir: Path = DEFAULT_RESULTS) -> Results:
     )
     if errors:
         raise ResultsError("\n".join(errors))
-    records = [record for document in documents.values() for record in document["records"]]
+    records = [
+        record for document in documents.values() for record in document["records"]
+    ]
     return Results(documents, tables, changelog, fairness or {}, records)
 
 
 def write_document(path: Path, document: Mapping[str, Any]) -> None:
-    path.write_text(render_document(document), encoding="utf-8")
+    """Write plain JSON or deterministic gzip, selected by the storage suffix."""
+    text = render_document(document)
+    if path.name.endswith(".json.gz"):
+        with path.open("wb") as output:
+            with gzip.GzipFile(
+                filename="", mode="wb", fileobj=output, compresslevel=9, mtime=0
+            ) as stream:
+                stream.write(text.encode("utf-8"))
+    else:
+        path.write_text(text, encoding="utf-8")
 
 
 def render_document(document: Mapping[str, Any]) -> str:
