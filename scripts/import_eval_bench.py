@@ -505,7 +505,14 @@ def main(argv: list[str] | None = None) -> int:
         print("results/ matches the import")
         return 0
     for name, text in files.items():
-        leaderboard.write_document(args.results / name, json.loads(text))
+        path = args.results / name
+        leaderboard.write_document_text(path, text)
+        sibling = (
+            path.with_suffix("")
+            if name.endswith(".gz")
+            else path.with_name(name + ".gz")
+        )
+        sibling.unlink(missing_ok=True)
     print("Imported: " + ", ".join(sorted(files)))
     return 0
 

@@ -113,6 +113,58 @@ def test_gzip_writer_is_deterministic_and_preserves_plain_text(tmp_path):
     )
 
 
+def test_gzip_content_requires_gzip_results_extension(results):
+    path = results / FIXTURE_DOC
+    path.write_bytes(gzip.compress(path.read_bytes()))
+    message = _errors(results)
+    assert f"{path.name}: cannot read:" in message
+    assert "require a .json.gz extension" in message
+
+
+@pytest.mark.parametrize("suffix", [".json", ".json.gz"])
+@pytest.mark.parametrize("existing", [False, True])
+def test_failed_atomic_replace_preserves_destination(
+    tmp_path, monkeypatch, suffix, existing
+):
+    path = tmp_path / ("document" + suffix)
+    document = lb.load_results(FIXTURE).documents[FIXTURE_DOC]
+    if existing:
+        lb.write_document(path, document)
+    previous = path.read_bytes() if existing else None
+
+    def fail_replace(source, destination):
+        # The staged document is complete before the destination is touched.
+        content = source.read_bytes()
+        if suffix.endswith(".gz"):
+            content = gzip.decompress(content)
+        assert content == lb.render_document(document).encode("utf-8")
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+    with pytest.raises(OSError, match="replace failed"):
+        lb.write_document(path, document)
+    assert (path.read_bytes() if path.exists() else None) == previous
+    assert list(tmp_path.iterdir()) == ([path] if existing else [])
+
+
+def test_failed_gzip_stream_preserves_destination(tmp_path, monkeypatch):
+    path = tmp_path / "document.json.gz"
+    document = lb.load_results(FIXTURE).documents[FIXTURE_DOC]
+    lb.write_document(path, document)
+    previous = path.read_bytes()
+    original_write = gzip.GzipFile.write
+
+    def fail_write(stream, content):
+        original_write(stream, content[:10])
+        raise OSError("disk full")
+
+    monkeypatch.setattr(gzip.GzipFile, "write", fail_write)
+    with pytest.raises(OSError, match="disk full"):
+        lb.write_document(path, document)
+    assert path.read_bytes() == previous
+    assert list(tmp_path.iterdir()) == [path]
+
+
 def test_duplicate_run_ids_span_plain_and_gzip_documents(results):
     document = lb.load_results(results).documents[FIXTURE_DOC]
     document["id"] = "fixture-copy"

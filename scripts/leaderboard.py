@@ -35,6 +35,7 @@ import json
 import math
 import re
 import sys
+import tempfile
 import zlib
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -148,9 +149,12 @@ def decompress_content(content: bytes, *, gzip_required: bool = False) -> bytes:
 
 
 def read_document_text(path: Path) -> str:
-    return decompress_content(
-        path.read_bytes(), gzip_required=path.name.endswith(".gz")
-    ).decode("utf-8")
+    content = path.read_bytes()
+    if path.name.endswith(".gz"):
+        content = decompress_content(content, gzip_required=True)
+    elif content.startswith(b"\x1f\x8b"):
+        raise CompressionError("gzip results documents require a .json.gz extension")
+    return content.decode("utf-8")
 
 
 def canonical_json(value: Any) -> str:
@@ -698,16 +702,33 @@ def load_results(results_dir: Path = DEFAULT_RESULTS) -> Results:
 
 
 def write_document(path: Path, document: Mapping[str, Any]) -> None:
-    """Write plain JSON or deterministic gzip, selected by the storage suffix."""
-    text = render_document(document)
-    if path.name.endswith(".json.gz"):
-        with path.open("wb") as output:
-            with gzip.GzipFile(
-                filename="", mode="wb", fileobj=output, compresslevel=9, mtime=0
-            ) as stream:
-                stream.write(text.encode("utf-8"))
-    else:
-        path.write_text(text, encoding="utf-8")
+    """Render and atomically write plain JSON or deterministic gzip."""
+    write_document_text(path, render_document(document))
+
+
+def write_document_text(path: Path, text: str) -> None:
+    """Atomically write rendered JSON text, compressing for a .json.gz suffix."""
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as output:
+            temporary = Path(output.name)
+            if path.name.endswith(".json.gz"):
+                with gzip.GzipFile(
+                    filename="", mode="wb", fileobj=output, compresslevel=9, mtime=0
+                ) as stream:
+                    stream.write(text.encode("utf-8"))
+            else:
+                output.write(text.encode("utf-8"))
+        temporary.replace(path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def render_document(document: Mapping[str, Any]) -> str:

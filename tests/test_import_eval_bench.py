@@ -516,7 +516,12 @@ def test_registered_v2_source_builds_with_deduplication_and_current_prices(
         in capsys.readouterr().err
     )
     args = ["--reports", str(reports), "--results", str(results)]
+    # A prior plain import must migrate without leaving duplicate storage forms.
+    prior = results / output_name.removesuffix(".gz")
+    prior.write_text(files[output_name], encoding="utf-8")
+    assert import_eval_bench.main(args + ["--check"]) == 1
     assert import_eval_bench.main(args) == 0
+    assert not prior.exists()
     output = results / output_name
     assert output.read_bytes().startswith(b"\x1f\x8b")
     for name, text in files.items():
@@ -631,3 +636,44 @@ def test_haiku_price_table_preserves_previous_entries_and_note():
             "source": "published-rate",
         },
     }
+
+
+@pytest.mark.parametrize("suffix", [".json", ".json.gz"])
+def test_import_writes_rendered_text_and_removes_alternate_storage(
+    tmp_path, monkeypatch, suffix
+):
+    name = "2026-10-18-eval-bench" + suffix
+    text = '{ "id": "eval-bench", "records": [] }\n'
+    monkeypatch.setattr(import_eval_bench, "build", lambda *_: {name: text})
+
+    def no_json_round_trip(*_):
+        pytest.fail("rendered document must not be parsed or rendered again")
+
+    monkeypatch.setattr(import_eval_bench.json, "loads", no_json_round_trip)
+    monkeypatch.setattr(lb, "render_document", no_json_round_trip)
+    sibling = tmp_path / (
+        name.removesuffix(".gz") if suffix.endswith(".gz") else name + ".gz"
+    )
+    sibling.write_bytes(b"previous document")
+    assert (
+        import_eval_bench.main(["--reports", str(tmp_path), "--results", str(tmp_path)])
+        == 0
+    )
+    assert lb.read_document_text(tmp_path / name) == text
+    assert not sibling.exists()
+
+
+def test_import_failed_migration_preserves_plain_sibling(tmp_path, monkeypatch):
+    name = "2026-10-18-eval-bench.json.gz"
+    monkeypatch.setattr(import_eval_bench, "build", lambda *_: {name: "{}\n"})
+    sibling = tmp_path / name.removesuffix(".gz")
+    sibling.write_bytes(b"previous document")
+
+    def fail_write(*_):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(lb, "write_document_text", fail_write)
+    with pytest.raises(OSError, match="disk full"):
+        import_eval_bench.main(["--reports", str(tmp_path), "--results", str(tmp_path)])
+    assert sibling.read_bytes() == b"previous document"
+    assert not (tmp_path / name).exists()
