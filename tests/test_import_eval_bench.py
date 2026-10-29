@@ -33,15 +33,20 @@ SCRUBBED = {
 
 
 @pytest.fixture(scope="module")
-def records() -> list[dict]:
-    return lb.load_results().records
+def legacy_records() -> list[dict]:
+    return [
+        record
+        for document in lb.load_results().documents.values()
+        if document["id"] != "eval-bench"
+        for record in document["records"]
+    ]
 
 
 @needs_reports
 def test_import_reproduces_the_committed_results():
     files = import_eval_bench.build(REPORTS, lb.DEFAULT_RESULTS)
     for name, text in files.items():
-        assert (lb.DEFAULT_RESULTS / name).read_text(encoding="utf-8") == text, name
+        assert lb.read_document_text(lb.DEFAULT_RESULTS / name) == text, name
 
 
 def _cells(records, suite):
@@ -65,8 +70,8 @@ def _by_model(cells):
     return {key: (merged[key], totals[key]) for key in totals}
 
 
-def test_docs_board_matches_the_published_leaderboard(records):
-    docs = _by_model(_cells(records, "docs"))
+def test_docs_board_matches_the_published_leaderboard(legacy_records):
+    docs = _by_model(_cells(legacy_records, "docs"))
     assert docs == {
         ("claude-code", "fireworks/qwen3.8-max"): (7, 18),
         ("claude-code", "anthropic/claude-sonnet-5-5"): (4, 12),
@@ -79,15 +84,15 @@ def test_docs_board_matches_the_published_leaderboard(records):
     }
 
 
-def test_hard_suites_match_the_hrf_report(records):
-    assert _by_model(_cells(records, "hard-review")) == {
+def test_hard_suites_match_the_hrf_report(legacy_records):
+    assert _by_model(_cells(legacy_records, "hard-review")) == {
         ("codex", "openai/gpt-6.1-sol"): (5, 6),
         ("antigravity", "google/gemini-3.1-pro"): (4, 6),
         ("claude-code", "fireworks/qwen3.8-max"): (7, 9),
         ("claude-code", "zai/glm-5.2"): (4, 4),
         ("opencode", "together/deepseek-v4.1-flash"): (7, 7),
     }
-    assert _by_model(_cells(records, "hard-fix")) == {
+    assert _by_model(_cells(legacy_records, "hard-fix")) == {
         ("codex", "openai/gpt-6.1-sol"): (6, 6),
         ("antigravity", "google/gemini-3.1-pro"): (5, 6),
         ("claude-code", "fireworks/qwen3.8-max"): (6, 6),
@@ -117,22 +122,22 @@ def test_open_weight_matrix_matches_the_ossharn_report():
     ]
 
 
-def test_every_exclusion_survives_the_import(records):
-    tags = Counter(r["excludedBecause"] for r in records if r["excludedBecause"])
+def test_every_exclusion_survives_the_import(legacy_records):
+    tags = Counter(r["excludedBecause"] for r in legacy_records if r["excludedBecause"])
     assert tags["pre-GYMDOCS-01"] == 35
     assert tags["pre-GYMAGY-02"] == 11
     assert tags["pre-RFDFIX-01"] == 6
     assert tags["infra:source_infra_list"] == 5
     assert all(
         r["excludedBecause"].startswith("infra:")
-        for r in records
+        for r in legacy_records
         if r["verdict"] in lb.INFRA_VERDICTS
     )
 
 
-def test_imported_rows_are_graded_task_versions_and_unmeasured(records):
+def test_imported_rows_are_graded_task_versions_and_unmeasured(legacy_records):
     tasks_dir = MODULE_ROOT / "tasks"
-    for record in records:
+    for record in legacy_records:
         task = tomllib.loads(
             (tasks_dir / record["task"] / "task.toml").read_text("utf-8")
         )
@@ -141,7 +146,7 @@ def test_imported_rows_are_graded_task_versions_and_unmeasured(records):
         assert record["task_version"] <= task["task_version"]
         assert record["tokens"] == {"input": None, "cache": None, "output": None}
         assert record["cost"]["source"] == lb.UNKNOWN and record["cost"]["usd"] is None
-    assert {r["task"] for r in records} & SCRUBBED == SCRUBBED
+    assert {r["task"] for r in legacy_records} & SCRUBBED == SCRUBBED
 
 
 @pytest.mark.parametrize(
