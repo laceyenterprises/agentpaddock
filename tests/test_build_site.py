@@ -102,9 +102,11 @@ def test_pages_show_boards_matrix_tasks_changelog_and_methodology():
     assert 'id="fairness"' in methodology and "Vendor-default tools." in methodology
 
 
-def test_committed_results_chart_says_tokens_are_not_measured():
+def test_committed_results_chart_shows_measured_tokens():
     matrix = build_site.build(lb.DEFAULT_RESULTS)["matrix.html"]
-    assert "No board row in results/ has complete token measurements yet." in matrix
+    assert "No board row in results/ has complete token measurements yet." not in matrix
+    assert 'aria-label="Tokens per pass by board row"' in matrix
+    assert '<path class="bar"' in matrix
 
 
 def test_committed_fairness_findings_and_sources_are_rendered():

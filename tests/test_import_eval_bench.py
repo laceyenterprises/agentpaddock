@@ -33,15 +33,30 @@ SCRUBBED = {
 
 
 @pytest.fixture(scope="module")
-def records() -> list[dict]:
-    return lb.load_results().records
+def result_store():
+    return lb.load_results()
+
+
+@pytest.fixture(scope="module")
+def records(result_store) -> list[dict]:
+    return result_store.records
+
+
+@pytest.fixture(scope="module")
+def legacy_records(result_store) -> list[dict]:
+    return [
+        record
+        for document in result_store.documents.values()
+        if document["id"] != "eval-bench"
+        for record in document["records"]
+    ]
 
 
 @needs_reports
 def test_import_reproduces_the_committed_results():
     files = import_eval_bench.build(REPORTS, lb.DEFAULT_RESULTS)
     for name, text in files.items():
-        assert (lb.DEFAULT_RESULTS / name).read_text(encoding="utf-8") == text, name
+        assert lb.read_document_text(lb.DEFAULT_RESULTS / name) == text, name
 
 
 def _cells(records, suite):
@@ -65,8 +80,8 @@ def _by_model(cells):
     return {key: (merged[key], totals[key]) for key in totals}
 
 
-def test_docs_board_matches_the_published_leaderboard(records):
-    docs = _by_model(_cells(records, "docs"))
+def test_legacy_docs_board_matches_calibration_report(legacy_records):
+    docs = _by_model(_cells(legacy_records, "docs"))
     assert docs == {
         ("claude-code", "fireworks/qwen3.8-max"): (7, 18),
         ("claude-code", "anthropic/claude-sonnet-5-5"): (4, 12),
@@ -79,15 +94,15 @@ def test_docs_board_matches_the_published_leaderboard(records):
     }
 
 
-def test_hard_suites_match_the_hrf_report(records):
-    assert _by_model(_cells(records, "hard-review")) == {
+def test_hard_suites_match_the_hrf_report(legacy_records):
+    assert _by_model(_cells(legacy_records, "hard-review")) == {
         ("codex", "openai/gpt-6.1-sol"): (5, 6),
         ("antigravity", "google/gemini-3.1-pro"): (4, 6),
         ("claude-code", "fireworks/qwen3.8-max"): (7, 9),
         ("claude-code", "zai/glm-5.2"): (4, 4),
         ("opencode", "together/deepseek-v4.1-flash"): (7, 7),
     }
-    assert _by_model(_cells(records, "hard-fix")) == {
+    assert _by_model(_cells(legacy_records, "hard-fix")) == {
         ("codex", "openai/gpt-6.1-sol"): (6, 6),
         ("antigravity", "google/gemini-3.1-pro"): (5, 6),
         ("claude-code", "fireworks/qwen3.8-max"): (6, 6),
@@ -117,12 +132,15 @@ def test_open_weight_matrix_matches_the_ossharn_report():
     ]
 
 
-def test_every_exclusion_survives_the_import(records):
-    tags = Counter(r["excludedBecause"] for r in records if r["excludedBecause"])
+def test_every_exclusion_survives_the_import(legacy_records):
+    tags = Counter(r["excludedBecause"] for r in legacy_records if r["excludedBecause"])
     assert tags["pre-GYMDOCS-01"] == 35
     assert tags["pre-GYMAGY-02"] == 11
     assert tags["pre-RFDFIX-01"] == 6
     assert tags["infra:source_infra_list"] == 5
+
+
+def test_all_infra_records_have_infra_exclusions(records):
     assert all(
         r["excludedBecause"].startswith("infra:")
         for r in records
@@ -130,18 +148,56 @@ def test_every_exclusion_survives_the_import(records):
     )
 
 
-def test_imported_rows_are_graded_task_versions_and_unmeasured(records):
+def test_all_records_reference_graded_task_versions(records):
     tasks_dir = MODULE_ROOT / "tasks"
+    tasks = {
+        task_id: tomllib.loads((tasks_dir / task_id / "task.toml").read_text("utf-8"))
+        for task_id in {record["task"] for record in records}
+    }
     for record in records:
-        task = tomllib.loads(
-            (tasks_dir / record["task"] / "task.toml").read_text("utf-8")
-        )
+        task = tasks[record["task"]]
         assert task["suite"] == record["suite"]
+        assert 1 <= record["task_version"] <= task["task_version"]
+
+
+def test_legacy_rows_are_version_one_and_unmeasured(legacy_records):
+    for record in legacy_records:
         assert record["task_version"] == 1
-        assert record["task_version"] <= task["task_version"]
         assert record["tokens"] == {"input": None, "cache": None, "output": None}
         assert record["cost"]["source"] == lb.UNKNOWN and record["cost"]["usd"] is None
-    assert {r["task"] for r in records} & SCRUBBED == SCRUBBED
+    assert {r["task"] for r in legacy_records} & SCRUBBED == SCRUBBED
+
+
+def test_eval_bench_rows_have_measured_tokens_and_valid_pricing(result_store):
+    document = result_store.documents["2026-10-29-eval-bench.json.gz"]
+    assert document["id"] == "eval-bench"
+    assert document["price_table"] == import_eval_bench.EVAL_BENCH_PRICE_TABLE
+    table = result_store.price_tables[document["price_table"]]
+    measured = priced = 0
+    for record in document["records"]:
+        tokens = record["tokens"]
+        assert set(tokens) == {"input", "cache", "output"}
+        if any(value is not None for value in tokens.values()):
+            assert all(type(value) is int and value >= 0 for value in tokens.values())
+            measured += 1
+        else:
+            assert record["cost"] == {
+                "usd": None,
+                "source": lb.UNKNOWN,
+                "reason": "tokens_not_measured",
+            }
+        assert record["cost"] == lb.price_cost(
+            tokens, record["model"]["provider_id"], table
+        )
+        if record["cost"]["source"] in lb.PRICED_SOURCES:
+            assert record["cost"]["usd"] >= 0
+            assert record["cost"]["reason"] is None
+            entry = table.models[record["model"]["provider_id"]]
+            assert entry["reference"]
+            assert entry["as_of"] <= document["date"]
+            priced += 1
+    assert measured > 0
+    assert priced > 0
 
 
 @pytest.mark.parametrize(

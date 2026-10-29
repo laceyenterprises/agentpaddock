@@ -419,13 +419,14 @@ def import_eval_bench(
     return document, already_published, version_unrecorded
 
 
-# Add (published filename, import_eval_bench) when the per-attempt export is published.
+# The published per-attempt export is registered after the four legacy sources.
 # build() handles its skip counts, deduplication and separate price table.
 SOURCES = (
     ("REPORT-rfd-calibration-2026-10-06.raw.json", import_rfd),
     ("REPORT-hrf-calibration-2026-10-07.raw.json", import_hrf),
     ("REPORT-ossharn-04-gym-matrix-2026-09-29.raw.json", import_ossharn),
     ("REPORT-omt-08-local-80b-gym-rows-2026-09-30.raw.json", import_omt),
+    ("REPORT-eval-bench-2026-10-29.raw.json.gz", import_eval_bench),
 )
 
 
