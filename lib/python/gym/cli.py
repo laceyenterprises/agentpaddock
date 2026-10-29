@@ -10,7 +10,8 @@ Operator surfaces plus the scheduled entrypoint:
     When a committed baseline exists it also diffs HEAD against it and emits a
     ``gym_regression`` alert for every baseline-pass -> HEAD-fail transition (a
     newly-passing task is logged, never alerted). This is exactly what the
-    scheduled launchd one-shot runs (``--suite all``).
+    scheduled launchd one-shot runs (``--suite all``). Alert delivery failures
+    are reported on stderr and in the results without changing the exit code.
   * ``hq gym baseline update`` — **operator-gated** (requires ``--confirm``):
     re-grade the suite and rewrite ``gym-baseline.json`` from the fresh
     verdicts. The scheduled runner never calls this, so it can never rewrite the
@@ -50,7 +51,7 @@ from gym import (
 )
 from gym.grader import TrajectorySource
 
-# Exit codes: 0 clean, 1 usage/refusal/error, 2 regressions detected+alerted.
+# Exit codes: 0 clean, 1 usage/refusal/error, 2 regressions detected.
 EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_REGRESSION = 2
@@ -239,6 +240,22 @@ def _baseline_date(generated_at: str | None) -> str | None:
     return generated_at.split("T", 1)[0]
 
 
+class _BestEffortAlerter:
+    """Keep delivery failures from interrupting a completed run or later alerts."""
+
+    def __init__(self, alerter: alerting.Alerter) -> None:
+        self.alerter = alerter
+        self.undelivered: list[dict[str, str]] = []
+
+    def emit(self, *, key: str, message: str, metadata: dict[str, Any]) -> None:
+        try:
+            self.alerter.emit(key=key, message=message, metadata=metadata)
+        except Exception as exc:
+            reason = " ".join(str(exc).split())[:200] or type(exc).__name__
+            self.undelivered.append({"key": key, "reason": reason})
+            print(f"[hq gym] alert undelivered: {key}: {reason}", file=sys.stderr)
+
+
 def cmd_run(
     args: argparse.Namespace,
     *,
@@ -295,7 +312,10 @@ def cmd_run(
         print(f"[hq gym] {exc}", file=sys.stderr)
         return EXIT_ERROR
 
-    alerting.emit_level_unresolved(alerter, suite=result.suite, count=result.level_unresolved)
+    run_alerter = _BestEffortAlerter(alerter)
+    alerting.emit_level_unresolved(
+        run_alerter, suite=result.suite, count=result.level_unresolved
+    )
 
     baseline_path = Path(args.baseline) if args.baseline else default_baseline_path()
     # A host that has never established a baseline reads the shipped
@@ -321,7 +341,7 @@ def cmd_run(
             if report.established:
                 alerting.emit_regressions(
                     report,
-                    alerter,
+                    run_alerter,
                     suite=result.suite,
                     baseline_ref=baseline_path.name,
                     baseline_date=baseline_date,
@@ -332,6 +352,7 @@ def cmd_run(
 
     if args.json:
         payload = result.summary_dict()
+        payload["alerts_undelivered"] = run_alerter.undelivered
         if result_path is not None:
             payload["model"] = args.model
             payload["worker_class"] = args.worker_class
@@ -358,6 +379,10 @@ def cmd_run(
         print(json.dumps(payload, indent=2, sort_keys=True), file=out)
     else:
         _print_scheduled_report(result, report, baseline_path, baseline_date, out=out)
+        for failure in run_alerter.undelivered:
+            print(
+                f"  alert undelivered: {failure['key']}: {failure['reason']}", file=out
+            )
         if result_path is not None:
             print(f"  results stored under model={args.model}: {result_path}", file=out)
 
