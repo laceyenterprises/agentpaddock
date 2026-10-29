@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import json
 import shutil
 import tomllib
@@ -446,13 +447,18 @@ def test_explicit_model_effort_still_rejects_conflicting_field(label):
         import_eval_bench.model_of(label, "low")
 
 
+@pytest.mark.parametrize("compressed", [False, True])
 def test_registered_v2_source_builds_with_deduplication_and_current_prices(
-    tmp_path, monkeypatch, capsys
+    tmp_path, monkeypatch, capsys, compressed
 ):
     reports, results = tmp_path / "reports", tmp_path / "results"
     reports.mkdir()
     shutil.copytree(lb.DEFAULT_RESULTS / "prices", results / "prices")
-    shutil.copyfile(V2_SAMPLE, reports / V2_SAMPLE.name)
+    source_name = V2_SAMPLE.name + (".gz" if compressed else "")
+    source_bytes = V2_SAMPLE.read_bytes()
+    (reports / source_name).write_bytes(
+        gzip.compress(source_bytes) if compressed else source_bytes
+    )
     legacy_name = "legacy.raw.json"
     (reports / legacy_name).write_text(
         json.dumps(
@@ -475,25 +481,26 @@ def test_registered_v2_source_builds_with_deduplication_and_current_prices(
         )
     )
     # Another published bundle is not a registered source but still owns its id.
-    (results / "2026-10-17-other.json").write_text(
-        json.dumps(
-            {
-                "id": "other",
-                "records": [{"run_id": _synthetic_id(3)}],
-            }
-        )
+    other = results / ("2026-10-17-other.json" + (".gz" if compressed else ""))
+    lb.write_document(
+        other,
+        {
+            "id": "other",
+            "records": [{"run_id": _synthetic_id(3)}],
+        },
     )
     # Register v2 first: deduplication must not depend on SOURCES order.
     monkeypatch.setattr(
         import_eval_bench,
         "SOURCES",
         (
-            (V2_SAMPLE.name, import_eval_bench.import_eval_bench),
+            (source_name, import_eval_bench.import_eval_bench),
             (legacy_name, import_eval_bench.import_rfd),
         ),
     )
     files = import_eval_bench.build(reports, results)
-    document = json.loads(files["2026-10-18-eval-bench.json"])
+    output_name = "2026-10-18-eval-bench.json.gz"
+    document = json.loads(files[output_name])
     ids = {record["run_id"] for record in document["records"]}
     assert _synthetic_id(2) not in ids
     assert _synthetic_id(2) + ":v2" in ids
@@ -508,8 +515,19 @@ def test_registered_v2_source_builds_with_deduplication_and_current_prices(
         "skipped 2 already-published and 1 version-unrecorded rows"
         in capsys.readouterr().err
     )
+    args = ["--reports", str(reports), "--results", str(results)]
+    # A prior plain import must migrate without leaving duplicate storage forms.
+    prior = results / output_name.removesuffix(".gz")
+    prior.write_text(files[output_name], encoding="utf-8")
+    assert import_eval_bench.main(args + ["--check"]) == 1
+    assert import_eval_bench.main(args) == 0
+    assert not prior.exists()
+    output = results / output_name
+    assert output.read_bytes().startswith(b"\x1f\x8b")
     for name, text in files.items():
-        (results / name).write_text(text)
+        assert lb.read_document_text(results / name) == text
+        if name.endswith(".json"):
+            assert (results / name).read_bytes() == text.encode("utf-8")
     assert import_eval_bench.build(reports, results) == files
     assert (
         import_eval_bench.main(
@@ -523,6 +541,23 @@ def test_registered_v2_source_builds_with_deduplication_and_current_prices(
         )
         == 0
     )
+    # Different gzip metadata is immaterial to --check.
+    output.write_bytes(
+        gzip.compress(files[output_name].encode(), compresslevel=1, mtime=123)
+    )
+    assert import_eval_bench.main(args + ["--check"]) == 0
+    document["source"]["description"] = "Changed synthetic description"
+    lb.write_document(output, document)
+    assert import_eval_bench.main(args + ["--check"]) == 1
+    assert output_name in capsys.readouterr().err
+    lb.write_document(output, json.loads(files[output_name]))
+    plain = output.with_suffix("")
+    plain.write_text(files[output_name])
+    assert import_eval_bench.main(args + ["--check"]) == 1
+    assert "duplicate results document" in capsys.readouterr().err
+    plain.unlink()
+    output.write_bytes(b"\x1f\x8bcorrupt")
+    assert import_eval_bench.main(args + ["--check"]) == 1
 
 
 @pytest.mark.parametrize(
@@ -601,3 +636,44 @@ def test_haiku_price_table_preserves_previous_entries_and_note():
             "source": "published-rate",
         },
     }
+
+
+@pytest.mark.parametrize("suffix", [".json", ".json.gz"])
+def test_import_writes_rendered_text_and_removes_alternate_storage(
+    tmp_path, monkeypatch, suffix
+):
+    name = "2026-10-18-eval-bench" + suffix
+    text = '{ "id": "eval-bench", "records": [] }\n'
+    monkeypatch.setattr(import_eval_bench, "build", lambda *_: {name: text})
+
+    def no_json_round_trip(*_):
+        pytest.fail("rendered document must not be parsed or rendered again")
+
+    monkeypatch.setattr(import_eval_bench.json, "loads", no_json_round_trip)
+    monkeypatch.setattr(lb, "render_document", no_json_round_trip)
+    sibling = tmp_path / (
+        name.removesuffix(".gz") if suffix.endswith(".gz") else name + ".gz"
+    )
+    sibling.write_bytes(b"previous document")
+    assert (
+        import_eval_bench.main(["--reports", str(tmp_path), "--results", str(tmp_path)])
+        == 0
+    )
+    assert lb.read_document_text(tmp_path / name) == text
+    assert not sibling.exists()
+
+
+def test_import_failed_migration_preserves_plain_sibling(tmp_path, monkeypatch):
+    name = "2026-10-18-eval-bench.json.gz"
+    monkeypatch.setattr(import_eval_bench, "build", lambda *_: {name: "{}\n"})
+    sibling = tmp_path / name.removesuffix(".gz")
+    sibling.write_bytes(b"previous document")
+
+    def fail_write(*_):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(lb, "write_document_text", fail_write)
+    with pytest.raises(OSError, match="disk full"):
+        import_eval_bench.main(["--reports", str(tmp_path), "--results", str(tmp_path)])
+    assert sibling.read_bytes() == b"previous document"
+    assert not (tmp_path / name).exists()

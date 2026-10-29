@@ -54,6 +54,8 @@ from collections.abc import Iterable, Iterator
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
+from leaderboard import CompressionError, decompress_content
+
 #: The organization that publishes Paddock, and its repositories that are public.
 PUBLIC_OWNER = "laceyenterprises"
 PUBLIC_REPOSITORIES = frozenset({"agentpaddock"})
@@ -196,6 +198,7 @@ CATEGORIES = (
     *dict.fromkeys(category for category, _, _ in PATTERNS),
     "private-repo",
     "operator-identity",
+    "gzip",
 )
 
 
@@ -371,8 +374,19 @@ def scan_tree(
     for path, content, oid in iter_file_contents(root, tracked_only=tracked_only):
         relative = path.relative_to(root).as_posix()
         # Binary files are read as text too: a key does not stop leaking in a blob.
-        text = content.decode("utf-8", errors="replace")
-        findings.extend(replace(finding, blob=oid) for finding in scan_text(text, relative, identities=identities))
+        try:
+            text = decompress_content(
+                content, gzip_required=path.name.endswith(".gz")
+            ).decode("utf-8", errors="replace")
+        except CompressionError:
+            findings.append(
+                Finding(relative, 0, 0, "gzip", "invalid-or-oversized-gzip", oid)
+            )
+        else:
+            findings.extend(
+                replace(finding, blob=oid)
+                for finding in scan_text(text, relative, identities=identities)
+            )
         findings.extend(
             Finding(relative, 0, 0, category, rule, oid)
             for _, category, rule in _identity_matches(relative, identities)

@@ -6,9 +6,13 @@ checks, so it must not hold a marker itself.
 
 from __future__ import annotations
 
+import gzip
+import subprocess
 from pathlib import Path
 
 import pytest
+
+import leaderboard as lb
 
 import internal_note_guard as guard
 
@@ -35,6 +39,58 @@ RECORDS = [
 def test_each_record_shape_is_rejected(rule, line):
     findings = guard.check_text(f"results summary\n{line}\n", "reports/note.md")
     assert [(f.path, f.line, f.rule) for f in findings] == [("reports/note.md", 2, rule)]
+
+
+@pytest.mark.parametrize(("rule", "line"), RECORDS, ids=[r for r, _ in RECORDS])
+def test_gzip_records_match_plain_text_findings(tmp_path, rule, line):
+    text = f"prefix\n{line}\n"
+    path = tmp_path / "fixture.gz"
+    path.write_bytes(gzip.compress(text.encode()))
+    assert guard.check_tree(tmp_path) == guard.check_text(text, path.name)
+
+
+@pytest.mark.parametrize("tracked", [False, True])
+@pytest.mark.parametrize("suffix", [".gz", ".bin"])
+def test_gzip_records_are_scanned_by_magic(tmp_path, tracked, suffix):
+    path = tmp_path / ("fixture" + suffix)
+    text = "prefix\nReviewer " + "verdict: synthetic\n"
+    path.write_bytes(gzip.compress(text.encode()))
+    if tracked:
+        subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+        subprocess.run(["git", "-C", str(tmp_path), "add", path.name], check=True)
+        path.unlink()
+    findings = guard.check_tree(tmp_path, tracked_only=tracked)
+    assert len(findings) == 1
+    assert (findings[0].path, findings[0].line, findings[0].rule) == (
+        path.name,
+        2,
+        "reviewer-verdict",
+    )
+    assert (findings[0].blob is not None) == tracked
+
+
+@pytest.mark.parametrize("tracked", [False, True])
+@pytest.mark.parametrize(
+    "content", [b"not gzip", b"\x1f\x8bcorrupt", gzip.compress(b"ok")[:-1]]
+)
+def test_corrupt_gzip_is_a_finding(tmp_path, content, tracked):
+    path = tmp_path / "fixture.gz"
+    path.write_bytes(content)
+    if tracked:
+        subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+        subprocess.run(["git", "-C", str(tmp_path), "add", path.name], check=True)
+    findings = guard.check_tree(tmp_path, tracked_only=tracked)
+    assert len(findings) == 1
+    assert findings[0].rule == "invalid-or-oversized-gzip"
+    assert (findings[0].blob is not None) == tracked
+
+
+def test_oversized_gzip_is_a_finding(tmp_path, monkeypatch):
+    monkeypatch.setattr(lb, "MAX_DECOMPRESSED_BYTES", 32)
+    path = tmp_path / "fixture.gz"
+    path.write_bytes(gzip.compress(b"x" * 33))
+    findings = guard.check_tree(tmp_path)
+    assert len(findings) == 1 and findings[0].rule == "invalid-or-oversized-gzip"
 
 
 @pytest.mark.parametrize(

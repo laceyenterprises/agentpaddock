@@ -449,8 +449,9 @@ def methodology_page(results: lb.Results) -> str:
         f"<td><code>{esc(lb.canonical_json(descriptor))}</code></td></tr>"
         for key, descriptor in results.configs().items()
     )
+    # Display the logical document name, independent of its storage compression.
     sources = "".join(
-        f"<tr><td><code>{esc(name)}</code></td><td>{esc(doc['source']['kind'])}</td>"
+        f"<tr><td><code>{esc(name.removesuffix('.gz'))}</code></td><td>{esc(doc['source']['kind'])}</td>"
         f'<td class="num">{len(doc["records"])}</td><td>{esc(doc["source"]["description"])}'
         f'<br><span class="note">Evidence: {esc(doc["source"]["evidence"])}</span></td></tr>'
         for name, doc in sorted(results.documents.items())

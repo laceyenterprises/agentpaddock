@@ -35,6 +35,17 @@ def test_site_builds_deterministically_from_fixtures(tmp_path: Path):
     assert set(first) == {name for name, _ in build_site.PAGES}
 
 
+def test_site_from_gzip_matches_site_from_plain_results(tmp_path):
+    results = tmp_path / "results"
+    shutil.copytree(FIXTURE, results)
+    expected = build_site.build(results)
+    for path in results.glob("*.json"):
+        document = lb.load_results(results).documents[path.name]
+        lb.write_document(path.with_suffix(".json.gz"), document)
+        path.unlink()
+    assert build_site.build(results) == expected
+
+
 def test_built_html_links_only_relatively_and_to_the_public_names():
     for files in (build_site.build(FIXTURE), build_site.build(lb.DEFAULT_RESULTS)):
         for name, page in files.items():

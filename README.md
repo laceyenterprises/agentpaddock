@@ -363,9 +363,17 @@ The open leaderboard is built only from the committed `results/` tree:
 | Path | What it holds |
 |---|---|
 | `results/<date>-<id>.json` | one results document per run bundle or import; each record is one cell (one graded attempt of one task by one harness configuration and model) |
+| `results/<date>-<id>.json.gz` | use for a document whose text would make a pull request diff larger than about 200 KB; write with `leaderboard.write_document` for deterministic gzip (level 9, mtime 0, no stored file name) |
 | `results/prices/<date>.json` | dated price tables; every price's `source` is `provider-invoice-reconciled`, `published-rate` or `unknown` |
 | `results/meta/changelog.json` | the grading changelog; each entry states its comparability boundary and the `excludedBecause` tag (`pre-<ID>`) it puts on voided rows |
 | `results/meta/fairness.json` | the harness-configuration fairness checklist and per-harness audit status (SPEC R8) |
+
+Plain `.json` files must contain UTF-8 JSON text; gzip content requires the
+`.json.gz` suffix. `leaderboard.write_document` and `write_document_text`
+(for already rendered JSON) write a temporary sibling and atomically replace
+the destination after closing it. The importer removes the alternate storage
+sibling only after that write succeeds, so a failed write preserves the prior
+document. Keep only one storage form per document; validation rejects duplicates.
 
 A record carries suite, task and `task_version`; harness name, version and
 config hash (the SHA-256 of a descriptor kept in the document); the model's
