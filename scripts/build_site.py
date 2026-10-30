@@ -115,7 +115,7 @@ code, .mono { font-family: var(--mono); font-size: .86em; }
 .num { font-variant-numeric: tabular-nums; }
 
 .wrap {
-  max-width: 1120px; margin: 0 auto;
+  max-width: 1488px; min-width: 0; margin: 0 auto;
   padding-left: max(24px, env(safe-area-inset-left, 0px));
   padding-right: max(24px, env(safe-area-inset-right, 0px));
 }
@@ -147,14 +147,14 @@ h2.h2 { font: 700 clamp(30px, 4vw, 44px)/1.05 var(--display); letter-spacing: -.
 .nav .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; flex: none; }
 .brand svg { width: 30px; height: 30px; display: block; }
-.wordmark { font: italic 800 22px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; }
+.wordmark { font: italic 800 22px/1 "Saira", var(--display); letter-spacing: .01em; text-transform: uppercase; }
 .nav-links { display: flex; gap: 4px; margin-left: auto; overflow-x: auto; scrollbar-width: none; min-width: 0; }
 .nav-links::-webkit-scrollbar { display: none; }
 .nav-links a {
   color: var(--ink-2); text-decoration: none; font-size: 14.5px; font-weight: 500; padding: 8px 12px; border-radius: 999px;
   white-space: nowrap; transition: background .2s var(--ease), color .2s var(--ease);
 }
-.nav-links a:hover, .nav-links a[aria-current="page"] { background: var(--soft); color: var(--ink); }
+.nav-links a:hover, .nav-links a[aria-current] { background: var(--soft); color: var(--ink); }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px;
   border-radius: 999px; font: 600 15px/1 var(--body); text-decoration: none; border: 1.5px solid var(--ink);
@@ -182,13 +182,13 @@ h2.h2 { font: 700 clamp(30px, 4vw, 44px)/1.05 var(--display); letter-spacing: -.
 .tower-title { font: italic 800 18px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; }
 .tower-sub { font: 500 11px/1.2 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--tower-mute); }
 .tower-cols, .tower-row {
-  display: grid; grid-template-columns: 34px 4px minmax(0, 1fr) 62px 62px; align-items: center; column-gap: 10px;
+  display: grid; align-items: center; column-gap: 10px;
   padding: 0 16px;
 }
-.tower-cols { font: 500 10.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--tower-mute); padding-block: 10px 6px; }
+.tower-cols { grid-template-columns: 34px 4px minmax(0, 1fr) 62px 62px; font: 500 10.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--tower-mute); padding-block: 10px 6px; }
 .tower-cols span:nth-child(n+4) { text-align: right; }
 .tower ol { list-style: none; margin: 0; padding: 0 0 6px; }
-.tower-row { padding-block: 8px; border-top: 1px solid var(--tower-rule); }
+.tower-row { grid-template-columns: 26px 4px minmax(0, 1fr) 64px; padding-block: 8px; border-top: 1px solid var(--tower-rule); }
 .tower-row:first-child { border-top: 0; }
 .pos {
   font: italic 800 20px/1 var(--display); text-align: center; color: var(--tower-fg); font-variant-numeric: tabular-nums;
@@ -244,7 +244,7 @@ h2.h2 { font: 700 clamp(30px, 4vw, 44px)/1.05 var(--display); letter-spacing: -.
 /* ---------- footer ---------- */
 .footer { background: var(--tower); color: var(--tower-fg); padding-block: 0 40px; }
 .footer .checker { margin-bottom: 40px; }
-.footer-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 32px; }
+.footer-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 32px; }
 .footer h4 { margin: 0 0 10px; font: 600 11.5px/1.2 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--tower-mute); }
 .footer a { color: var(--tower-fg); text-decoration: none; display: block; padding: 3px 0; font-size: 14.5px; }
 .footer a:hover { color: var(--tower-lit); }
@@ -257,31 +257,28 @@ h2.h2 { font: 700 clamp(30px, 4vw, 44px)/1.05 var(--display); letter-spacing: -.
 .page-hero h1 { font: italic 800 clamp(44px, 6.4vw, 76px)/.95 var(--display); text-transform: uppercase; letter-spacing: -.01em; margin-top: 14px; }
 .page-hero .lede { margin-top: 16px; }
 
-.grid-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--radius-card); background: var(--paper); }
+.grid-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--radius-card); background: var(--paper); margin-block: 16px 28px; }
 table.grid { border-collapse: collapse; width: 100%; min-width: 680px; font-variant-numeric: tabular-nums; }
 .grid th, .grid td { padding: 10px 12px; border-top: 1px solid var(--rule); text-align: center; font-size: 14px; }
 .grid thead th { border-top: 0; background: var(--soft); font: 600 11.5px/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .grid thead th .dot { margin-right: 6px; vertical-align: -1px; }
 .grid th[scope="row"] { text-align: left; font-weight: 600; white-space: nowrap; }
 .grid th[scope="row"] small { display: block; font: 400 11.5px var(--mono); color: var(--muted); }
-.grid td .cell { display: inline-flex; align-items: center; justify-content: center; gap: 1px; white-space: nowrap; padding: 0 6px; min-width: 46px; height: 34px; border-radius: 8px; font: italic 800 19px/1 var(--display); }
+.grid td .cell { display: inline-flex; align-items: center; justify-content: center; gap: 1px; white-space: nowrap; min-width: 46px; border-radius: 8px; background: color-mix(in srgb, var(--blue) var(--shade), var(--paper)); color: var(--ink); font: 500 12px/1.5 var(--mono); height: auto; padding: 6px 10px; margin: 2px; }
 .grid td .cell.best { outline: 2px solid var(--ink); outline-offset: 1px; }
 .grid td.empty { color: var(--muted); }
 
 * { box-sizing: border-box; }
 .symbols { position: absolute; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-a:hover { color: var(--blue-ink); }
 .brand:hover { color: var(--ink); }
 html { scroll-padding-top: 90px; }
-.wrap { max-width: 1488px; min-width: 0; }
 main { padding-bottom: 64px; }
 h2 { font: 700 36px/1.1 var(--display); margin: 40px 0 20px; }
 h3 { font: 600 24px/1.3 var(--display); margin: 28px 0 12px; }
 h4 { margin: 24px 0 12px; }
 p, ul, ol, pre { margin-block: 12px; }
 .footer p a { display: inline; }
-.wordmark { font: italic 800 22px/1 "Saira", var(--display); letter-spacing: .01em; }
 .note { color: var(--muted); font-size: 13px; }
 .page-hero { max-width: 100%; }
 .page-hero h1 { overflow-wrap: anywhere; }
@@ -303,7 +300,7 @@ p, ul, ol, pre { margin-block: 12px; }
 details { border: 1px solid var(--rule); border-radius: var(--radius-inner); padding: 14px 20px; margin-bottom: 24px; }
 summary { cursor: pointer; font-weight: 600; }
 .task-list { columns: 3 220px; padding-left: 20px; overflow-wrap: anywhere; }
-.table-wrap, .grid-wrap, .scroll { max-width: 100%; overflow-x: auto; }
+.table-wrap, .scroll { max-width: 100%; overflow-x: auto; }
 .tower-table { border-collapse: collapse; width: 100%; white-space: nowrap; }
 .tower-table th, .tower-table td { padding: 12px 8px; border-bottom: 1px solid var(--tower-rule); text-align: right; }
 .tower-table th { color: var(--tower-mute); font: 500 10px/1.3 var(--mono); text-transform: uppercase; }
@@ -324,15 +321,12 @@ summary { cursor: pointer; font-weight: 600; }
 .ci .band { fill: var(--tower-mute); }
 .ci .point { fill: var(--tower-lit); }
 .tag { font: 500 10px/1 var(--mono); padding: 3px 4px; border: 1px solid var(--tower-rule); border-radius: 4px; color: var(--tower-mute); }
-.tower-row { grid-template-columns: 26px 4px minmax(0, 1fr) 64px; }
 .tower-row .who b { font-size: 12px; }
 .tower-row .who span { font-size: 10px; }
 .tower-foot { flex-wrap: wrap; }
-.grid-wrap { margin-block: 16px 28px; }
 .grid td { vertical-align: top; text-align: left; overflow-wrap: anywhere; }
 .grid .num { text-align: right; }
 .matrix td { text-align: center; }
-.grid td .cell { background: color-mix(in srgb, var(--blue) var(--shade), var(--paper)); color: var(--ink); font: 500 12px/1.5 var(--mono); height: auto; padding: 6px 10px; margin: 2px; }
 .grid code { overflow-wrap: anywhere; }
 .chart { font-family: var(--mono); }
 .chart .bar { fill: var(--blue); }
@@ -342,7 +336,6 @@ summary { cursor: pointer; font-weight: 600; }
 pre { overflow-x: auto; padding: 20px; background: var(--soft); border-radius: var(--radius-inner); }
 .footer .brand { display: inline-flex; }
 .footer .brand { --ink: var(--tower-fg); --paper: var(--tower); }
-.footer-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
 @media (max-width: 1279px) {
   .tower-table { min-width: 1200px; }
 }
@@ -479,10 +472,18 @@ def hero(eyebrow: str, title: str, lede: str = "") -> str:
     )
 
 
-def document(title: str, active: str, body: str, *, canonical: bool = False) -> str:
+def document(
+    title: str,
+    active: str,
+    body: str,
+    *,
+    canonical: bool = False,
+    section: str | None = None,
+) -> str:
     current = ' aria-current="page"'
+    section_current = ' aria-current="true"'
     nav = "".join(
-        f'<a href="{name}"{current if name == active else ""}>{esc(label)}</a>'
+        f'<a href="{name}"{current if name == active else section_current if name == section else ""}>{esc(label)}</a>'
         for name, label in PAGES
     )
     head_link = f'<link rel="canonical" href="{SITE_URL}">' if canonical else ""
@@ -632,7 +633,12 @@ def board_page(board: Mapping[str, Any]) -> str:
     body = hero(
         f"Board · task version {board['task_version']}", board["suite"], COMPARABILITY
     )
-    return document(board_title(board), "index.html", body + board_html(board))
+    return document(
+        board_title(board),
+        board_filename(board),
+        body + board_html(board),
+        section="index.html",
+    )
 
 
 def board_card(board: Mapping[str, Any]) -> str:
@@ -731,7 +737,7 @@ def matrix_page(results: lb.Results) -> str:
         f'<div class="grid-wrap"><table class="grid matrix"><thead><tr><th>harness · config</th>{header}</tr></thead>'
         f"<tbody>{''.join(rows)}</tbody></table></div>" + tokens_chart(results)
     )
-    return document("Harness x model", "matrix.html", body)
+    return document("Harness × model", "matrix.html", body)
 
 
 def tokens_chart(results: lb.Results) -> str:
