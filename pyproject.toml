@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 # The distribution is agentpaddock: on PyPI the name `paddock` belongs to an
-# unrelated project. The product and its command are still Paddock / paddock.
+# unrelated project. The product is Agent Paddock; its command is still `paddock`.
 name = "agentpaddock"
 version = "0.1.0"
-description = "Paddock: an open leaderboard for model x harness combinations on coding-agent tasks"
+description = "Agent Paddock: an open leaderboard for model x harness combinations on coding-agent tasks"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]

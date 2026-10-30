@@ -370,7 +370,7 @@ def test_brand_assets_and_navigation_on_every_page():
         assert 'fill="var(--ink)"' in page and page.count('fill="var(--paper)"') == 3
         assert '<link rel="icon" href="favicon.svg" type="image/svg+xml">' in page
         assert '<link rel="stylesheet" href="paddock.css">' in page
-        assert 'aria-label="Paddock home"' in page and "PADDOCK" in page
+        assert 'aria-label="Agent Paddock home"' in page and "PADDOCK" in page
         assert page.count("fonts.googleapis.com/css2?") == 1 and "display=swap" in page
         assert page.count("<script") == 2 and "<style" not in page
         assert "<h1>" in page and page.count("<h1>") == 1
@@ -471,3 +471,150 @@ def test_board_filenames_cannot_escape_output_directory():
     board = {"suite": "../synthetic suite", "task_version": 1}
     name = build_site.board_filename(board)
     assert "/" not in name and name.startswith("board-") and name.endswith("-v1.html")
+
+
+#: Where a generated page may say "paddock" without the product name "Agent Paddock".
+PRODUCT_NAME_ALLOWLIST = re.compile(
+    r"Agent\s+Paddock"  # the product name itself
+    r'|>AGENT</span><span class="wordmark-name">PADDOCK<'  # the stacked lockup
+    r"|\bpaddock (?:run|show|baseline|lock)\b"  # the command
+    r"|\bpaddock\.css\b"  # the stylesheet path
+    r"|agentpaddock"  # the domain, repository and distribution
+    r"|\bPADDOCK_[A-Z0-9_]+"  # environment variables
+)
+
+
+def _stray_product_names(page: str) -> list[str]:
+    return re.findall(
+        r"(?i).{0,30}paddock.{0,30}", PRODUCT_NAME_ALLOWLIST.sub("", page)
+    )
+
+
+@pytest.mark.parametrize(
+    ("text", "stray"),
+    [
+        ("the eval bench that preceded Agent Paddock", False),
+        ("run <code>paddock run --suite coding</code>", False),
+        ('<a href="https://agentpaddock.ai/">', False),
+        ('<link rel="stylesheet" href="paddock.css">', False),
+        ("set PADDOCK_NO_DOCKER=1", False),
+        ("the eval bench that preceded Paddock", True),
+        ('aria-label="Paddock home"', True),
+        ("<title>Tasks · Paddock</title>", True),
+        ('<span class="wordmark">PADDOCK</span>', True),
+        ("the paddock commit", True),
+    ],
+)
+def test_product_name_allowlist(text, stray):
+    assert bool(_stray_product_names(text)) is stray
+
+
+def test_no_page_names_the_product_bare_paddock():
+    for name, page in build_site.build(FIXTURE).items():
+        assert not _stray_product_names(page), (name, _stray_product_names(page))
+
+
+def test_every_page_title_and_eyebrow_names_agent_paddock():
+    files = build_site.build(FIXTURE)
+    for name, page in files.items():
+        if not name.endswith(".html"):
+            continue
+        head = page.split("<head>", 1)[1].split("</head>", 1)[0]
+        titles = re.findall(r"<title>(.*?)</title>", head)
+        assert len(titles) == 1 and titles[0].endswith(" · Agent Paddock"), name
+    for name, _ in build_site.PAGES:
+        assert '<span class="eyebrow">Agent Paddock</span><h1>' in files[name], name
+    methodology = files["methodology.html"]
+    assert "the eval bench that preceded Agent Paddock," in methodology
+    assert "Agent Paddock commit it ran at" in methodology
+
+
+def _css_rules(css: str) -> dict[str, str]:
+    rules: dict[str, str] = {}
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    for selector, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+        rules.setdefault(selector.strip(), "")
+        rules[selector.strip()] += body
+    return rules
+
+
+def test_header_and_footer_render_the_one_stacked_lockup(monkeypatch):
+    lockup = build_site.brand()
+    assert re.fullmatch(
+        r'<a class="brand" href="index.html" aria-label="Agent Paddock home">'
+        r'<svg viewBox="0 0 100 100" aria-hidden="true"><use href="#broadcast"/></svg>'
+        r'<span class="wordmark"><span class="wordmark-agent">AGENT</span>'
+        r'<span class="wordmark-name">PADDOCK</span></span></a>',
+        lockup,
+    )
+    for name, page in build_site.build(FIXTURE).items():
+        if not name.endswith(".html"):
+            continue
+        header = page.split('<header class="nav">', 1)[1].split("</header>", 1)[0]
+        footer = page.split('<footer class="footer">', 1)[1].split("</footer>", 1)[0]
+        assert header.count(lockup) == 1 and footer.count(lockup) == 1, name
+        assert page.count("wordmark-agent") == 2, name
+    # Both renderings come from brand(): replacing it replaces both.
+    monkeypatch.setattr(build_site, "brand", lambda: "<i>synthetic lockup</i>")
+    page = build_site.build(FIXTURE)["index.html"]
+    assert (
+        page.count("<i>synthetic lockup</i>") == 2
+        and "wordmark" not in page.split("</head>")[1]
+    )
+
+
+def test_lockup_styles_follow_the_brand_spec():
+    style = build_site.STYLE
+    rules = _css_rules(style)
+    phone = _css_rules(
+        style.split("@media (max-width: 640px) {", 1)[1].split("\n}\n", 1)[0]
+    )
+
+    def declares(rules: dict[str, str], selector: str, *declarations: str) -> None:
+        body = " ".join(rules[selector].split())
+        for declaration in declarations:
+            assert declaration in body, (selector, declaration, body)
+
+    declares(
+        rules,
+        ".wordmark",
+        "flex-direction: column;",
+        "align-items: flex-start;",
+        "font-style: italic;",
+        "line-height: .95;",
+        '"Saira"',
+    )
+    declares(
+        rules,
+        ".wordmark-agent",
+        "font-weight: 500;",
+        "letter-spacing: .04em;",
+        "font-size: 13px;",
+    )
+    declares(
+        rules,
+        ".wordmark-name",
+        "font-weight: 800;",
+        "letter-spacing: .01em;",
+        "font-size: 21px;",
+    )
+    declares(rules, ".brand svg", "width: 34px;", "height: 34px;")
+    declares(rules, ".footer .brand svg", "width: 46px;", "height: 46px;")
+    declares(rules, ".footer .wordmark-agent", "font-size: 17px;")
+    declares(rules, ".footer .wordmark-name", "font-size: 28px;")
+    declares(phone, ".nav .brand svg", "width: 32px;", "height: 32px;")
+    declares(phone, ".nav .wordmark-agent", "font-size: 12px;")
+    declares(phone, ".nav .wordmark-name", "font-size: 19px;")
+    # AGENT is 0.6 x PADDOCK at every size, within a pixel.
+    for agent, name in ((13, 21), (17, 28), (12, 19)):
+        assert abs(agent - name * 0.6) < 1
+    # Both lines inherit the brand text colour (ink on light, white on the dark footer).
+    for selector, body in rules.items():
+        if "wordmark" in selector:
+            assert "color" not in body, selector
+            assert not re.search(r"--(muted|tower-mute|ink-2)", body), selector
+    declares(rules, ".brand", "color: var(--ink);")
+    declares(rules, ".footer .brand", "color: var(--tower-fg);")
+    page = build_site.build(FIXTURE)["index.html"]
+    assert "family=Saira:ital,wght@1,500;1,800&amp;" in page
+    assert page.count("fonts.googleapis.com/css2?") == 1
