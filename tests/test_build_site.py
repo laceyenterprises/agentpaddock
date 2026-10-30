@@ -478,11 +478,12 @@ def test_featured_board_tie_breaks():
         return {"task_version": version, "tasks": ["t"] * tasks, "rows": [{}] * rows}
 
     assert (
-        build_site.featured_board([board(1, 5, 1), board(2, 5, 1)])["task_version"] == 2
+        build_site.featured_board([board(1, 5, 9), board(2, 5, 1)])["task_version"] == 2
     )
     assert (
         build_site.featured_board([board(1, 6, 1), board(2, 5, 9)])["task_version"] == 1
     )
+    # Duplicate versions exercise the defensive fallback, outside lb.boards output.
     a, b = board(1, 5, 1), board(1, 5, 2)
     assert (
         build_site.featured_board([b, a]) is b

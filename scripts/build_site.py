@@ -22,7 +22,7 @@ import html
 import re
 import sys
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 import leaderboard as lb
 
@@ -597,12 +597,13 @@ def plural(count: int, singular: str, plural_form: str = "") -> str:
     return f"{count} {singular if count == 1 else plural_form or singular + 's'}"
 
 
-def featured_board(boards: list[Mapping[str, Any]]) -> Mapping[str, Any]:
+def featured_board(boards: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
     """The board a suite's overview card features, chosen from that suite's boards.
 
     Task versions are per task, so a suite's newest version may cover only the tasks
     that were bumped. Feature the board covering the most tasks; break ties by the
-    higher task version, then by more entries.
+    higher task version. Suite boards have distinct versions, so the final
+    entry-count tie-breaker is purely defensive for inputs with duplicate versions.
     """
     return max(
         boards,
@@ -698,7 +699,7 @@ def board_counts(board: Mapping[str, Any]) -> str:
     )
 
 
-def board_card(board: Mapping[str, Any], others: list[Mapping[str, Any]]) -> str:
+def board_card(board: Mapping[str, Any], others: Sequence[Mapping[str, Any]]) -> str:
     """A suite's card: the featured board's mini tower, then one line per other board."""
     rows = "".join(
         f'<li class="tower-row"><span class="pos{" p1" if rank == 1 else ""}">{rank}</span>'
