@@ -180,6 +180,9 @@ modules/adversarial-eval-gym/
     toc_eval.py          # `hq gym toc-matrix` driver (TOC-05)
   scripts/leaderboard.py # results/ schema, validation, pricing, aggregation (PDK-04)
   scripts/build_site.py  # static leaderboard site from results/ only (PDK-04)
+  scripts/social_card.html       # the 1200x630 share card's source (PDKSOCIAL-01)
+  scripts/social-card.png        # the committed share image; the build copies it
+  scripts/render_social_card.py  # headless Chrome: card source -> social-card.png
   scripts/import_eval_bench.py # eval-bench evidence -> results/ (PDK-04)
   results/               # leaderboard results, price tables, changelog, fairness (PDK-04)
   CONTRIBUTING.md        # run bundles, reproduction, vendor corrections (PDK-04)
@@ -386,9 +389,15 @@ without a priced source reads `unknown`.
 ```bash
 python3 scripts/leaderboard.py validate          # schema-check results/
 python3 scripts/build_site.py                    # write site/ (gitignored); open site/index.html
-python3 scripts/build_site.py --check            # fail if site/ is stale
+python3 scripts/build_site.py --check            # fail if site/ or the share card is stale
+python3 scripts/render_social_card.py            # re-render scripts/social-card.png (Chrome, network)
 python3 scripts/import_eval_bench.py --reports ../../docs/reports --check
 ```
+
+The build fails with a render command if the committed share card is missing.
+The renderer discovers Chrome automatically; `CHROME` overrides discovery with
+an executable path or PATH command, and an invalid override fails immediately.
+Rendering failures include the last 8 KiB of browser stderr for diagnosis.
 
 The site has per-suite boards with 95% Wilson intervals (one board per suite
 and task version), a harness x model matrix, a tokens-per-pass chart, a
