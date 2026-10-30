@@ -6,6 +6,8 @@ import html
 import re
 import shutil
 import struct
+import subprocess
+import sys
 import zlib
 from copy import deepcopy
 from html.parser import HTMLParser
@@ -15,6 +17,7 @@ from urllib.parse import urlsplit
 import build_site
 import leaderboard as lb
 import pytest
+import render_social_card
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "leaderboard"
 # The repository name the site must never link: it was never created.
@@ -51,7 +54,7 @@ def _png(width: int, height: int) -> bytes:
     )
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def synthetic_card(tmp_path_factory, monkeypatch) -> Path:
     """A synthetic card template and a PNG stamped with its source's SHA-256."""
     card = tmp_path_factory.mktemp("card")
@@ -381,7 +384,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         footer = page.split('<footer class="footer">', 1)[1].split("</footer>", 1)[0]
         for block in (consent, loader):
             assert page.count(block) == 1, path.name
-        assert head.index('<meta name="viewport"') < head.index("<title>") < head.index(consent) < head.index(loader)
+        assert (
+            head.index('<meta name="viewport"')
+            < head.index("<title>")
+            < head.index(consent)
+            < head.index(loader)
+        )
         assert head.index("<script>") == head.index(consent) + consent.index("<script>")
         assert page.count("GTM-P52SNL3D") == 1, path.name
         assert page.count("www.googletagmanager.com/gtm.js") == 1, path.name
@@ -742,6 +750,27 @@ def test_social_card_png_is_written_at_card_size_and_deterministically(tmp_path)
         assert (outs[0] / name).read_bytes() == (outs[1] / name).read_bytes(), name
 
 
+def test_committed_social_card_matches_its_source():
+    assert build_site.card_problem(build_site.CARD_PNG.read_bytes()) == ""
+
+
+@pytest.mark.parametrize("check", [False, True])
+def test_missing_card_reports_how_to_render_it(tmp_path, capsys, synthetic_card, check):
+    build_site.CARD_PNG.unlink()
+    argv = ["--results", str(FIXTURE), "--out", str(tmp_path / "site")]
+    assert build_site.main([*argv, *(["--check"] if check else [])]) == 1
+    assert capsys.readouterr().err == (
+        "social-card.png is missing; run python3 scripts/render_social_card.py\n"
+    )
+    assert not (tmp_path / "site").exists()
+
+
+@pytest.mark.parametrize("length", range(8, 16))
+def test_truncated_png_header_is_reported_as_invalid(length):
+    png = build_site.PNG_SIGNATURE + b"\0" * (length - 8)
+    assert build_site.card_problem(png) == "social-card.png is not a PNG"
+
+
 def test_check_reports_a_card_rendered_from_another_source(
     tmp_path, capsys, monkeypatch, synthetic_card
 ):
@@ -805,6 +834,60 @@ def test_stamp_replaces_the_card_hash_and_keeps_the_image():
     assert (
         twice.replace(twice[33 : 33 + 12 + len(build_site.CARD_KEY) + 65], b"") == blank
     )
+
+
+@pytest.mark.parametrize(
+    "override", ["missing-browser", "", "not-executable", "directory"]
+)
+def test_invalid_chrome_override_never_falls_back(tmp_path, monkeypatch, override):
+    browser = tmp_path / "browser"
+    browser.write_text("#!/bin/sh\n", encoding="utf-8")
+    browser.chmod(0o755)
+    (tmp_path / "not-executable").touch()
+    (tmp_path / "directory").mkdir()
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setenv("CHROME", override)
+    monkeypatch.setattr(render_social_card, "CANDIDATES", (str(browser),))
+    with pytest.raises(SystemExit, match="CHROME does not name an executable browser"):
+        render_social_card.find_chrome()
+
+
+@pytest.mark.parametrize("mode", ["path", "command", "automatic"])
+def test_chrome_discovery_accepts_executables(tmp_path, monkeypatch, mode):
+    browser = tmp_path / "browser"
+    browser.write_text("#!/bin/sh\n", encoding="utf-8")
+    browser.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setattr(render_social_card, "CANDIDATES", ("browser",))
+    if mode == "automatic":
+        monkeypatch.delenv("CHROME", raising=False)
+    else:
+        monkeypatch.setenv("CHROME", str(browser) if mode == "path" else "browser")
+    assert render_social_card.find_chrome() == str(browser)
+
+
+@pytest.mark.parametrize("returncode", [0, 17])
+def test_render_failure_includes_bounded_browser_diagnostics(monkeypatch, returncode):
+    popen = subprocess.Popen
+
+    def failing_browser(command, **kwargs):
+        return popen(
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.stderr.write('x' * 131072 + '\\nlaunch failed\\n'); "
+                f"sys.exit({returncode})",
+            ],
+            **kwargs,
+        )
+
+    monkeypatch.setattr(render_social_card.subprocess, "Popen", failing_browser)
+    with pytest.raises(SystemExit) as error:
+        render_social_card.render("<p>card</p>", "browser", timeout=5)
+    message = str(error.value)
+    assert f"Chrome exited ({returncode}) without a complete screenshot" in message
+    assert message.endswith("launch failed")
+    assert len(message) < 8300
 
 
 class Text(HTMLParser):

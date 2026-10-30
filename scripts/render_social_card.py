@@ -7,7 +7,8 @@ SHA-256 of that source in a tEXt chunk, so ``python3 scripts/build_site.py
 reports the card as stale, and commit the PNG.
 
 Needs Google Chrome or Chromium, and network access for the web fonts. Set
-CHROME to the browser binary if it is not found automatically.
+CHROME to an executable path or PATH command to override automatic discovery.
+An invalid override fails immediately. Browser failures include stderr diagnostics.
 
     python3 scripts/render_social_card.py
     python3 scripts/render_social_card.py --out DIR/social-card.png
@@ -40,10 +41,15 @@ CANDIDATES = (
 
 
 def find_chrome() -> str:
-    override = [os.environ["CHROME"]] if os.environ.get("CHROME") else []
-    for candidate in override + list(CANDIDATES):
-        path = candidate if os.path.isabs(candidate) else shutil.which(candidate)
-        if path and os.path.exists(path):
+    override = os.environ.get("CHROME")
+    if override is not None:
+        path = shutil.which(override)
+        if path:
+            return path
+        raise SystemExit(f"CHROME does not name an executable browser: {override!r}")
+    for candidate in CANDIDATES:
+        path = shutil.which(candidate)
+        if path:
             return path
     raise SystemExit("Chrome or Chromium not found; set CHROME to the browser binary")
 
@@ -57,7 +63,15 @@ def render(
     so wait for a complete PNG and then stop the browser's process group.
     """
     width, height = build_site.CARD_SIZE
-    with tempfile.TemporaryDirectory() as scratch:
+    with tempfile.TemporaryDirectory() as scratch, tempfile.TemporaryFile() as errors:
+
+        def failure(message: str) -> SystemExit:
+            # A file avoids pipe backpressure; keep the reported tail bounded.
+            errors.seek(0, os.SEEK_END)
+            errors.seek(max(0, errors.tell() - 8192))
+            detail = errors.read().decode("utf-8", errors="replace").strip()
+            return SystemExit(f"{message}\n{detail}" if detail else message)
+
         page = Path(scratch) / "social-card.html"
         page.write_text(source, encoding="utf-8")
         shot = Path(scratch) / "card.png"
@@ -80,7 +94,7 @@ def render(
                 page.as_uri(),
             ],
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=errors,
             start_new_session=True,
         )
         deadline = time.monotonic() + timeout
@@ -89,11 +103,11 @@ def render(
                 if shot.is_file() and shot.read_bytes().endswith(IEND):
                     return shot.read_bytes()
                 if proc.poll() is not None:
-                    raise SystemExit(
+                    raise failure(
                         f"Chrome exited ({proc.returncode}) without a complete screenshot"
                     )
                 time.sleep(0.25)
-            raise SystemExit(f"no screenshot after {timeout:.0f} s")
+            raise failure(f"no screenshot after {timeout:.0f} s")
         finally:
             if proc.poll() is None:
                 try:

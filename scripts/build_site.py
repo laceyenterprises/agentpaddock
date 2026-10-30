@@ -1144,9 +1144,10 @@ def png_chunks(data: bytes) -> list[tuple[bytes, bytes]]:
 
 def png_size(data: bytes) -> tuple[int, int]:
     """Width and height from a PNG's IHDR."""
-    kind, body = png_chunks(data)[0]
-    if kind != b"IHDR":
+    chunks = png_chunks(data)
+    if not chunks or chunks[0][0] != b"IHDR":
         raise ValueError("PNG does not start with IHDR")
+    _, body = chunks[0]
     return struct.unpack(">II", body[:8])
 
 
@@ -1194,8 +1195,14 @@ def card_problem(png: bytes) -> str:
 
 
 def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
-    """``{filename: text or bytes}`` for the whole site; raises ``ResultsError`` on invalid input."""
+    """Site files; raises ``ResultsError`` on invalid results or ``FileNotFoundError`` for a missing card."""
     results = lb.load_results(results_dir)
+    try:
+        card = CARD_PNG.read_bytes()
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(
+            f"{CARD_NAME} is missing; run python3 scripts/render_social_card.py"
+        ) from exc
     return {
         "index.html": index_page(results),
         "matrix.html": matrix_page(results),
@@ -1204,7 +1211,7 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
         "methodology.html": methodology_page(results),
         "paddock.css": STYLE,
         "favicon.svg": FAVICON,
-        CARD_NAME: CARD_PNG.read_bytes(),
+        CARD_NAME: card,
         **{
             board_filename(board): board_page(board)
             for board in lb.boards(results.records)
@@ -1224,6 +1231,9 @@ def main(argv: list[str] | None = None) -> int:
         files = build(args.results)
     except lb.ResultsError as exc:
         print(f"results/ does not validate:\n{exc}", file=sys.stderr)
+        return 1
+    except FileNotFoundError as exc:
+        print(exc, file=sys.stderr)
         return 1
     card = card_problem(files[CARD_NAME])
     if args.check:

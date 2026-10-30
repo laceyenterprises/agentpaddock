@@ -394,6 +394,11 @@ python3 scripts/render_social_card.py            # re-render scripts/social-card
 python3 scripts/import_eval_bench.py --reports ../../docs/reports --check
 ```
 
+The build fails with a render command if the committed share card is missing.
+The renderer discovers Chrome automatically; `CHROME` overrides discovery with
+an executable path or PATH command, and an invalid override fails immediately.
+Rendering failures include the last 8 KiB of browser stderr for diagnosis.
+
 The site has per-suite boards with 95% Wilson intervals (one board per suite
 and task version), a harness x model matrix, a tokens-per-pass chart, a
 per-task discrimination view, the methodology with the price tables and the
