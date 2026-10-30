@@ -28,6 +28,7 @@ import leaderboard as lb
 
 REPO_URL = "https://github.com/laceyenterprises/agentpaddock"
 SITE_URL = "https://agentpaddock.ai/"
+GTM_CONTAINER_ID = "GTM-P52SNL3D"
 DEFAULT_OUT = lb.MODULE_ROOT / "site"
 
 PAGES = (
@@ -499,6 +500,17 @@ def document(title: str, active: str, body: str, *, canonical: bool = False) -> 
         '<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"<title>{esc(title)} · Paddock</title>\n{head_link}\n"
+        "<!-- Google consent defaults: analytics storage denied in the EEA, UK, Switzerland and listed territories; no consent UI; ad storage off everywhere -->\n"
+        "<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}\n"
+        "gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'granted'});\n"
+        "gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IS','IE','IT','LV','LI','LT','LU','MT','NL','NO','PL','PT','RO','SK','SI','ES','SE','GB','CH','AX','GF','GP','MQ','RE','YT','MF','GI','JE','GG','IM']});</script>\n"
+        "<!-- Google Tag Manager -->\n"
+        "<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n"
+        "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n"
+        "j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n"
+        "'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n"
+        f"}})(window,document,'script','dataLayer','{GTM_CONTAINER_ID}');</script>\n"
+        "<!-- End Google Tag Manager -->\n"
         '<link rel="icon" href="favicon.svg" type="image/svg+xml">\n'
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700'
@@ -516,7 +528,9 @@ def document(title: str, active: str, body: str, *, canonical: bool = False) -> 
         "<p>Built only from the committed <code>results/</code> of "
         f'<a href="{REPO_URL}">laceyenterprises/agentpaddock</a>. '
         f'Submit a run or a correction: <a href="{REPO_URL}/blob/main/CONTRIBUTING.md">'
-        "CONTRIBUTING</a>.</p></div><div>"
+        "CONTRIBUTING</a>.</p>"
+        "<p>This site uses Google Analytics to count visits. "
+        "Google Tag Manager loads on every page; analytics cookies are disabled for visitors in the EEA, the UK, Switzerland and listed territories.</p></div><div>"
         f'<a href="{REPO_URL}">GitHub</a>'
         f'<a href="{REPO_URL}/blob/main/CONTRIBUTING.md">CONTRIBUTING</a>'
         f'<a href="{REPO_URL}/blob/main/LICENSE">MIT LICENSE</a></div></div>'
