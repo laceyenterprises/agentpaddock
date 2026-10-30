@@ -59,6 +59,27 @@ def test_site_from_gzip_matches_site_from_plain_results(tmp_path):
     assert build_site.build(results) == expected
 
 
+def _is_tag_manager_link(scheme: str, target: str) -> bool:
+    return scheme == "https:" and target.startswith("www.googletagmanager.com/")
+
+
+@pytest.mark.parametrize(
+    ("url", "allowed"),
+    [
+        ("https://www.googletagmanager.com/gtm.js?id=GTM-P52SNL3D", True),
+        ("https://www.googletagmanager.com/ns.html?id=GTM-P52SNL3D", True),
+        ("http://www.googletagmanager.com/gtm.js", False),
+        ("//www.googletagmanager.com/gtm.js", False),
+        ("https://www.googletagmanager.com.example/gtm.js", False),
+        ("https://www.googletagmanager.com@other.example/gtm.js", False),
+        ("https://www.google-analytics.com/analytics.js", False),
+    ],
+)
+def test_tag_manager_external_link_allowance(url, allowed):
+    scheme, target = ABSOLUTE_LINK.search(f'src="{url}"').groups()
+    assert _is_tag_manager_link(scheme, target) is allowed
+
+
 def test_built_html_links_only_relatively_and_to_the_public_names():
     for files in (build_site.build(FIXTURE), build_site.build(lb.DEFAULT_RESULTS)):
         for name, page in files.items():
@@ -83,7 +104,12 @@ def test_built_html_links_only_relatively_and_to_the_public_names():
                     target.startswith("fonts.googleapis.com/")
                     or target == "fonts.gstatic.com"
                 )
-                assert public_link or vendor_evidence or font_link, f"{name}: {target}"
+                assert (
+                    public_link
+                    or vendor_evidence
+                    or font_link
+                    or _is_tag_manager_link(scheme, target)
+                ), f"{name}: {target}"
             canonical = re.findall(r'rel="canonical" href="([^"]+)"', page)
             assert canonical in ([], ["https://agentpaddock.ai/"]), name
         assert (
@@ -175,7 +201,9 @@ def test_audited_without_sign_off_remains_provisional_and_escapes_evidence():
     )
     assert "alpha-cli" in build_site.fairness_banner(results)
     page = build_site.methodology_page(results)
-    assert "<script>" not in page
+    assert (
+        "<script>" not in page.split('<main class="wrap">', 1)[1].split("</main>", 1)[0]
+    )
     assert "&lt;script&gt;&quot;finding&quot;&lt;/script&gt;" in page
     assert (
         'href="https://vendor.example/defaults?a=1&amp;b=2" rel="noopener noreferrer"'
@@ -268,6 +296,48 @@ class Elements(HTMLParser):
         self.items.append((tag, dict(attrs)))
 
 
+def test_every_page_has_tag_manager_consent_defaults_and_disclosure(tmp_path):
+    consent = """<!-- Google consent defaults: analytics off in the EEA, UK and Switzerland until consent; ad storage off everywhere -->
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
+gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IS','IE','IT','LV','LI','LT','LU','MT','NL','NO','PL','PT','RO','SK','SI','ES','SE','GB','CH']});
+gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'granted'});</script>"""
+    loader = """<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-P52SNL3D');</script>
+<!-- End Google Tag Manager -->"""
+    noscript = """<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P52SNL3D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->"""
+    disclosure = (
+        "This site uses Google Analytics to count visits. "
+        "Analytics is off by default for visitors in the EEA, the UK and Switzerland."
+    )
+    out = tmp_path / "site"
+    assert build_site.GTM_CONTAINER_ID == "GTM-P52SNL3D"
+    assert build_site.main(["--results", str(FIXTURE), "--out", str(out)]) == 0
+    pages = sorted(out.glob("*.html"))
+    assert {page.name for page in pages} == {
+        name for name in build_site.build(FIXTURE) if name.endswith(".html")
+    }
+    for path in pages:
+        page = path.read_text(encoding="utf-8")
+        head = page.split("<head>", 1)[1].split("</head>", 1)[0]
+        footer = page.split('<footer class="footer">', 1)[1].split("</footer>", 1)[0]
+        for block in (consent, loader, noscript):
+            assert page.count(block) == 1, path.name
+        assert head.index(consent) < head.index(loader)
+        assert head.index("<script>") == head.index(consent) + consent.index("<script>")
+        assert page.split("<body>", 1)[1].lstrip().startswith(noscript), path.name
+        assert page.count("GTM-P52SNL3D") == 2, path.name
+        assert page.count("www.googletagmanager.com/gtm.js") == 1, path.name
+        assert page.count("<noscript>") == page.count("<iframe") == 1, path.name
+        assert footer.count(disclosure) == 1, path.name
+        assert "gtag/js" not in page and "googletagmanager.com/gtag" not in page
+
+
 def test_every_local_link_and_anchor_resolves():
     files = build_site.build(FIXTURE)
     elements = {
@@ -306,7 +376,7 @@ def test_brand_assets_and_navigation_on_every_page():
         assert '<link rel="stylesheet" href="paddock.css">' in page
         assert 'aria-label="Paddock home"' in page and "PADDOCK" in page
         assert page.count("fonts.googleapis.com/css2?") == 1 and "display=swap" in page
-        assert "<script" not in page and "<style" not in page
+        assert page.count("<script") == 2 and "<style" not in page
         assert "<h1>" in page and page.count("<h1>") == 1
         for other, _ in build_site.PAGES:
             assert f'href="{other}"' in page
