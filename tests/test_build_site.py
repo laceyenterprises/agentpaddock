@@ -136,7 +136,7 @@ def test_pages_show_boards_matrix_tasks_changelog_and_methodology():
     files = build_site.build(FIXTURE)
     index = files["index.html"]
     assert "<h3>review</h3>" in index and "task version 2" in index
-    assert "review · task version 1" in index
+    assert "Also: task version 1 · 1 task · 1 entry →" in index
     assert "95% Wilson" in index
     assert "not measured" in files["board-review-v1.html"]
     assert "beta-cli" in index.split('class="caveat"')[1].split("</p>")[0]
@@ -325,7 +325,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         footer = page.split('<footer class="footer">', 1)[1].split("</footer>", 1)[0]
         for block in (consent, loader):
             assert page.count(block) == 1, path.name
-        assert head.index('<meta name="viewport"') < head.index("<title>") < head.index(consent) < head.index(loader)
+        assert (
+            head.index('<meta name="viewport"')
+            < head.index("<title>")
+            < head.index(consent)
+            < head.index(loader)
+        )
         assert head.index("<script>") == head.index(consent) + consent.index("<script>")
         assert page.count("GTM-P52SNL3D") == 1, path.name
         assert page.count("www.googletagmanager.com/gtm.js") == 1, path.name
@@ -386,28 +391,105 @@ def test_brand_assets_and_navigation_on_every_page():
     assert all(color in favicon for color in ("#007BFF", "#00C27A", "#E0703A"))
 
 
-def test_overview_selects_current_boards_and_preserves_old_anchors():
+def test_overview_features_one_board_per_suite_and_preserves_old_anchors():
     results = lb.load_results(FIXTURE)
     files = build_site.build(FIXTURE)
     index = files["index.html"]
-    current, earlier = index.split('<h2 id="current-boards">')[1].split(
-        '<h2 id="earlier-boards">'
-    )
+    current = index.split('<h2 id="current-boards">')[1].split("</section>")[0]
     assert "<table" not in index
     assert "<h1>Leaderboard</h1>" in index and build_site.DESCRIPTION in index
+    assert index.count(build_site.TASK_VERSIONS) == 1
     assert f"<b>{len(results.records)}</b><span>result rows</span>" in index
     boards = lb.boards(results.records)
+    cards = re.findall(r'<article class="card".*?</article>', current)
+    assert len(cards) == len({b["suite"] for b in boards})
     for board in boards:
         anchor = build_site.board_anchor(board)
         assert index.count(f'id="{anchor}"') == 1
-        latest = max(b["task_version"] for b in boards if b["suite"] == board["suite"])
-        section = current if board["task_version"] == latest else earlier
-        assert f'id="{anchor}"' in section
-        assert f'href="{build_site.board_filename(board)}"' in section
-    for card in re.findall(r'<article class="card".*?</article>', current):
+        card = next(c for c in cards if f"<h3>{board['suite']}</h3>" in c)
+        assert f'id="{anchor}"' in card
+        assert f'href="{build_site.board_filename(board)}"' in card
+    for card in cards:
         anchor = re.search(r'id="([^"]+)"', card)[1]
         board = next(b for b in boards if build_site.board_anchor(b) == anchor)
         assert card.count('<li class="tower-row">') == min(5, len(board["rows"]))
+    assert "Earlier task versions" not in index and "earlier-boards" not in index
+
+
+def _three_board_suite(tmp_path: Path) -> Path:
+    """The fixture plus a synthetic suite with boards v1 (5 tasks, 1 entry),
+    v2 (5 tasks, 2 entries) and v3 (1 task, 1 entry)."""
+    results = tmp_path / "results"
+    shutil.copytree(FIXTURE, results)
+    (name,) = [p.name for p in FIXTURE.glob("*.json")]
+    document = deepcopy(lb.load_results(FIXTURE).documents[name])
+    first, other = document["records"][0], document["records"][3]
+    plan = [(1, 5, (first,)), (2, 5, (first, other)), (3, 1, (first,))]
+    records = []
+    for version, tasks, templates in plan:
+        for task in range(1, tasks + 1):
+            for template in templates:
+                record = deepcopy(template)
+                record.update(
+                    run_id=f"triad-{len(records):03d}",
+                    suite="triad",
+                    task=f"triad-{task}",
+                    task_version=version,
+                )
+                records.append(record)
+    document.update(id="triad-run", records=records)
+    lb.write_document(results / f"{document['date']}-triad-run.json", document)
+    return results
+
+
+def test_featured_board_has_the_most_tasks_and_lists_the_others(tmp_path: Path):
+    results = _three_board_suite(tmp_path)
+    triad = [
+        b for b in lb.boards(lb.load_results(results).records) if b["suite"] == "triad"
+    ]
+    assert build_site.featured_board(triad)["task_version"] == 2
+    files = build_site.build(results)
+    assert build_site.build(results) == files
+    index = files["index.html"]
+    (card,) = [
+        c
+        for c in re.findall(r'<article class="card".*?</article>', index)
+        if "<h3>triad</h3>" in c
+    ]
+    assert card.startswith('<article class="card" id="triad-v2">')
+    assert '<p class="kicker">task version 2 · 5 tasks · 2 entries</p>' in card
+    also = re.findall(
+        r'<li><a id="([^"]+)" href="([^"]+)">Also: ([^<]+)</a></li>', card
+    )
+    assert also == [
+        ("triad-v3", "board-triad-v3.html", "task version 3 · 1 task · 1 entry →"),
+        ("triad-v1", "board-triad-v1.html", "task version 1 · 5 tasks · 1 entry →"),
+    ]
+    assert card.index('<ul class="also">') > card.index('<div class="tower">')
+    for version in (1, 2, 3):
+        assert index.count(f'id="triad-v{version}"') == 1
+    assert "<details><summary>1 task</summary>" in files["board-triad-v3.html"]
+    assert "<details><summary>5 tasks</summary>" in files["board-triad-v1.html"]
+    assert "Earlier task versions" not in index
+
+
+def test_featured_board_tie_breaks():
+    def board(version, tasks, rows):
+        return {"task_version": version, "tasks": ["t"] * tasks, "rows": [{}] * rows}
+
+    assert (
+        build_site.featured_board([board(1, 5, 1), board(2, 5, 1)])["task_version"] == 2
+    )
+    assert (
+        build_site.featured_board([board(1, 6, 1), board(2, 5, 9)])["task_version"] == 1
+    )
+    a, b = board(1, 5, 1), board(1, 5, 2)
+    assert (
+        build_site.featured_board([b, a]) is b
+        and build_site.featured_board([a, b]) is b
+    )
+    assert build_site.plural(1, "task") == "1 task"
+    assert build_site.plural(0, "entry", "entries") == "0 entries"
 
 
 def test_each_board_page_preserves_its_own_values_and_tasks():
