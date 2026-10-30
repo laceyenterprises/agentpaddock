@@ -32,52 +32,356 @@ DEFAULT_OUT = lb.MODULE_ROOT / "site"
 
 PAGES = (
     ("index.html", "Leaderboard"),
-    ("matrix.html", "Harness x model"),
+    ("matrix.html", "Harness × model"),
     ("tasks.html", "Tasks"),
-    ("changelog.html", "Grading changelog"),
+    ("changelog.html", "Changelog"),
     ("methodology.html", "Methodology"),
 )
 
 STYLE = """
-:root { color-scheme: light; --surface: #fcfcfb; --raised: #f3f2ee; --ink: #0b0b0b;
-  --ink-2: #52514e; --rule: #dcdbd5; --series-1: #2a78d6; --band: #b9d2f2; --warn: #8a5a00; }
-@media (prefers-color-scheme: dark) {
-  :root { color-scheme: dark; --surface: #1a1a19; --raised: #242422; --ink: #f0efec;
-    --ink-2: #c3c2b7; --rule: #3a3a37; --series-1: #3987e5; --band: #29476b; --warn: #e0b453; }
+:root {
+  /* paper and ink (Searchlight family) */
+  --paper: #FFFFFF;
+  --soft: #F4F6F9;
+  --rule: #E3E7EC;
+  --ink: #111111;
+  --ink-2: #4F5761;
+  --muted: #626C78;
+  /* Lacey Enterprises brand: blue = interactive, green = the finish */
+  --blue: #007BFF;
+  --blue-ink: #0057B3;
+  --blue-soft: #EAF3FF;
+  --go: #00C27A;
+  --go-ink: #007A4D;
+  --go-soft: #E2F7EE;
+  /* flags */
+  --red: #E5202E;
+  --red-ink: #B3121C;
+  --amber: #F5B700;
+  --amber-ink: #8A5A00;
+  /* the timing tower never changes with the theme */
+  --tower: #0E1116;
+  --tower-2: #171B22;
+  --tower-rule: #262C35;
+  --tower-fg: #F2F4F7;
+  --tower-mute: #8B94A3;
+  --tower-lit: #2BD99A;
+  /* team liveries: one colour per car (harness), used in every chart */
+  --car-cc: #E0703A;
+  --car-codex: #10A37A;
+  --car-opencode: #C2185B;
+  --car-pi: #007BFF;
+  --car-agy: #D99A00;
+
+  --display: "Saira Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+  --body: "Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --radius-card: 18px;
+  --radius-inner: 12px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
 }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0C0F13; --soft: #141920; --rule: #262C35; --ink: #F2F4F7; --ink-2: #B9C1CC; --muted: #8B94A3;
+    --blue: #3D9BFF; --blue-ink: #7DBBFF; --blue-soft: #0F2238;
+    --go: #2BD99A; --go-ink: #5BE3AE; --go-soft: #0D2A20;
+    --red: #FF4D4F; --red-ink: #FF8587; --amber: #FFC83D; --amber-ink: #FFD36B;
+    --tower: #161B22; --tower-2: #1D232C; --tower-rule: #2B323C;
+    --car-cc: #F08A55; --car-codex: #2BC495; --car-opencode: #E8558E; --car-pi: #3D9BFF; --car-agy: #FFC83D;
+    color-scheme: dark;
+  }
+}
+
+/* ---------- base ---------- */
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 16px/1.6 var(--body);
+  font-feature-settings: "cv11", "ss01";
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 10; background: var(--paper);
+}
+a { color: var(--blue-ink); text-underline-offset: 3px; }
+a:hover { color: var(--blue-ink); }
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 4px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+p { margin: 0; }
+code, .mono { font-family: var(--mono); font-size: .86em; }
+.num { font-variant-numeric: tabular-nums; }
+
+.wrap {
+  max-width: 1120px; margin: 0 auto;
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
+}
+.section { padding-block: 80px; }
+.section.soft { background: var(--soft); }
+.section-head { display: grid; gap: 12px; max-width: 720px; margin-bottom: 40px; }
+.eyebrow {
+  font: 600 12px/1.2 var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--blue-ink);
+  display: inline-flex; align-items: center; gap: 10px;
+}
+h2.h2 { font: 700 clamp(30px, 4vw, 44px)/1.05 var(--display); letter-spacing: -.005em; }
+.lede { font-size: 18px; color: var(--ink-2); max-width: 640px; }
+.small { font-size: 14px; color: var(--muted); }
+
+/* engineer's line: the same fact in the field's own terms */
+.eng {
+  font: 400 12.5px/1.55 var(--mono); color: var(--muted);
+  border-top: 1px dashed var(--rule); padding-top: 10px; margin-top: auto;
+}
+.eng b { color: var(--ink-2); font-weight: 500; }
+
+/* ---------- nav ---------- */
+.nav {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px);
+  border-bottom: 1px solid var(--rule);
+}
+.nav .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; flex: none; }
+.brand svg { width: 30px; height: 30px; display: block; }
+.wordmark { font: italic 800 22px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; }
+.nav-links { display: flex; gap: 4px; margin-left: auto; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+.nav-links::-webkit-scrollbar { display: none; }
+.nav-links a {
+  color: var(--ink-2); text-decoration: none; font-size: 14.5px; font-weight: 500; padding: 8px 12px; border-radius: 999px;
+  white-space: nowrap; transition: background .2s var(--ease), color .2s var(--ease);
+}
+.nav-links a:hover, .nav-links a[aria-current="page"] { background: var(--soft); color: var(--ink); }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px;
+  border-radius: 999px; font: 600 15px/1 var(--body); text-decoration: none; border: 1.5px solid var(--ink);
+  transition: transform .12s var(--ease), background .2s var(--ease), color .2s var(--ease);
+}
+.btn:active { transform: translateY(1px); }
+.btn.solid { background: var(--ink); color: var(--paper); }
+.btn.solid:hover { background: var(--ink-2); border-color: var(--ink-2); color: var(--paper); }
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.ghost:hover { background: var(--soft); color: var(--ink); }
+.btn.sm { min-height: 36px; padding: 0 14px; font-size: 14px; }
+.btn svg { width: 16px; height: 16px; }
+
+
+/* ---------- timing tower ---------- */
+.tower {
+  background: var(--tower); color: var(--tower-fg); border-radius: var(--radius-card); overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .25), 0 18px 48px -18px rgba(10, 14, 20, .55);
+  min-width: 0;
+}
+.tower-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--tower-rule);
+}
+.tower-title { font: italic 800 18px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; }
+.tower-sub { font: 500 11px/1.2 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--tower-mute); }
+.tower-cols, .tower-row {
+  display: grid; grid-template-columns: 34px 4px minmax(0, 1fr) 62px 62px; align-items: center; column-gap: 10px;
+  padding: 0 16px;
+}
+.tower-cols { font: 500 10.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--tower-mute); padding-block: 10px 6px; }
+.tower-cols span:nth-child(n+4) { text-align: right; }
+.tower ol { list-style: none; margin: 0; padding: 0 0 6px; }
+.tower-row { padding-block: 8px; border-top: 1px solid var(--tower-rule); }
+.tower-row:first-child { border-top: 0; }
+.pos {
+  font: italic 800 20px/1 var(--display); text-align: center; color: var(--tower-fg); font-variant-numeric: tabular-nums;
+}
+.pos.p1 { color: var(--tower-lit); }
+.livery { width: 4px; height: 30px; border-radius: 2px; background: var(--c, var(--tower-mute)); }
+.who { min-width: 0; display: grid; gap: 1px; }
+.who b { font: 600 14.5px/1.2 var(--body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who span { font: 400 12px/1.2 var(--mono); color: var(--tower-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fin { white-space: nowrap; text-align: right; font: italic 800 22px/1 var(--display); font-variant-numeric: tabular-nums; }
+.fin small { font: 500 11px var(--mono); color: var(--tower-mute); font-style: normal; margin-left: 1px; }
+.cost { text-align: right; font: 500 12.5px/1 var(--mono); color: var(--tower-fg); font-variant-numeric: tabular-nums; }
+.cost.na { color: var(--tower-mute); }
+.tower-foot {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px 14px;
+  border-top: 1px solid var(--tower-rule); font: 400 11.5px/1.4 var(--mono); color: var(--tower-mute);
+}
+.tower-foot a { color: var(--tower-fg); font-weight: 600; white-space: nowrap; }
+.checker {
+  height: 10px; background-color: var(--tower-fg);
+  background-image: conic-gradient(var(--tower) 25%, transparent 0 50%, var(--tower) 0 75%, transparent 0);
+  background-size: 10px 10px;
+}
+
+/* ---------- checkered finish-line rule ---------- */
+.finish-line {
+  height: 12px; background-color: var(--paper);
+  background-image: conic-gradient(var(--ink) 25%, transparent 0 50%, var(--ink) 0 75%, transparent 0);
+  background-size: 12px 12px; opacity: .9;
+}
+
+/* ---------- findings ---------- */
+.cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.card {
+  background: var(--paper); border: 1px solid var(--rule); border-radius: var(--radius-card); padding: 28px;
+  display: flex; flex-direction: column; gap: 12px; min-width: 0;
+}
+.card .big { font: italic 800 clamp(44px, 5.4vw, 60px)/.95 var(--display); color: var(--blue); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.card .kicker { font: 600 12px/1.2 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.card h3 { font: 600 21px/1.25 var(--body); letter-spacing: -.01em; }
+.card p { color: var(--ink-2); }
+.caveat {
+  margin-top: 24px; display: flex; gap: 12px; align-items: flex-start; font-size: 14px; color: var(--ink-2);
+  padding: 14px 16px; border-radius: var(--radius-inner); background: var(--paper); border: 1px solid var(--rule);
+}
+.flag-chip {
+  flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 5px; margin-top: 1px;
+}
+.flag-chip.yellow { background: var(--amber); }
+.flag-chip svg { width: 14px; height: 14px; }
+
+
+/* ---------- footer ---------- */
+.footer { background: var(--tower); color: var(--tower-fg); padding-block: 0 40px; }
+.footer .checker { margin-bottom: 40px; }
+.footer-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 32px; }
+.footer h4 { margin: 0 0 10px; font: 600 11.5px/1.2 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--tower-mute); }
+.footer a { color: var(--tower-fg); text-decoration: none; display: block; padding: 3px 0; font-size: 14.5px; }
+.footer a:hover { color: var(--tower-lit); }
+.footer p { color: var(--tower-mute); font-size: 14px; }
+.footer .brand { color: var(--tower-fg); margin-bottom: 12px; }
+.footer-base { margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--tower-rule); font: 400 12px var(--mono); color: var(--tower-mute); display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+
+/* ---------- standings page ---------- */
+.page-hero { padding-block: 56px 32px; }
+.page-hero h1 { font: italic 800 clamp(44px, 6.4vw, 76px)/.95 var(--display); text-transform: uppercase; letter-spacing: -.01em; margin-top: 14px; }
+.page-hero .lede { margin-top: 16px; }
+
+.grid-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--radius-card); background: var(--paper); }
+table.grid { border-collapse: collapse; width: 100%; min-width: 680px; font-variant-numeric: tabular-nums; }
+.grid th, .grid td { padding: 10px 12px; border-top: 1px solid var(--rule); text-align: center; font-size: 14px; }
+.grid thead th { border-top: 0; background: var(--soft); font: 600 11.5px/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.grid thead th .dot { margin-right: 6px; vertical-align: -1px; }
+.grid th[scope="row"] { text-align: left; font-weight: 600; white-space: nowrap; }
+.grid th[scope="row"] small { display: block; font: 400 11.5px var(--mono); color: var(--muted); }
+.grid td .cell { display: inline-flex; align-items: center; justify-content: center; gap: 1px; white-space: nowrap; padding: 0 6px; min-width: 46px; height: 34px; border-radius: 8px; font: italic 800 19px/1 var(--display); }
+.grid td .cell.best { outline: 2px solid var(--ink); outline-offset: 1px; }
+.grid td.empty { color: var(--muted); }
+
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--surface); color: var(--ink);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-header, main, footer { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
-header { padding-top: 24px; }
-header h1 { margin: 0; font-size: 26px; }
-header p { margin: 4px 0 12px; color: var(--ink-2); }
-nav { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
-nav a { color: var(--ink-2); text-decoration: none; }
-nav a[aria-current] { color: var(--ink); font-weight: 600; }
-a { color: var(--series-1); }
-h2 { margin-top: 36px; font-size: 20px; }
-h3 { margin-top: 24px; font-size: 16px; }
-.note { color: var(--ink-2); font-size: 14px; }
-.banner { margin: 16px 0; padding: 10px 14px; border-left: 4px solid var(--warn);
-  background: var(--raised); }
-.scroll { overflow-x: auto; }
-table { border-collapse: collapse; width: 100%; margin: 8px 0 4px; font-size: 14px; }
-th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
-th { color: var(--ink-2); font-weight: 600; white-space: nowrap; }
-.nowrap { white-space: nowrap; }
-td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-code { font-size: 13px; }
-.ci { display: inline-block; vertical-align: middle; }
-.ci .track { stroke: var(--rule); }
-.ci .band { fill: var(--band); }
-.ci .point { fill: var(--series-1); }
-.chart .bar { fill: var(--series-1); }
+.symbols { position: absolute; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+a:hover { color: var(--blue-ink); }
+.brand:hover { color: var(--ink); }
+html { scroll-padding-top: 90px; }
+.wrap { max-width: 1488px; min-width: 0; }
+main { padding-bottom: 64px; }
+h2 { font: 700 36px/1.1 var(--display); margin: 40px 0 20px; }
+h3 { font: 600 24px/1.3 var(--display); margin: 28px 0 12px; }
+h4 { margin: 24px 0 12px; }
+p, ul, ol, pre { margin-block: 12px; }
+.footer p a { display: inline; }
+.wordmark { font: italic 800 22px/1 "Saira", var(--display); letter-spacing: .01em; }
+.note { color: var(--muted); font-size: 13px; }
+.page-hero { max-width: 100%; }
+.page-hero h1 { overflow-wrap: anywhere; }
+.lede { max-width: 72ch; }
+.facts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-block: 1px solid var(--rule); }
+.fact { padding: 20px 12px 20px 0; display: grid; gap: 6px; }
+.fact b { font: italic 800 36px/1 var(--display); }
+.fact span { color: var(--muted); font-size: 13px; }
+.caveat { margin-bottom: 28px; }
+.caveat p { margin: 0; }
+.flag-chip { color: #111111; }
+.card h3 { margin: 0; overflow-wrap: anywhere; }
+.card .kicker { line-height: 1.6; }
+.card .tower { margin-top: auto; }
+.card-link { align-self: flex-start; }
+.earlier { list-style: none; padding: 0; }
+.earlier li { padding-block: 10px; border-bottom: 1px solid var(--rule); }
+[id] { scroll-margin-top: 90px; }
+details { border: 1px solid var(--rule); border-radius: var(--radius-inner); padding: 14px 20px; margin-bottom: 24px; }
+summary { cursor: pointer; font-weight: 600; }
+.task-list { columns: 3 220px; padding-left: 20px; overflow-wrap: anywhere; }
+.table-wrap, .grid-wrap, .scroll { max-width: 100%; overflow-x: auto; }
+.tower-table { border-collapse: collapse; width: 100%; white-space: nowrap; }
+.tower-table th, .tower-table td { padding: 12px 8px; border-bottom: 1px solid var(--tower-rule); text-align: right; }
+.tower-table th { color: var(--tower-mute); font: 500 10px/1.3 var(--mono); text-transform: uppercase; }
+.tower-table td { font: 400 12.5px/1.4 var(--mono); }
+.tower-table th:nth-child(3), .tower-table td:nth-child(3) { text-align: left; }
+.tower-table td:nth-child(2) { padding-inline: 0; width: 4px; }
+.tower-table .who { display: table-cell; }
+.tower-table .who b { display: block; overflow: visible; font-size: 14.5px; }
+.tower-table .who span { display: block; overflow: visible; margin-top: 5px; font-size: 11px; }
+.tower .who a { color: inherit; text-decoration: none; }
+.tower .who a:hover { text-decoration: underline; }
+.tower-table .pos { font: italic 800 22px/1 var(--display); text-align: center; }
+.tower-table .fin { font: italic 800 24px/1 var(--display); }
+.tower .note { color: var(--tower-mute); font-size: 11px; }
+.tower .cost { white-space: nowrap; }
+.ci { display: inline-block; vertical-align: middle; width: 72px; height: 14px; }
+.ci .track { stroke: var(--tower-rule); }
+.ci .band { fill: var(--tower-mute); }
+.ci .point { fill: var(--tower-lit); }
+.tag { font: 500 10px/1 var(--mono); padding: 3px 4px; border: 1px solid var(--tower-rule); border-radius: 4px; color: var(--tower-mute); }
+.tower-row { grid-template-columns: 26px 4px minmax(0, 1fr) 64px; }
+.tower-row .who b { font-size: 12px; }
+.tower-row .who span { font-size: 10px; }
+.tower-foot { flex-wrap: wrap; }
+.grid-wrap { margin-block: 16px 28px; }
+.grid td { vertical-align: top; text-align: left; overflow-wrap: anywhere; }
+.grid .num { text-align: right; }
+.matrix td { text-align: center; }
+.grid td .cell { background: color-mix(in srgb, var(--blue) var(--shade), var(--paper)); color: var(--ink); font: 500 12px/1.5 var(--mono); height: auto; padding: 6px 10px; margin: 2px; }
+.grid code { overflow-wrap: anywhere; }
+.chart { font-family: var(--mono); }
+.chart .bar { fill: var(--blue); }
 .chart text { fill: var(--ink); font-size: 12px; }
-.chart .muted { fill: var(--ink-2); }
-footer { margin-top: 48px; padding: 16px 20px 32px; color: var(--ink-2); font-size: 13px;
-  border-top: 1px solid var(--rule); }
+.chart .muted { fill: var(--muted); }
+.prose > p, .prose > ul, .prose > ol { max-width: 72ch; }
+pre { overflow-x: auto; padding: 20px; background: var(--soft); border-radius: var(--radius-inner); }
+.footer .brand { display: inline-flex; }
+.footer .brand { --ink: var(--tower-fg); --paper: var(--tower); }
+.footer-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+@media (max-width: 1279px) {
+  .tower-table { min-width: 1200px; }
+}
+@media (max-width: 960px) {
+  .nav .wrap { gap: 12px; }
+  .nav-links a { padding-inline: 10px; }
+  .cards { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .wrap { padding-inline: 16px; }
+  .nav .wrap { height: 56px; gap: 12px; }
+  .nav .gh { display: none; }
+  .wordmark { font-size: 19px; }
+  .nav-links { margin-left: 0; }
+  .nav-links a { font-size: 13px; }
+  .page-hero { padding-top: 36px; }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card { padding: 18px; }
+  .footer-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; }
+}
 """
+
+MARK = """<g transform="translate(9 0) skewX(-10)">
+    <rect x="18" y="16" width="64" height="68" rx="7" fill="var(--ink)"/>
+    <rect x="26" y="26" width="8" height="12" fill="#007BFF"/><rect x="38" y="26" width="36" height="12" fill="var(--paper)"/>
+    <rect x="26" y="44" width="8" height="12" fill="#00C27A"/><rect x="38" y="44" width="26" height="12" fill="var(--paper)"/>
+    <rect x="26" y="62" width="8" height="12" fill="#E0703A"/><rect x="38" y="62" width="16" height="12" fill="var(--paper)"/>
+  </g>"""
+
+FAVICON = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">\n'
+    "<style>:root { --ink: #111111; --paper: #FFFFFF; } "
+    "@media (prefers-color-scheme: dark) { :root { --ink: #F2F4F7; --paper: #0C0F13; } }</style>\n"
+    + MARK
+    + "\n</svg>\n"
+)
 
 
 def esc(value: Any) -> str:
@@ -130,14 +434,17 @@ def cost_cell(summary: Mapping[str, Any]) -> str:
     shown = lb.format_cost(cost)
     if shown == lb.UNKNOWN:
         return "unknown"
-    return f'{esc(shown)} <span class="note">{esc(cost["source"])}</span>'
+    tag = {"published-rate": "list", "provider-invoice-reconciled": "invoice"}[
+        cost["source"]
+    ]
+    return f'{esc(shown)} <span class="tag">{tag}</span>'
 
 
 def ci_svg(low: float, high: float, point: float | None) -> str:
     width, height = 120, 14
     x = lambda value: 2 + value * (width - 4)  # noqa: E731
     parts = [
-        f'<svg class="ci" width="{width}" height="{height}" role="img" '
+        f'<svg class="ci" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" '
         f'aria-label="95% interval {pct(low)} to {pct(high)}">',
         f'<line class="track" x1="2" x2="{width - 2}" y1="7" y2="7" stroke-width="1"/>',
         f'<rect class="band" x="{x(low):.1f}" y="3" width="{max(x(high) - x(low), 1):.1f}" '
@@ -155,6 +462,23 @@ def excluded_text(excluded: Mapping[str, int]) -> str:
     return ", ".join(f"{count} {esc(tag)}" for tag, count in excluded.items())
 
 
+def brand() -> str:
+    return (
+        '<a class="brand" href="index.html" aria-label="Paddock home">'
+        '<svg viewBox="0 0 100 100" aria-hidden="true"><use href="#broadcast"/></svg>'
+        '<span class="wordmark">PADDOCK</span></a>'
+    )
+
+
+def hero(eyebrow: str, title: str, lede: str = "") -> str:
+    return (
+        f'<div class="page-hero"><span class="eyebrow">{esc(eyebrow)}</span>'
+        f"<h1>{esc(title)}</h1>"
+        + (f'<p class="lede">{lede}</p>' if lede else "")
+        + "</div>"
+    )
+
+
 def document(title: str, active: str, body: str, *, canonical: bool = False) -> str:
     current = ' aria-current="page"'
     nav = "".join(
@@ -162,38 +486,110 @@ def document(title: str, active: str, body: str, *, canonical: bool = False) -> 
         for name, label in PAGES
     )
     head_link = f'<link rel="canonical" href="{SITE_URL}">' if canonical else ""
+    # Other pages keep their content but share the same table and page treatments.
+    body = body.replace(
+        '<div class="scroll"><table>', '<div class="grid-wrap"><table class="grid">'
+    )
+    body = re.sub(r"<th\b(?![^>]*\bscope=)([^>]*)>", r'<th scope="col"\1>', body)
+    if active not in ("index.html", "matrix.html") and "<h1>" not in body:
+        body = re.sub(r"<h2>(.*?)</h2>", lambda m: hero("Paddock", m[1]), body, count=1)
+    prose = ' class="prose"' if active == "methodology.html" else ""
     return (
         "<!doctype html>\n"
         '<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"<title>{esc(title)} · Paddock</title>\n{head_link}\n"
-        f"<style>{STYLE}</style>\n</head>\n<body>\n"
-        "<header><h1>Paddock</h1>"
-        "<p>An open leaderboard for coding agents: model × harness on real repository tasks.</p>"
-        f"<nav>{nav}</nav></header>\n<main>\n{body}\n</main>\n"
-        "<footer>Built only from the committed <code>results/</code> of "
+        '<link rel="icon" href="favicon.svg" type="image/svg+xml">\n'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
+        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700'
+        "&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Saira:ital,wght@1,800"
+        '&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,800&amp;display=swap" rel="stylesheet">\n'
+        '<link rel="stylesheet" href="paddock.css">\n</head>\n<body>\n'
+        '<svg width="0" height="0" aria-hidden="true" class="symbols">'
+        f'<defs><symbol id="broadcast" viewBox="0 0 100 100">{MARK}</symbol></defs></svg>\n'
+        f'<header class="nav"><nav class="wrap" aria-label="Main">{brand()}'
+        f'<div class="nav-links">{nav}</div>'
+        f'<a class="btn ghost sm gh" href="{REPO_URL}">GitHub</a></nav></header>\n'
+        f'<main class="wrap"><div{prose}>\n{body}\n</div></main>\n'
+        '<footer class="footer"><div class="checker"></div><div class="wrap">'
+        f'<div class="footer-grid"><div>{brand()}'
+        "<p>Built only from the committed <code>results/</code> of "
         f'<a href="{REPO_URL}">laceyenterprises/agentpaddock</a>. '
         f'Submit a run or a correction: <a href="{REPO_URL}/blob/main/CONTRIBUTING.md">'
-        "CONTRIBUTING</a>.</footer>\n</body>\n</html>\n"
+        "CONTRIBUTING</a>.</p></div><div>"
+        f'<a href="{REPO_URL}">GitHub</a>'
+        f'<a href="{REPO_URL}/blob/main/CONTRIBUTING.md">CONTRIBUTING</a>'
+        f'<a href="{REPO_URL}/blob/main/LICENSE">MIT LICENSE</a></div></div>'
+        '<div class="footer-base">A Lacey Enterprises project · MIT licensed · '
+        "© 2026 Lacey Enterprises LLC</div></div></footer>\n</body>\n</html>\n"
     )
 
 
 def fairness_banner(results: lb.Results) -> str:
     harnesses = sorted({record["harness"]["name"] for record in results.records})
-    status = {audit["harness"]: audit["status"] for audit in results.fairness.get("audits", [])}
+    status = {
+        audit["harness"]: audit["status"]
+        for audit in results.fairness.get("audits", [])
+    }
     pending = [name for name in harnesses if status.get(name) != "passed"]
     if not pending:
         return ""
     return (
-        '<p class="banner"><strong>Provisional.</strong> The harness fairness audit '
+        '<div class="caveat"><span class="flag-chip yellow" aria-hidden="true">⚑</span>'
+        "<p><strong>Provisional.</strong> The harness fairness audit "
         f"(tools and permissions against vendor defaults) is not yet signed off for: "
-        f'{esc(", ".join(pending))}. See <a href="methodology.html#fairness">fairness</a>.</p>'
+        f'{esc(", ".join(pending))}. See <a href="methodology.html#fairness">fairness</a>.</p></div>'
     )
 
 
 def board_title(board: Mapping[str, Any]) -> str:
     title = board["suite"]
-    return f"{title} · task version {board['task_version']}" if board["split"] else title
+    return (
+        f"{title} · task version {board['task_version']}" if board["split"] else title
+    )
+
+
+DESCRIPTION = (
+    "An open leaderboard for coding agents: model × harness on real repository tasks."
+)
+COMPARABILITY = (
+    "Each board ranks harness × model combinations on one suite by pass rate with a 95% "
+    "Wilson interval; rows are not comparable across suites or task versions."
+)
+
+
+def board_anchor(board: Mapping[str, Any]) -> str:
+    return f"{board['suite']}-v{board['task_version']}"
+
+
+def board_filename(board: Mapping[str, Any]) -> str:
+    # Suite labels outside the usual slug alphabet still need a single safe filename.
+    suite = board["suite"]
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", suite):
+        suite = "~" + suite.encode("utf-8").hex()
+    return f"board-{suite}-v{board['task_version']}.html"
+
+
+def livery(key: tuple) -> str:
+    token = {
+        "claude-code": "car-cc",
+        "codex": "car-codex",
+        "opencode": "car-opencode",
+        "pi": "car-pi",
+        "antigravity": "car-agy",
+    }.get(key[0], "tower-mute")
+    return f'<div class="livery" style="--c:var(--{token})" aria-hidden="true"></div>'
+
+
+def who(key: tuple) -> str:
+    return (
+        f"<b>{esc(model_label(key))}</b><span>{esc(harness_label(key))} · "
+        f"config {config_cell(key[2])}</span>"
+    )
+
+
+def finish(row: Mapping[str, Any]) -> str:
+    return f"{row['passed']}<small> / {row['n']}</small>" if row["n"] else "—"
 
 
 def board_html(board: Mapping[str, Any]) -> str:
@@ -201,52 +597,99 @@ def board_html(board: Mapping[str, Any]) -> str:
     for rank, row in enumerate(board["rows"], start=1):
         key = row["key"]
         low, high = row["ci"]
-        rate = f"{row['passed']}/{row['n']}" if row["n"] else "—"
         mean = "" if row["mean_score"] is None else f"{row['mean_score']:.2f}"
         rows.append(
             "<tr>"
-            f'<td class="num">{rank}</td>'
-            f'<td class="nowrap">{esc(harness_label(key))}</td>'
-            f"<td>{config_cell(key[2])}</td>"
-            f"<td>{esc(model_label(key))}</td>"
-            f'<td class="num">{rate}</td>'
-            f'<td class="nowrap">{ci_svg(low, high, row["rate"])} {pct(low)}–{pct(high)}</td>'
-            f'<td class="num">{mean}</td>'
-            f'<td class="num">{row["tasks"]}</td>'
-            f'<td class="num">{tokens_cell(row)}</td>'
-            f"<td>{cost_cell(row)}</td>"
-            f'<td class="note">{excluded_text(row["excluded"])}</td>'
+            f'<td class="pos{" p1" if rank == 1 else ""}">{rank}</td>'
+            f'<td>{livery(key)}</td><td class="who">{who(key)}</td>'
+            f'<td class="fin">{finish(row)}</td>'
+            f"<td>{ci_svg(low, high, row['rate'])} {pct(low)}–{pct(high)}</td>"
+            f"<td>{mean}</td><td>{row['tasks']}</td><td>{tokens_cell(row)}</td>"
+            f'<td class="cost">{cost_cell(row)}</td>'
+            f'<td title="{excluded_text(row["excluded"])}">{sum(row["excluded"].values())}</td>'
             "</tr>"
         )
-    anchor = f"{board['suite']}-v{board['task_version']}"
+    tasks = "".join(f"<li>{esc(task)}</li>" for task in board["tasks"])
     return (
-        f'<section id="{esc(anchor)}"><h2>{esc(board_title(board))}</h2>'
-        f'<p class="note">{len(board["tasks"])} tasks: {esc(", ".join(board["tasks"]))}.</p>'
-        '<div class="scroll"><table><thead><tr><th class="num">#</th><th>harness</th>'
-        '<th>config</th><th>model</th><th class="num">passed / n</th><th>95% Wilson</th>'
-        '<th class="num">mean</th><th class="num">tasks</th><th class="num">tokens / pass</th>'
-        "<th>cost / pass</th><th>excluded</th></tr></thead><tbody>"
+        f'<section id="{esc(board_anchor(board))}">'
+        f'<details><summary>{len(board["tasks"])} tasks</summary><ul class="task-list">{tasks}</ul></details>'
+        '<div class="tower"><div class="tower-head">'
+        f'<span class="tower-title">{esc(board_title(board))}</span></div>'
+        '<div class="table-wrap" role="region" aria-label="Board standings" tabindex="0">'
+        '<table class="tower-table"><thead><tr><th scope="col">#</th>'
+        '<th scope="col"><span class="sr-only">Livery</span></th><th scope="col">model · harness · config</th>'
+        '<th scope="col">passed / n</th><th scope="col">95% Wilson</th>'
+        '<th scope="col">mean</th><th scope="col">tasks</th><th scope="col">tokens / pass</th>'
+        '<th scope="col">cost / pass</th><th scope="col">excluded</th></tr></thead><tbody>'
         + "".join(rows)
-        + "</tbody></table></div></section>"
+        + '</tbody></table></div><div class="tower-foot">'
+        "<span>list = published-rate · invoice = provider-invoice-reconciled</span>"
+        '</div><div class="checker"></div></div></section>'
+    )
+
+
+def board_page(board: Mapping[str, Any]) -> str:
+    body = hero(
+        f"Board · task version {board['task_version']}", board["suite"], COMPARABILITY
+    )
+    return document(board_title(board), "index.html", body + board_html(board))
+
+
+def board_card(board: Mapping[str, Any]) -> str:
+    rows = "".join(
+        f'<li class="tower-row"><span class="pos{" p1" if rank == 1 else ""}">{rank}</span>'
+        f'{livery(row["key"])}<div class="who">{who(row["key"])}</div>'
+        f'<span class="fin">{finish(row)}</span></li>'
+        for rank, row in enumerate(board["rows"][:5], start=1)
+    )
+    return (
+        f'<article class="card" id="{esc(board_anchor(board))}"><h3>{esc(board["suite"])}</h3>'
+        f'<p class="kicker">task version {board["task_version"]} · {len(board["tasks"])} tasks · '
+        f'{len(board["rows"])} entries</p><div class="tower"><ol>{rows}</ol></div>'
+        f'<a class="card-link" href="{esc(board_filename(board))}">Full board →</a></article>'
     )
 
 
 def index_page(results: lb.Results) -> str:
     boards = lb.boards(results.records)
     graded = sum(lb.included(record) for record in results.records)
-    toc = ", ".join(
-        f'<a href="#{esc(board["suite"])}-v{board["task_version"]}">{esc(board_title(board))}</a>'
-        for board in boards
+    latest: dict[str, int] = {}
+    for board in boards:
+        latest[board["suite"]] = max(
+            latest.get(board["suite"], 0), board["task_version"]
+        )
+    current = [b for b in boards if b["task_version"] == latest[b["suite"]]]
+    earlier = [b for b in boards if b["task_version"] != latest[b["suite"]]]
+    facts = [
+        (len(results.records), "result rows"),
+        (graded, "graded and scored"),
+        (len(boards), "boards"),
+        (len({r["harness"]["name"] for r in results.records}), "harnesses"),
+        (len({lb.row_key(r)[3:] for r in results.records}), "models"),
+    ]
+    facts_html = "".join(
+        f'<div class="fact"><b>{value}</b><span>{label}</span></div>'
+        for value, label in facts
+    )
+    earlier_html = "".join(
+        f'<li><a id="{esc(board_anchor(b))}" href="{esc(board_filename(b))}">'
+        f"{esc(b['suite'])} · task version {b['task_version']}</a></li>"
+        for b in earlier
     )
     body = (
-        fairness_banner(results)
+        hero("Paddock", "Leaderboard", DESCRIPTION)
+        + f'<div class="facts">{facts_html}</div>'
+        + fairness_banner(results)
+        + '<section aria-labelledby="current-boards"><h2 id="current-boards">Current boards</h2>'
+        + '<div class="cards">'
+        + "".join(board_card(board) for board in current)
+        + "</div></section>"
+        + '<section aria-labelledby="earlier-boards"><h2 id="earlier-boards">Earlier task versions</h2>'
+        + f'<ul class="earlier">{earlier_html}</ul></section>'
         + f"<p>{len(results.records)} result rows from {len(results.documents)} sources, "
-        f"{graded} of them graded and scored. Each board ranks harness × model "
-        "combinations on one suite by pass rate with a 95% Wilson interval; rows are not "
-        "comparable across suites or task versions. Read the "
+        f"{graded} of them graded and scored. {COMPARABILITY} Read the "
         '<a href="methodology.html">methodology</a> before drawing conclusions: most cells '
         "are small.</p>"
-        f"<p>Suites: {toc}.</p>" + "".join(board_html(board) for board in boards)
     )
     return document("Leaderboard", "index.html", body, canonical=True)
 
@@ -263,22 +706,29 @@ def matrix_page(results: lb.Results) -> str:
         for model in data["models"]:
             by_suite = data["cells"].get((harness, model))
             if not by_suite:
-                cells.append('<td class="note">—</td>')
+                cells.append(
+                    '<td class="empty"><span aria-label="No rows">·</span></td>'
+                )
                 continue
-            lines = [
-                f"{esc(suite)}{'' if version == 1 else f' v{version}'}: "
-                f"{summary['passed']}/{summary['n']}"
-                for (suite, version), summary in by_suite.items()
-            ]
+            lines = []
+            for (suite, version), summary in by_suite.items():
+                shade = round((summary["rate"] or 0) * 24)
+                label = f"{suite}{'' if version == 1 else f' v{version}'}"
+                lines.append(
+                    f'<span class="cell" style="--shade:{shade}%">{esc(label)}: '
+                    f"{summary['passed']}/{summary['n']}</span>"
+                )
             cells.append(f"<td>{'<br>'.join(lines)}</td>")
         label = harness_label(harness)
-        rows.append(f"<tr><th>{esc(label)}<br>{config_cell(harness[2])}</th>{''.join(cells)}</tr>")
+        rows.append(
+            f'<tr><th scope="row">{esc(label)}<br>{config_cell(harness[2])}</th>{"".join(cells)}</tr>'
+        )
     body = (
-        "<h2>Harness × model</h2>"
-        '<p class="note">Each cell lists passed / n per suite for one harness configuration '
-        "and model. A dash means the combination has no rows. Coverage differs between "
+        hero("Paddock", "Harness × model")
+        + '<p class="note">Each cell lists passed / n per suite for one harness configuration '
+        "and model. A dot means the combination has no rows. Coverage differs between "
         "cells, so compare within a suite on its board.</p>"
-        f'<div class="scroll"><table><thead><tr><th>harness · config</th>{header}</tr></thead>'
+        f'<div class="grid-wrap"><table class="grid matrix"><thead><tr><th>harness · config</th>{header}</tr></thead>'
         f"<tbody>{''.join(rows)}</tbody></table></div>" + tokens_chart(results)
     )
     return document("Harness x model", "matrix.html", body)
@@ -293,9 +743,7 @@ def tokens_chart(results: lb.Results) -> str:
             if row["tokens_per_pass"] is None:
                 unmeasured += row["n"] > 0
                 continue
-            label = (
-                f"{board_title(board)} · {harness_label(row['key'])} · {model_label(row['key'])}"
-            )
+            label = f"{board_title(board)} · {harness_label(row['key'])} · {model_label(row['key'])}"
             bars.append((label, row["tokens_per_pass"], row["passed"], row["n"]))
     intro = (
         "<h2>Tokens per pass</h2>"
@@ -304,7 +752,10 @@ def tokens_chart(results: lb.Results) -> str:
         f"tokens; {unmeasured} board rows do not and are left out rather than estimated.</p>"
     )
     if not bars:
-        return intro + "<p>No board row in results/ has complete token measurements yet.</p>"
+        return (
+            intro
+            + "<p>No board row in results/ has complete token measurements yet.</p>"
+        )
     label_w, bar_w, row_h = 420, 360, 26
     top = max(value for _, value, _, _ in bars)
     height = row_h * len(bars) + 8
@@ -321,7 +772,8 @@ def tokens_chart(results: lb.Results) -> str:
             f'<text x="{label_w + width + 6:.1f}" y="{y + 15}">{esc(tokens_text(value))}</text></g>'
         )
     return (
-        intro + f'<div class="scroll"><svg class="chart" width="{label_w + bar_w + 80}" '
+        intro
+        + f'<div class="scroll"><svg class="chart" width="{label_w + bar_w + 80}" '
         f'height="{height}" role="img" aria-label="Tokens per pass by board row">'
         + "".join(marks)
         + "</svg></div>"
@@ -366,9 +818,13 @@ def tasks_page(results: lb.Results) -> str:
 def changelog_page(results: lb.Results) -> str:
     counts = lb.exclusion_counts(results.records)
     rows = []
-    for entry in sorted(results.changelog, key=lambda e: (e["date"], e["id"]), reverse=True):
+    for entry in sorted(
+        results.changelog, key=lambda e: (e["date"], e["id"]), reverse=True
+    ):
         tag = entry["excludes"]
-        excluded = f"{counts.get(tag, 0)} rows tagged <code>{esc(tag)}</code>" if tag else "—"
+        excluded = (
+            f"{counts.get(tag, 0)} rows tagged <code>{esc(tag)}</code>" if tag else "—"
+        )
         rows.append(
             f'<tr id="{esc(entry["id"])}"><td>{esc(entry["date"])}</td>'
             f"<td><strong>{esc(entry['id'])}</strong><br>"
@@ -401,7 +857,11 @@ def price_table_html(table: lb.PriceTable) -> str:
         rows.append(
             f"<tr><td>{esc(model)}</td>{rates}<td>{esc(entry['source'])}</td>"
             f"<td>{esc(entry['as_of'])}</td><td>{esc(entry['reference'])}"
-            + (f'<br><span class="note">{esc(entry["note"])}</span>' if entry["note"] else "")
+            + (
+                f'<br><span class="note">{esc(entry["note"])}</span>'
+                if entry["note"]
+                else ""
+            )
             + "</td></tr>"
         )
     return (
@@ -419,7 +879,9 @@ def fairness_source(source: str) -> str:
     """Link vendor documentation and repository lines; escape telemetry selectors."""
     if source.startswith("https://"):
         return f'<a href="{esc(source)}" rel="noopener noreferrer">{esc(source)}</a>'
-    match = re.match(r"^((?:results|lib|batteries|locks|scripts)/[\w./-]+):(\d+)\b", source)
+    match = re.match(
+        r"^((?:results|lib|batteries|locks|scripts)/[\w./-]+):(\d+)\b", source
+    )
     if match and lb.fairness_repository_reference(source):
         path, line = match.groups()
         return f'<a href="{REPO_URL}/blob/main/{esc(path)}#L{line}">{esc(source)}</a>'
@@ -464,13 +926,19 @@ def methodology_page(results: lb.Results) -> str:
         f"<tr><td>{esc(audit['harness'])}</td><td>{esc(audit['status'])}</td>"
         f"<td>{esc(audit['date'] or '—')}</td><td>{esc(audit['notes'])}</td>"
         f"<td>{esc(audit.get('sign_off') or '—')}</td></tr>"
-        for audit in sorted(results.fairness.get("audits", []), key=lambda a: a["harness"])
+        for audit in sorted(
+            results.fairness.get("audits", []), key=lambda a: a["harness"]
+        )
     )
     audit_evidence = "".join(
         fairness_evidence(audit)
-        for audit in sorted(results.fairness.get("audits", []), key=lambda a: a["harness"])
+        for audit in sorted(
+            results.fairness.get("audits", []), key=lambda a: a["harness"]
+        )
     )
-    prices = "".join(price_table_html(table) for _, table in sorted(results.price_tables.items()))
+    prices = "".join(
+        price_table_html(table) for _, table in sorted(results.price_tables.items())
+    )
     body = f"""
 <h2>Methodology</h2>
 <h3>What a row is</h3>
@@ -553,7 +1021,7 @@ python3 scripts/build_site.py</code></pre>
 
 
 def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str]:
-    """``{page name: html}`` for the whole site; raises ``ResultsError`` on invalid input."""
+    """``{filename: text}`` for the whole site; raises ``ResultsError`` on invalid input."""
     results = lb.load_results(results_dir)
     return {
         "index.html": index_page(results),
@@ -561,6 +1029,12 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str]:
         "tasks.html": tasks_page(results),
         "changelog.html": changelog_page(results),
         "methodology.html": methodology_page(results),
+        "paddock.css": STYLE,
+        "favicon.svg": FAVICON,
+        **{
+            board_filename(board): board_page(board)
+            for board in lb.boards(results.records)
+        },
     }
 
 
@@ -568,7 +1042,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--results", type=Path, default=lb.DEFAULT_RESULTS)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
-    parser.add_argument("--check", action="store_true", help="fail if --out differs from a build")
+    parser.add_argument(
+        "--check", action="store_true", help="fail if --out differs from a build"
+    )
     args = parser.parse_args(argv)
     try:
         files = build(args.results)
