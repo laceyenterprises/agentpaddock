@@ -498,10 +498,12 @@ def document(title: str, active: str, body: str, *, canonical: bool = False) -> 
     return (
         "<!doctype html>\n"
         '<html lang="en">\n<head>\n<meta charset="utf-8">\n'
-        "<!-- Google consent defaults: analytics off in the EEA, UK and Switzerland until consent; ad storage off everywhere -->\n"
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        f"<title>{esc(title)} · Paddock</title>\n{head_link}\n"
+        "<!-- Google consent defaults: analytics storage denied in the EEA, UK, Switzerland and listed territories; no consent UI; ad storage off everywhere -->\n"
         "<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}\n"
-        "gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IS','IE','IT','LV','LI','LT','LU','MT','NL','NO','PL','PT','RO','SK','SI','ES','SE','GB','CH']});\n"
-        "gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'granted'});</script>\n"
+        "gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'granted'});\n"
+        "gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IS','IE','IT','LV','LI','LT','LU','MT','NL','NO','PL','PT','RO','SK','SI','ES','SE','GB','CH','AX','GF','GP','MQ','RE','YT','MF','GI','JE','GG','IM']});</script>\n"
         "<!-- Google Tag Manager -->\n"
         "<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n"
         "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n"
@@ -509,18 +511,12 @@ def document(title: str, active: str, body: str, *, canonical: bool = False) -> 
         "'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n"
         f"}})(window,document,'script','dataLayer','{GTM_CONTAINER_ID}');</script>\n"
         "<!-- End Google Tag Manager -->\n"
-        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        f"<title>{esc(title)} · Paddock</title>\n{head_link}\n"
         '<link rel="icon" href="favicon.svg" type="image/svg+xml">\n'
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700'
         "&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Saira:ital,wght@1,800"
         '&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,800&amp;display=swap" rel="stylesheet">\n'
         '<link rel="stylesheet" href="paddock.css">\n</head>\n<body>\n'
-        "<!-- Google Tag Manager (noscript) -->\n"
-        '<noscript><iframe src="https://www.googletagmanager.com/ns.html?id='
-        f'{GTM_CONTAINER_ID}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>\n'
-        "<!-- End Google Tag Manager (noscript) -->\n"
         '<svg width="0" height="0" aria-hidden="true" class="symbols">'
         f'<defs><symbol id="broadcast" viewBox="0 0 100 100">{MARK}</symbol></defs></svg>\n'
         f'<header class="nav"><nav class="wrap" aria-label="Main">{brand()}'
@@ -534,7 +530,7 @@ def document(title: str, active: str, body: str, *, canonical: bool = False) -> 
         f'Submit a run or a correction: <a href="{REPO_URL}/blob/main/CONTRIBUTING.md">'
         "CONTRIBUTING</a>.</p>"
         "<p>This site uses Google Analytics to count visits. "
-        "Analytics is off by default for visitors in the EEA, the UK and Switzerland.</p></div><div>"
+        "Google Tag Manager loads on every page; analytics cookies are disabled for visitors in the EEA, the UK, Switzerland and listed territories.</p></div><div>"
         f'<a href="{REPO_URL}">GitHub</a>'
         f'<a href="{REPO_URL}/blob/main/CONTRIBUTING.md">CONTRIBUTING</a>'
         f'<a href="{REPO_URL}/blob/main/LICENSE">MIT LICENSE</a></div></div>'

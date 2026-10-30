@@ -297,10 +297,10 @@ class Elements(HTMLParser):
 
 
 def test_every_page_has_tag_manager_consent_defaults_and_disclosure(tmp_path):
-    consent = """<!-- Google consent defaults: analytics off in the EEA, UK and Switzerland until consent; ad storage off everywhere -->
+    consent = """<!-- Google consent defaults: analytics storage denied in the EEA, UK, Switzerland and listed territories; no consent UI; ad storage off everywhere -->
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
-gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IS','IE','IT','LV','LI','LT','LU','MT','NL','NO','PL','PT','RO','SK','SI','ES','SE','GB','CH']});
-gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'granted'});</script>"""
+gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'granted'});
+gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IS','IE','IT','LV','LI','LT','LU','MT','NL','NO','PL','PT','RO','SK','SI','ES','SE','GB','CH','AX','GF','GP','MQ','RE','YT','MF','GI','JE','GG','IM']});</script>"""
     loader = """<!-- Google Tag Manager -->
 <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
 new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -308,12 +308,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
 })(window,document,'script','dataLayer','GTM-P52SNL3D');</script>
 <!-- End Google Tag Manager -->"""
-    noscript = """<!-- Google Tag Manager (noscript) -->
-<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P52SNL3D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-<!-- End Google Tag Manager (noscript) -->"""
     disclosure = (
         "This site uses Google Analytics to count visits. "
-        "Analytics is off by default for visitors in the EEA, the UK and Switzerland."
+        "Google Tag Manager loads on every page; analytics cookies are disabled for visitors in the EEA, the UK, Switzerland and listed territories."
     )
     out = tmp_path / "site"
     assert build_site.GTM_CONTAINER_ID == "GTM-P52SNL3D"
@@ -326,14 +323,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         page = path.read_text(encoding="utf-8")
         head = page.split("<head>", 1)[1].split("</head>", 1)[0]
         footer = page.split('<footer class="footer">', 1)[1].split("</footer>", 1)[0]
-        for block in (consent, loader, noscript):
+        for block in (consent, loader):
             assert page.count(block) == 1, path.name
-        assert head.index(consent) < head.index(loader)
+        assert head.index('<meta name="viewport"') < head.index("<title>") < head.index(consent) < head.index(loader)
         assert head.index("<script>") == head.index(consent) + consent.index("<script>")
-        assert page.split("<body>", 1)[1].lstrip().startswith(noscript), path.name
-        assert page.count("GTM-P52SNL3D") == 2, path.name
+        assert page.count("GTM-P52SNL3D") == 1, path.name
         assert page.count("www.googletagmanager.com/gtm.js") == 1, path.name
-        assert page.count("<noscript>") == page.count("<iframe") == 1, path.name
+        assert "<noscript>" not in page and "<iframe" not in page, path.name
         assert footer.count(disclosure) == 1, path.name
         assert "gtag/js" not in page and "googletagmanager.com/gtag" not in page
 
