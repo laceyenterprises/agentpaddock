@@ -13,14 +13,22 @@ byte-identical pages.
     python3 scripts/build_site.py                 # write site/
     python3 scripts/build_site.py --check         # fail if site/ is stale
     python3 scripts/build_site.py --results DIR --out DIR
+
+The share image is the one file not built here: ``scripts/render_social_card.py``
+renders ``scripts/social_card.html`` to the committed ``scripts/social-card.png``,
+which the build copies. The PNG carries the SHA-256 of the card source, so
+``--check`` reports a stale card without a browser.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import re
+import struct
 import sys
+import zlib
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -32,6 +40,18 @@ REPO_URL = "https://github.com/laceyenterprises/agentpaddock"
 SITE_URL = "https://agentpaddock.ai/"
 GTM_CONTAINER_ID = "GTM-P52SNL3D"
 DEFAULT_OUT = lb.MODULE_ROOT / "site"
+CARD_TEMPLATE = lb.MODULE_ROOT / "scripts" / "social_card.html"
+CARD_PNG = lb.MODULE_ROOT / "scripts" / "social-card.png"
+CARD_NAME = "social-card.png"
+CARD_SIZE = (1200, 630)
+#: The PNG tEXt keyword holding the SHA-256 of the card source it was rendered from.
+CARD_KEY = "agentpaddock-card-source-sha256"
+CARD_ALT = (
+    "Agent Paddock: an open leaderboard for coding agents. Model × harness on real "
+    "repository tasks, graded by a checker the agent never sees. agentpaddock.ai"
+)
+CARD_MARK_SLOT = "<!-- broadcast-mark -->"
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 PAGES = (
     ("index.html", "Leaderboard"),
@@ -488,6 +508,37 @@ def brand() -> str:
     )
 
 
+def page_url(active: str) -> str:
+    """The page's canonical absolute URL; the overview is the site root."""
+    return SITE_URL if active == "index.html" else SITE_URL + active
+
+
+def social_meta(title: str, url: str) -> str:
+    """Open Graph and Twitter card tags; every URL is absolute on agentpaddock.ai."""
+    image = SITE_URL + CARD_NAME
+    width, height = CARD_SIZE
+    tags = (
+        ("property", "og:type", "website"),
+        ("property", "og:site_name", PRODUCT),
+        ("property", "og:title", title),
+        ("property", "og:description", DESCRIPTION),
+        ("property", "og:url", url),
+        ("property", "og:image", image),
+        ("property", "og:image:width", str(width)),
+        ("property", "og:image:height", str(height)),
+        ("property", "og:image:type", "image/png"),
+        ("property", "og:image:alt", CARD_ALT),
+        ("name", "twitter:card", "summary_large_image"),
+        ("name", "twitter:title", title),
+        ("name", "twitter:description", DESCRIPTION),
+        ("name", "twitter:image", image),
+        ("name", "twitter:image:alt", CARD_ALT),
+    )
+    return "".join(
+        f'<meta {kind}="{key}" content="{esc(value)}">\n' for kind, key, value in tags
+    )
+
+
 def hero(eyebrow: str, title: str, lede: str = "") -> str:
     return (
         f'<div class="page-hero"><span class="eyebrow">{esc(eyebrow)}</span>'
@@ -497,7 +548,15 @@ def hero(eyebrow: str, title: str, lede: str = "") -> str:
     )
 
 
-def document(title: str, active: str, body: str, *, canonical: bool = False) -> str:
+def document(
+    title: str,
+    active: str,
+    body: str,
+    *,
+    canonical: bool = False,
+    filename: str | None = None,
+) -> str:
+    """One page; ``filename`` is the output name when it differs from ``active``."""
     current = ' aria-current="page"'
     nav = "".join(
         f'<a href="{name}"{current if name == active else ""}>{esc(label)}</a>'
@@ -517,7 +576,8 @@ def document(title: str, active: str, body: str, *, canonical: bool = False) -> 
         '<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"<title>{esc(title)} · {PRODUCT}</title>\n{head_link}\n"
-        "<!-- Google consent defaults: analytics storage denied in the EEA, UK, Switzerland and listed territories; no consent UI; ad storage off everywhere -->\n"
+        + social_meta(f"{title} · {PRODUCT}", page_url(filename or active))
+        + "<!-- Google consent defaults: analytics storage denied in the EEA, UK, Switzerland and listed territories; no consent UI; ad storage off everywhere -->\n"
         "<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}\n"
         "gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'granted'});\n"
         "gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IS','IE','IT','LV','LI','LT','LU','MT','NL','NO','PL','PT','RO','SK','SI','ES','SE','GB','CH','AX','GF','GP','MQ','RE','YT','MF','GI','JE','GG','IM']});</script>\n"
@@ -663,7 +723,12 @@ def board_page(board: Mapping[str, Any]) -> str:
     body = hero(
         f"Board · task version {board['task_version']}", board["suite"], COMPARABILITY
     )
-    return document(board_title(board), "index.html", body + board_html(board))
+    return document(
+        board_title(board),
+        "index.html",
+        body + board_html(board),
+        filename=board_filename(board),
+    )
 
 
 def board_card(board: Mapping[str, Any]) -> str:
@@ -1051,8 +1116,85 @@ python3 scripts/build_site.py</code></pre>
     return document("Methodology", "methodology.html", body)
 
 
-def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str]:
-    """``{filename: text}`` for the whole site; raises ``ResultsError`` on invalid input."""
+def card_source() -> str:
+    """The share card's HTML: the committed template with the site's one Broadcast mark."""
+    template = CARD_TEMPLATE.read_text(encoding="utf-8")
+    if template.count(CARD_MARK_SLOT) != 1:
+        raise ValueError(f"{CARD_TEMPLATE.name} needs exactly one {CARD_MARK_SLOT}")
+    return template.replace(CARD_MARK_SLOT, MARK)
+
+
+def card_source_hash(source: str) -> str:
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+
+def png_chunks(data: bytes) -> list[tuple[bytes, bytes]]:
+    """``(type, body)`` for each chunk of a PNG, through IEND."""
+    if data[:8] != PNG_SIGNATURE:
+        raise ValueError("not a PNG")
+    chunks, i = [], 8
+    while i + 8 <= len(data):
+        length, kind = struct.unpack(">I4s", data[i : i + 8])
+        chunks.append((kind, data[i + 8 : i + 8 + length]))
+        i += 12 + length
+        if kind == b"IEND":
+            break
+    return chunks
+
+
+def png_size(data: bytes) -> tuple[int, int]:
+    """Width and height from a PNG's IHDR."""
+    kind, body = png_chunks(data)[0]
+    if kind != b"IHDR":
+        raise ValueError("PNG does not start with IHDR")
+    return struct.unpack(">II", body[:8])
+
+
+def png_text(data: bytes) -> dict[str, str]:
+    """A PNG's tEXt chunks, keyword -> text."""
+    return {
+        key.decode("latin-1"): value.decode("latin-1")
+        for kind, body in png_chunks(data)
+        if kind == b"tEXt" and b"\0" in body
+        for key, value in [body.split(b"\0", 1)]
+    }
+
+
+def stamp_png(data: bytes, key: str, value: str) -> bytes:
+    """``data`` with one tEXt chunk ``key`` = ``value`` right after IHDR."""
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        crc = zlib.crc32(kind + body) & 0xFFFFFFFF
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", crc)
+
+    keyword = key.encode("latin-1")
+    kept = [
+        chunk(kind, body)
+        for kind, body in png_chunks(data)
+        if not (kind == b"tEXt" and body.split(b"\0", 1)[0] == keyword)
+    ]
+    text = chunk(b"tEXt", keyword + b"\0" + value.encode("latin-1"))
+    return PNG_SIGNATURE + kept[0] + text + b"".join(kept[1:])
+
+
+def card_problem(png: bytes) -> str:
+    """Why the committed card does not match its source, or ``""`` when it does."""
+    try:
+        size, stamp = png_size(png), png_text(png).get(CARD_KEY)
+    except (ValueError, struct.error):
+        return f"{CARD_NAME} is not a PNG"
+    if size != CARD_SIZE:
+        return f"{CARD_NAME} is {size[0]}x{size[1]}, not {CARD_SIZE[0]}x{CARD_SIZE[1]}"
+    if stamp != card_source_hash(card_source()):
+        return (
+            f"{CARD_NAME} was rendered from a different card source; "
+            "run python3 scripts/render_social_card.py"
+        )
+    return ""
+
+
+def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
+    """``{filename: text or bytes}`` for the whole site; raises ``ResultsError`` on invalid input."""
     results = lb.load_results(results_dir)
     return {
         "index.html": index_page(results),
@@ -1062,6 +1204,7 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str]:
         "methodology.html": methodology_page(results),
         "paddock.css": STYLE,
         "favicon.svg": FAVICON,
+        CARD_NAME: CARD_PNG.read_bytes(),
         **{
             board_filename(board): board_page(board)
             for board in lb.boards(results.records)
@@ -1082,23 +1225,39 @@ def main(argv: list[str] | None = None) -> int:
     except lb.ResultsError as exc:
         print(f"results/ does not validate:\n{exc}", file=sys.stderr)
         return 1
+    card = card_problem(files[CARD_NAME])
     if args.check:
         stale = [
             name
-            for name, text in files.items()
+            for name, content in files.items()
             if not (args.out / name).is_file()
-            or (args.out / name).read_text(encoding="utf-8") != text
+            or read(args.out / name, content) != content
         ]
+        if card:
+            stale.append(card)
         if stale:
             print(f"{args.out} is stale: {', '.join(stale)}", file=sys.stderr)
             return 1
         print(f"{args.out} is current")
         return 0
     args.out.mkdir(parents=True, exist_ok=True)
-    for name, text in files.items():
-        (args.out / name).write_text(text, encoding="utf-8")
+    for name, content in files.items():
+        if isinstance(content, bytes):
+            (args.out / name).write_bytes(content)
+        else:
+            (args.out / name).write_text(content, encoding="utf-8")
     print(f"Site written to {args.out}: " + ", ".join(files))
+    if card:
+        print(f"warning: {card}", file=sys.stderr)
     return 0
+
+
+def read(path: Path, like: str | bytes) -> str | bytes:
+    return (
+        path.read_bytes()
+        if isinstance(like, bytes)
+        else path.read_text(encoding="utf-8")
+    )
 
 
 if __name__ == "__main__":

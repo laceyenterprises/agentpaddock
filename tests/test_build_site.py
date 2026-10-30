@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import html
 import re
 import shutil
+import struct
+import zlib
 from copy import deepcopy
 from html.parser import HTMLParser
 from pathlib import Path
@@ -25,6 +28,52 @@ ABSOLUTE_LINK = re.compile(
 )
 
 
+#: The committed card template, captured before any test swaps in a synthetic one.
+CARD_TEMPLATE = build_site.CARD_TEMPLATE
+SYNTHETIC_CARD = (
+    "<!doctype html><p>synthetic card</p><svg><!-- broadcast-mark --></svg>\n"
+)
+
+
+def _png(width: int, height: int) -> bytes:
+    """A blank one-bit greyscale PNG built with the standard library."""
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        crc = zlib.crc32(kind + body) & 0xFFFFFFFF
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", crc)
+
+    rows = (b"\0" + b"\0" * ((width + 7) // 8)) * height
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 1, 0, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(rows))
+        + chunk(b"IEND", b"")
+    )
+
+
+@pytest.fixture(autouse=True)
+def synthetic_card(tmp_path_factory, monkeypatch) -> Path:
+    """A synthetic card template and a PNG stamped with its source's SHA-256."""
+    card = tmp_path_factory.mktemp("card")
+    template = card / "social_card.html"
+    template.write_text(SYNTHETIC_CARD, encoding="utf-8")
+    monkeypatch.setattr(build_site, "CARD_TEMPLATE", template)
+    png = card / "social-card.png"
+    png.write_bytes(
+        build_site.stamp_png(
+            _png(*build_site.CARD_SIZE),
+            build_site.CARD_KEY,
+            build_site.card_source_hash(build_site.card_source()),
+        )
+    )
+    monkeypatch.setattr(build_site, "CARD_PNG", png)
+    return card
+
+
+def _text_files(files):
+    return [(name, text) for name, text in files.items() if isinstance(text, str)]
+
+
 def _row(page: str, label: str) -> str:
     """The board table row whose model cell is ``label``."""
     rows = [row for row in page.split("<tr>") if f"<b>{label}</b>" in row]
@@ -40,7 +89,7 @@ def test_site_builds_deterministically_from_fixtures(tmp_path: Path):
     assert build_site.build(moved) == first
     assert set(first) == (
         {name for name, _ in build_site.PAGES}
-        | {"paddock.css", "favicon.svg"}
+        | {"paddock.css", "favicon.svg", "social-card.png"}
         | {
             build_site.board_filename(b)
             for b in lb.boards(lb.load_results(FIXTURE).records)
@@ -82,7 +131,7 @@ def test_tag_manager_external_link_allowance(url, allowed):
 
 def test_built_html_links_only_relatively_and_to_the_public_names():
     for files in (build_site.build(FIXTURE), build_site.build(lb.DEFAULT_RESULTS)):
-        for name, page in files.items():
+        for name, page in _text_files(files):
             assert "github.io" not in page, name
             assert RETIRED_REPOSITORY not in page, name
             assert not ROOT_RELATIVE.search(page), name
@@ -217,7 +266,14 @@ def test_audited_without_sign_off_remains_provisional_and_escapes_evidence():
 
 
 @pytest.mark.parametrize(
-    "stale_file", ["index.html", "paddock.css", "favicon.svg", "board-review-v2.html"]
+    "stale_file",
+    [
+        "index.html",
+        "paddock.css",
+        "favicon.svg",
+        "social-card.png",
+        "board-review-v2.html",
+    ],
 )
 def test_cli_writes_then_checks(tmp_path: Path, capsys, stale_file):
     out = tmp_path / "site"
@@ -510,7 +566,7 @@ def test_product_name_allowlist(text, stray):
 
 
 def test_no_page_names_the_product_bare_paddock():
-    for name, page in build_site.build(FIXTURE).items():
+    for name, page in _text_files(build_site.build(FIXTURE)):
         assert not _stray_product_names(page), (name, _stray_product_names(page))
 
 
@@ -618,3 +674,187 @@ def test_lockup_styles_follow_the_brand_spec():
     page = build_site.build(FIXTURE)["index.html"]
     assert "family=Saira:ital,wght@1,500;1,800&amp;" in page
     assert page.count("fonts.googleapis.com/css2?") == 1
+
+
+def _meta(page: str) -> list[tuple[str, str]]:
+    head = page.split("<head>", 1)[1].split("</head>", 1)[0]
+    return [
+        (attrs.get("property") or attrs.get("name"), attrs["content"])
+        for tag, attrs in Elements(head).items
+        if tag == "meta"
+        and ("property" in attrs or "name" in attrs)
+        and attrs.get("name") != "viewport"
+    ]
+
+
+def test_every_page_carries_the_social_card_meta():
+    files = build_site.build(FIXTURE)
+    pages = [name for name in files if name.endswith(".html")]
+    urls = set()
+    for name in pages:
+        page = files[name]
+        meta = _meta(page)
+        tags = dict(meta)
+        assert len(tags) == len(meta), name
+        title = html.unescape(re.search(r"<title>(.*?)</title>", page)[1])
+        url = "https://agentpaddock.ai/" + ("" if name == "index.html" else name)
+        alt = build_site.CARD_ALT
+        assert tags == {
+            "og:type": "website",
+            "og:site_name": "Agent Paddock",
+            "og:title": title,
+            "og:description": build_site.DESCRIPTION,
+            "og:url": url,
+            "og:image": "https://agentpaddock.ai/social-card.png",
+            "og:image:width": "1200",
+            "og:image:height": "630",
+            "og:image:type": "image/png",
+            "og:image:alt": alt,
+            "twitter:card": "summary_large_image",
+            "twitter:title": title,
+            "twitter:description": build_site.DESCRIPTION,
+            "twitter:image": "https://agentpaddock.ai/social-card.png",
+            "twitter:image:alt": alt,
+        }, name
+        for value in tags.values():
+            if "://" in value:
+                assert value.startswith("https://agentpaddock.ai/"), (name, value)
+        urls.add(tags["og:url"])
+        # The tags sit in the head, after the title and before the Tag Manager.
+        head = page.split("</head>", 1)[0]
+        assert head.index("<title>") < head.index('property="og:type"')
+        assert head.index('name="twitter:image:alt"') < head.index("<script>")
+    assert len(urls) == len(pages)
+    assert any(name.startswith("board-") for name in pages)
+
+
+def test_social_card_png_is_written_at_card_size_and_deterministically(tmp_path):
+    outs = [tmp_path / "first", tmp_path / "second"]
+    for out in outs:
+        assert build_site.main(["--results", str(FIXTURE), "--out", str(out)]) == 0
+    data = (outs[0] / "social-card.png").read_bytes()
+    assert data == build_site.CARD_PNG.read_bytes()
+    assert data[:8] == b"\x89PNG\r\n\x1a\n" and data[12:16] == b"IHDR"
+    assert struct.unpack(">II", data[16:24]) == (1200, 630)
+    first = sorted(path.name for path in outs[0].iterdir())
+    assert first == sorted(path.name for path in outs[1].iterdir())
+    for name in first:
+        assert (outs[0] / name).read_bytes() == (outs[1] / name).read_bytes(), name
+
+
+def test_check_reports_a_card_rendered_from_another_source(
+    tmp_path, capsys, monkeypatch, synthetic_card
+):
+    out = tmp_path / "site"
+    argv = ["--results", str(FIXTURE), "--out", str(out)]
+    assert build_site.main(argv) == 0
+    assert "warning" not in capsys.readouterr().err
+    assert build_site.main([*argv, "--check"]) == 0
+    capsys.readouterr()
+    template = synthetic_card / "social_card.html"
+    template.write_text(SYNTHETIC_CARD.replace("synthetic", "edited"), "utf-8")
+    assert build_site.main([*argv, "--check"]) == 1
+    err = capsys.readouterr().err
+    assert "social-card.png was rendered from a different card source" in err
+    assert "scripts/render_social_card.py" in err
+    # Re-stamping the PNG for the edited source makes the card current again.
+    png = synthetic_card / "social-card.png"
+    source_hash = build_site.card_source_hash(build_site.card_source())
+    png.write_bytes(
+        build_site.stamp_png(png.read_bytes(), build_site.CARD_KEY, source_hash)
+    )
+    assert build_site.main(argv) == 0
+    assert build_site.main([*argv, "--check"]) == 0
+    # The mark is part of the card source: changing it stales the card too.
+    monkeypatch.setattr(build_site, "MARK", "<rect/>")
+    assert build_site.main([*argv, "--check"]) == 1
+    assert "different card source" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("png", "problem"),
+    [
+        (b"not a png", "social-card.png is not a PNG"),
+        (_png(600, 315), "social-card.png is 600x315, not 1200x630"),
+        (_png(1200, 630), "social-card.png was rendered from a different card source"),
+    ],
+)
+def test_check_names_the_card_problem(tmp_path, capsys, synthetic_card, png, problem):
+    out = tmp_path / "site"
+    argv = ["--results", str(FIXTURE), "--out", str(out)]
+    assert build_site.main(argv) == 0
+    (synthetic_card / "social-card.png").write_bytes(png)
+    assert build_site.main(argv) == 0
+    assert problem in capsys.readouterr().err
+    assert build_site.main([*argv, "--check"]) == 1
+    assert problem in capsys.readouterr().err
+
+
+def test_stamp_replaces_the_card_hash_and_keeps_the_image():
+    blank = _png(1200, 630)
+    once = build_site.stamp_png(blank, build_site.CARD_KEY, "a" * 64)
+    twice = build_site.stamp_png(once, build_site.CARD_KEY, "b" * 64)
+    assert build_site.png_text(twice) == {build_site.CARD_KEY: "b" * 64}
+    assert [kind for kind, _ in build_site.png_chunks(twice)] == [
+        b"IHDR",
+        b"tEXt",
+        b"IDAT",
+        b"IEND",
+    ]
+    assert build_site.png_size(twice) == (1200, 630)
+    assert (
+        twice.replace(twice[33 : 33 + 12 + len(build_site.CARD_KEY) + 65], b"") == blank
+    )
+
+
+class Text(HTMLParser):
+    def __init__(self, page):
+        super().__init__()
+        self.skip = 0
+        self.text = []
+        self.feed(page)
+
+    def handle_starttag(self, tag, attrs):
+        self.skip += tag in ("style", "script", "title")
+
+    def handle_endtag(self, tag):
+        self.skip -= tag in ("style", "script", "title")
+
+    def handle_data(self, data):
+        if not self.skip:
+            self.text.append(data)
+
+
+def test_card_template_holds_the_stacked_lockup_and_no_data(monkeypatch):
+    monkeypatch.setattr(build_site, "CARD_TEMPLATE", CARD_TEMPLATE)
+    source = build_site.card_source()
+    template = CARD_TEMPLATE.read_text(encoding="utf-8")
+    # The mark comes from the site's one MARK, never a copy in the template.
+    assert template.count(build_site.CARD_MARK_SLOT) == 1
+    assert "translate(9 0) skewX(-10)" not in template
+    assert source.count(build_site.MARK) == 1
+    assert '<svg viewBox="0 0 100 100" aria-hidden="true">' + build_site.MARK in source
+    assert (
+        '<div class="wordmark"><span class="wordmark-agent">AGENT</span>'
+        '<span class="wordmark-name">PADDOCK</span></div>' in source
+    )
+    css = " ".join(source.split("<style>", 1)[1].split("</style>", 1)[0].split())
+    for declaration in (
+        ".lockup svg { width: 176px; height: 176px;",
+        ".wordmark-agent { font-weight: 500; font-size: 60px;",
+        ".wordmark-name { font-weight: 800; font-size: 100px;",
+        'font-family: "Saira", sans-serif; font-style: italic; color: #FFFFFF;',
+        'font-family: "JetBrains Mono", monospace;',
+        "background: #0E1116;",
+        "width: 1200px; height: 630px;",
+    ):
+        assert declaration in css, declaration
+    text = " ".join(" ".join(Text(source).text).split())
+    assert "An open leaderboard for coding agents" in text
+    assert (
+        "Model × harness on real repository tasks, graded by a checker the agent "
+        "never sees." in text
+    )
+    assert "agentpaddock.ai" in text
+    # Decoration, not data: the tower positions are the only digits on the card.
+    assert re.findall(r"\d", text) == ["1", "2", "3", "4", "5"]
