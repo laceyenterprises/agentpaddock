@@ -22,7 +22,7 @@ import html
 import re
 import sys
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 import leaderboard as lb
 
@@ -305,8 +305,8 @@ p, ul, ol, pre { margin-block: 12px; }
 .card .kicker { line-height: 1.6; }
 .card .tower { margin-top: auto; }
 .card-link { align-self: flex-start; }
-.earlier { list-style: none; padding: 0; }
-.earlier li { padding-block: 10px; border-bottom: 1px solid var(--rule); }
+.also { list-style: none; padding: 0; margin: 0; font: 500 12.5px/1.4 var(--mono); }
+.also li + li { margin-top: 6px; }
 [id] { scroll-margin-top: 90px; }
 details { border: 1px solid var(--rule); border-radius: var(--radius-inner); padding: 14px 20px; margin-bottom: 24px; }
 summary { cursor: pointer; font-weight: 600; }
@@ -587,6 +587,32 @@ COMPARABILITY = (
     "Each board ranks harness × model combinations on one suite by pass rate with a 95% "
     "Wilson interval; rows are not comparable across suites or task versions."
 )
+TASK_VERSIONS = (
+    "Task versions are per task: a suite's newer versions can cover only the tasks that "
+    "changed. Each board compares only rows at one task version."
+)
+
+
+def plural(count: int, singular: str, plural_form: str = "") -> str:
+    return f"{count} {singular if count == 1 else plural_form or singular + 's'}"
+
+
+def featured_board(boards: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
+    """The board a suite's overview card features, chosen from that suite's boards.
+
+    Task versions are per task, so a suite's newest version may cover only the tasks
+    that were bumped. Feature the board covering the most tasks; break ties by the
+    higher task version. Suite boards have distinct versions, so the final
+    entry-count tie-breaker is purely defensive for inputs with duplicate versions.
+    """
+    return max(
+        boards,
+        key=lambda board: (
+            len(board["tasks"]),
+            board["task_version"],
+            len(board["rows"]),
+        ),
+    )
 
 
 def board_anchor(board: Mapping[str, Any]) -> str:
@@ -643,7 +669,7 @@ def board_html(board: Mapping[str, Any]) -> str:
     tasks = "".join(f"<li>{esc(task)}</li>" for task in board["tasks"])
     return (
         f'<section id="{esc(board_anchor(board))}">'
-        f'<details><summary>{len(board["tasks"])} tasks</summary><ul class="task-list">{tasks}</ul></details>'
+        f'<details><summary>{plural(len(board["tasks"]), "task")}</summary><ul class="task-list">{tasks}</ul></details>'
         '<div class="tower"><div class="tower-head">'
         f'<span class="tower-title">{esc(board_title(board))}</span></div>'
         '<div class="table-wrap" role="region" aria-label="Board standings" tabindex="0">'
@@ -666,31 +692,45 @@ def board_page(board: Mapping[str, Any]) -> str:
     return document(board_title(board), "index.html", body + board_html(board))
 
 
-def board_card(board: Mapping[str, Any]) -> str:
+def board_counts(board: Mapping[str, Any]) -> str:
+    return (
+        f"task version {board['task_version']} · {plural(len(board['tasks']), 'task')} · "
+        f"{plural(len(board['rows']), 'entry', 'entries')}"
+    )
+
+
+def board_card(board: Mapping[str, Any], others: Sequence[Mapping[str, Any]]) -> str:
+    """A suite's card: the featured board's mini tower, then one line per other board."""
     rows = "".join(
         f'<li class="tower-row"><span class="pos{" p1" if rank == 1 else ""}">{rank}</span>'
         f'{livery(row["key"])}<div class="who">{who(row["key"])}</div>'
         f'<span class="fin">{finish(row)}</span></li>'
         for rank, row in enumerate(board["rows"][:5], start=1)
     )
+    also = "".join(
+        f'<li><a id="{esc(board_anchor(other))}" href="{esc(board_filename(other))}">'
+        f"Also: {board_counts(other)} →</a></li>"
+        for other in sorted(others, key=lambda b: b["task_version"], reverse=True)
+    )
     return (
         f'<article class="card" id="{esc(board_anchor(board))}"><h3>{esc(board["suite"])}</h3>'
-        f'<p class="kicker">task version {board["task_version"]} · {len(board["tasks"])} tasks · '
-        f'{len(board["rows"])} entries</p><div class="tower"><ol>{rows}</ol></div>'
-        f'<a class="card-link" href="{esc(board_filename(board))}">Full board →</a></article>'
+        f'<p class="kicker">{board_counts(board)}</p><div class="tower"><ol>{rows}</ol></div>'
+        + (f'<ul class="also">{also}</ul>' if also else "")
+        + f'<a class="card-link" href="{esc(board_filename(board))}">Full board →</a></article>'
     )
 
 
 def index_page(results: lb.Results) -> str:
     boards = lb.boards(results.records)
     graded = sum(lb.included(record) for record in results.records)
-    latest: dict[str, int] = {}
+    by_suite: dict[str, list[dict[str, Any]]] = {}
     for board in boards:
-        latest[board["suite"]] = max(
-            latest.get(board["suite"], 0), board["task_version"]
-        )
-    current = [b for b in boards if b["task_version"] == latest[b["suite"]]]
-    earlier = [b for b in boards if b["task_version"] != latest[b["suite"]]]
+        by_suite.setdefault(board["suite"], []).append(board)
+    cards = []
+    for suite_boards in by_suite.values():
+        featured = featured_board(suite_boards)
+        others = [b for b in suite_boards if b is not featured]
+        cards.append(board_card(featured, others))
     facts = [
         (len(results.records), "result rows"),
         (graded, "graded and scored"),
@@ -702,21 +742,14 @@ def index_page(results: lb.Results) -> str:
         f'<div class="fact"><b>{value}</b><span>{label}</span></div>'
         for value, label in facts
     )
-    earlier_html = "".join(
-        f'<li><a id="{esc(board_anchor(b))}" href="{esc(board_filename(b))}">'
-        f"{esc(b['suite'])} · task version {b['task_version']}</a></li>"
-        for b in earlier
-    )
     body = (
-        hero(PRODUCT, "Leaderboard", DESCRIPTION)
+        hero(PRODUCT, "Leaderboard", f"{DESCRIPTION} {TASK_VERSIONS}")
         + f'<div class="facts">{facts_html}</div>'
         + fairness_banner(results)
         + '<section aria-labelledby="current-boards"><h2 id="current-boards">Current boards</h2>'
         + '<div class="cards">'
-        + "".join(board_card(board) for board in current)
+        + "".join(cards)
         + "</div></section>"
-        + '<section aria-labelledby="earlier-boards"><h2 id="earlier-boards">Earlier task versions</h2>'
-        + f'<ul class="earlier">{earlier_html}</ul></section>'
         + f"<p>{len(results.records)} result rows from {len(results.documents)} sources, "
         f"{graded} of them graded and scored. {COMPARABILITY} Read the "
         '<a href="methodology.html">methodology</a> before drawing conclusions: most cells '
