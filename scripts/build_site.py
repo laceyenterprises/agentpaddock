@@ -1,4 +1,4 @@
-"""Build the Paddock leaderboard site from ``results/`` only (PDK-04).
+"""Build the Agent Paddock leaderboard site from ``results/`` only (PDK-04).
 
 The input is the committed ``results/`` tree (see ``scripts/leaderboard.py``):
 results documents, dated price tables, the grading changelog and the fairness
@@ -26,6 +26,8 @@ from typing import Any, Mapping
 
 import leaderboard as lb
 
+#: The product's public name; the command, packages and paths stay ``paddock``.
+PRODUCT = "Agent Paddock"
 REPO_URL = "https://github.com/laceyenterprises/agentpaddock"
 SITE_URL = "https://agentpaddock.ai/"
 GTM_CONTAINER_ID = "GTM-P52SNL3D"
@@ -147,8 +149,14 @@ h2.h2 { font: 700 clamp(30px, 4vw, 44px)/1.05 var(--display); letter-spacing: -.
 }
 .nav .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; flex: none; }
-.brand svg { width: 30px; height: 30px; display: block; }
-.wordmark { font: italic 800 22px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; }
+.brand svg { width: 34px; height: 34px; display: block; flex: none; }
+/* stacked lockup: both lines take the brand colour; weight alone separates them */
+.wordmark {
+  display: inline-flex; flex-direction: column; align-items: flex-start;
+  font-family: "Saira", var(--display); font-style: italic; line-height: .95; text-transform: uppercase;
+}
+.wordmark-agent { font-weight: 500; font-size: 13px; letter-spacing: .04em; }
+.wordmark-name { font-weight: 800; font-size: 21px; letter-spacing: .01em; }
 .nav-links { display: flex; gap: 4px; margin-left: auto; overflow-x: auto; scrollbar-width: none; min-width: 0; }
 .nav-links::-webkit-scrollbar { display: none; }
 .nav-links a {
@@ -282,7 +290,6 @@ h3 { font: 600 24px/1.3 var(--display); margin: 28px 0 12px; }
 h4 { margin: 24px 0 12px; }
 p, ul, ol, pre { margin-block: 12px; }
 .footer p a { display: inline; }
-.wordmark { font: italic 800 22px/1 "Saira", var(--display); letter-spacing: .01em; }
 .note { color: var(--muted); font-size: 13px; }
 .page-hero { max-width: 100%; }
 .page-hero h1 { overflow-wrap: anywhere; }
@@ -343,6 +350,9 @@ summary { cursor: pointer; font-weight: 600; }
 pre { overflow-x: auto; padding: 20px; background: var(--soft); border-radius: var(--radius-inner); }
 .footer .brand { display: inline-flex; }
 .footer .brand { --ink: var(--tower-fg); --paper: var(--tower); }
+.footer .brand svg { width: 46px; height: 46px; }
+.footer .wordmark-agent { font-size: 17px; }
+.footer .wordmark-name { font-size: 28px; }
 .footer-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
 @media (max-width: 1279px) {
   .tower-table { min-width: 1200px; }
@@ -356,7 +366,9 @@ pre { overflow-x: auto; padding: 20px; background: var(--soft); border-radius: v
   .wrap { padding-inline: 16px; }
   .nav .wrap { height: 56px; gap: 12px; }
   .nav .gh { display: none; }
-  .wordmark { font-size: 19px; }
+  .nav .brand svg { width: 32px; height: 32px; }
+  .nav .wordmark-agent { font-size: 12px; }
+  .nav .wordmark-name { font-size: 19px; }
   .nav-links { margin-left: 0; }
   .nav-links a { font-size: 13px; }
   .page-hero { padding-top: 36px; }
@@ -464,10 +476,15 @@ def excluded_text(excluded: Mapping[str, int]) -> str:
 
 
 def brand() -> str:
+    """The one brand lockup: the Broadcast mark beside AGENT stacked over PADDOCK.
+
+    The header and the footer both render this; the stylesheet sizes each.
+    """
     return (
-        '<a class="brand" href="index.html" aria-label="Paddock home">'
+        '<a class="brand" href="index.html" aria-label="Agent Paddock home">'
         '<svg viewBox="0 0 100 100" aria-hidden="true"><use href="#broadcast"/></svg>'
-        '<span class="wordmark">PADDOCK</span></a>'
+        '<span class="wordmark"><span class="wordmark-agent">AGENT</span>'
+        '<span class="wordmark-name">PADDOCK</span></span></a>'
     )
 
 
@@ -493,13 +510,13 @@ def document(title: str, active: str, body: str, *, canonical: bool = False) -> 
     )
     body = re.sub(r"<th\b(?![^>]*\bscope=)([^>]*)>", r'<th scope="col"\1>', body)
     if active not in ("index.html", "matrix.html") and "<h1>" not in body:
-        body = re.sub(r"<h2>(.*?)</h2>", lambda m: hero("Paddock", m[1]), body, count=1)
+        body = re.sub(r"<h2>(.*?)</h2>", lambda m: hero(PRODUCT, m[1]), body, count=1)
     prose = ' class="prose"' if active == "methodology.html" else ""
     return (
         "<!doctype html>\n"
         '<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        f"<title>{esc(title)} · Paddock</title>\n{head_link}\n"
+        f"<title>{esc(title)} · {PRODUCT}</title>\n{head_link}\n"
         "<!-- Google consent defaults: analytics storage denied in the EEA, UK, Switzerland and listed territories; no consent UI; ad storage off everywhere -->\n"
         "<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}\n"
         "gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'granted'});\n"
@@ -514,7 +531,7 @@ def document(title: str, active: str, body: str, *, canonical: bool = False) -> 
         '<link rel="icon" href="favicon.svg" type="image/svg+xml">\n'
         '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
         '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700'
-        "&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Saira:ital,wght@1,800"
+        "&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Saira:ital,wght@1,500;1,800"
         '&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,800&amp;display=swap" rel="stylesheet">\n'
         '<link rel="stylesheet" href="paddock.css">\n</head>\n<body>\n'
         '<svg width="0" height="0" aria-hidden="true" class="symbols">'
@@ -691,7 +708,7 @@ def index_page(results: lb.Results) -> str:
         for b in earlier
     )
     body = (
-        hero("Paddock", "Leaderboard", DESCRIPTION)
+        hero(PRODUCT, "Leaderboard", DESCRIPTION)
         + f'<div class="facts">{facts_html}</div>'
         + fairness_banner(results)
         + '<section aria-labelledby="current-boards"><h2 id="current-boards">Current boards</h2>'
@@ -738,7 +755,7 @@ def matrix_page(results: lb.Results) -> str:
             f'<tr><th scope="row">{esc(label)}<br>{config_cell(harness[2])}</th>{"".join(cells)}</tr>'
         )
     body = (
-        hero("Paddock", "Harness × model")
+        hero(PRODUCT, "Harness × model")
         + '<p class="note">Each cell lists passed / n per suite for one harness configuration '
         "and model. A dot means the combination has no rows. Coverage differs between "
         "cells, so compare within a suite on its board.</p>"
@@ -960,7 +977,7 @@ def methodology_page(results: lb.Results) -> str:
 configuration and one model. It records the suite, task and <code>task_version</code>; the
 harness name, version and configuration hash; the model's provider id; the verdict and
 partial-credit score; tokens (fresh input, cache reads, output); wall time; the run id and the
-Paddock commit it ran at; and its cost.</p>
+Agent Paddock commit it ran at; and its cost.</p>
 <h3>What is scored</h3>
 <ul>
 <li>A verifier outside the agent's sandbox grades every attempt from its submission and the
@@ -1017,7 +1034,7 @@ defaults. Current runner code does not establish how an imported run executed.</
 <div class="scroll"><table><thead><tr><th>hash</th><th>descriptor</th></tr></thead>
 <tbody>{configs}</tbody></table></div>
 <h3>Sources</h3>
-<p>The first results were imported from the eval bench that preceded Paddock, keeping each
+<p>The first results were imported from the eval bench that preceded Agent Paddock, keeping each
 source's exclusions. Those rows carry no token or wall-time measurements and no harness
 version, so their tokens and cost read "not measured" and "unknown". Published aggregates with
 no per-attempt rows are not imported: only rows can be recomputed.</p>

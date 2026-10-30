@@ -1,11 +1,11 @@
-# Paddock
+# Agent Paddock
 
-Paddock is an open leaderboard for coding agents: each model and harness
+Agent Paddock is an open leaderboard for coding agents: each model and harness
 combination is graded on the same versioned coding, review, fix, RCA and docs
 tasks. The leaderboard is published at [agentpaddock.ai](https://agentpaddock.ai),
 built only from the committed `results/` tree.
 
-Python 3.11 or newer is required for Paddock and standalone task verifiers.
+Python 3.11 or newer is required for Agent Paddock and standalone task verifiers.
 
 ```bash
 git clone https://github.com/laceyenterprises/agentpaddock.git
@@ -378,7 +378,7 @@ document. Keep only one storage form per document; validation rejects duplicates
 A record carries suite, task and `task_version`; harness name, version and
 config hash (the SHA-256 of a descriptor kept in the document); the model's
 provider id; verdict, score, tokens (fresh input, cache reads, output) and
-wall time; run id and Paddock commit; `excludedBecause`; and its cost.
+wall time; run id and Agent Paddock commit; `excludedBecause`; and its cost.
 Validation recomputes every cost from the tokens and the named price table, so
 a hand-typed figure fails. Unmeasured tokens are null, never zero, and a cost
 without a priced source reads `unknown`.
@@ -1934,17 +1934,17 @@ stateDiagram-v2
 
 | Object | Non-terminal states | Proposed exit owner | Proposed maximum | Recipient | Enforcement |
 |---|---|---|---|---|---|
-| paddock.grade | `error` | Suite caller: _invalidate_level_mismatch | 180s | Paddock maintainer | missing |
-| paddock.grade | `failed` | Suite caller: _invalidate_level_mismatch | 180s | Paddock maintainer | missing |
-| paddock.grade | `format_failed` | Suite caller: _invalidate_level_mismatch | 180s | Paddock maintainer | missing |
-| paddock.grade | `integrity_hold` | Suite caller: _invalidate_level_mismatch | 180s | Paddock maintainer | missing |
-| paddock.grade | `no_submission` | Suite caller: _invalidate_level_mismatch | 180s | Paddock maintainer | missing |
-| paddock.grade | `passed` | Suite caller: _invalidate_level_mismatch | 180s | Paddock maintainer | missing |
-| paddock.endpoint | `closing` | paddock maintainer/caller | 180s | paddock maintainer | missing |
-| paddock.endpoint | `creating` | paddock maintainer/caller | 180s | paddock maintainer | missing |
-| paddock.endpoint | `ready` | paddock maintainer/caller | 180s | paddock maintainer | missing |
-| paddock.endpoint | `warming` | paddock maintainer/caller | 180s | paddock maintainer | missing |
-| paddock.process | `running` | paddock maintainer/caller | 180s | paddock maintainer | missing |
+| paddock.grade | `error` | Suite caller: _invalidate_level_mismatch | 180s | Agent Paddock maintainer | missing |
+| paddock.grade | `failed` | Suite caller: _invalidate_level_mismatch | 180s | Agent Paddock maintainer | missing |
+| paddock.grade | `format_failed` | Suite caller: _invalidate_level_mismatch | 180s | Agent Paddock maintainer | missing |
+| paddock.grade | `integrity_hold` | Suite caller: _invalidate_level_mismatch | 180s | Agent Paddock maintainer | missing |
+| paddock.grade | `no_submission` | Suite caller: _invalidate_level_mismatch | 180s | Agent Paddock maintainer | missing |
+| paddock.grade | `passed` | Suite caller: _invalidate_level_mismatch | 180s | Agent Paddock maintainer | missing |
+| paddock.endpoint | `closing` | Agent Paddock maintainer/caller | 180s | Agent Paddock maintainer | missing |
+| paddock.endpoint | `creating` | Agent Paddock maintainer/caller | 180s | Agent Paddock maintainer | missing |
+| paddock.endpoint | `ready` | Agent Paddock maintainer/caller | 180s | Agent Paddock maintainer | missing |
+| paddock.endpoint | `warming` | Agent Paddock maintainer/caller | 180s | Agent Paddock maintainer | missing |
+| paddock.process | `running` | Agent Paddock maintainer/caller | 180s | Agent Paddock maintainer | missing |
 
 Each missing row has source evidence in its definition. No general overdue enforcer is added here.
 Proposed lifetime/expiry bounds above are not repairs. See each state deadEndEvidence selector.
@@ -1967,4 +1967,4 @@ Snapshots/observations do not transfer ownership from the referenced runtime. Sy
 
 ## License
 
-Paddock is licensed under the [MIT License](LICENSE).
+Agent Paddock is licensed under the [MIT License](LICENSE).
