@@ -178,6 +178,7 @@ def test_exported_call_matches_separately_sourced_raw_control(worker_class, meta
         ("x" * 200, "x" * 200),
         (_LONG_CALL_ID, _LONG_CALL_ID),
         (_LONG_CALL_ID, _EXPORTED_CALL_ID),
+        (_EXPORTED_CALL_ID, _LONG_CALL_ID),
         (_EXPORTED_CALL_ID, _EXPORTED_CALL_ID),
     ],
 )

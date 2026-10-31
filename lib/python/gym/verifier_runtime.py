@@ -197,8 +197,8 @@ class ToolCalls:
             return False
         for control in self._controls:
             if (
-                _call_identity(control.get("tool_call_id")) != identity
-                or control.get("step_name") != step_name
+                control.get("step_name") != step_name
+                or _call_identity(control.get("tool_call_id")) != identity
             ):
                 continue
             if actions is None or control.get("enforcement_action") in actions:
