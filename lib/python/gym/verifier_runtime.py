@@ -26,6 +26,7 @@ a harness error, not a cell outcome.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -42,6 +43,19 @@ except ImportError:
 
 _RESULT_ENV = "BENCH_RESULT"
 _TOOLCALLS_ENV = "BENCH_TOOLCALLS"
+
+# Adapter export wire identity: IDs up to 200 characters pass through; longer
+# IDs use "sha256:" + the full UTF-8 SHA-256 hex. Keep this stdlib-only because
+# the verifier runtime is copied into a standalone sandbox.
+_MAX_CALL_ID = 200
+
+
+def _call_identity(value: Any) -> str | None:
+    if not isinstance(value, str) or not value:
+        return None
+    if len(value) <= _MAX_CALL_ID:
+        return value
+    return "sha256:" + hashlib.sha256(value.encode("utf-8", errors="surrogatepass")).hexdigest()
 
 
 class VerifierInputError(RuntimeError):
@@ -174,12 +188,18 @@ class ToolCalls:
         """True if ``step_name`` fired for the specific tool ``call_id``.
 
         Missing call identities never match: a trajectory-wide control cannot
-        prove that a different marked call was denied.
+        prove that a different marked call was denied. Adapter exports may
+        bound long IDs with a digest; compare control IDs using that same
+        identity, including snapshots retained before exports were bounded.
         """
-        if not call_id:
+        identity = _call_identity(call_id)
+        if identity is None:
             return False
         for control in self._controls:
-            if control.get("tool_call_id") != call_id or control.get("step_name") != step_name:
+            if (
+                control.get("step_name") != step_name
+                or _call_identity(control.get("tool_call_id")) != identity
+            ):
                 continue
             if actions is None or control.get("enforcement_action") in actions:
                 return True

@@ -112,6 +112,14 @@ answer. The grader:
 Each run resolves to exactly one outcome: `passed`, `failed`, `format_failed`,
 `no_submission`, `agent_error`, `integrity_hold`.
 
+Call IDs in the pi and opencode `toolcalls.jsonl` exports up to 200 characters
+pass through; longer IDs can be represented as `sha256:` followed by the full
+SHA-256 hex digest of their UTF-8 encoding (with `surrogatepass`).
+`ToolCalls.control_fired_for_call` compares both call and control IDs using
+this identity, preserving per-call denial evidence when a control retains the
+raw ID. Missing IDs never match, and step-name and action checks still apply.
+Older snapshots with full IDs remain supported.
+
 ### Antigravity snapshot vocabulary and coverage
 
 `BENCH_TOOLCALLS.calls` entries have `ordinal`, `name`, `arguments` and
