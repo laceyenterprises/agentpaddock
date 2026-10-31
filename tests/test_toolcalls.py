@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
+from gym.harness_toolcalls import collect
 from gym.toolcalls import build_snapshot, extract_controls, extract_tool_calls
 from gym.verifier_runtime import ToolCalls
 
@@ -130,3 +133,89 @@ def test_controls_surface_for_not_called_assertion():
     assert tc.control_fired("send", actions=("deny", "block"))
     assert not tc.control_fired("send", actions=("allow",))
     assert not tc.control_fired("other")
+
+
+# Synthetic adapter-export wire vector; the full provider signature never needs
+# to appear in a JSONL line. Pin the digest independently of the implementation.
+_LONG_CALL_ID = "call_1__thought__" + "A" * 300_000
+_EXPORTED_CALL_ID = "sha256:0a79c8fb180c2d7b327e255fb80680a9b1fe3d46e596c3626aaa3def03588dd4"
+
+
+@pytest.mark.parametrize("worker_class", ["pi", "oss-pi", "opencode", "oss-opencode"])
+@pytest.mark.parametrize("metadata", [False, True])
+def test_exported_call_matches_separately_sourced_raw_control(worker_class, metadata):
+    line = json.dumps(
+        {"name": "send", "arguments": {"text": "synthetic marker"}, "call_id": _EXPORTED_CALL_ID}
+    )
+    streams = []
+
+    def log_reader(stream):
+        streams.append(stream)
+        assert stream == "toolcalls"
+        return [line]
+
+    fallback = collect(log_reader=log_reader, worker_class=worker_class)
+    control = {"step_name": "send_gate", "enforcement_action": "deny"}
+    if metadata:
+        control["metadata_json"] = json.dumps({"tool_call_id": _LONG_CALL_ID})
+    else:
+        control["tool_call_id"] = _LONG_CALL_ID
+    # Exercise the collection -> snapshot -> verifier path across JSON transport.
+    snapshot = json.loads(json.dumps(build_snapshot([], [control], fallback_calls=fallback)))
+    calls = ToolCalls(snapshot)
+    call_id = calls.calls[0]["call_id"]
+    assert streams == ["toolcalls"]
+    assert call_id == _EXPORTED_CALL_ID
+    assert calls.control_fired_for_call(call_id, "send_gate", actions=("deny",))
+    assert not calls.control_fired_for_call(call_id, "other_gate", actions=("deny",))
+    assert not calls.control_fired_for_call(call_id, "send_gate", actions=("allow",))
+
+
+@pytest.mark.parametrize(
+    "call_id,control_id",
+    [
+        ("short", "short"),
+        ("x" * 200, "x" * 200),
+        (_LONG_CALL_ID, _LONG_CALL_ID),
+        (_LONG_CALL_ID, _EXPORTED_CALL_ID),
+        (_EXPORTED_CALL_ID, _EXPORTED_CALL_ID),
+    ],
+)
+def test_control_identity_keeps_short_and_legacy_raw_calls(call_id, control_id):
+    calls = ToolCalls(
+        {
+            "controls": [
+                {"tool_call_id": control_id, "step_name": "gate", "enforcement_action": "deny"}
+            ]
+        }
+    )
+    assert calls.control_fired_for_call(call_id, "gate")
+    assert calls.control_fired_for_call(call_id, "gate", actions=("deny",))
+
+
+@pytest.mark.parametrize("missing_id", [None, "", 42, {"id": "fake"}])
+def test_missing_or_malformed_call_identity_never_proves_denial(missing_id):
+    calls = ToolCalls(
+        {
+            "controls": [
+                {"tool_call_id": missing_id, "step_name": "gate", "enforcement_action": "deny"}
+            ]
+        }
+    )
+    assert not calls.control_fired_for_call(missing_id, "gate", actions=("deny",))
+    assert not calls.control_fired_for_call(_EXPORTED_CALL_ID, "gate", actions=("deny",))
+
+
+def test_control_for_a_different_long_call_cannot_prove_denial():
+    calls = ToolCalls(
+        {
+            "controls": [
+                {
+                    "tool_call_id": _LONG_CALL_ID + "B",
+                    "step_name": "gate",
+                    "enforcement_action": "deny",
+                }
+            ]
+        }
+    )
+    assert not calls.control_fired_for_call(_EXPORTED_CALL_ID, "gate", actions=("deny",))

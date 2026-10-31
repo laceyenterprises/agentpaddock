@@ -89,7 +89,14 @@ answer. The grader:
    teardown deletes, so their adapters export the calls to `toolcalls.jsonl`
    before teardown, and the host projects that logical stream before the others, but only when the ledger's
    `launch_requests.worker_class` is `pi`, `oss-pi`, `opencode`, or
-   `oss-opencode`. A worker can write to its dispatch directory and no other
+   `oss-opencode`. Adapter call IDs up to 200 characters pass through;
+   longer IDs can be represented as `sha256:` followed by the full SHA-256
+   hex digest of their UTF-8 encoding (with `surrogatepass`).
+   `ToolCalls.control_fired_for_call` compares both call and control IDs using
+   this identity, preserving per-call denial evidence when a control retains
+   the raw ID. Missing IDs never match, and step-name and action checks still
+   apply. Older snapshots with full IDs remain supported.
+   A worker can write to its dispatch directory and no other
    adapter clears the file, so on any other class it is ignored and logged as
    a possible plant; if the ledger lookup of the class fails, the run is graded
    the same way. Even for pi and opencode the file is only as trustworthy as a
