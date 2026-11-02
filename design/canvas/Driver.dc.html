@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Results: driver performance</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,500;1,800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#007BFF}a:hover{color:#0056B3}
+select:focus-visible{outline:2px solid #007BFF;outline-offset:2px}
+.dr-mono{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace}
+</style>
+</helmet>
+<div style="width: 1600px; height: 900px; position: relative; overflow: hidden; background: #F6F7F9; color: #111111; font-family: Inter, -apple-system, Helvetica, Arial, sans-serif;">
+<div style="position: absolute; left: 80px; top: 48px; width: 1440px; display: flex; justify-content: space-between; align-items: flex-end; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<div class="dr-mono" style="font-size: 13px; letter-spacing: 0.1em; color: #5C6470;">RESULTS · DRIVER PERFORMANCE</div>
+<h1 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 52px; line-height: 1;">Does more effort make {{driver}} better?</h1>
+<p style="margin: 0; font-size: 17px; color: #5C6470;">One driver, each car it raced, every engine map it ran: the pass rate it bought, and the fuel it burned for it.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<label for="dr-driver" class="dr-mono" style="font-size: 12px; letter-spacing: 0.08em; color: #5C6470;">DRIVER (MODEL)</label>
+<select id="dr-driver" value="{{driver}}" onChange="{{onDriver}}" style="font: 600 16px Inter, Helvetica, Arial, sans-serif; padding: 10px 14px; border: 1px solid #C9CED6; border-radius: 8px; background: #FFFFFF; color: #111111; min-width: 240px;">
+<sc-for list="{{driverOpts}}" as="o" hint-placeholder-count="8"><option value="{{o}}">{{o}}</option></sc-for>
+</select>
+</div>
+</div>
+<div style="position: absolute; left: 80px; top: 196px; width: 1040px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+<sc-for list="{{panels}}" as="p" hint-placeholder-count="5">
+<div style="background: #FFFFFF; border: 1px solid #DCE0E6; border-radius: 12px; padding: 12px 16px 10px; display: flex; flex-direction: column; gap: 4px;">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;"><span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 22px;">{{p.car}}</span><span class="dr-mono" style="font-size: 11px; color: #5C6470;">{{p.common}}</span></div>
+<div style="position: relative; height: 166px; margin-left: 34px;">
+<div class="dr-mono" style="position: absolute; left: -34px; top: 16px; font-size: 10px; color: #5C6470;">100%</div>
+<div class="dr-mono" style="position: absolute; left: -34px; top: 76px; font-size: 10px; color: #5C6470;">50%</div>
+<div class="dr-mono" style="position: absolute; left: -34px; top: 136px; font-size: 10px; color: #5C6470;">0%</div>
+<div style="position: absolute; left: 0; right: 0; top: 22px; height: 1px; background: #E6E9EE;"></div>
+<div style="position: absolute; left: 0; right: 0; top: 82px; height: 1px; background: #E6E9EE;"></div>
+<div style="position: absolute; left: 0; right: 0; top: 142px; height: 1px; background: #C9CED6;"></div>
+<svg style="position: absolute; left: 0; top: 0; width: 100%; height: 144px; overflow: visible;" viewBox="0 0 260 144" preserveAspectRatio="none" aria-hidden="true"><polyline points="{{p.line}}" fill="none" stroke="#007BFF" stroke-width="2" vector-effect="non-scaling-stroke"></polyline></svg>
+<sc-for list="{{p.pts}}" as="q" hint-placeholder-count="4">
+<div title="{{q.tip}}" style="position: absolute; left: {{q.x}}%; top: {{q.hiY}}px; height: {{q.wh}}px; width: 2px; margin-left: -1px; background: #9AA3AF;"></div>
+<div title="{{q.tip}}" style="position: absolute; left: {{q.x}}%; top: {{q.y}}px; width: 12px; height: 12px; margin-left: -6px; margin-top: -6px; border-radius: 50%; background: #007BFF; box-shadow: 0 0 0 2px #FFFFFF;"></div>
+<div style="position: absolute; left: {{q.x}}%; top: {{q.labY}}px; transform: translateX(-50%); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;">{{q.pct}}</div>
+<div class="dr-mono" style="position: absolute; left: {{q.x}}%; top: 150px; transform: translateX(-50%); font-size: 10px; color: #5C6470; white-space: nowrap;">{{q.short}}</div>
+</sc-for>
+</div>
+<div style="position: relative; height: 54px; margin-left: 34px; border-top: 1px dashed #DCE0E6;">
+<div class="dr-mono" style="position: absolute; left: -34px; top: 6px; width: 30px; font-size: 9px; line-height: 1.2; color: #5C6470;">FUEL<br>/PASS</div>
+<sc-for list="{{p.pts}}" as="q" hint-placeholder-count="4">
+<div title="{{q.ftip}}" style="position: absolute; left: {{q.x}}%; bottom: 0; width: 14px; margin-left: -7px; height: {{q.fh}}px; background: #3A414B; border-radius: 3px 3px 0 0;"></div>
+<div class="dr-mono" style="position: absolute; left: {{q.x}}%; bottom: {{q.flb}}px; transform: translateX(-50%); font-size: 10px; color: #111111; white-space: nowrap;">{{q.ftxt}}</div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="position: absolute; left: 1160px; top: 196px; width: 360px; display: flex; flex-direction: column; gap: 12px;">
+<div style="background: #111317; color: #F2F4F7; border-radius: 12px; padding: 18px 22px; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; align-items: center; gap: 10px;"><svg style="width: 26px; height: 26px; color: #F2F4F7;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4.5 14v-1.5a7.5 7.5 0 0 1 15 0V14"></path><rect x="3" y="13.5" width="4" height="6" rx="1.5"></rect><rect x="17" y="13.5" width="4" height="6" rx="1.5"></rect><path d="M19 19.5c0 1.4-1.2 2-3 2H13.5"></path><circle cx="12" cy="21.5" r="1.7" fill="#4DA3FF" stroke="none"></circle></svg><span class="dr-mono" style="font-size: 12px; letter-spacing: 0.1em; color: #9AA3AF;">TEAM RADIO · SKILLS</span></div>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 28px; line-height: 1.05;">Not measured yet</div>
+<p style="margin: 0; font-size: 14px; line-height: 1.45; color: #C9CED6;">Every race so far ran without a skill pack. A radio test runs the same driver, car and races with and without one.</p>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE0E6; border-radius: 12px; padding: 16px 22px; display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; align-items: center; gap: 10px;"><svg style="width: 22px; height: 22px;" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16"></path><path d="M3 21h13"></path><path d="M7 7h5v4H7z"></path><path d="M15 9h2a2 2 0 0 1 2 2v6a1.5 1.5 0 0 0 3 0V8l-3-3"></path></svg><span class="dr-mono" style="font-size: 12px; letter-spacing: 0.1em; color: #5C6470;">FUEL BURN · PER RACE PASSED</span></div>
+<div style="display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: baseline;">
+<span style="font-size: 14px; color: #5C6470;">Leanest map</span><span class="dr-mono" style="font-size: 14px; font-weight: 500; text-align: right;">{{leanVal}}</span>
+<span style="grid-column: 1 / -1; font-size: 15px; font-weight: 700; margin-top: -2px;">{{leanName}}</span>
+<span style="font-size: 14px; color: #5C6470; margin-top: 6px;">Thirstiest map</span><span class="dr-mono" style="font-size: 14px; font-weight: 500; text-align: right; margin-top: 6px;">{{thirstVal}}</span>
+<span style="grid-column: 1 / -1; font-size: 15px; font-weight: 700; margin-top: -2px;">{{thirstName}}</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; background: #F6F7F9; border: 1px solid #E6E9EE; border-radius: 8px; padding: 10px 12px;"><div style="display: flex; align-items: baseline; gap: 8px;"><span class="dr-mono" style="font-size: 10px; letter-spacing: 0.1em; color: #5C6470;">THE FUEL TRIAD</span><span class="dr-mono" style="font-size: 13px; font-weight: 500;">Input (cached %) : Output</span></div><div style="font-size: 12px; line-height: 1.45; color: #3A414B;"><b>Input</b>: every token sent to the model. <b>Cached %</b>: the share of it read from the prompt cache. <b>Output</b>: the tokens the model wrote. Per race passed.</div></div>
+<p style="margin: 0; font-size: 13px; line-height: 1.45; color: #5C6470;">{{fuelNote}}</p>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE0E6; border-radius: 12px; padding: 16px 22px; display: flex; flex-direction: column; gap: 8px;">
+<div class="dr-mono" style="font-size: 12px; letter-spacing: 0.1em; color: #5C6470;">HOW TO READ IT</div>
+<p style="margin: 0; font-size: 13px; line-height: 1.45;">Dot: pass rate at that engine map; grey bar: its 95% interval. Dark bar: total fuel per race passed, one log scale for every panel (hover for the triad). Most maps share only 9 races, so one race is 11 points.</p>
+</div>
+</div>
+<div class="dr-mono" style="position: absolute; left: 80px; top: 866px; width: 1440px; font-size: 11px; color: #5C6470;">All counted runs on each car's common races, repeats included · fuel = every token the run processed (fresh input, cache reads, output) · hover for counts and dollars · eval bench, 2026-11-02</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1600,"height":900}}'>
+class Component extends DCLogic {
+constructor(props) {
+super(props);
+this.state = { driver: 'Gemini 3.8 Flash' };
+}
+data() {
+return [["Claude Opus 5.5","Claude Code",9,[["low",2,9,6.3,54.7,2.3805,3702587,[3677129,100,25458]],["medium",5,9,26.7,81.1,0.9941,1664580,[1649815,100,14765]],["high",22,43,36.8,65.4,1.1264,2136265,[2112014,100,24251]],["xhigh",26,33,62.2,89.3,1.4982,2188035,[2139359,100,48675]],["max",9,10,59.6,98.2,4.0435,5888311,[5719248,100,169062]]]],["Claude Sonnet 5.5","Claude Code",9,[["low",4,9,18.9,73.3,0.6191,1939196,[1924147,100,15049]],["medium",4,9,18.9,73.3,0.7305,1791035,[1773559,100,17475]],["high",12,19,41.0,80.9,0.4169,1467131,[1449486,100,17645]],["xhigh",7,9,45.3,93.7,0.6722,2116233,[2069149,100,47083]],["max",8,9,56.5,98.0,3.4548,11728865,[11445356,100,283508]]]],["GPT-5.6 Terra","Codex",9,[["low",6,9,35.4,87.9,0.16,292149,[289178,87,2971]],["medium",6,9,35.4,87.9,0.1732,288478,[284406,87,4072]],["high",6,9,35.4,87.9,0.2261,391596,[385236,90,6360]],["xhigh",7,9,45.3,93.7,0.2517,350094,[340128,90,9965]],["max",5,9,26.7,81.1,0.5611,727441,[702087,91,25353]],["ultra",3,9,12.1,64.6,1.1,2240629,[2208456,93,32173]]]],["GPT-6.1 Sol","Codex",9,[["low",8,9,56.5,98.0,0.0667,150698,[149291,87,1407]],["low (CLI default)",24,33,55.8,84.9,0.1059,193386,[190920,83,2466]],["medium",57,69,72.0,89.8,0.0878,169789,[167894,84,1895]],["high",44,63,57.6,79.8,0.1246,221904,[217945,85,3958]],["xhigh",21,33,46.6,77.8,0.177,286210,[278644,86,7566]],["max",6,9,35.4,87.9,0.1972,334237,[324817,89,9420]],["ultra",6,10,31.3,83.2,0.192,469419,[463650,90,5768]]]],["Gemini 3.8 Flash","Antigravity",9,[["low",5,9,26.7,81.1,0.2337,924172,[918609,77,5562]],["medium",8,9,56.5,98.0,0.5061,1611088,[1547402,86,63686]],["high",24,27,71.9,96.1,0.5831,1666536,[1587426,84,79110]]]],["Gemini 4 Argon","Antigravity",9,[["low",7,9,45.3,93.7,null,143207,[140792,71,2415]],["medium",7,9,45.3,93.7,null,167025,[156936,71,10089]],["high",7,9,45.3,93.7,null,310211,[279928,68,30283]]]],["Gemini 3.8 Flash","Claude Code",54,[["low",46,54,73.4,92.3,0.1488,344807,[340817,53,3990]],["medium",51,54,84.9,98.1,0.2332,475900,[453922,62,21978]],["high",48,54,77.8,94.8,0.28,1139007,[1102908,92,36098]],["high (asked)",48,55,76.0,93.7,0.263,981182,[947454,90,33728]]]],["GPT-6.1 Sol","Claude Code",9,[["low",8,9,56.5,98.0,0.113,260544,[258919,86,1625]],["high",7,10,39.7,89.2,0.202,326697,[320271,83,6425]],["high (route default)",7,10,39.7,89.2,0.2115,386501,[379455,86,7045]],["max",5,9,26.7,81.1,0.4951,534705,[510509,79,24195]]]],["Claude Opus 5.5","Codex",9,[["none",7,9,45.3,93.7,0.5267,116472,[112668,0,3803]],["low",4,10,16.8,68.7,0.8952,210111,[206691,0,3420]],["medium",7,10,39.7,89.2,0.6403,145146,[141415,0,3730]],["high",9,10,59.6,98.2,0.5806,128198,[123960,0,4238]],["xhigh",8,10,49.0,94.3,1.3559,266580,[248480,0,18100]]]],["Claude Sonnet 5.5","Codex",9,[["none",5,10,23.7,76.3,0.3517,161459,[157860,0,3598]],["low",2,9,6.3,54.7,0.8192,383474,[376941,0,6532]],["medium",3,10,10.8,60.3,0.6848,320467,[314981,0,5486]],["high",6,9,35.4,87.9,0.3261,148043,[144297,0,3746]],["xhigh",8,10,49.0,94.3,0.5261,213160,[200682,0,12478]]]],["Gemini 3.8 Flash","Codex",45,[["low",37,45,68.7,90.7,0.1438,277489,[271384,45,6104]],["medium",48,55,76.0,93.7,0.2471,548195,[523206,68,24988]],["high",40,45,76.5,95.2,0.3255,833277,[795122,77,38155]]]],["Claude Opus 5.5","OpenCode",9,[["none",6,9,35.4,87.9,0.3305,144256,[138397,72,5859]],["low",3,10,10.8,60.3,0.6241,309910,[304457,69,5452]],["medium",5,9,26.7,81.1,0.4856,184867,[179665,60,5202]],["high",6,10,31.3,83.2,0.5657,248884,[240770,69,8114]],["xhigh",8,9,56.5,98.0,0.9251,356454,[332512,76,23942]]]],["Claude Sonnet 5.5","OpenCode",9,[["none",8,10,49.0,94.3,0.1451,150614,[145538,77,5076]],["low",1,9,2.0,43.5,0.8627,1012383,[995564,75,16819]],["medium",2,9,6.3,54.7,0.4649,510648,[500445,74,10203]],["high",5,9,26.7,81.1,0.2244,205092,[199080,70,6012]],["xhigh",8,9,56.5,98.0,0.3673,261562,[243046,73,18516]]]],["Gemini 3.8 Flash","OpenCode",54,[["low",43,54,67.1,88.2,0.1071,208237,[206967,38,1269]],["medium",58,64,81.0,95.6,0.2682,788214,[763319,77,24895]],["high",51,54,84.9,98.1,0.2853,812616,[781687,79,30928]]]],["GPT-6.1 Sol","OpenCode",9,[["low",8,10,49.0,94.3,0.0837,116174,[114296,75,1878]],["high",6,10,31.3,83.2,0.2201,373931,[363420,89,10511]],["high (route default)",12,22,34.7,73.1,0.2503,398670,[385573,89,13096]],["max",6,10,31.3,83.2,0.5545,521177,[482393,87,38784]]]],["Claude Opus 5.5","Pi",9,[["none",5,9,26.7,81.1,0.525,104894,[98306,0,6588]],["low",3,10,10.8,60.3,0.6725,149140,[144391,0,4748]],["medium",6,9,35.4,87.9,0.3867,81006,[77086,0,3920]],["high",6,10,31.3,83.2,0.4983,100643,[94658,0,5984]],["xhigh",8,9,56.5,98.0,0.8139,151990,[139122,0,12868]]]],["Claude Sonnet 5.5","Pi",9,[["none",6,10,31.3,83.2,0.233,93870,[88212,0,5658]],["low",2,9,6.3,54.7,0.4235,185480,[178918,0,6562]],["medium",5,9,26.7,81.1,0.1933,84704,[81721,0,2983]],["high",7,9,45.3,93.7,0.1586,66275,[63013,0,3261]],["xhigh",7,9,45.3,93.7,0.2417,87808,[79543,0,8265]]]],["Gemini 3.8 Flash","Pi",50,[["low",89,106,75.8,89.7,0.294,2745968,[2744208,96,1759]],["medium",95,106,82.4,94.1,0.2546,593309,[563370,74,29938]],["high",95,105,83.4,94.7,0.3475,882872,[838818,79,44053]]]],["GPT-6.1 Sol","Pi",9,[["low",8,10,49.0,94.3,0.0452,60651,[59397,76,1253]],["high",6,10,31.3,83.2,0.1095,125638,[119944,82,5693]],["high (route default)",8,10,49.0,94.3,0.0812,86058,[81714,81,4344]],["max",6,10,31.3,83.2,0.2462,148278,[129356,82,18921]]]],["GPT-6 Luna","Codex",9,[["low",1,9,2.0,43.5,0.0272,1091157,[1083856,87,7301]],["medium",5,9,26.7,81.1,0.0062,239566,[237678,87,1887]],["high",7,9,45.3,93.7,0.006,211961,[209236,87,2725]],["xhigh",8,9,56.5,98.0,0.0093,237321,[229504,85,7817]],["max",7,9,45.3,93.7,0.0106,249090,[238638,86,10452]]]],["Claude Haiku 5.5","Claude Code",9,[["low",6,9,35.4,87.9,0.0359,709831,[678380,100,31450]],["medium",6,9,35.4,87.9,0.0405,915170,[873272,100,41897]],["high",7,11,35.4,84.8,0.0618,1255160,[1177331,100,77829]],["xhigh",5,9,26.7,81.1,0.1433,2827664,[2613239,100,214424]],["max",4,9,18.9,73.3,0.8169,8845441,[8146775,100,698666]]]],["GPT-5.6 Terra","Claude Code",9,[["low",8,9,56.5,98.0,0.1328,190964,[188698,80,2266]],["high",7,9,45.3,93.7,0.2503,272092,[265542,75,6550]]]],["GPT-6 Luna","Claude Code",9,[["low",5,9,26.7,81.1,0.0114,490667,[488592,88,2075]],["high",8,9,56.5,98.0,0.0111,309432,[300328,87,9104]],["xhigh",5,9,26.7,81.1,0.0211,332205,[306287,82,25917]],["max",5,9,26.7,81.1,0.0389,347408,[283956,83,63452]]]],["Claude Haiku 5.5","Codex",9,[["low",6,9,35.4,87.9,0.0181,167148,[163785,0,3362]],["medium",6,10,31.3,83.2,0.0223,203231,[198247,0,4984]],["high",4,9,18.9,73.3,0.0529,487761,[477522,0,10238]],["xhigh",7,10,39.7,89.2,0.068,467493,[414463,0,53030]],["max",3,10,10.8,60.3,0.4775,2491176,[1920187,0,570988]]]],["Claude Haiku 5.5","OpenCode",9,[["low",6,9,35.4,87.9,0.0094,161793,[158120,67,3673]],["medium",6,9,35.4,87.9,0.0102,198619,[194260,73,4358]],["high",6,9,35.4,87.9,0.011,223295,[217816,76,5479]],["xhigh",5,9,26.7,81.1,0.0802,684403,[607379,49,77024]],["max",3,9,12.1,64.6,0.5604,3616535,[2906058,47,710476]]]],["GPT-5.6 Terra","OpenCode",9,[["low",7,9,45.3,93.7,0.1202,173939,[171037,83,2902]],["high",6,9,35.4,87.9,0.2291,302960,[294302,87,8658]]]],["GPT-6 Luna","OpenCode",9,[["low",8,9,56.5,98.0,0.0039,102779,[101418,76,1360]],["high",7,9,45.3,93.7,0.0132,284845,[269385,89,15460]],["xhigh",8,10,49.0,94.3,0.0205,408076,[380452,91,27623]],["max",4,10,16.8,68.7,0.0875,814720,[664850,90,149870]]]],["Claude Haiku 5.5","Pi",9,[["low",6,9,35.4,87.9,0.0115,101391,[97922,0,3469]],["medium",5,9,26.7,81.1,0.0162,141468,[136294,0,5173]],["high",7,9,45.3,93.7,0.016,138540,[133230,0,5310]],["xhigh",3,9,12.1,64.6,0.1415,941635,[823198,0,118437]],["max",3,9,12.1,64.6,0.452,2285147,[1726500,0,558646]]]],["GPT-5.6 Terra","Pi",9,[["low",6,9,35.4,87.9,0.0725,65664,[63305,72,2359]],["high",5,9,26.7,81.1,0.1636,100181,[91580,75,8601]]]],["GPT-6 Luna","Pi",9,[["low",4,9,18.9,73.3,0.004,81908,[80146,68,1761]],["high",7,9,45.3,93.7,0.007,97005,[88112,79,8893]],["xhigh",5,9,26.7,81.1,0.0156,170710,[147411,82,23298]],["max",6,9,35.4,87.9,0.0412,251262,[176820,86,74442]]]]];
+}
+renderVals() {
+const short = { 'low (CLI default)': 'low·def', 'high (route default)': 'high·route', 'high (asked)': 'high·asked', 'provider default': 'provider' };
+const tk = (v) => v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1000 ? Math.round(v / 1000) + 'k' : String(v);
+const tri = (x) => x ? tk(x[0]) + ' (' + x[1] + '%) : ' + tk(x[2]) : 'not recorded';
+const usd = (v) => v == null ? 'no dollar cost' : '$' + (v < 0.1 ? v.toFixed(3) : v.toFixed(2)) + ' per pass';
+const LO = Math.log10(30000), HI = Math.log10(15000000), FH = 34;
+const driver = this.state.driver;
+const all = this.data();
+const driverOpts = Array.from(new Set(all.map((r) => r[0]))).sort();
+const Y = (v) => 22 + (100 - v) / 100 * 120;
+const cand = [];
+const panels = all.filter((r) => r[0] === driver).sort((a, b) => a[1].localeCompare(b[1])).map((r) => {
+const pts = r[3];
+const m = pts.length;
+const items = pts.map((p, i) => {
+const x = m === 1 ? 50 : 6 + i * (88 / (m - 1));
+const rate = 100 * p[1] / p[2];
+const t = p[6];
+const fh = t ? Math.max(3, Math.min(FH, FH * (Math.log10(t) - LO) / (HI - LO))) : 0;
+if (t) cand.push({ name: p[0] + ' in ' + r[1], t, x: p[7] });
+return { x: x.toFixed(2), y: Y(rate).toFixed(1), hiY: Y(p[4]).toFixed(1), wh: (Y(p[3]) - Y(p[4])).toFixed(1), labY: (Y(p[4]) - 16).toFixed(1), pct: Math.round(rate) + '%', short: short[p[0]] || p[0],
+tip: p[0] + ': ' + p[1] + ' of ' + p[2] + ' runs passed (' + rate.toFixed(1) + '%), 95% interval ' + p[3] + '–' + p[4] + '%',
+fh: fh.toFixed(1), flb: (fh + 2).toFixed(1), ftxt: t ? tk(t) : 'n/a',
+ftip: p[0] + ': ' + (t ? tk(t) + ' tokens per race passed, ' + tri(p[7]) : 'tokens not recorded') + ', ' + usd(p[5]) + ', over the same ' + p[2] + ' runs' };
+});
+const line = items.map((q) => (parseFloat(q.x) * 2.6).toFixed(1) + ',' + q.y).join(' ');
+return { car: r[1], common: 'on ' + r[2] + ' common races', pts: items, line };
+});
+cand.sort((a, b) => a.t - b.t);
+const lean = cand[0], thirst = cand[cand.length - 1];
+return {
+driver, driverOpts, panels,
+leanName: lean ? lean.name : '–', leanVal: lean ? tri(lean.x) : '',
+thirstName: thirst ? thirst.name : '–', thirstVal: thirst ? tri(thirst.x) : '',
+fuelNote: lean && thirst ? Math.round(thirst.t / lean.t) + '× apart in total fuel. Maps compare within a car on the same races.' : '',
+onDriver: (e) => this.setState({ driver: e.target.value })
+};
+}
+}
+</script>
+</body>
+</html>

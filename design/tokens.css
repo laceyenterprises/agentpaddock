@@ -1,0 +1,101 @@
+/* Agent Paddock design tokens. One file, imported by any page:
+     <link rel="stylesheet" href="design/tokens.css">
+   Light values on :root, dark values under prefers-color-scheme (or data-theme="dark").
+   The surface, ink, brand, signal, tower and livery values are the ones the site already uses. */
+:root {
+  /* Surfaces and ink */
+  --paper: #FFFFFF;
+  --soft: #F4F6F9;
+  --rule: #E3E7EC;
+  --ink: #111111;
+  --ink-2: #4F5761;
+  --muted: #626C78;
+
+  /* Brand: Lacey blue, the one accent (icons, links, highlighted series, illustrations) */
+  --blue: #007BFF;
+  --blue-ink: #0057B3;
+  --blue-soft: #EAF3FF;
+
+  /* Signals: reserved for meaning, never for decoration or a series colour */
+  --go: #00C27A;        /* pass, green flag */
+  --go-ink: #007A4D;
+  --go-soft: #E2F7EE;
+  --red: #E5202E;       /* red flag: infrastructure fault, run again */
+  --red-ink: #B3121C;
+  --amber: #F5B700;     /* yellow flag: pending */
+  --amber-ink: #8A5A00;
+  --black-flag: #111111; /* black flag: integrity hold */
+
+  /* Timing tower and telemetry screens: dark grounds in both themes */
+  --tower: #0E1116;
+  --tower-2: #171B22;
+  --tower-rule: #262C35;
+  --tower-fg: #F2F4F7;
+  --tower-mute: #8B94A3;
+  --tower-lit: #2BD99A;
+  --screen: #05070A;
+  --screen-panel: #080C11;
+  --screen-rule: #1A222C;
+
+  /* Livery: one colour per car (harness), for identity only */
+  --car-cc: #E0703A;
+  --car-codex: #10A37A;
+  --car-opencode: #C2185B;
+  --car-pi: #007BFF;
+  --car-agy: #D99A00;
+
+  /* Glyph inputs (the sprite reads these) */
+  --pdk-accent: var(--blue);
+  --pdk-green: var(--go);
+  --pdk-red: var(--red);
+  --pdk-yellow: var(--amber);
+  --pdk-black: var(--black-flag);
+
+  /* Data: one sequential blue ramp for pass rates, light ground (bins <50, 50-69, 70-79, 80-89, 90-94, 95-99, 100) */
+  --viz-seq-1: #CDE2FB; --viz-seq-2: #9EC5F4; --viz-seq-3: #6DA7EC; --viz-seq-4: #3987E5;
+  --viz-seq-5: #256ABF; --viz-seq-6: #184F95; --viz-seq-7: #0D366B;
+  --viz-seq-ink-light: #111111; /* text on bins 1-4 */
+  --viz-seq-ink-dark: #FFFFFF;  /* text on bins 5-7 */
+  --viz-other: #B4BBC5;     /* every series that is not highlighted */
+  --viz-interval: #9AA3AF;  /* 95% interval bars */
+  --viz-fuel: #3A414B;      /* fuel bars */
+  --viz-empty: #EEF0F3;     /* a cell with no runs */
+
+  /* Type */
+  --font-display: "Saira Condensed", "Arial Narrow", sans-serif;
+  --font-body: Inter, -apple-system, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  /* Space (4 px base), radius */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px;
+  --space-6: 32px; --space-7: 48px; --space-8: 64px; --space-9: 80px;
+  --radius-xs: 3px; --radius-sm: 6px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 18px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0C0F13; --soft: #141920; --rule: #262C35; --ink: #F2F4F7; --ink-2: #B9C1CC; --muted: #8B94A3;
+    --blue: #3D9BFF; --blue-ink: #7DBBFF; --blue-soft: #0F2238;
+    --go: #2BD99A; --go-ink: #5BE3AE; --go-soft: #0D2A20;
+    --red: #FF4D4F; --red-ink: #FF8587; --amber: #FFC83D; --amber-ink: #FFD36B;
+    --tower: #161B22; --tower-2: #1D232C; --tower-rule: #2B323C;
+    --car-cc: #F08A55; --car-codex: #2BC495; --car-opencode: #E8558E; --car-pi: #3D9BFF; --car-agy: #FFC83D;
+    --viz-seq-1: #16263D; --viz-seq-2: #1C3A66; --viz-seq-3: #21508F; --viz-seq-4: #2A6BC0;
+    --viz-seq-5: #3B88E6; --viz-seq-6: #71AEF5; --viz-seq-7: #B5D7FB;
+    --viz-seq-ink-light: #DCE6F2; --viz-seq-ink-dark: #06111F;
+    --viz-other: #56606D; --viz-interval: #8B95A3; --viz-fuel: #B9C1CC; --viz-empty: #0D1218;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #0C0F13; --soft: #141920; --rule: #262C35; --ink: #F2F4F7; --ink-2: #B9C1CC; --muted: #8B94A3;
+  --blue: #3D9BFF; --blue-ink: #7DBBFF; --blue-soft: #0F2238;
+  --go: #2BD99A; --go-ink: #5BE3AE; --go-soft: #0D2A20;
+  --red: #FF4D4F; --red-ink: #FF8587; --amber: #FFC83D; --amber-ink: #FFD36B;
+  --tower: #161B22; --tower-2: #1D232C; --tower-rule: #2B323C;
+  --car-cc: #F08A55; --car-codex: #2BC495; --car-opencode: #E8558E; --car-pi: #3D9BFF; --car-agy: #FFC83D;
+  --viz-seq-1: #16263D; --viz-seq-2: #1C3A66; --viz-seq-3: #21508F; --viz-seq-4: #2A6BC0;
+  --viz-seq-5: #3B88E6; --viz-seq-6: #71AEF5; --viz-seq-7: #B5D7FB;
+  --viz-seq-ink-light: #DCE6F2; --viz-seq-ink-dark: #06111F;
+  --viz-other: #56606D; --viz-interval: #8B95A3; --viz-fuel: #B9C1CC; --viz-empty: #0D1218;
+}

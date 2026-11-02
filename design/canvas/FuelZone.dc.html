@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Results: fuel zone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,500;1,800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#007BFF}a:hover{color:#0056B3}
+select:focus-visible{outline:2px solid #007BFF;outline-offset:2px}
+.fz-sel{font:600 16px Inter,Helvetica,Arial,sans-serif;padding:10px 14px;border:1px solid #C9CED6;border-radius:8px;background:#FFFFFF;color:#111111}
+.fz-lab{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:12px;letter-spacing:0.08em;color:#5C6470}
+.fz-mono{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace}
+.fz-tab td,.fz-tab th{padding:7px 10px;border-bottom:1px solid #E6E9EE;text-align:left;font-size:14px}
+.fz-tab th{position:sticky;top:0;background:#F6F7F9;font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:0.08em;color:#5C6470;font-weight:500}
+.fz-tab td.n{text-align:right;font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+<div style="width: 1600px; height: 900px; position: relative; overflow: hidden; background: #F6F7F9; color: #111111; font-family: Inter, -apple-system, Helvetica, Arial, sans-serif;">
+<div style="position: absolute; left: 80px; top: 48px; width: 1440px; display: flex; justify-content: space-between; align-items: flex-end; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<div class="fz-mono" style="font-size: 13px; letter-spacing: 0.1em; color: #5C6470;">RESULTS · FUEL ZONE</div>
+<h1 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 52px; line-height: 1;">What each pass burns</h1>
+<p style="margin: 0; font-size: 17px; color: #5C6470;">Fuel is what an entry burns for each race it passes: the bill in dollars, or the burn in tokens. Up and to the left wins.</p>
+</div>
+<div style="display: flex; gap: 16px; align-items: flex-end;">
+<div style="display: flex; flex-direction: column; gap: 6px;"><label for="fz-measure" class="fz-lab">FUEL AS</label>
+<select id="fz-measure" class="fz-sel" value="{{measure}}" onChange="{{onMeasure}}"><option value="usd">Fuel bill ($)</option><option value="tok">Fuel burn (tokens)</option></select></div>
+<div style="display: flex; flex-direction: column; gap: 6px;"><label for="fz-hl" class="fz-lab">HIGHLIGHT</label>
+<select id="fz-hl" class="fz-sel" value="{{hl}}" onChange="{{onHl}}" style="min-width: 230px;"><option value="all">All entries</option>
+<optgroup label="Car (harness)"><sc-for list="{{carOpts}}" as="o" hint-placeholder-count="5"><option value="{{o.v}}">{{o.t}}</option></sc-for></optgroup>
+<optgroup label="Driver (model)"><sc-for list="{{drvOpts}}" as="o" hint-placeholder-count="8"><option value="{{o.v}}">{{o.t}}</option></sc-for></optgroup>
+</select></div>
+<div style="display: flex; flex-direction: column; gap: 6px;"><label for="fz-view" class="fz-lab">VIEW</label>
+<select id="fz-view" class="fz-sel" value="{{view}}" onChange="{{onView}}"><option value="chart">Chart</option><option value="table">Table</option></select></div>
+</div>
+</div>
+
+<div style="position: absolute; left: 80px; top: 190px; width: 1010px; height: 650px; display: {{chartDisplay}};">
+<div style="position: absolute; left: 70px; top: 0; display: flex; gap: 20px; align-items: center; font-size: 13px; color: #3A414B;">
+<span style="display: inline-flex; align-items: center; gap: 6px;"><span style="width: 11px; height: 11px; border-radius: 50%; background: #007BFF;"></span>{{hlName}}</span>
+<span style="display: {{otherDisplay}}; align-items: center; gap: 6px;"><span style="width: 11px; height: 11px; border-radius: 50%; background: #B4BBC5;"></span>Other entries</span>
+<span style="display: inline-flex; align-items: center; gap: 6px;"><svg width="26" height="8" aria-hidden="true"><path d="M0 4 H26" stroke="#111111" stroke-width="1.5" stroke-dasharray="5 4"></path></svg>Racing line: nothing that burns less passes more</span>
+</div>
+<div style="position: absolute; left: 70px; top: 36px; width: 930px; height: 540px;">
+<sc-for list="{{yt}}" as="t" hint-placeholder-count="6">
+<div style="position: absolute; left: 0; width: 930px; top: {{t.y}}px; height: 1px; background: #E1E5EA;"></div>
+<div class="fz-mono" style="position: absolute; left: -54px; width: 46px; text-align: right; top: {{t.ly}}px; font-size: 12px; color: #5C6470;">{{t.t}}</div>
+</sc-for>
+<sc-for list="{{xt}}" as="t" hint-placeholder-count="5">
+<div style="position: absolute; top: 0; height: 540px; left: {{t.x}}px; width: 1px; background: #E1E5EA;"></div>
+<div class="fz-mono" style="position: absolute; top: 550px; left: {{t.x}}px; transform: translateX(-50%); font-size: 12px; color: #5C6470;">{{t.t}}</div>
+</sc-for>
+<svg style="position: absolute; left: 0; top: 0; width: 930px; height: 540px; overflow: visible;" viewBox="0 0 930 540" aria-hidden="true"><polyline points="{{front}}" fill="none" stroke="#111111" stroke-width="1.5" stroke-dasharray="6 5"></polyline></svg>
+<sc-for list="{{pts}}" as="p" hint-placeholder-count="52">
+<div title="{{p.tip}}" style="position: absolute; left: {{p.x}}px; top: {{p.y}}px; width: {{p.s}}px; height: {{p.s}}px; margin-left: {{p.m}}px; margin-top: {{p.m}}px; border-radius: 50%; background: {{p.bg}}; box-shadow: {{p.ring}}; z-index: {{p.z}}; cursor: default;"></div>
+</sc-for>
+<sc-for list="{{flabels}}" as="l" hint-placeholder-count="3">
+<div style="position: absolute; left: {{l.x}}px; top: {{l.y}}px; transform: {{l.tf}}; text-align: {{l.align}}; z-index: 30; white-space: nowrap; line-height: 1.25; background: rgba(246,247,249,0.85); padding: 2px 4px; border-radius: 4px;"><div style="font-size: 13px; font-weight: 700;">{{l.a}}</div><div class="fz-mono" style="font-size: 11px; color: #3A414B;">{{l.b}}</div></div>
+</sc-for>
+</div>
+<div class="fz-mono" style="position: absolute; left: 70px; top: 612px; width: 930px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #5C6470;"><span style="color: #111111; font-weight: 500;">◀ LEAN</span><span>{{xLabel}} · log scale</span><span style="color: #111111; font-weight: 500;">RICH ▶</span></div>
+<div class="fz-mono" style="position: absolute; left: -52px; top: 300px; transform: rotate(-90deg); transform-origin: center; width: 160px; text-align: center; font-size: 12px; color: #5C6470;">First-run pass rate</div>
+</div>
+
+<div style="position: absolute; left: 80px; top: 190px; width: 1010px; height: 650px; display: {{tableDisplay}}; overflow: auto; background: #FFFFFF; border: 1px solid #DCE0E6; border-radius: 12px;">
+<table class="fz-tab" style="width: 100%; border-collapse: collapse;">
+<thead><tr><th>DRIVER</th><th>CAR</th><th>ENGINE MAP</th><th style="text-align: right;">PASSED</th><th style="text-align: right;">PASS RATE</th><th style="text-align: right;">$ PER PASS</th><th style="text-align: right;">FUEL BURN</th><th style="text-align: right;">TRIAD · IN (CACHED %) : OUT</th></tr></thead>
+<tbody><sc-for list="{{rows}}" as="r" hint-placeholder-count="52"><tr style="background: {{r.bg}};"><td style="font-weight: 600;">{{r.driver}}</td><td>{{r.car}}</td><td>{{r.effort}}</td><td class="n">{{r.kn}}</td><td class="n">{{r.pct}}</td><td class="n">{{r.usd}}</td><td class="n">{{r.tok}}</td><td class="n">{{r.tri}}</td></tr></sc-for></tbody>
+</table>
+</div>
+
+<div style="position: absolute; left: 1140px; top: 190px; width: 380px; display: flex; flex-direction: column; gap: 14px;">
+<div style="background: #0E1116; color: #E8EDF3; border-radius: 12px; padding: 16px 18px; display: grid; grid-template-columns: 72px 1fr; gap: 16px; align-items: center;">
+<svg width="72" height="132" viewBox="0 0 72 132" aria-hidden="true">
+<rect x="6" y="10" width="44" height="114" rx="5" fill="#1B2129" stroke="#3A4350" stroke-width="2"></rect>
+<rect x="12" y="20" width="32" height="22" rx="2" fill="#05070A" stroke="#4DA3FF" stroke-width="1.5"></rect>
+<path d="M16 31 H40" stroke="#4DA3FF" stroke-width="2"></path>
+<rect x="12" y="50" width="32" height="6" rx="1" fill="#2C333C"></rect>
+<rect x="12" y="60" width="32" height="6" rx="1" fill="#2C333C"></rect>
+<circle cx="28" cy="88" r="9" fill="none" stroke="#4DA3FF" stroke-width="2.5"></circle>
+<path d="M28 88 L33 83" stroke="#E8EDF3" stroke-width="2"></path>
+<rect x="2" y="122" width="52" height="8" rx="2" fill="#2C333C"></rect>
+<path d="M50 40 C64 40 66 52 66 64 V96" stroke="#3A4350" stroke-width="5" fill="none" stroke-linecap="round"></path>
+<path d="M60 96 h12 v10 h-4 l-2 10 h-4 l-2-10 h-0z" fill="#E8EDF3"></path>
+</svg>
+<div style="display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+<div class="fz-mono" style="font-size: 11px; letter-spacing: 0.1em; color: #8B95A3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">FUEL PUMP · {{grpName}}</div>
+<div style="display: flex; flex-direction: column; gap: 2px; background: #05070A; border: 1px solid #1F2730; border-radius: 6px; padding: 8px 12px;"><span class="fz-mono" style="font-size: 10px; letter-spacing: 0.08em; color: #8B95A3;">MEDIAN {{unitName}} PER PASS</span><span class="fz-mono" style="font-size: 26px; font-weight: 700; color: #4DA3FF; font-variant-numeric: tabular-nums;">{{grpMedian}}</span></div>
+<div style="display: flex; flex-direction: column; gap: 2px; background: #05070A; border: 1px solid #1F2730; border-radius: 6px; padding: 8px 12px;"><span class="fz-mono" style="font-size: 10px; letter-spacing: 0.08em; color: #8B95A3;">MILEAGE · PASSES PER {{tankName}}</span><span class="fz-mono" style="font-size: 26px; font-weight: 700; color: #4DA3FF; font-variant-numeric: tabular-nums;">{{grpMileage}}</span></div>
+<div class="fz-mono" style="font-size: 10px; color: #8B95A3;">{{grpCount}}</div>
+</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE0E6; border-radius: 12px; padding: 14px 20px; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; align-items: center; gap: 10px;"><svg style="width: 22px; height: 22px;" viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="2" aria-hidden="true"><path d="M3 17c4 0 4-10 9-10s5 10 9 10"></path><path d="M3 21h18" stroke-dasharray="3 3"></path></svg><span class="fz-lab" style="letter-spacing: 0.1em;">FUEL STRATEGY · THE RACING LINE</span></div>
+<sc-for list="{{flist}}" as="f" hint-placeholder-count="3">
+<div style="display: flex; justify-content: space-between; gap: 12px; align-items: baseline; border-top: 1px solid #EEF0F3; padding-top: 8px;">
+<div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><span style="font-size: 15px; font-weight: 700;">{{f.name}}</span><span class="fz-mono" style="font-size: 11px; color: #5C6470;">{{f.effort}} · {{f.kn}} · {{f.pct}}</span></div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;"><span style="font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums;">{{f.fuel}}</span><span class="fz-mono" style="font-size: 11px; color: #5C6470; white-space: nowrap;">{{f.mileage}}</span></div>
+</div>
+</sc-for>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE0E6; border-radius: 12px; padding: 14px 20px; display: flex; flex-direction: column; gap: 6px;">
+<div class="fz-lab" style="letter-spacing: 0.1em;">THE GUZZLER</div>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 24px; line-height: 1.05;">{{dearName}}</div>
+<p style="margin: 0; font-size: 14px; line-height: 1.45; color: #3A414B;">{{dearText}}</p>
+</div>
+<div style="font-size: 12px; line-height: 1.45; color: #5C6470; padding: 0 4px;">Fuel bill: billed route prices for open-model routes, API list price for the subscription cars. Fuel burn: every token processed, cache reads included; the triad splits it as Input (cached %) : Output. Gemini 4 Argon and Gemini 3.1 Pro have no dollar cost, so they are left out. With 54 races a pass rate is good to about ±7 points.</div>
+</div>
+<div class="fz-mono" style="position: absolute; left: 80px; top: 866px; width: 1440px; font-size: 11px; color: #5C6470;">First counted result of each of the 54 races per entry · hover a point for its numbers · eval bench, 2026-11-02</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1600,"height":900}}'>
+class Component extends DCLogic {
+constructor(props) {
+super(props);
+this.state = { measure: 'usd', hl: 'all', view: 'chart' };
+}
+data() {
+return [["Gemini 3.8 Flash","Antigravity","high",50,54,0.3099,829682,[793522,79,36160]],["Claude Opus 5.5","Claude Code","high",47,54,0.4097,1029844,[1021624,100,8219]],["Claude Sonnet 5.5","Claude Code","high",50,54,0.2519,882194,[875898,100,6296]],["DeepSeek V4.1 Flash · Together","Claude Code","provider default",48,54,0.1131,346973,[336940,91,10032]],["GLM 5.2","Claude Code","provider default",45,54,0.8736,580641,[560415,95,20226]],["GLM 5.3 Flash · Baseten","Claude Code","provider default",43,54,0.042,507831,[498657,63,9174]],["GPT-6.1 Sol","Claude Code","high (route default)",50,54,0.097,211811,[209508,87,2302]],["Gemini 3.8 Flash","Claude Code","high",48,54,0.28,1139007,[1102908,92,36098]],["Gemini 3.8 Flash","Claude Code","high (asked)",47,54,0.2586,974546,[941449,90,33097]],["Gemini 3.8 Flash","Claude Code","low",46,54,0.1488,344807,[340817,53,3990]],["Gemini 3.8 Flash","Claude Code","medium",51,54,0.2332,475900,[453922,62,21978]],["Kimi K3","Claude Code","provider default",45,54,0.2162,319607,[314164,95,5443]],["Kimi K3 · Fireworks","Claude Code","provider default",44,54,0.1582,269351,[265796,97,3554]],["Qwen 3.8 27B · OpenRouter","Claude Code","provider default",50,54,0.0349,176994,[165694,61,11300]],["Qwen 3.8 Max · Fireworks","Claude Code","provider default",48,54,0.1695,261327,[250560,90,10766]],["Claude Opus 5.5","Codex","none",50,54,0.2728,61183,[59428,0,1754]],["Claude Sonnet 5.5","Codex","none",45,54,0.1289,59799,[58636,0,1163]],["DeepSeek V4.1 Flash · Together","Codex","provider default",45,54,0.0384,102658,[94167,90,8491]],["GLM 5.2","Codex","provider default",46,54,0.3372,181594,[153925,85,27668]],["GLM 5.3 Flash · Baseten","Codex","provider default",44,54,0.0129,89598,[86450,16,3148]],["GPT-6.1 Sol","Codex","high",51,54,0.054,111009,[109566,86,1443]],["GPT-6.1 Sol","Codex","low (CLI default)",50,54,0.0404,98800,[97905,88,895]],["GPT-6.1 Sol","Codex","medium",51,54,0.0445,99802,[98761,87,1040]],["Gemini 3.8 Flash","Codex","low",46,54,0.1325,248203,[242213,44,5990]],["Gemini 3.8 Flash","Codex","medium",49,54,0.2127,429650,[408619,63,21030]],["Kimi K3","Codex","provider default",44,54,0.1216,97923,[93437,90,4486]],["Kimi K3 · Fireworks","Codex","provider default",45,54,0.1084,73403,[70880,74,2523]],["Qwen 3.8 Max · Fireworks","Codex","provider default",46,54,0.1538,165497,[151776,87,13720]],["Claude Opus 5.5","OpenCode","none",48,54,0.1644,78479,[76279,71,2199]],["Claude Sonnet 5.5","OpenCode","none",50,54,0.0759,76902,[74926,73,1975]],["DeepSeek V4.1 Flash · Together","OpenCode","provider default",47,54,0.0345,101950,[97563,73,4387]],["GLM 5.2","OpenCode","provider default",46,54,0.2733,174390,[164682,77,9707]],["GLM 5.3 Flash · Baseten","OpenCode","provider default",45,54,0.0156,122527,[118689,29,3838]],["GPT-6.1 Sol","OpenCode","high (route default)",49,54,0.0817,131447,[127661,87,3786]],["Gemini 3.8 Flash","OpenCode","high",51,54,0.2853,812616,[781687,79,30928]],["Gemini 3.8 Flash","OpenCode","low",43,54,0.1071,208237,[206967,38,1269]],["Gemini 3.8 Flash","OpenCode","medium",49,54,0.231,739907,[720885,78,19021]],["Kimi K3","OpenCode","provider default",47,54,0.168,124356,[118314,87,6041]],["Kimi K3 · Fireworks","OpenCode","provider default",46,54,0.2006,130536,[124600,78,5936]],["Qwen 3.8 Max · Fireworks","OpenCode","provider default",47,54,0.143,180407,[171351,85,9055]],["Claude Opus 5.5","Pi","none",48,54,0.1745,36126,[34251,0,1874]],["Claude Sonnet 5.5","Pi","none",50,54,0.0741,30991,[29477,0,1514]],["DeepSeek V4.1 Flash · Together","Pi","provider default",49,54,0.0293,82941,[77999,91,4941]],["GLM 5.2","Pi","provider default",45,54,0.2227,132404,[119963,72,12440]],["GLM 5.3 Flash · Baseten","Pi","provider default",47,54,0.0103,73762,[69900,25,3861]],["GPT-6.1 Sol","Pi","high (route default)",52,54,0.0348,40722,[38918,83,1804]],["Gemini 3.8 Flash","Pi","high",52,54,0.2847,727939,[697247,75,30691]],["Gemini 3.8 Flash","Pi","low",45,51,0.0719,128968,[127840,33,1128]],["Gemini 3.8 Flash","Pi","medium",49,54,0.2069,486138,[465266,70,20872]],["Kimi K3","Pi","provider default",49,54,0.1161,62047,[57344,82,4702]],["Kimi K3 · Fireworks","Pi","provider default",49,54,0.1267,64218,[59380,77,4838]],["Qwen 3.8 Max · Fireworks","Pi","provider default",50,54,0.1026,117482,[109511,86,7971]]];
+}
+renderVals() {
+const { measure, hl, view } = this.state;
+const W = 930, H = 540;
+const base = (d) => d.split(' · ')[0];
+const all = this.data().map((r) => ({ driver: r[0], car: r[1], effort: r[2], k: r[3], n: r[4], usd: r[5], tok: r[6], tri: r[7], rate: 100 * r[3] / r[4] }));
+const usd = (v) => '$' + (v < 0.1 ? v.toFixed(3) : v.toFixed(2));
+const tok = (v) => v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : Math.round(v / 1000) + 'k';
+const tk1 = (v) => v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1000 ? Math.round(v / 1000) + 'k' : String(v);
+const tri = (x) => x ? tk1(x[0]) + ' (' + x[1] + '%) : ' + tk1(x[2]) : 'n/a';
+const M = measure === 'usd'
+? { key: 'usd', lo: 0.008, hi: 1.2, fmt: usd, ticks: [0.01, 0.03, 0.1, 0.3, 1], tf: (v) => '$' + v, label: 'Fuel bill per race passed ($)', name: '$ PER PASS', unit: 'FUEL BILL', tank: '$10', per: 10, mi: (v) => Math.round(10 / v) + ' passes per $10' }
+: { key: 'tok', lo: 20000, hi: 2000000, fmt: tok, ticks: [30000, 100000, 300000, 1000000], tf: tok, label: 'Fuel burn per race passed (tokens)', name: 'TOKENS PER PASS', unit: 'FUEL BURN', tank: '1M TOKENS', per: 1e6, mi: (v) => (1e6 / v).toFixed(1) + ' passes per 1M tokens' };
+const X = (v) => (Math.log10(v) - Math.log10(M.lo)) / (Math.log10(M.hi) - Math.log10(M.lo)) * W;
+const Y = (r) => (100 - r) / 25 * H;
+const isHl = (e) => hl === 'all' || (hl.startsWith('car:') && e.car === hl.slice(4)) || (hl.startsWith('drv:') && base(e.driver) === hl.slice(4));
+const sorted = all.slice().sort((a, b) => (a[M.key] - b[M.key]) || (b.rate - a.rate));
+const front = [];
+let best = -1;
+for (const e of sorted) { if (e.rate > best) { front.push(e); best = e.rate; } }
+const fset = new Set(front);
+const steps = [];
+front.forEach((e, i) => { const x = X(e[M.key]), y = Y(e.rate); if (i > 0) steps.push(x.toFixed(1) + ',' + Y(front[i - 1].rate).toFixed(1)); steps.push(x.toFixed(1) + ',' + y.toFixed(1)); });
+if (front.length) steps.push(W + ',' + Y(front[front.length - 1].rate).toFixed(1));
+const name = (e) => e.driver + ' in ' + e.car;
+const pts = all.map((e) => {
+const on = isHl(e), f = fset.has(e), s = f ? 14 : 12;
+return { x: X(e[M.key]).toFixed(1), y: Y(e.rate).toFixed(1), s, m: -s / 2, bg: on ? '#007BFF' : '#B4BBC5', z: f ? 20 : (on ? 10 : 1),
+ring: f ? '0 0 0 2px #FFFFFF, 0 0 0 3.5px #111111' : '0 0 0 2px #FFFFFF',
+tip: name(e) + ' · ' + e.effort + ': ' + e.k + ' of ' + e.n + ' passed (' + e.rate.toFixed(1) + '%), ' + usd(e.usd) + ' and ' + tok(e.tok) + ' tokens per pass, triad ' + tri(e.tri) };
+});
+const flabels = front.map((e) => { const x = X(e[M.key]), y = Y(e.rate), left = x > 200;
+return { x: (left ? x - 12 : x + 12).toFixed(1), y: (y - 17).toFixed(1), tf: left ? 'translateX(-100%)' : 'none', align: left ? 'right' : 'left', a: name(e), b: M.fmt(e[M.key]) + ' · ' + e.rate.toFixed(1) + '%' }; });
+const flist = front.slice().reverse().map((e) => ({ name: name(e), effort: e.effort, kn: e.k + '/' + e.n, fuel: M.fmt(e[M.key]), pct: e.rate.toFixed(1) + '%', mileage: M.mi(e[M.key]) }));
+const grp = all.filter((e) => isHl(e)).map((e) => e[M.key]).sort((a, b) => a - b);
+const med = grp.length ? (grp.length % 2 ? grp[(grp.length - 1) / 2] : (grp[grp.length / 2 - 1] + grp[grp.length / 2]) / 2) : 0;
+const dear = all.reduce((a, b) => (b[M.key] > a[M.key] ? b : a));
+const top = front[front.length - 1];
+const ratio = dear[M.key] / top[M.key];
+const cars = Array.from(new Set(all.map((e) => e.car))).sort();
+const drvs = Array.from(new Set(all.map((e) => base(e.driver)))).sort();
+const hlName = hl === 'all' ? 'Entry' : hl.slice(4);
+const rows = all.slice().sort((a, b) => a.usd - b.usd).map((e) => ({ driver: e.driver, car: e.car, effort: e.effort, kn: e.k + '/' + e.n, pct: e.rate.toFixed(1) + '%', usd: usd(e.usd), tok: tok(e.tok), tri: tri(e.tri), bg: isHl(e) && hl !== 'all' ? '#EAF3FF' : '#FFFFFF' }));
+return {
+measure, hl, view, pts, flabels, flist, rows,
+front: steps.join(' '),
+yt: [75, 80, 85, 90, 95, 100].map((v) => ({ y: Y(v).toFixed(1), ly: (Y(v) - 8).toFixed(1), t: v + '%' })),
+xt: M.ticks.map((v) => ({ x: X(v).toFixed(1), t: M.tf(v) })),
+xLabel: M.label, measureName: M.name, hlName,
+otherDisplay: hl === 'all' ? 'none' : 'inline-flex',
+chartDisplay: view === 'chart' ? 'block' : 'none',
+tableDisplay: view === 'table' ? 'block' : 'none',
+carOpts: cars.map((c) => ({ v: 'car:' + c, t: c })),
+drvOpts: drvs.map((d) => ({ v: 'drv:' + d, t: d })),
+dearName: name(dear),
+dearText: M.fmt(dear[M.key]) + ' per race passed at ' + dear.rate.toFixed(1) + '%: ' + Math.round(ratio) + '× the fuel of ' + name(top) + ', which passed more.',
+grpName: hl === 'all' ? 'THE WHOLE FIELD' : hl.slice(4).toUpperCase(), unitName: M.unit, tankName: M.tank,
+grpMedian: med ? M.fmt(med) : '–', grpMileage: med ? (M.key === 'usd' ? String(Math.round(10 / med)) : (1e6 / med).toFixed(1)) : '–',
+grpCount: grp.length + (grp.length === 1 ? ' entry' : ' entries') + ' · median of each entry\'s fuel per pass',
+onMeasure: (e) => this.setState({ measure: e.target.value }),
+onHl: (e) => this.setState({ hl: e.target.value }),
+onView: (e) => this.setState({ view: e.target.value })
+};
+}
+}
+</script>
+</body>
+</html>

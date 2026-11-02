@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Flags</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,500;1,800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#007BFF}a:hover{color:#0056B3}
+</style>
+</helmet>
+<div style="width: 1600px; height: 900px; position: relative; overflow: hidden; background: #F6F7F9; color: #111111; font-family: Inter, -apple-system, Helvetica, Arial, sans-serif;">
+<div style="position: absolute; left: 80px; top: 56px; width: 1300px; display: flex; flex-direction: column; gap: 10px;">
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; letter-spacing: 0.1em; color: #5C6470;">HOW THE RACES ENDED</div>
+<h1 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 60px; line-height: 1;">Four ways a race can end</h1>
+<p style="margin: 0; font-size: 19px; line-height: 1.45; color: #5C6470; max-width: 980px;">Every run gets one flag. Finished and did-not-finish runs count toward the pass rate. Red and black flags do not: a red flag is run again, a black flag goes to a person for review.</p>
+</div>
+<div style="position: absolute; left: 80px; top: 236px; width: 1440px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<svg style="width: 300px; height: 230px;" viewBox="0 0 300 230" aria-hidden="true">
+<defs><pattern id="fl-chk" width="28" height="28" patternUnits="userSpaceOnUse"><rect width="28" height="28" fill="#FFFFFF"></rect><rect width="14" height="14" fill="#111111"></rect><rect x="14" y="14" width="14" height="14" fill="#111111"></rect></pattern></defs>
+<rect x="60" y="14" width="10" height="212" rx="3" fill="#111111"></rect>
+<path d="M70 26 C120 10 170 42 230 26 C250 21 262 22 270 26 L270 136 C262 132 250 131 230 136 C170 152 120 120 70 136 Z" fill="url(#fl-chk)" stroke="#111111" stroke-width="4"></path>
+</svg>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 72px; line-height: 1; font-variant-numeric: tabular-nums;">4,589</div>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 28px; line-height: 1.1;">Finished</div>
+<div style="font-size: 16px; line-height: 1.45; color: #5C6470;">The task passed its checks. Counted.</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<svg style="width: 300px; height: 230px;" viewBox="0 0 300 230" aria-hidden="true">
+<rect x="60" y="14" width="10" height="212" rx="3" fill="#111111"></rect>
+<rect x="70" y="26" width="200" height="110" rx="8" fill="#111111"></rect>
+<text x="170" y="104" text-anchor="middle" font-family="Saira Condensed, Arial Narrow, sans-serif" font-style="italic" font-weight="800" font-size="64" fill="#F6F7F9">DNF</text>
+</svg>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 72px; line-height: 1; font-variant-numeric: tabular-nums;">963</div>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 28px; line-height: 1.1;">Did not finish</div>
+<div style="font-size: 16px; line-height: 1.45; color: #5C6470;">The task failed its checks, or no answer was handed in. Counted.</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<svg style="width: 300px; height: 230px;" viewBox="0 0 300 230" aria-hidden="true">
+<rect x="60" y="14" width="10" height="212" rx="3" fill="#111111"></rect>
+<path d="M70 26 C120 10 170 42 230 26 C250 21 262 22 270 26 L270 136 C262 132 250 131 230 136 C170 152 120 120 70 136 Z" fill="#D7263D" stroke="#111111" stroke-width="4"></path>
+</svg>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 72px; line-height: 1; font-variant-numeric: tabular-nums;">532</div>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 28px; line-height: 1.1;">Red flag</div>
+<div style="font-size: 16px; line-height: 1.45; color: #5C6470;">An infrastructure fault, not the model. Left out and run again.</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<svg style="width: 300px; height: 230px;" viewBox="0 0 300 230" aria-hidden="true">
+<rect x="60" y="14" width="10" height="212" rx="3" fill="#111111"></rect>
+<path d="M70 26 C120 10 170 42 230 26 C250 21 262 22 270 26 L270 136 C262 132 250 131 230 136 C170 152 120 120 70 136 Z" fill="#111111" stroke="#111111" stroke-width="4"></path>
+</svg>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 72px; line-height: 1; font-variant-numeric: tabular-nums;">1</div>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 28px; line-height: 1.1;">Black flag</div>
+<div style="font-size: 16px; line-height: 1.45; color: #5C6470;">An integrity hold. Set aside for a person to review.</div>
+</div>
+</div>
+<div style="position: absolute; left: 80px; top: 762px; width: 1440px; display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; height: 22px; border-radius: 6px; overflow: hidden;">
+<div style="width: 82.7%; background: {{acc}};"></div>
+<div style="width: 17.3%; background: #9AA3AF;"></div>
+</div>
+<div style="display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; font-size: 15px;">
+<span><b>82.7% pass rate</b> across all counted runs: 4,589 of 5,552</span>
+<span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #5C6470;">Eval bench, 2026-11-02 · current task versions</span>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"primary":{"editor":"color","default":"#007BFF","options":["#007BFF","#111111"]},"$preview":{"width":1600,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { acc: this.props.primary ?? '#007BFF' };
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Photo finish</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,500;1,800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4DA3FF}a:hover{color:#80BDFF}
+</style>
+</helmet>
+<div style="width: 1600px; height: 900px; position: relative; overflow: hidden; background: #0E1013; color: #F2F4F7; font-family: Inter, -apple-system, Helvetica, Arial, sans-serif;">
+<div style="position: absolute; left: 80px; top: 56px; width: 1100px; display: flex; flex-direction: column; gap: 10px;">
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; letter-spacing: 0.1em; color: #9AA3AF;">PHOTO FINISH</div>
+<h1 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 60px; line-height: 1;">Three entries tied at 96.3%</h1>
+<p style="margin: 0; font-size: 19px; line-height: 1.45; color: #9AA3AF; max-width: 860px;">Each passed 52 of 54 races. Their 95% intervals overlap, so the board calls it a tie, not a winner.</p>
+</div>
+<svg style="position: absolute; left: 80px; top: 250px; width: 1440px; height: 380px;" viewBox="0 0 1440 380" aria-hidden="true">
+<defs>
+<pattern id="pf-chk" width="24" height="24" patternUnits="userSpaceOnUse"><rect width="24" height="24" fill="#0B0C0E"></rect><rect width="12" height="12" fill="#F2F4F7"></rect><rect x="12" y="12" width="12" height="12" fill="#F2F4F7"></rect></pattern>
+<g id="pf-car">
+<rect x="70" y="226" width="780" height="8" fill="#F2F4F7"></rect>
+<path d="M76 226 L84 156 L160 150 L190 170 L330 166 C360 152 388 140 410 133 C418 108 442 94 470 95 C484 96 492 106 494 120 L520 122 C542 122 556 136 568 154 L604 176 C684 190 780 206 856 222 L856 226 Z" fill="#F2F4F7"></path>
+<rect x="36" y="64" width="14" height="120" rx="2" fill="#F2F4F7"></rect>
+<rect x="36" y="64" width="128" height="16" rx="3" fill="#F2F4F7"></rect>
+<rect x="44" y="88" width="112" height="10" rx="3" fill="#F2F4F7"></rect>
+<path d="M118 98 L132 152" stroke="#F2F4F7" stroke-width="8" fill="none"></path>
+<circle cx="528" cy="112" r="25" fill="{{accDark}}"></circle>
+<rect x="532" y="101" width="24" height="12" rx="6" fill="#0B0C0E"></rect>
+<path d="M486 100 C504 80 560 82 580 150" stroke="#F2F4F7" stroke-width="9" stroke-linecap="round" fill="none"></path>
+<rect x="790" y="228" width="100" height="14" rx="3" fill="#F2F4F7"></rect>
+<rect x="876" y="204" width="12" height="38" rx="2" fill="#F2F4F7"></rect>
+<circle cx="196" cy="228" r="64" fill="#0B0C0E" stroke="#3A3F47" stroke-width="4"></circle>
+<circle cx="196" cy="228" r="38" fill="#2A2F36"></circle>
+<circle cx="722" cy="230" r="60" fill="#0B0C0E" stroke="#3A3F47" stroke-width="4"></circle>
+<circle cx="722" cy="230" r="35" fill="#2A2F36"></circle>
+</g>
+</defs>
+<path d="M0 130 H1440 M0 250 H1440" stroke="#2A2F36" stroke-width="2" stroke-dasharray="14 10" fill="none"></path>
+<rect x="1100" y="6" width="24" height="368" fill="url(#pf-chk)"></rect>
+<use href="#pf-car" transform="translate(655 -19) scale(0.5)"></use>
+<use href="#pf-car" transform="translate(655 101) scale(0.5)"></use>
+<use href="#pf-car" transform="translate(655 221) scale(0.5)"></use>
+<path d="M1036 26 V2 H1060 M1164 2 H1188 V26 M1188 354 V378 H1164 M1060 378 H1036 V354" stroke="{{accDark}}" stroke-width="4" fill="none"></path>
+<g font-family="Inter, Helvetica, Arial, sans-serif">
+<text x="16" y="64" font-size="22" font-weight="600" fill="#F2F4F7">GPT-6.1 Sol</text>
+<text x="16" y="90" font-size="15" fill="#9AA3AF" font-family="JetBrains Mono, Menlo, monospace">Pi · high</text>
+<text x="16" y="184" font-size="22" font-weight="600" fill="#F2F4F7">Gemini 3.8 Flash</text>
+<text x="16" y="210" font-size="15" fill="#9AA3AF" font-family="JetBrains Mono, Menlo, monospace">Pi · high</text>
+<text x="16" y="304" font-size="22" font-weight="600" fill="#F2F4F7">Gemini 4 Argon</text>
+<text x="16" y="330" font-size="15" fill="#9AA3AF" font-family="JetBrains Mono, Menlo, monospace">Antigravity · high</text>
+</g>
+<g font-family="Saira Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="36" fill="#F2F4F7" text-anchor="end">
+<text x="620" y="82">52 / 54</text><text x="620" y="202">52 / 54</text><text x="620" y="322">52 / 54</text>
+</g>
+</svg>
+<svg style="position: absolute; left: 0px; top: 652px; width: 1600px; height: 240px;" viewBox="0 0 1600 240" aria-hidden="true">
+<g stroke="#2A2F36" stroke-width="1" fill="none"><path d="M300 20 V196 M595 20 V196 M890 20 V196 M1185 20 V196 M1480 20 V196"></path></g>
+<g stroke="{{accDark}}" stroke-width="4" fill="none">
+<path d="M742.5 40 H1421 M742.5 33 V47 M1421 33 V47"></path>
+<path d="M742.5 76 H1421 M742.5 69 V83 M1421 69 V83"></path>
+<path d="M742.5 112 H1421 M742.5 105 V119 M1421 105 V119"></path>
+</g>
+<g fill="{{accDark}}"><circle cx="1261.7" cy="40" r="8"></circle><circle cx="1261.7" cy="76" r="8"></circle><circle cx="1261.7" cy="112" r="8"></circle></g>
+<g stroke="#9AA3AF" stroke-width="4" fill="none"><path d="M589.1 160 H1367.9 M589.1 153 V167 M1367.9 153 V167"></path></g>
+<circle cx="1149.6" cy="160" r="8" fill="#9AA3AF"></circle>
+<path d="M300 196 H1480" stroke="#5C6470" stroke-width="2" fill="none"></path>
+<g font-family="Inter, Helvetica, Arial, sans-serif" font-size="15" fill="#F2F4F7">
+<text x="80" y="45">Sol · Pi</text><text x="80" y="81">Flash · Pi</text><text x="80" y="117">Argon · Antigravity</text>
+<text x="80" y="165" fill="#9AA3AF">4 entries at 51 / 54</text>
+</g>
+<g font-family="JetBrains Mono, Menlo, monospace" font-size="13" fill="#9AA3AF" text-anchor="middle">
+<text x="300" y="222">80%</text><text x="595" y="222">85%</text><text x="890" y="222">90%</text><text x="1185" y="222">95%</text><text x="1480" y="222">100%</text>
+</g>
+<text x="1480" y="14" font-family="JetBrains Mono, Menlo, monospace" font-size="12" fill="#9AA3AF" text-anchor="end">pass rate · dot = measured · bar = 95% interval (Wilson)</text>
+</svg>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"primaryOnDark":{"editor":"color","default":"#4DA3FF","options":["#4DA3FF","#F2F4F7"]},"$preview":{"width":1600,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { accDark: this.props.primaryOnDark ?? '#4DA3FF' };
+}
+}
+</script>
+</body>
+</html>
