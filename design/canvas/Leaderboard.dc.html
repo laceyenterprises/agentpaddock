@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Results: full standings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,500;1,800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#007BFF}a:hover{color:#0056B3}
+select:focus-visible{outline:2px solid #007BFF;outline-offset:2px}
+</style>
+</helmet>
+<div style="width: 1600px; height: 900px; position: relative; overflow: hidden; background: #F6F7F9; color: #111111; font-family: Inter, -apple-system, Helvetica, Arial, sans-serif;">
+<div style="position: absolute; left: 80px; top: 48px; width: 1440px; display: flex; justify-content: space-between; align-items: flex-end; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; letter-spacing: 0.1em; color: #5C6470;">RESULTS · TIMING TOWER</div>
+<h1 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 52px; line-height: 1;">Full standings</h1>
+<p style="margin: 0; font-size: 17px; color: #5C6470;">Pass rate is an average: the share of its races an entry passed, each race counted once. Every entry with at least 48 of the 54 races.</p>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<label for="lb-metric" style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.08em; color: #5C6470;">RANK BY</label>
+<select id="lb-metric" value="{{metric}}" onChange="{{onMetric}}" style="font: 600 16px Inter, Helvetica, Arial, sans-serif; padding: 10px 14px; border: 1px solid #C9CED6; border-radius: 8px; background: #FFFFFF; color: #111111; min-width: 220px;">
+<sc-for list="{{metricOpts}}" as="o" hint-placeholder-count="8"><option value="{{o.v}}">{{o.label}}</option></sc-for>
+</select>
+</div>
+</div>
+<div style="position: absolute; left: 80px; top: 214px; width: 1440px; box-sizing: border-box; padding: 6px 20px 8px; background: #FFFFFF; border: 1px solid #DCE0E6; border-radius: 12px;">
+<div style="display: grid; grid-template-columns: 56px 320px 120px 200px repeat(7, 58px) 92px 92px; gap: 8px; align-items: end; height: 40px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 11px; letter-spacing: 0.06em; color: #5C6470;">
+<span>POS</span><span>DRIVER · CAR · ENGINE MAP</span><span>AVG PASS RATE</span><span>95% INTERVAL (0–100%)</span>
+<sc-for list="{{heads}}" as="h" hint-placeholder-count="7"><span style="text-align: center; color: {{h.color}}; font-weight: {{h.weight}};">{{h.label}}</span></sc-for>
+<span style="text-align: right; line-height: 1.3;" title="Fuel bill: dollars per race passed">FUEL BILL<br>$ / PASS</span><span style="text-align: right; line-height: 1.3;" title="Fuel burn: tokens per race passed">FUEL BURN<br>TOKENS</span>
+</div>
+<sc-for list="{{rows}}" as="row" hint-placeholder-count="14">
+<div style="display: grid; grid-template-columns: 56px 320px 120px 200px repeat(7, 58px) 92px 92px; gap: 8px; align-items: center; height: 39px; border-top: 1px solid #E6E9EE;">
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 20px;">{{row.pos}}</div>
+<div style="display: flex; flex-direction: column; min-width: 0; line-height: 1.2;"><span style="font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{row.driver}}</span><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #5C6470; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{row.sub}}</span></div>
+<div style="display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums;"><span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 22px;">{{row.pct}}</span><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #5C6470;">{{row.kn}}</span></div>
+<div title="{{row.ci}}" style="position: relative; height: 16px;"><div style="position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: #E6E9EE;"></div><div style="position: absolute; left: {{row.wl}}px; width: {{row.ww}}px; top: 6px; height: 4px; border-radius: 2px; background: #9AA3AF;"></div><div style="position: absolute; left: {{row.wp}}px; top: 2px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #007BFF; box-shadow: 0 0 0 2px #FFFFFF;"></div></div>
+<sc-for list="{{row.cells}}" as="c" hint-placeholder-count="7"><div title="{{c.tip}}" style="height: 28px; border-radius: 6px; background: {{c.bg}}; color: {{c.fg}}; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; box-shadow: {{c.ring}};">{{c.txt}}</div></sc-for>
+<div style="text-align: right; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; font-variant-numeric: tabular-nums;">{{row.cost}}</div><div title="{{row.tokTip}}" style="text-align: right; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; font-variant-numeric: tabular-nums;">{{row.tok}}</div>
+</div>
+</sc-for>
+</div>
+<div style="position: absolute; left: 80px; top: 846px; width: 1440px; display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap;">
+<div style="display: flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 11px; color: #5C6470;">
+<span style="margin-right: 4px;">AVG PASS RATE</span>
+<sc-for list="{{legend}}" as="l" hint-placeholder-count="7"><span style="display: inline-flex; align-items: center; gap: 4px; margin-right: 6px;"><span style="width: 14px; height: 14px; border-radius: 3px; background: {{l.bg}};"></span>{{l.label}}</span></sc-for>
+</div>
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 11px; color: #5C6470;">{{footer}}</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1600,"height":900}}'>
+class Component extends DCLogic {
+constructor(props) {
+super(props);
+this.state = { metric: 'all' };
+}
+data() {
+return [["Gemini 3.1 Pro","Antigravity","high",41,49,71.0,91.5,null,[[12,13],[10,11],[4,9],[0,1],[6,6],[6,6],[3,3]],258846,[247386,77,11459]],["Gemini 3.8 Flash","Antigravity","high",50,54,82.4,97.1,0.3099,[[12,13],[10,11],[8,9],[5,6],[6,6],[6,6],[3,3]],829682,[793522,79,36160]],["Gemini 4 Argon","Antigravity","high",52,54,87.5,99.0,null,[[13,13],[11,11],[7,9],[6,6],[6,6],[6,6],[3,3]],167382,[156127,73,11255]],["Claude Opus 5.5","Claude Code","high",47,54,75.6,93.6,0.4097,[[13,13],[11,11],[6,9],[4,6],[6,6],[6,6],[1,3]],1029844,[1021624,100,8219]],["Claude Sonnet 5.5","Claude Code","high",50,54,82.4,97.1,0.2519,[[12,13],[11,11],[6,9],[6,6],[6,6],[6,6],[3,3]],882194,[875898,100,6296]],["DeepSeek V4.1 Flash · Together","Claude Code","provider default",48,54,77.8,94.8,0.1131,[[9,13],[11,11],[8,9],[6,6],[6,6],[5,6],[3,3]],346973,[336940,91,10032]],["GLM 5.2","Claude Code","provider default",45,54,71.3,91.0,0.8736,[[11,13],[10,11],[8,9],[6,6],[5,6],[4,6],[1,3]],580641,[560415,95,20226]],["GLM 5.3 Flash · Baseten","Claude Code","provider default",43,54,67.1,88.2,0.042,[[8,13],[10,11],[6,9],[5,6],[6,6],[5,6],[3,3]],507831,[498657,63,9174]],["GPT-6.1 Sol","Claude Code","high (route default)",50,54,82.4,97.1,0.097,[[13,13],[11,11],[7,9],[4,6],[6,6],[6,6],[3,3]],211811,[209508,87,2302]],["Gemini 3.8 Flash","Claude Code","high",48,54,77.8,94.8,0.28,[[12,13],[10,11],[6,9],[6,6],[6,6],[5,6],[3,3]],1139007,[1102908,92,36098]],["Gemini 3.8 Flash","Claude Code","high (asked)",47,54,75.6,93.6,0.2586,[[12,13],[10,11],[5,9],[6,6],[5,6],[6,6],[3,3]],974546,[941449,90,33097]],["Gemini 3.8 Flash","Claude Code","low",46,54,73.4,92.3,0.1488,[[12,13],[11,11],[6,9],[5,6],[5,6],[4,6],[3,3]],344807,[340817,53,3990]],["Gemini 3.8 Flash","Claude Code","medium",51,54,84.9,98.1,0.2332,[[12,13],[11,11],[8,9],[5,6],[6,6],[6,6],[3,3]],475900,[453922,62,21978]],["Kimi K3","Claude Code","provider default",45,54,71.3,91.0,0.2162,[[9,13],[10,11],[6,9],[6,6],[6,6],[5,6],[3,3]],319607,[314164,95,5443]],["Kimi K3 · Fireworks","Claude Code","provider default",44,54,69.2,89.6,0.1582,[[10,13],[10,11],[7,9],[5,6],[5,6],[5,6],[2,3]],269351,[265796,97,3554]],["Qwen 3.8 27B · OpenRouter","Claude Code","provider default",50,54,82.4,97.1,0.0349,[[12,13],[11,11],[8,9],[5,6],[6,6],[5,6],[3,3]],176994,[165694,61,11300]],["Qwen 3.8 Max · Fireworks","Claude Code","provider default",48,54,77.8,94.8,0.1695,[[12,13],[11,11],[6,9],[5,6],[6,6],[5,6],[3,3]],261327,[250560,90,10766]],["Claude Opus 5.5","Codex","none",50,54,82.4,97.1,0.2728,[[13,13],[11,11],[7,9],[6,6],[5,6],[5,6],[3,3]],61183,[59428,0,1754]],["Claude Sonnet 5.5","Codex","none",45,54,71.3,91.0,0.1289,[[11,13],[11,11],[4,9],[6,6],[6,6],[4,6],[3,3]],59799,[58636,0,1163]],["DeepSeek V4.1 Flash · Together","Codex","provider default",45,54,71.3,91.0,0.0384,[[9,13],[10,11],[8,9],[5,6],[5,6],[5,6],[3,3]],102658,[94167,90,8491]],["GLM 5.2","Codex","provider default",46,54,73.4,92.3,0.3372,[[11,13],[10,11],[8,9],[5,6],[5,6],[4,6],[3,3]],181594,[153925,85,27668]],["GLM 5.3 Flash · Baseten","Codex","provider default",44,54,69.2,89.6,0.0129,[[10,13],[11,11],[5,9],[5,6],[5,6],[5,6],[3,3]],89598,[86450,16,3148]],["GPT-6.1 Sol","Codex","high",51,54,84.9,98.1,0.054,[[12,13],[11,11],[7,9],[6,6],[6,6],[6,6],[3,3]],111009,[109566,86,1443]],["GPT-6.1 Sol","Codex","low (CLI default)",50,54,82.4,97.1,0.0404,[[12,13],[11,11],[7,9],[6,6],[6,6],[6,6],[2,3]],98800,[97905,88,895]],["GPT-6.1 Sol","Codex","medium",51,54,84.9,98.1,0.0445,[[13,13],[11,11],[7,9],[5,6],[6,6],[6,6],[3,3]],99802,[98761,87,1040]],["Gemini 3.8 Flash","Codex","low",46,54,73.4,92.3,0.1325,[[11,13],[10,11],[5,9],[5,6],[6,6],[6,6],[3,3]],248203,[242213,44,5990]],["Gemini 3.8 Flash","Codex","medium",49,54,80.1,96.0,0.2127,[[11,13],[11,11],[7,9],[6,6],[5,6],[6,6],[3,3]],429650,[408619,63,21030]],["Kimi K3","Codex","provider default",44,54,69.2,89.6,0.1216,[[11,13],[10,11],[5,9],[6,6],[4,6],[5,6],[3,3]],97923,[93437,90,4486]],["Kimi K3 · Fireworks","Codex","provider default",45,54,71.3,91.0,0.1084,[[11,13],[10,11],[4,9],[6,6],[6,6],[5,6],[3,3]],73403,[70880,74,2523]],["Qwen 3.8 Max · Fireworks","Codex","provider default",46,54,73.4,92.3,0.1538,[[11,13],[11,11],[7,9],[5,6],[6,6],[4,6],[2,3]],165497,[151776,87,13720]],["Claude Opus 5.5","OpenCode","none",48,54,77.8,94.8,0.1644,[[13,13],[11,11],[6,9],[5,6],[5,6],[5,6],[3,3]],78479,[76279,71,2199]],["Claude Sonnet 5.5","OpenCode","none",50,54,82.4,97.1,0.0759,[[12,13],[10,11],[7,9],[6,6],[6,6],[6,6],[3,3]],76902,[74926,73,1975]],["DeepSeek V4.1 Flash · Together","OpenCode","provider default",47,54,75.6,93.6,0.0345,[[10,13],[10,11],[8,9],[5,6],[5,6],[6,6],[3,3]],101950,[97563,73,4387]],["GLM 5.2","OpenCode","provider default",46,54,73.4,92.3,0.2733,[[10,13],[10,11],[8,9],[5,6],[6,6],[4,6],[3,3]],174390,[164682,77,9707]],["GLM 5.3 Flash · Baseten","OpenCode","provider default",45,54,71.3,91.0,0.0156,[[9,13],[9,11],[8,9],[5,6],[6,6],[5,6],[3,3]],122527,[118689,29,3838]],["GPT-6.1 Sol","OpenCode","high (route default)",49,54,80.1,96.0,0.0817,[[13,13],[11,11],[6,9],[4,6],[6,6],[6,6],[3,3]],131447,[127661,87,3786]],["Gemini 3.8 Flash","OpenCode","high",51,54,84.9,98.1,0.2853,[[12,13],[11,11],[8,9],[5,6],[6,6],[6,6],[3,3]],812616,[781687,79,30928]],["Gemini 3.8 Flash","OpenCode","low",43,54,67.1,88.2,0.1071,[[12,13],[10,11],[4,9],[3,6],[6,6],[5,6],[3,3]],208237,[206967,38,1269]],["Gemini 3.8 Flash","OpenCode","medium",49,54,80.1,96.0,0.231,[[12,13],[11,11],[6,9],[5,6],[6,6],[6,6],[3,3]],739907,[720885,78,19021]],["Kimi K3","OpenCode","provider default",47,54,75.6,93.6,0.168,[[11,13],[9,11],[7,9],[6,6],[6,6],[5,6],[3,3]],124356,[118314,87,6041]],["Kimi K3 · Fireworks","OpenCode","provider default",46,54,73.4,92.3,0.2006,[[10,13],[8,11],[8,9],[6,6],[6,6],[5,6],[3,3]],130536,[124600,78,5936]],["Qwen 3.8 Max · Fireworks","OpenCode","provider default",47,54,75.6,93.6,0.143,[[11,13],[10,11],[7,9],[6,6],[6,6],[5,6],[2,3]],180407,[171351,85,9055]],["Claude Opus 5.5","Pi","none",48,54,77.8,94.8,0.1745,[[13,13],[11,11],[5,9],[6,6],[5,6],[5,6],[3,3]],36126,[34251,0,1874]],["Claude Sonnet 5.5","Pi","none",50,54,82.4,97.1,0.0741,[[13,13],[11,11],[5,9],[6,6],[6,6],[6,6],[3,3]],30991,[29477,0,1514]],["DeepSeek V4.1 Flash · Together","Pi","provider default",49,54,80.1,96.0,0.0293,[[11,13],[10,11],[8,9],[5,6],[6,6],[6,6],[3,3]],82941,[77999,91,4941]],["GLM 5.2","Pi","provider default",45,54,71.3,91.0,0.2227,[[11,13],[10,11],[7,9],[5,6],[5,6],[4,6],[3,3]],132404,[119963,72,12440]],["GLM 5.3 Flash · Baseten","Pi","provider default",47,54,75.6,93.6,0.0103,[[10,13],[9,11],[8,9],[6,6],[6,6],[5,6],[3,3]],73762,[69900,25,3861]],["GPT-6.1 Sol","Pi","high (route default)",52,54,87.5,99.0,0.0348,[[13,13],[11,11],[8,9],[5,6],[6,6],[6,6],[3,3]],40722,[38918,83,1804]],["Gemini 3.8 Flash","Pi","high",52,54,87.5,99.0,0.2847,[[13,13],[11,11],[8,9],[5,6],[6,6],[6,6],[3,3]],727939,[697247,75,30691]],["Gemini 3.8 Flash","Pi","low",45,51,76.6,94.5,0.0719,[[12,13],[11,11],[6,9],[5,6],[6,6],[2,3],[3,3]],128968,[127840,33,1128]],["Gemini 3.8 Flash","Pi","medium",49,54,80.1,96.0,0.2069,[[12,13],[11,11],[7,9],[4,6],[6,6],[6,6],[3,3]],486138,[465266,70,20872]],["Kimi K3","Pi","provider default",49,54,80.1,96.0,0.1161,[[11,13],[10,11],[8,9],[5,6],[6,6],[6,6],[3,3]],62047,[57344,82,4702]],["Kimi K3 · Fireworks","Pi","provider default",49,54,80.1,96.0,0.1267,[[10,13],[10,11],[8,9],[6,6],[6,6],[6,6],[3,3]],64218,[59380,77,4838]],["Qwen 3.8 Max · Fireworks","Pi","provider default",50,54,82.4,97.1,0.1026,[[11,13],[11,11],[8,9],[6,6],[6,6],[6,6],[2,3]],117482,[109511,86,7971]]];
+}
+renderVals() {
+const cats = ['Coding', 'Hard fix', 'Hard review', 'Docs', 'Fix', 'Review', 'RCA'];
+const metric = this.state.metric;
+const bins = [[0.5, '#cde2fb', '#111111', '<50'], [0.7, '#9ec5f4', '#111111', '50–69'], [0.8, '#6da7ec', '#111111', '70–79'], [0.9, '#3987e5', '#111111', '80–89'], [0.95, '#256abf', '#FFFFFF', '90–94'], [1.0, '#184f95', '#FFFFFF', '95–99'], [1.01, '#0d366b', '#FFFFFF', '100']];
+const color = (r) => { if (r < 0) return ['#EEF0F3', '#5C6470']; for (const b of bins) { if (r < b[0]) return [b[1], b[2]]; } return ['#0d366b', '#FFFFFF']; };
+const wilson = (k, n) => { if (!n) return [0, 0]; const z = 1.959964, p = k / n, d = 1 + z * z / n, c = (p + z * z / (2 * n)) / d, h = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d; return [100 * (c - h), 100 * (c + h)]; };
+const W = 200;
+let rows = this.data().map((r) => {
+const [driver, car, effort, k, n, lo, hi, cpp, cs, tpp, tri] = r;
+let mk = k, mn = n, wl = lo, wh = hi;
+if (metric !== 'all') { [mk, mn] = cs[+metric]; [wl, wh] = wilson(mk, mn); }
+const rate = mn ? mk / mn : -1;
+return { driver, car, effort, mk, mn, rate, wl, wh, cpp, cs, tpp, tri };
+});
+rows.sort((a, b) => (b.rate - a.rate) || (b.mn - a.mn) || ((a.cpp == null ? 9 : a.cpp) - (b.cpp == null ? 9 : b.cpp)));
+let prev = null, firstPos = 0;
+rows = rows.slice(0, 14).map((r, i) => {
+if (prev === null || r.rate !== prev) { firstPos = i + 1; }
+const tie = (i > 0 && r.rate === prev) || (i + 1 < rows.length && rows[i + 1] && rows[i + 1].rate === r.rate);
+prev = r.rate;
+return {
+pos: (tie ? '=' : '') + firstPos,
+driver: r.driver,
+sub: r.car + ' · ' + r.effort,
+pct: r.mn ? (100 * r.rate).toFixed(1) + '%' : '–',
+kn: r.mk + '/' + r.mn,
+ci: '95% interval ' + r.wl.toFixed(1) + '–' + r.wh.toFixed(1) + '%',
+wl: Math.round(r.wl / 100 * W), ww: Math.max(2, Math.round((r.wh - r.wl) / 100 * W)), wp: Math.round(Math.max(r.rate, 0) * W),
+cells: r.cs.map((c, j) => { const cr = c[1] ? c[0] / c[1] : -1; const [bg, fg] = color(cr); return { txt: c[1] ? Math.round(100 * cr) + '' : '–', bg, fg, tip: cats[j] + ': ' + c[0] + ' of ' + c[1] + ' races', ring: metric === String(j) ? '0 0 0 2px #111111' : 'none' }; }),
+cost: r.cpp == null ? 'n/a' : '$' + r.cpp.toFixed(3),
+tok: r.tpp == null ? 'n/a' : (r.tpp >= 1e6 ? (r.tpp / 1e6).toFixed(2) + 'M' : Math.round(r.tpp / 1000) + 'k'),
+tokTip: r.tpp == null ? 'tokens not recorded' : r.tpp.toLocaleString('en-US') + ' tokens per race passed; triad Input (cached %) : Output = ' + (r.tri ? (r.tri[0] >= 1e6 ? (r.tri[0] / 1e6).toFixed(1) + 'M' : Math.round(r.tri[0] / 1000) + 'k') + ' (' + r.tri[1] + '%) : ' + (r.tri[2] >= 1e6 ? (r.tri[2] / 1e6).toFixed(1) + 'M' : r.tri[2] >= 1000 ? Math.round(r.tri[2] / 1000) + 'k' : r.tri[2]) : 'n/a')
+};
+});
+const heads = cats.map((c, j) => ({ label: c.toUpperCase(), color: metric === String(j) ? '#111111' : '#5C6470', weight: metric === String(j) ? 700 : 400 }));
+const metricOpts = [{ v: 'all', label: 'All 54 races' }].concat(cats.map((c, j) => ({ v: String(j), label: c })));
+return {
+metric, metricOpts, heads, rows,
+legend: bins.map((b) => ({ bg: b[1], label: b[3] })),
+footer: 'Top 14 of 54 entries · first result of each race per entry · fuel per race passed: bill in dollars, burn in tokens (cache reads included) · n/a: no dollar cost for Gemini 4 Argon or Gemini 3.1 Pro · eval bench, 2026-11-02',
+onMetric: (e) => this.setState({ metric: e.target.value })
+};
+}
+}
+</script>
+</body>
+</html>

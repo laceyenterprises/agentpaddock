@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The grid</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,500;1,800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4DA3FF}a:hover{color:#80BDFF}
+</style>
+</helmet>
+<div style="width: 1600px; height: 900px; position: relative; overflow: hidden; background: #0E1013; color: #F2F4F7; font-family: Inter, -apple-system, Helvetica, Arial, sans-serif;">
+<svg style="position: absolute; left: 480px; top: 0px; width: 1120px; height: 900px;" viewBox="0 0 1120 900" aria-hidden="true">
+<defs>
+<pattern id="pdk-chk" width="24" height="24" patternUnits="userSpaceOnUse"><rect width="12" height="12" fill="#F2F4F7"></rect><rect x="12" y="12" width="12" height="12" fill="#F2F4F7"></rect></pattern>
+<pattern id="pdk-kerb" width="24" height="80" patternUnits="userSpaceOnUse"><rect width="24" height="40" fill="{{accDark}}"></rect><rect y="40" width="24" height="40" fill="#F2F4F7"></rect></pattern>
+<g id="pdk-car">
+<rect x="-44" y="-96" width="88" height="10" rx="2" fill="#F2F4F7"></rect>
+<rect x="-50" y="-72" width="18" height="32" rx="4" fill="#0B0C0E" stroke="#3A3F47" stroke-width="2"></rect>
+<rect x="32" y="-72" width="18" height="32" rx="4" fill="#0B0C0E" stroke="#3A3F47" stroke-width="2"></rect>
+<rect x="-54" y="20" width="22" height="40" rx="5" fill="#0B0C0E" stroke="#3A3F47" stroke-width="2"></rect>
+<rect x="32" y="20" width="22" height="40" rx="5" fill="#0B0C0E" stroke="#3A3F47" stroke-width="2"></rect>
+<path d="M-32 -58 L-8 -48 M32 -58 L8 -48 M-32 -50 L-9 -40 M32 -50 L9 -40 M-32 34 L-25 30 M32 34 L25 30" stroke="#9AA3AF" stroke-width="2" fill="none"></path>
+<path d="M0 -88 C5 -88 7 -70 8 -50 L10 -20 C24 -16 28 -2 28 18 L24 52 C20 62 12 66 0 66 C-12 66 -20 62 -24 52 L-28 18 C-28 -2 -24 -16 -10 -20 L-8 -50 C-7 -70 -5 -88 0 -88 Z" fill="#F2F4F7"></path>
+<path d="M-9 -18 C-9 -26 9 -26 9 -18 L9 4 C9 10 -9 10 -9 4 Z" fill="#0B0C0E"></path>
+<path d="M0 16 V58" stroke="#C9CED6" stroke-width="2" fill="none"></path>
+<rect x="-36" y="66" width="72" height="12" rx="2" fill="#F2F4F7"></rect>
+<path d="M-36 62 V82 M36 62 V82" stroke="#F2F4F7" stroke-width="3" fill="none"></path>
+</g>
+</defs>
+<rect x="80" y="0" width="960" height="900" fill="#1A1D22"></rect>
+<rect x="56" y="0" width="24" height="900" fill="url(#pdk-kerb)"></rect>
+<rect x="1040" y="0" width="24" height="900" fill="url(#pdk-kerb)"></rect>
+<path d="M82 0 V900 M1038 0 V900" stroke="#F2F4F7" stroke-opacity="0.55" stroke-width="4" fill="none"></path>
+<rect x="80" y="168" width="960" height="24" fill="url(#pdk-chk)"></rect>
+<rect x="180" y="0" width="14" height="96" fill="#2A2F36"></rect>
+<rect x="926" y="0" width="14" height="96" fill="#2A2F36"></rect>
+<rect x="170" y="50" width="780" height="58" rx="8" fill="#22262C"></rect>
+<rect x="220" y="59" width="96" height="40" rx="6" fill="#0B0C0E"></rect>
+<rect x="364" y="59" width="96" height="40" rx="6" fill="#0B0C0E"></rect>
+<rect x="508" y="59" width="96" height="40" rx="6" fill="#0B0C0E"></rect>
+<rect x="652" y="59" width="96" height="40" rx="6" fill="#0B0C0E"></rect>
+<rect x="796" y="59" width="96" height="40" rx="6" fill="#0B0C0E"></rect>
+<g fill="#2A2F36"><circle cx="248" cy="79" r="12"></circle><circle cx="288" cy="79" r="12"></circle><circle cx="392" cy="79" r="12"></circle><circle cx="432" cy="79" r="12"></circle><circle cx="536" cy="79" r="12"></circle><circle cx="576" cy="79" r="12"></circle><circle cx="680" cy="79" r="12"></circle><circle cx="720" cy="79" r="12"></circle><circle cx="824" cy="79" r="12"></circle><circle cx="864" cy="79" r="12"></circle></g>
+<g stroke="#F2F4F7" stroke-opacity="0.7" stroke-width="4" fill="none">
+<path d="M308 226 h104 M308 226 v18 M412 226 v18"></path>
+<path d="M708 336 h104 M708 336 v18 M812 336 v18"></path>
+<path d="M308 496 h104 M308 496 v18 M412 496 v18"></path>
+<path d="M708 606 h104 M708 606 v18 M812 606 v18"></path>
+<path d="M308 766 h104 M308 766 v18 M412 766 v18"></path>
+<path d="M708 876 h104 M708 876 v18 M812 876 v18"></path>
+</g>
+<g fill="#F2F4F7" fill-opacity="0.16" font-family="Saira Condensed, Arial Narrow, sans-serif" font-style="italic" font-weight="800" font-size="64" text-anchor="middle">
+<text x="210" y="290">1</text><text x="900" y="400">2</text><text x="210" y="560">3</text><text x="900" y="670">4</text><text x="210" y="830">5</text>
+</g>
+<use href="#pdk-car" x="360" y="330"></use>
+<use href="#pdk-car" x="760" y="440"></use>
+<use href="#pdk-car" x="360" y="600"></use>
+<use href="#pdk-car" x="760" y="710"></use>
+<use href="#pdk-car" x="360" y="870"></use>
+<use href="#pdk-car" x="760" y="980"></use>
+<g stroke="#0B0C0E" stroke-width="2">
+<circle cx="360" cy="320" r="9" fill="{{accDark}}"></circle>
+<circle cx="760" cy="430" r="9" fill="{{accDark}}"></circle>
+<circle cx="360" cy="590" r="9" fill="{{accDark}}"></circle>
+<circle cx="760" cy="700" r="9" fill="#9AA3AF"></circle>
+<circle cx="360" cy="860" r="9" fill="#9AA3AF"></circle>
+</g>
+<g fill="#111111" font-family="Saira Condensed, Arial Narrow, sans-serif" font-style="italic" font-weight="800" font-size="18" text-anchor="middle">
+<text x="360" y="376">1</text><text x="760" y="486">2</text><text x="360" y="646">3</text><text x="760" y="756">4</text><text x="360" y="916">5</text>
+</g>
+</svg>
+<div style="position: absolute; left: 64px; top: 64px; width: 400px; display: flex; flex-direction: column; background: #111317; border: 1px solid #2A2F36; border-radius: 12px; overflow: hidden;">
+<div style="padding: 22px 24px 18px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid #2A2F36;">
+<div style="display: flex; flex-direction: column; line-height: 0.95; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic;">
+<span style="font-weight: 500; font-size: 15px; letter-spacing: 0.04em;">AGENT</span>
+<span style="font-weight: 800; font-size: 30px;">PADDOCK</span>
+</div>
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.08em; color: #9AA3AF;">STANDINGS · ALL 54 RACES</div>
+</div>
+<div style="display: flex; align-items: center; gap: 14px; padding: 10px 20px; border-top: 1px solid #22262C;">
+<div style="width: 40px; height: 36px; border-radius: 6px; background: {{accDark}}; color: #0B0C0E; display: flex; align-items: center; justify-content: center; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 20px;">=1</div>
+<div style="display: flex; flex-direction: column; min-width: 0;"><span style="font-size: 15px; font-weight: 600;">GPT-6.1 Sol</span><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #9AA3AF;">Pi · high</span></div>
+<div style="margin-left: auto; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 24px; font-variant-numeric: tabular-nums;">96.3</div>
+</div>
+<div style="display: flex; align-items: center; gap: 14px; padding: 10px 20px; border-top: 1px solid #22262C;">
+<div style="width: 40px; height: 36px; border-radius: 6px; background: {{accDark}}; color: #0B0C0E; display: flex; align-items: center; justify-content: center; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 20px;">=1</div>
+<div style="display: flex; flex-direction: column; min-width: 0;"><span style="font-size: 15px; font-weight: 600;">Gemini 3.8 Flash</span><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #9AA3AF;">Pi · high</span></div>
+<div style="margin-left: auto; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 24px; font-variant-numeric: tabular-nums;">96.3</div>
+</div>
+<div style="display: flex; align-items: center; gap: 14px; padding: 10px 20px; border-top: 1px solid #22262C;">
+<div style="width: 40px; height: 36px; border-radius: 6px; background: {{accDark}}; color: #0B0C0E; display: flex; align-items: center; justify-content: center; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 20px;">=1</div>
+<div style="display: flex; flex-direction: column; min-width: 0;"><span style="font-size: 15px; font-weight: 600;">Gemini 4 Argon</span><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #9AA3AF;">Antigravity · high</span></div>
+<div style="margin-left: auto; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 24px; font-variant-numeric: tabular-nums;">96.3</div>
+</div>
+<div style="display: flex; align-items: center; gap: 14px; padding: 10px 20px; border-top: 1px solid #22262C;">
+<div style="width: 40px; height: 36px; border-radius: 6px; background: #2A2F36; color: #F2F4F7; display: flex; align-items: center; justify-content: center; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 20px;">=4</div>
+<div style="display: flex; flex-direction: column; min-width: 0;"><span style="font-size: 15px; font-weight: 600;">Gemini 3.8 Flash</span><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #9AA3AF;">OpenCode · high</span></div>
+<div style="margin-left: auto; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 24px; font-variant-numeric: tabular-nums;">94.4</div>
+</div>
+<div style="display: flex; align-items: center; gap: 14px; padding: 10px 20px; border-top: 1px solid #22262C;">
+<div style="width: 40px; height: 36px; border-radius: 6px; background: #2A2F36; color: #F2F4F7; display: flex; align-items: center; justify-content: center; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 20px;">=4</div>
+<div style="display: flex; flex-direction: column; min-width: 0;"><span style="font-size: 15px; font-weight: 600;">Gemini 3.8 Flash</span><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #9AA3AF;">Claude Code · medium</span></div>
+<div style="margin-left: auto; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 24px; font-variant-numeric: tabular-nums;">94.4</div>
+</div>
+<div style="display: flex; align-items: center; gap: 14px; padding: 10px 20px; border-top: 1px solid #22262C;">
+<div style="width: 40px; height: 36px; border-radius: 6px; background: #2A2F36; color: #F2F4F7; display: flex; align-items: center; justify-content: center; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 20px;">=4</div>
+<div style="display: flex; flex-direction: column; min-width: 0;"><span style="font-size: 15px; font-weight: 600;">GPT-6.1 Sol</span><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #9AA3AF;">Codex · medium</span></div>
+<div style="margin-left: auto; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 24px; font-variant-numeric: tabular-nums;">94.4</div>
+</div>
+<div style="display: flex; align-items: center; gap: 14px; padding: 10px 20px; border-top: 1px solid #22262C;">
+<div style="width: 40px; height: 36px; border-radius: 6px; background: #2A2F36; color: #F2F4F7; display: flex; align-items: center; justify-content: center; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 20px;">=4</div>
+<div style="display: flex; flex-direction: column; min-width: 0;"><span style="font-size: 15px; font-weight: 600;">GPT-6.1 Sol</span><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #9AA3AF;">Codex · high</span></div>
+<div style="margin-left: auto; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 24px; font-variant-numeric: tabular-nums;">94.4</div>
+</div>
+<div style="display: flex; align-items: center; gap: 14px; padding: 10px 20px; border-top: 1px solid #22262C;">
+<div style="width: 40px; height: 36px; border-radius: 6px; background: #2A2F36; color: #F2F4F7; display: flex; align-items: center; justify-content: center; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 20px;">8</div>
+<div style="display: flex; flex-direction: column; min-width: 0;"><span style="font-size: 15px; font-weight: 600;">Qwen 3.8 Max</span><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #9AA3AF;">Pi · provider default</span></div>
+<div style="margin-left: auto; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 24px; font-variant-numeric: tabular-nums;">92.6</div>
+</div>
+<div style="padding: 14px 24px; border-top: 1px solid #2A2F36; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 11px; line-height: 1.5; color: #9AA3AF;">Pass rate on 54 tasks · eval bench, 2026-11-02</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"primary":{"editor":"color","default":"#007BFF","options":["#007BFF","#111111"]},"primaryOnDark":{"editor":"color","default":"#4DA3FF","options":["#4DA3FF","#F2F4F7"]},"$preview":{"width":1600,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { acc: this.props.primary ?? '#007BFF', accDark: this.props.primaryOnDark ?? '#4DA3FF' };
+}
+}
+</script>
+</body>
+</html>

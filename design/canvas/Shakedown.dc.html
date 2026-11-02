@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shakedown</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,500;1,800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#007BFF}a:hover{color:#0056B3}
+</style>
+</helmet>
+<div style="width: 1600px; height: 900px; position: relative; overflow: hidden; background: #F6F7F9; color: #111111; font-family: Inter, -apple-system, Helvetica, Arial, sans-serif;">
+<div style="position: absolute; left: 80px; top: 56px; width: 1300px; display: flex; flex-direction: column; gap: 10px;">
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; letter-spacing: 0.1em; color: #5C6470;">THE SHAKEDOWN</div>
+<h1 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 60px; line-height: 1;">The bench doubles as the fleet's smoke test</h1>
+<p style="margin: 0; font-size: 19px; line-height: 1.45; color: #5C6470; max-width: 980px;">Every harness and model combination the fleet can run gets driven here. A combination that stops finishing shows up on the bench before fleet work trips over it.</p>
+</div>
+<svg style="position: absolute; left: 60px; top: 300px; width: 600px; height: 440px;" viewBox="0 0 600 440" aria-hidden="true">
+<defs>
+<g id="sk-car">
+<rect x="70" y="226" width="780" height="8" fill="#111111"></rect>
+<path d="M76 226 L84 156 L160 150 L190 170 L330 166 C360 152 388 140 410 133 C418 108 442 94 470 95 C484 96 492 106 494 120 L520 122 C542 122 556 136 568 154 L604 176 C684 190 780 206 856 222 L856 226 Z" fill="#111111"></path>
+<rect x="36" y="64" width="14" height="120" rx="2" fill="#111111"></rect>
+<rect x="36" y="64" width="128" height="16" rx="3" fill="#111111"></rect>
+<rect x="44" y="88" width="112" height="10" rx="3" fill="#111111"></rect>
+<path d="M118 98 L132 152" stroke="#111111" stroke-width="8" fill="none"></path>
+<circle cx="528" cy="112" r="25" fill="currentColor"></circle>
+<rect x="532" y="101" width="24" height="12" rx="6" fill="#111111"></rect>
+<path d="M486 100 C504 80 560 82 580 150" stroke="#111111" stroke-width="9" stroke-linecap="round" fill="none"></path>
+<rect x="790" y="228" width="100" height="14" rx="3" fill="#111111"></rect>
+<rect x="876" y="204" width="12" height="38" rx="2" fill="#111111"></rect>
+<circle cx="196" cy="228" r="64" fill="#111111"></circle>
+<circle cx="196" cy="228" r="40" fill="#3A3F47"></circle>
+<circle cx="196" cy="228" r="12" fill="#F6F7F9"></circle>
+<circle cx="722" cy="230" r="60" fill="#111111"></circle>
+<circle cx="722" cy="230" r="37" fill="#3A3F47"></circle>
+<circle cx="722" cy="230" r="11" fill="#F6F7F9"></circle>
+</g>
+</defs>
+<rect x="0" y="372" width="600" height="6" fill="#111111"></rect>
+<use href="#sk-car" transform="translate(120 226) scale(0.5)" style="color: {{acc}};"></use>
+<g stroke="#9AA3AF" stroke-width="5" stroke-linecap="round" fill="none">
+<path d="M18 330 c14 -14 28 14 42 0 s28 14 42 0"></path>
+<path d="M30 300 c14 -14 28 14 42 0 s28 14 42 0" stroke-opacity="0.6"></path>
+</g>
+<g stroke="{{acc}}" stroke-width="5" stroke-linecap="round" fill="none">
+<path d="M410 238 C440 208 470 208 500 238"></path>
+<path d="M392 204 C432 164 478 164 518 204"></path>
+<path d="M374 170 C424 120 486 120 536 170"></path>
+</g>
+</svg>
+<div style="position: absolute; left: 700px; top: 268px; width: 820px; box-sizing: border-box; padding: 26px 30px; background: #111317; color: #F2F4F7; border-radius: 14px; display: flex; flex-direction: column; gap: 18px;">
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap;">
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; letter-spacing: 0.1em; color: #9AA3AF;">SMOKE MATRIX · 183 COMBINATIONS</div>
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #9AA3AF;">eval bench, 2026-11-02</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(23, minmax(0, 1fr)); gap: 8px;">
+<sc-for list="{{cells}}" as="c" hint-placeholder-count="183">
+<div style="aspect-ratio: 1 / 1; border-radius: 4px; background: {{c.color}};"></div>
+</sc-for>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; font-size: 14px; line-height: 1.4;">
+<div style="display: flex; gap: 10px; align-items: flex-start;"><span style="width: 14px; height: 14px; border-radius: 3px; background: #00A866; flex: none; margin-top: 3px;"></span><span><b>138 green</b><br><span style="color: #9AA3AF;">runs land and grade</span></span></div>
+<div style="display: flex; gap: 10px; align-items: flex-start;"><span style="width: 14px; height: 14px; border-radius: 3px; background: #F2B705; flex: none; margin-top: 3px;"></span><span><b>42 amber</b><br><span style="color: #9AA3AF;">some runs lost, or none lately</span></span></div>
+<div style="display: flex; gap: 10px; align-items: flex-start;"><span style="width: 14px; height: 14px; border-radius: 3px; background: #D7263D; flex: none; margin-top: 3px;"></span><span><b>3 red</b><br><span style="color: #9AA3AF;">the latest runs fail before grading</span></span></div>
+</div>
+</div>
+<div style="position: absolute; left: 700px; top: 760px; width: 820px; font-size: 16px; line-height: 1.5; color: #5C6470;">Two of the reds are native Gemini combinations. They flagged a fleet fault on 2026-11-01, a missing coordination fence that stopped every Gemini worker from booting. The fix was confirmed on 2026-11-02.</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"primary":{"editor":"color","default":"#007BFF","options":["#007BFF","#111111"]},"$preview":{"width":1600,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const cells = [];
+for (let i = 0; i < 183; i++) {
+cells.push({ color: i < 138 ? '#00A866' : (i < 180 ? '#F2B705' : '#D7263D') });
+}
+return { acc: this.props.primary ?? '#007BFF', cells };
+}
+}
+</script>
+</body>
+</html>

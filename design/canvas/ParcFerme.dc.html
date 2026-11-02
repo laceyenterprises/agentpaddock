@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sealed circuit</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,500;1,800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#007BFF}a:hover{color:#0056B3}
+</style>
+</helmet>
+<div style="width: 1600px; height: 900px; position: relative; overflow: hidden; background: #F6F7F9; color: #111111; font-family: Inter, -apple-system, Helvetica, Arial, sans-serif;">
+<div style="position: absolute; left: 80px; top: 56px; width: 1300px; display: flex; flex-direction: column; gap: 10px;">
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; letter-spacing: 0.1em; color: #5C6470;">A RACE</div>
+<h1 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 60px; line-height: 1;">Every race is a solo lap on a sealed circuit</h1>
+<p style="margin: 0; font-size: 19px; line-height: 1.45; color: #5C6470; max-width: 940px;">One entry on track at a time, inside a fence around the whole circuit. The fence sets the limits, the same for every entry, and race control throws challenges at the team during the lap.</p>
+</div>
+<svg style="position: absolute; left: 60px; top: 236px; width: 880px; height: 620px;" viewBox="0 0 880 620" aria-hidden="true">
+<defs>
+<pattern id="sc-chk" width="12" height="12" patternUnits="userSpaceOnUse"><rect width="12" height="12" fill="#111111"></rect><rect width="6" height="6" fill="#FFFFFF"></rect><rect x="6" y="6" width="6" height="6" fill="#FFFFFF"></rect></pattern>
+<g id="sc-car">
+<rect x="-44" y="-96" width="88" height="10" rx="2" fill="{{acc}}"></rect>
+<rect x="-50" y="-72" width="18" height="32" rx="4" fill="#111111"></rect>
+<rect x="32" y="-72" width="18" height="32" rx="4" fill="#111111"></rect>
+<rect x="-54" y="20" width="22" height="40" rx="5" fill="#111111"></rect>
+<rect x="32" y="20" width="22" height="40" rx="5" fill="#111111"></rect>
+<path d="M0 -88 C5 -88 7 -70 8 -50 L10 -20 C24 -16 28 -2 28 18 L24 52 C20 62 12 66 0 66 C-12 66 -20 62 -24 52 L-28 18 C-28 -2 -24 -16 -10 -20 L-8 -50 C-7 -70 -5 -88 0 -88 Z" fill="#FFFFFF" stroke="{{acc}}" stroke-width="7"></path>
+<circle cx="0" cy="-8" r="13" fill="{{acc}}" stroke="#111111" stroke-width="5"></circle>
+<rect x="-36" y="66" width="72" height="12" rx="2" fill="{{acc}}"></rect>
+</g>
+</defs>
+<rect x="40" y="30" width="800" height="560" rx="44" fill="#E9ECEF"></rect>
+<path d="M190 490 H580 C660 490 710 450 720 390 C730 320 680 290 620 280 C560 270 540 240 560 200 C580 160 640 150 680 160 C740 175 780 140 770 110 C760 80 710 70 640 80 L280 110 C190 118 140 170 140 250 V420 C140 460 170 490 190 490 Z" stroke="#FFFFFF" stroke-width="58" stroke-linejoin="round" fill="none"></path>
+<path d="M190 490 H580 C660 490 710 450 720 390 C730 320 680 290 620 280 C560 270 540 240 560 200 C580 160 640 150 680 160 C740 175 780 140 770 110 C760 80 710 70 640 80 L280 110 C190 118 140 170 140 250 V420 C140 460 170 490 190 490 Z" stroke="{{acc}}" stroke-width="58" stroke-dasharray="16 16" stroke-linejoin="round" fill="none"></path>
+<path d="M190 490 H580 C660 490 710 450 720 390 C730 320 680 290 620 280 C560 270 540 240 560 200 C580 160 640 150 680 160 C740 175 780 140 770 110 C760 80 710 70 640 80 L280 110 C190 118 140 170 140 250 V420 C140 460 170 490 190 490 Z" stroke="#2A2F36" stroke-width="50" stroke-linejoin="round" fill="none"></path>
+<rect x="294" y="465" width="12" height="50" fill="url(#sc-chk)"></rect>
+<rect x="40" y="30" width="800" height="560" rx="44" stroke="{{acc}}" stroke-width="8" fill="none"></rect>
+<rect x="40" y="30" width="800" height="560" rx="44" stroke="#111111" stroke-width="18" stroke-dasharray="4 40" fill="none"></rect>
+<use href="#sc-car" transform="translate(450 490) rotate(90) scale(0.4)"></use>
+<path d="M450 448 V462" stroke="{{acc}}" stroke-width="3" fill="none"></path>
+<rect x="398" y="414" width="104" height="34" rx="17" fill="{{acc}}"></rect>
+<text x="450" y="436" text-anchor="middle" font-family="JetBrains Mono, Menlo, monospace" font-size="14" font-weight="500" fill="#FFFFFF">ON TRACK</text>
+<rect x="290" y="210" width="96" height="120" rx="6" fill="#111111"></rect>
+<rect x="302" y="226" width="72" height="26" rx="3" fill="#F6F7F9"></rect>
+<text x="338" y="300" text-anchor="middle" font-family="JetBrains Mono, Menlo, monospace" font-size="12" fill="#F6F7F9">RACE</text>
+<text x="338" y="316" text-anchor="middle" font-family="JetBrains Mono, Menlo, monospace" font-size="12" fill="#F6F7F9">CONTROL</text>
+<g font-family="Saira Condensed, Arial Narrow, sans-serif" font-weight="800" font-size="22" fill="#FFFFFF" text-anchor="middle">
+<rect x="752" y="296" width="36" height="36" rx="8" fill="#111111"></rect><text x="770" y="322">!</text>
+<rect x="490" y="168" width="36" height="36" rx="8" fill="#111111"></rect><text x="508" y="194">!</text>
+<rect x="72" y="320" width="36" height="36" rx="8" fill="#111111"></rect><text x="90" y="346">!</text>
+</g>
+</svg>
+<div style="position: absolute; left: 1000px; top: 250px; width: 520px; display: flex; flex-direction: column; gap: 14px;">
+<div style="display: flex; flex-direction: column; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid #DCE0E6;">
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.1em; color: #5C6470;">ON THE CIRCUIT</div>
+<div style="display: flex; align-items: center; gap: 12px; font-size: 15px;"><svg style="width: 24px; height: 24px; flex: none;" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5" fill="#111111"></rect><text x="12" y="18" text-anchor="middle" font-family="Saira Condensed, Arial Narrow, sans-serif" font-weight="800" font-size="16" fill="#FFFFFF">!</text></svg>A challenge from race control, during the lap</div>
+<div style="display: flex; align-items: center; gap: 12px; font-size: 15px;"><svg style="width: 24px; height: 24px; flex: none;" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="2" width="20" height="20" fill="#111111"></rect><rect x="2" y="2" width="10" height="10" fill="#FFFFFF"></rect><rect x="12" y="12" width="10" height="10" fill="#FFFFFF"></rect><rect x="2" y="2" width="20" height="20" fill="none" stroke="#111111" stroke-width="2"></rect></svg>Start and finish line</div>
+<div style="display: flex; align-items: center; gap: 12px; font-size: 15px;"><svg style="width: 24px; height: 24px; flex: none;" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12 H23" stroke="{{acc}}" stroke-width="4"></path><path d="M4 7 V17 M12 7 V17 M20 7 V17" stroke="#111111" stroke-width="3"></path></svg>The fence around the whole circuit</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.1em; color: #5C6470;">INSIDE THE FENCE</div>
+<div style="font-size: 15px; color: #5C6470;">The containment every entry gets</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+<div style="background: #FFFFFF; border: 1px solid #DCE0E6; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;">
+<svg style="width: 24px; height: 24px; color: #111111;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"></rect><rect x="9.5" y="9.5" width="5" height="5" stroke="none" fill="{{acc}}"></rect><path d="M9.5 2.5V6M14.5 2.5V6M9.5 18v3.5M14.5 18v3.5M2.5 9.5H6M2.5 14.5H6M18 9.5h3.5M18 14.5h3.5"></path></svg>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 26px; line-height: 1;">2 CPUs</div>
+<div style="font-size: 13px; color: #5C6470;">per race</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE0E6; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;">
+<svg style="width: 24px; height: 24px; color: #111111;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="6" width="20" height="10" rx="1"></rect><rect x="5" y="9" width="3.5" height="4" fill="currentColor" stroke="none"></rect><rect x="10.25" y="9" width="3.5" height="4" stroke="none" fill="{{acc}}"></rect><rect x="15.5" y="9" width="3.5" height="4" fill="currentColor" stroke="none"></rect><path d="M5 16v3M8 16v3M11 16v3M15 16v3M18 16v3"></path></svg>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 26px; line-height: 1;">2 GiB memory</div>
+<div style="font-size: 13px; color: #5C6470;">and no swap</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE0E6; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;">
+<svg style="width: 24px; height: 24px; color: #111111;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9.5"></circle><path d="M9.5 7.5v9l7-4.5z" stroke="none" fill="{{acc}}"></path></svg>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 26px; line-height: 1;">256 processes</div>
+<div style="font-size: 13px; color: #5C6470;">at most, at once</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE0E6; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;">
+<svg style="width: 24px; height: 24px; color: #111111;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"></circle><path d="M9.5 2.5h5M12 2.5V6M18.2 6.8l1.6-1.6"></path><path d="M12 13.5l3.2-3.6" stroke="{{acc}}"></path></svg>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 26px; line-height: 1;">60 minutes</div>
+<div style="font-size: 13px; color: #5C6470;">to finish the lap</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE0E6; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;">
+<svg style="width: 24px; height: 24px; color: #111111;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10.5" rx="1.5"></rect><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"></path><circle cx="12" cy="15.7" r="1.7" stroke="none" fill="{{acc}}"></circle></svg>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 26px; line-height: 1;">Read-only system</div>
+<div style="font-size: 13px; color: #5C6470;">only a scratch /tmp is writable</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DCE0E6; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px;">
+<svg style="width: 24px; height: 24px; color: #111111;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8.2-7 10-4-1.8-7-5-7-10V6z"></path><path d="M8.7 11.8l2.3 2.3 4.3-4.6" stroke="{{acc}}"></path></svg>
+<div style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 26px; line-height: 1;">No extra privileges</div>
+<div style="font-size: 13px; color: #5C6470;">every capability dropped, no escalation</div>
+</div>
+</div>
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #5C6470;">Defaults of the Paddock standalone runner</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"primary":{"editor":"color","default":"#007BFF","options":["#007BFF","#111111"]},"$preview":{"width":1600,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { acc: this.props.primary ?? '#007BFF' };
+}
+}
+</script>
+</body>
+</html>

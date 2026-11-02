@@ -1,0 +1,212 @@
+[
+  {
+    "id": "driver",
+    "group": "cast",
+    "meaning": "Driver: the model behind the wheel"
+  },
+  {
+    "id": "car",
+    "group": "cast",
+    "meaning": "Car: the harness that runs the model"
+  },
+  {
+    "id": "entry",
+    "group": "cast",
+    "meaning": "Entry: the driver in the car, one model in one harness"
+  },
+  {
+    "id": "tires",
+    "group": "grip",
+    "meaning": "Tires: the tools, the car's grip on the environment"
+  },
+  {
+    "id": "team-radio",
+    "group": "grip",
+    "meaning": "Team radio: skills, the crew's coaching during the lap"
+  },
+  {
+    "id": "briefing",
+    "group": "grip",
+    "meaning": "Briefing: the instructions the driver is given before the lap"
+  },
+  {
+    "id": "engine-map",
+    "group": "cast",
+    "meaning": "Engine map: the effort level (this one: high)"
+  },
+  {
+    "id": "engine-map-low",
+    "group": "engine",
+    "meaning": "Effort low"
+  },
+  {
+    "id": "engine-map-medium",
+    "group": "engine",
+    "meaning": "Effort medium"
+  },
+  {
+    "id": "engine-map-high",
+    "group": "engine",
+    "meaning": "Effort high"
+  },
+  {
+    "id": "engine-map-xhigh",
+    "group": "engine",
+    "meaning": "Effort xhigh"
+  },
+  {
+    "id": "engine-map-max",
+    "group": "engine",
+    "meaning": "Effort max"
+  },
+  {
+    "id": "flag-checkered",
+    "group": "flags",
+    "meaning": "Finished: the task passed"
+  },
+  {
+    "id": "flag-green",
+    "group": "flags",
+    "meaning": "Green: running, lights out"
+  },
+  {
+    "id": "flag-yellow",
+    "group": "flags",
+    "meaning": "Yellow: audit pending"
+  },
+  {
+    "id": "flag-red",
+    "group": "flags",
+    "meaning": "Red: infrastructure fault, rerun"
+  },
+  {
+    "id": "flag-black",
+    "group": "flags",
+    "meaning": "Black: integrity hold"
+  },
+  {
+    "id": "dnf",
+    "group": "flags",
+    "meaning": "DNF: the task failed"
+  },
+  {
+    "id": "race",
+    "group": "race",
+    "meaning": "A race: one task"
+  },
+  {
+    "id": "track-map",
+    "group": "race",
+    "meaning": "Track map: how a run works, in four sectors"
+  },
+  {
+    "id": "race-calendar",
+    "group": "race",
+    "meaning": "Race calendar: the suites and their tasks"
+  },
+  {
+    "id": "lap-time",
+    "group": "race",
+    "meaning": "Lap time: wall-clock time for a task"
+  },
+  {
+    "id": "whisker",
+    "group": "race",
+    "meaning": "Whiskers: the 95% interval around a pass rate"
+  },
+  {
+    "id": "photo-finish",
+    "group": "race",
+    "meaning": "Photo finish: a statistical tie"
+  },
+  {
+    "id": "timing-tower",
+    "group": "race",
+    "meaning": "Timing tower: the standings"
+  },
+  {
+    "id": "podium",
+    "group": "race",
+    "meaning": "Podium: the top three"
+  },
+  {
+    "id": "rulebook",
+    "group": "rules",
+    "meaning": "Rulebook: the methodology"
+  },
+  {
+    "id": "setup-sheet",
+    "group": "rules",
+    "meaning": "Setup sheet: the run's configuration and its hash"
+  },
+  {
+    "id": "fence",
+    "group": "rules",
+    "meaning": "Fence: the containment around the whole circuit"
+  },
+  {
+    "id": "scrutineering",
+    "group": "rules",
+    "meaning": "Scrutineering: the car passed its checks"
+  },
+  {
+    "id": "stewards",
+    "group": "rules",
+    "meaning": "Stewards: the grader that rules on every finish"
+  },
+  {
+    "id": "track-limits",
+    "group": "rules",
+    "meaning": "Track limits: the CPU, memory and time caps"
+  },
+  {
+    "id": "fuel-gauge",
+    "group": "fuel",
+    "meaning": "Fuel gauge: a spend cap"
+  },
+  {
+    "id": "fuel-bill",
+    "group": "fuel",
+    "meaning": "Fuel bill: dollars per pass"
+  },
+  {
+    "id": "fuel",
+    "group": "fuel",
+    "meaning": "Fuel: tokens"
+  },
+  {
+    "id": "slipstream",
+    "group": "fuel",
+    "meaning": "Slipstream: cached tokens, read at a fraction of the price"
+  },
+  {
+    "id": "pit-lane",
+    "group": "running",
+    "meaning": "Pit lane: run the bench yourself"
+  },
+  {
+    "id": "pit-wall",
+    "group": "running",
+    "meaning": "Pit wall: telemetry from a run"
+  },
+  {
+    "id": "shakedown",
+    "group": "running",
+    "meaning": "Shakedown: the bench doubles as the fleet's smoke test"
+  },
+  {
+    "id": "start-lights",
+    "group": "new",
+    "meaning": "Lights out: a run starts"
+  },
+  {
+    "id": "trophy",
+    "group": "new",
+    "meaning": "Trophy: a category winner"
+  },
+  {
+    "id": "roundel",
+    "group": "new",
+    "meaning": "Roundel: the frame a race-type glyph sits in"
+  }
+]

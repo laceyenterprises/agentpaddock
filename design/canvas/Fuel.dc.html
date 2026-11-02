@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fuel bill</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,500;1,800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4DA3FF}a:hover{color:#80BDFF}
+</style>
+</helmet>
+<div style="width: 1600px; height: 900px; position: relative; overflow: hidden; background: #0E1013; color: #F2F4F7; font-family: Inter, -apple-system, Helvetica, Arial, sans-serif;">
+<div style="position: absolute; left: 80px; top: 56px; width: 1300px; display: flex; flex-direction: column; gap: 10px;">
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; letter-spacing: 0.1em; color: #9AA3AF;">THE FUEL BILL</div>
+<h1 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 60px; line-height: 1;">Most of the fuel is slipstream</h1>
+<p style="margin: 0; font-size: 19px; line-height: 1.45; color: #9AA3AF; max-width: 980px;">2.76 billion tokens across 7,476 measured runs. Four in five were cached: the model reads the same context again, at a fraction of the price of fresh input.</p>
+</div>
+<svg style="position: absolute; left: 80px; top: 268px; width: 1440px; height: 290px;" viewBox="0 0 1440 290" aria-hidden="true">
+<defs>
+<g id="fu-car">
+<rect x="70" y="226" width="780" height="8" fill="#F2F4F7"></rect>
+<path d="M76 226 L84 156 L160 150 L190 170 L330 166 C360 152 388 140 410 133 C418 108 442 94 470 95 C484 96 492 106 494 120 L520 122 C542 122 556 136 568 154 L604 176 C684 190 780 206 856 222 L856 226 Z" fill="#F2F4F7"></path>
+<rect x="36" y="64" width="14" height="120" rx="2" fill="#F2F4F7"></rect>
+<rect x="36" y="64" width="128" height="16" rx="3" fill="#F2F4F7"></rect>
+<rect x="44" y="88" width="112" height="10" rx="3" fill="#F2F4F7"></rect>
+<path d="M118 98 L132 152" stroke="#F2F4F7" stroke-width="8" fill="none"></path>
+<circle cx="528" cy="112" r="25" fill="currentColor"></circle>
+<rect x="532" y="101" width="24" height="12" rx="6" fill="#0B0C0E"></rect>
+<path d="M486 100 C504 80 560 82 580 150" stroke="#F2F4F7" stroke-width="9" stroke-linecap="round" fill="none"></path>
+<rect x="790" y="228" width="100" height="14" rx="3" fill="#F2F4F7"></rect>
+<rect x="876" y="204" width="12" height="38" rx="2" fill="#F2F4F7"></rect>
+<circle cx="196" cy="228" r="64" fill="#0B0C0E" stroke="#3A3F47" stroke-width="4"></circle>
+<circle cx="196" cy="228" r="38" fill="#2A2F36"></circle>
+<circle cx="722" cy="230" r="60" fill="#0B0C0E" stroke="#3A3F47" stroke-width="4"></circle>
+<circle cx="722" cy="230" r="35" fill="#2A2F36"></circle>
+</g>
+</defs>
+<rect x="0" y="246" width="1440" height="4" fill="#2A2F36"></rect>
+<path d="M0 250 H1440" stroke="#F2F4F7" stroke-opacity="0.25" stroke-width="2" stroke-dasharray="40 30" fill="none"></path>
+<g stroke="{{accDark}}" stroke-width="6" stroke-linecap="round" fill="none">
+<path d="M80 150 H380"></path>
+<path d="M120 186 H420"></path>
+<path d="M60 222 H360"></path>
+<path d="M500 132 H700" stroke-opacity="0.75"></path>
+<path d="M540 168 H730" stroke-opacity="0.75"></path>
+<path d="M520 204 H720" stroke-opacity="0.75"></path>
+</g>
+<use href="#fu-car" transform="translate(380 128) scale(0.42)" style="color: {{accDark}};"></use>
+<use href="#fu-car" transform="translate(800 128) scale(0.42)" style="color: #9AA3AF;"></use>
+</svg>
+<div style="position: absolute; left: 80px; top: 600px; width: 1440px; display: flex; flex-direction: column; gap: 18px;">
+<div style="display: flex; height: 72px; border-radius: 12px; overflow: hidden; border: 2px solid #3A3F47;">
+<div style="width: 82.7%; background: {{accDark}};"></div>
+<div style="width: 13.9%; background: #F2F4F7;"></div>
+<div style="width: 3.4%; background: #9AA3AF;"></div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px;">
+<div style="display: flex; gap: 12px; align-items: flex-start;"><span style="width: 18px; height: 18px; border-radius: 4px; background: {{accDark}}; flex: none; margin-top: 6px;"></span><div style="display: flex; flex-direction: column; gap: 2px;"><span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 34px; line-height: 1;">82.7% cached</span><span style="font-size: 15px; color: #9AA3AF;">2.28 billion tokens, the slipstream</span></div></div>
+<div style="display: flex; gap: 12px; align-items: flex-start;"><span style="width: 18px; height: 18px; border-radius: 4px; background: #F2F4F7; flex: none; margin-top: 6px;"></span><div style="display: flex; flex-direction: column; gap: 2px;"><span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 34px; line-height: 1;">13.9% fresh input</span><span style="font-size: 15px; color: #9AA3AF;">383 million tokens, read for the first time</span></div></div>
+<div style="display: flex; gap: 12px; align-items: flex-start;"><span style="width: 18px; height: 18px; border-radius: 4px; background: #9AA3AF; flex: none; margin-top: 6px;"></span><div style="display: flex; flex-direction: column; gap: 2px;"><span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 34px; line-height: 1;">3.4% output</span><span style="font-size: 15px; color: #9AA3AF;">94.5 million tokens the models wrote</span></div></div>
+</div>
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #9AA3AF;">Eval bench, 2026-11-02 · runs with all three counts measured</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"primaryOnDark":{"editor":"color","default":"#4DA3FF","options":["#4DA3FF","#F2F4F7"]},"$preview":{"width":1600,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { accDark: this.props.primaryOnDark ?? '#4DA3FF' };
+}
+}
+</script>
+</body>
+</html>

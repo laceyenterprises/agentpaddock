@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Race calendar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,500;1,800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4DA3FF}a:hover{color:#80BDFF}
+</style>
+</helmet>
+<div style="width: 1600px; height: 900px; position: relative; overflow: hidden; background: #0E1013; color: #F2F4F7; font-family: Inter, -apple-system, Helvetica, Arial, sans-serif;">
+<div style="position: absolute; left: 80px; top: 56px; width: 1300px; display: flex; flex-direction: column; gap: 10px;">
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; letter-spacing: 0.1em; color: #9AA3AF;">THE RACE CALENDAR</div>
+<h1 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 60px; line-height: 1;">54 races, seven kinds of challenge</h1>
+<p style="margin: 0; font-size: 19px; line-height: 1.45; color: #9AA3AF; max-width: 980px;">Every entry runs the same calendar. Each square is one race; the number on the right is how often entries finish that kind of race.</p>
+</div>
+<div style="position: absolute; left: 80px; top: 250px; width: 1440px; display: flex; flex-direction: column; gap: 14px;">
+<div style="display: grid; grid-template-columns: 300px 1fr 150px; align-items: end; gap: 24px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.08em; color: #9AA3AF;">
+<span>CHALLENGE</span><span>RACES</span><span style="text-align: right;">PASS RATE</span>
+</div>
+<sc-for list="{{rows}}" as="row" hint-placeholder-count="7">
+<div style="display: grid; grid-template-columns: 300px 1fr 150px; align-items: center; gap: 24px; padding-top: 12px; border-top: 1px solid #22262C;">
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 28px; line-height: 1.05;">{{row.name}}</span>
+<span style="font-size: 14px; color: #9AA3AF;">{{row.metaphor}}</span>
+</div>
+<div style="display: flex; gap: 8px; align-items: center;">
+<sc-for list="{{row.squares}}" as="sq" hint-placeholder-count="6">
+<div style="width: 40px; height: 40px; border-radius: 6px; background: {{row.fill}};"></div>
+</sc-for>
+<span style="margin-left: 8px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 14px; color: #9AA3AF;">{{row.n}}</span>
+</div>
+<div style="text-align: right; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 34px; font-variant-numeric: tabular-nums;">{{row.rate}}</div>
+</div>
+</sc-for>
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #9AA3AF; padding-top: 8px;">Pass rate over all counted runs of every entry · eval bench, 2026-11-02</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"primaryOnDark":{"editor":"color","default":"#4DA3FF","options":["#4DA3FF","#F2F4F7"]},"$preview":{"width":1600,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const acc = this.props.primaryOnDark ?? '#4DA3FF';
+const data = [
+['Coding', 'Time trial', 13, '87.7%'],
+['Hard fix', 'The wrong call from the pit wall', 11, '91.5%'],
+['Hard review', 'Scrutineering with decoys', 9, '69.1%'],
+['Docs', 'The setup sheet', 6, '87.7%'],
+['Fix', 'Pit stop', 6, '94.3%'],
+['Review', 'Scrutineering', 6, '88.3%'],
+['RCA', 'Crash investigation', 3, '93.4%']
+];
+const rows = data.map(([name, metaphor, n, rate]) => ({
+name, metaphor, n, rate,
+fill: name === 'Hard review' ? '#F2F4F7' : acc,
+squares: Array.from({ length: n }, (_, i) => ({ i }))
+}));
+return { rows };
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hard fix: the wrong call</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,500;1,800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#007BFF}a:hover{color:#0056B3}
+</style>
+</helmet>
+<div style="width: 1600px; height: 900px; position: relative; overflow: hidden; background: #F6F7F9; color: #111111; font-family: Inter, -apple-system, Helvetica, Arial, sans-serif;">
+<div style="position: absolute; left: 80px; top: 56px; width: 1300px; display: flex; flex-direction: column; gap: 10px;">
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; letter-spacing: 0.1em; color: #5C6470;">CHALLENGE · HARD FIX · 11 OF 54 RACES</div>
+<h1 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 60px; line-height: 1;">The wrong call from the pit wall</h1>
+<p style="margin: 0; font-size: 19px; line-height: 1.45; color: #5C6470; max-width: 900px;">The finding is real, but the fix it recommends is wrong. The rulebook wins: follow the documented contracts, not the advice.</p>
+</div>
+<svg style="position: absolute; left: 80px; top: 260px; width: 880px; height: 560px;" viewBox="0 0 880 560" aria-hidden="true">
+<defs>
+<g id="ch-car">
+<rect x="70" y="226" width="780" height="8" fill="#111111"></rect>
+<path d="M76 226 L84 156 L160 150 L190 170 L330 166 C360 152 388 140 410 133 C418 108 442 94 470 95 C484 96 492 106 494 120 L520 122 C542 122 556 136 568 154 L604 176 C684 190 780 206 856 222 L856 226 Z" fill="#111111"></path>
+<rect x="36" y="64" width="14" height="120" rx="2" fill="#111111"></rect>
+<rect x="36" y="64" width="128" height="16" rx="3" fill="#111111"></rect>
+<rect x="44" y="88" width="112" height="10" rx="3" fill="#111111"></rect>
+<path d="M118 98 L132 152" stroke="#111111" stroke-width="8" fill="none"></path>
+<circle cx="528" cy="112" r="25" fill="currentColor"></circle>
+<rect x="532" y="101" width="24" height="12" rx="6" fill="#111111"></rect>
+<path d="M486 100 C504 80 560 82 580 150" stroke="#111111" stroke-width="9" stroke-linecap="round" fill="none"></path>
+<rect x="790" y="228" width="100" height="14" rx="3" fill="#111111"></rect>
+<rect x="876" y="204" width="12" height="38" rx="2" fill="#111111"></rect>
+<circle cx="196" cy="228" r="64" fill="#111111"></circle><circle cx="196" cy="228" r="40" fill="#3A3F47"></circle><circle cx="196" cy="228" r="12" fill="#F6F7F9"></circle>
+<circle cx="722" cy="230" r="60" fill="#111111"></circle><circle cx="722" cy="230" r="37" fill="#3A3F47"></circle><circle cx="722" cy="230" r="11" fill="#F6F7F9"></circle>
+</g>
+</defs>
+<rect x="40" y="20" width="360" height="170" rx="12" fill="#111111"></rect>
+<text x="66" y="62" font-family="JetBrains Mono, Menlo, monospace" font-size="15" fill="#9AA3AF">THE FINDING SAYS</text>
+<text x="66" y="118" font-family="Saira Condensed, Arial Narrow, sans-serif" font-style="italic" font-weight="800" font-size="40" fill="#F6F7F9">"FIX IT THIS WAY"</text>
+<path d="M60 40 L380 170 M380 40 L60 170" stroke="#D7263D" stroke-width="9" stroke-linecap="round" fill="none"></path>
+<path d="M640 64 C600 44 550 38 480 38 V168 C550 168 600 174 640 194 C680 174 730 168 800 168 V38 C730 38 680 44 640 64 Z M640 64 V194" stroke="#111111" stroke-width="6" stroke-linejoin="round" fill="#FFFFFF"></path>
+<path d="M672 110 L694 132 L742 84" stroke="{{acc}}" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" fill="none"></path>
+<text x="640" y="226" text-anchor="middle" font-family="JetBrains Mono, Menlo, monospace" font-size="15" fill="#5C6470">THE CONTRACT WINS</text>
+<use href="#ch-car" transform="translate(166 320) scale(0.56)" style="color: {{acc}};"></use>
+<rect x="0" y="484" width="880" height="6" fill="#111111"></rect>
+</svg>
+<div style="position: absolute; left: 1040px; top: 250px; width: 480px; display: flex; flex-direction: column; gap: 20px;">
+<div style="display: flex; flex-direction: column; gap: 4px;"><div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.1em; color: #5C6470;">THE AGENT GETS</div><div style="font-size: 18px; line-height: 1.45;">A finding whose recommended fix is wrong, plus code whose documented contracts say otherwise.</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px;"><div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.1em; color: #5C6470;">IT HANDS IN</div><div style="font-size: 18px; line-height: 1.45;">The fix the contracts call for, not the one the finding suggests.</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px;"><div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.1em; color: #5C6470;">HOW IT IS JUDGED</div><div style="font-size: 18px; line-height: 1.45;">Hidden checks against the contracts. Doing what the bad advice says fails.</div></div>
+<div style="display: flex; align-items: baseline; gap: 14px; padding-top: 16px; border-top: 1px solid #DCE0E6;"><span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 64px; line-height: 1; font-variant-numeric: tabular-nums;">91.5%</span><span style="font-size: 15px; color: #5C6470;">pass rate · 669 of 731 counted runs</span></div>
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; color: #5C6470;">Example race: "Retry a timed-out charge without charging twice"</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"primary":{"editor":"color","default":"#007BFF","options":["#007BFF","#111111"]},"$preview":{"width":1600,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { acc: this.props.primary ?? '#007BFF' };
+}
+}
+</script>
+</body>
+</html>

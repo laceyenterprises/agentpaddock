@@ -193,6 +193,7 @@ modules/adversarial-eval-gym/
   scripts/render_social_card.py  # headless Chrome: card source -> social-card.png
   scripts/import_eval_bench.py # eval-bench evidence -> results/ (PDK-04)
   results/               # leaderboard results, price tables, changelog, fairness (PDK-04)
+  design/                # design system: tokens, glyphs, vocabulary, illustration mocks (PDKDESIGN-01)
   CONTRIBUTING.md        # run bundles, reproduction, vendor corrections (PDK-04)
   bin/hq-gym             # hq gym wrapper (routed from worker-pool/bin/hq)
   launchd/               # scheduled-run StartInterval one-shot plist template (GYM-04)

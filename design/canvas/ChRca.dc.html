@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RCA: crash investigation</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,500;1,800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#007BFF}a:hover{color:#0056B3}
+</style>
+</helmet>
+<div style="width: 1600px; height: 900px; position: relative; overflow: hidden; background: #F6F7F9; color: #111111; font-family: Inter, -apple-system, Helvetica, Arial, sans-serif;">
+<div style="position: absolute; left: 80px; top: 56px; width: 1300px; display: flex; flex-direction: column; gap: 10px;">
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; letter-spacing: 0.1em; color: #5C6470;">CHALLENGE · RCA · 3 OF 54 RACES</div>
+<h1 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 60px; line-height: 1;">Crash investigation</h1>
+<p style="margin: 0; font-size: 19px; line-height: 1.45; color: #5C6470; max-width: 900px;">Something went badly wrong on track. Read the telemetry, name the single root cause, and pin the one piece of evidence that proves it.</p>
+</div>
+<svg style="position: absolute; left: 80px; top: 260px; width: 880px; height: 560px;" viewBox="0 0 880 560" aria-hidden="true">
+<rect x="20" y="20" width="840" height="330" rx="14" fill="#111317"></rect>
+<g stroke="#2A2F36" stroke-width="1" fill="none"><path d="M60 100 H820 M60 180 H820 M60 260 H820"></path></g>
+<path d="M60 270 L120 262 L180 268 L240 255 L300 262 L360 250 L420 258 L470 246 L520 236 L548 120 L566 300 L600 252 L660 262 L720 255 L780 264 L820 258" stroke="#F2F4F7" stroke-width="4" stroke-linejoin="round" fill="none"></path>
+<path d="M548 60 V320" stroke="{{acc}}" stroke-width="3" stroke-dasharray="8 6" fill="none"></path>
+<circle cx="548" cy="120" r="9" fill="{{acc}}"></circle>
+<path d="M548 120 L612 84" stroke="{{acc}}" stroke-width="3" fill="none"></path>
+<path d="M612 64 H730 L752 84 L730 104 H612 Z" fill="{{acc}}"></path>
+<circle cx="628" cy="84" r="5" fill="#111317"></circle>
+<text x="684" y="90" text-anchor="middle" font-family="JetBrains Mono, Menlo, monospace" font-size="15" font-weight="500" fill="#FFFFFF">EVIDENCE</text>
+<text x="60" y="56" font-family="JetBrains Mono, Menlo, monospace" font-size="14" fill="#9AA3AF">TELEMETRY · ERROR LOG</text>
+<g font-family="JetBrains Mono, Menlo, monospace" font-size="15">
+<rect x="20" y="380" width="840" height="44" rx="8" fill="#FFFFFF" stroke="#DCE0E6" stroke-width="2"></rect>
+<text x="44" y="408" fill="#5C6470">record · retry storm after the wedge</text>
+<rect x="20" y="434" width="840" height="44" rx="8" fill="#FFFFFF" stroke="{{acc}}" stroke-width="3"></rect>
+<text x="44" y="462" fill="#111111">record · the line that proves the root cause</text>
+<rect x="20" y="488" width="840" height="44" rx="8" fill="#FFFFFF" stroke="#DCE0E6" stroke-width="2"></rect>
+<text x="44" y="516" fill="#5C6470">record · a symptom, not the cause</text>
+</g>
+</svg>
+<div style="position: absolute; left: 1040px; top: 250px; width: 480px; display: flex; flex-direction: column; gap: 20px;">
+<div style="display: flex; flex-direction: column; gap: 4px;"><div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.1em; color: #5C6470;">THE AGENT GETS</div><div style="font-size: 18px; line-height: 1.45;">A redacted incident bundle from a real outage: error logs and schema notes, every record tagged.</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px;"><div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.1em; color: #5C6470;">IT HANDS IN</div><div style="font-size: 18px; line-height: 1.45;">The single root cause, and the one evidence record that proves it.</div></div>
+<div style="display: flex; flex-direction: column; gap: 4px;"><div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.1em; color: #5C6470;">HOW IT IS JUDGED</div><div style="font-size: 18px; line-height: 1.45;">Both are required: the right cause and the right evidence. A symptom does not count.</div></div>
+<div style="display: flex; align-items: baseline; gap: 14px; padding-top: 16px; border-top: 1px solid #DCE0E6;"><span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 64px; line-height: 1; font-variant-numeric: tabular-nums;">93.4%</span><span style="font-size: 15px; color: #5C6470;">pass rate · 253 of 271 counted runs</span></div>
+<div style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; color: #5C6470;">Example race: "Session-ledger dual-write FK drain"</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"primary":{"editor":"color","default":"#007BFF","options":["#007BFF","#111111"]},"$preview":{"width":1600,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { acc: this.props.primary ?? '#007BFF' };
+}
+}
+</script>
+</body>
+</html>
