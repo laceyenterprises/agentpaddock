@@ -52,7 +52,10 @@ def main():
     sprite = (HERE / "paddock-glyphs.svg").read_text(encoding="utf-8").replace(
         'style="display:none"', 'style="position:absolute;width:0;height:0" aria-hidden="true"')
     index = json.loads((HERE / "index.json").read_text(encoding="utf-8"))
-    use = lambda gid, size: f'<svg class="s{size}" aria-hidden="true"><use href="#{gid}"/></svg>'
+
+    def use(gid, size):
+        return f'<svg class="s{size}" aria-hidden="true"><use href="#{gid}"/></svg>'
+
     parts = ['<!doctype html>', '<html lang="en">', '<head>', '<meta charset="utf-8">',
              '<meta name="viewport" content="width=device-width, initial-scale=1">', '<title>Agent Paddock glyphs</title>',
              '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&'

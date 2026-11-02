@@ -15,6 +15,11 @@ not the marks.
 | [`glyphs/`](glyphs/) | The glyph sprite, its generator and a catalogue page. |
 | [`canvas/`](canvas/) | The illustration and results-board mocks, as design canvas sources. |
 
+In `tokens.json`, the `font`, `space` and `radius` groups omit their CSS category prefix:
+`font.display`, `space["1"]` and `radius.xs` correspond to `--font-display`, `--space-1` and `--radius-xs`.
+Colour keys keep their CSS names without `--`. The generator reads the plain `:root` block and the explicit
+`:root[data-theme="dark"]` block, independently of block order, whitespace or attribute quote style.
+
 ## Principles
 
 1. **One accent.** Lacey blue marks what matters on a page: a link, the highlighted series, the accent stroke of a

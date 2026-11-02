@@ -165,7 +165,7 @@ const ratio = dear[M.key] / top[M.key];
 const cars = Array.from(new Set(all.map((e) => e.car))).sort();
 const drvs = Array.from(new Set(all.map((e) => base(e.driver)))).sort();
 const hlName = hl === 'all' ? 'Entry' : hl.slice(4);
-const rows = all.slice().sort((a, b) => a.usd - b.usd).map((e) => ({ driver: e.driver, car: e.car, effort: e.effort, kn: e.k + '/' + e.n, pct: e.rate.toFixed(1) + '%', usd: usd(e.usd), tok: tok(e.tok), tri: tri(e.tri), bg: isHl(e) && hl !== 'all' ? '#EAF3FF' : '#FFFFFF' }));
+const rows = sorted.map((e) => ({ driver: e.driver, car: e.car, effort: e.effort, kn: e.k + '/' + e.n, pct: e.rate.toFixed(1) + '%', usd: usd(e.usd), tok: tok(e.tok), tri: tri(e.tri), bg: isHl(e) && hl !== 'all' ? '#EAF3FF' : '#FFFFFF' }));
 return {
 measure, hl, view, pts, flabels, flist, rows,
 front: steps.join(' '),

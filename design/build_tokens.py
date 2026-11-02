@@ -17,16 +17,24 @@ def pairs(block):
     return {k: v.strip() for k, v in re.findall(r"--([a-z0-9-]+):\s*([^;]+);", block)}
 
 
+def block_pairs(css, selector):
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    match = re.search(selector + r"\s*\{([^{}]*)\}", css)
+    if match is None:
+        raise ValueError(f"Missing token block matching {selector!r}")
+    return pairs(match.group(1))
+
+
 def main():
     css = (HERE / "tokens.css").read_text(encoding="utf-8")
-    light = pairs(css[css.index(":root {"):css.index("@media")])
-    dark = pairs(css[css.index(':root[data-theme="dark"] {'):])
+    light = block_pairs(css, r":root")
+    dark = block_pairs(css, r""":root\s*\[\s*data-theme\s*=\s*["']dark["']\s*\]""")
     out = {
         "$description": "Agent Paddock design tokens. Generated from tokens.css by build_tokens.py; edit the CSS.",
         "color": {k: {"light": v, "dark": dark.get(k, v)} for k, v in light.items() if v.startswith(("#", "var("))},
         "font": {k.removeprefix("font-"): v for k, v in light.items() if k.startswith("font-")},
-        "space": {k: v for k, v in light.items() if k.startswith("space-")},
-        "radius": {k: v for k, v in light.items() if k.startswith("radius-")},
+        "space": {k.removeprefix("space-"): v for k, v in light.items() if k.startswith("space-")},
+        "radius": {k.removeprefix("radius-"): v for k, v in light.items() if k.startswith("radius-")},
     }
     (HERE / "tokens.json").write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
     print(f"{len(out['color'])} colours -> tokens.json")
