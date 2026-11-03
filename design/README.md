@@ -1,3 +1,10 @@
+[Home](../README.md) · [How it works](guide/README.md) · [Races](guide/races.md) · [Hard races](guide/hard-races.md) · [Board](guide/board.md) · [Race it yourself](guide/race-it-yourself.md) · [Under the hood](guide/the-gym.md) · [Batteries](guide/batteries.md) · **Design**
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="guide/assets/banner-design-dark.svg">
+  <img alt="Design: how Agent Paddock looks and talks." src="guide/assets/banner-design-light.svg">
+</picture>
+
 # Agent Paddock design system
 
 How Agent Paddock looks and talks: colour, type, glyphs, illustrations, data views and words. The site, the share
@@ -145,3 +152,7 @@ flags, the race and its results, rules and fairness, fuel, running the bench, an
 [`canvas/`](canvas/) holds the illustration boards and the results-board mocks: the grid, the entry, the challenges,
 the standings, the pit wall, driver performance and the fuel zone. They are prototypes. Their numbers are sample
 values, and the site renders these views from the committed results documents.
+
+---
+
+← [Batteries](guide/batteries.md) · [Home](../README.md)
