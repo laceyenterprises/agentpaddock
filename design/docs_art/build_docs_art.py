@@ -218,12 +218,51 @@ def glyph_sheet(theme):
     return frame(W, y + 64, theme, f"The glyph set: {total} glyphs.", "Design", "".join(out))
 
 
+# Page banners and card tiles for the guide pages (design/guide/*.md) and the README home page.
+PAGES = {
+    "how-it-works": ("track-map", "How it works", "The paddock in pictures.", "The cast, a race, the flags and the board."),
+    "races": ("race-calendar", "The races", "Seven challenges, one calendar.", "How a race is built and graded, and every corpus."),
+    "hard-races": ("scrutineering", "Hard races", "Review, fix and the hardest races.", "Decoys, several targets, and how they are graded."),
+    "board": ("timing-tower", "The board", "How the standings are made.", "Trust, pass rates, intervals and fuel, from results."),
+    "race-it-yourself": ("pit-lane", "Race it yourself", "Run the bench on your machine.", "Runners, host services, the layout and the tests."),
+    "the-gym": ("fence", "Under the hood", "The gym behind the races.", "The out-of-band idea, scheduled runs and locks."),
+    "batteries": ("fuel-gauge", "Batteries", "Efficiency batteries and reports.", "Model efficiency, matrix reports and the fix audit."),
+    "design": ("setup-sheet", "Design", "How Agent Paddock looks and talks.", "Colour, type, glyphs, pictures and words."),
+}
+
+
+def banner(key, theme):
+    gid, eyebrow, title, sub = PAGES[key]
+    W, H = 1200, 200
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" '
+            f'aria-label="{html.escape(eyebrow)}: {html.escape(title)}">'
+            f'<rect width="{W}" height="{H}" rx="24" fill="{tok("paper", theme)}" stroke="{tok("rule", theme)}"/>'
+            f'<rect x="40" y="40" width="120" height="120" rx="24" fill="{tok("soft", theme)}"/>'
+            + glyph(gid, 64, 64, 72, theme)
+            + text(196, 76, eyebrow.upper(), 16, theme, "muted", 500, MONO)
+            + text(196, 122, title, 40, theme, "ink", 800, DISPLAY, italic=True)
+            + text(196, 158, sub, 20, theme, "ink-2") + "</svg>")
+
+
+def tile(key, theme):
+    gid = PAGES[key][0]
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" role="img" '
+            f'aria-label="{html.escape(PAGES[key][1])}"><rect width="120" height="120" rx="26" fill="{tok("soft", theme)}"/>'
+            + glyph(gid, 30, 30, 60, theme) + "</svg>")
+
+
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
-    for name, fn in ART.items():
-        for theme in ("light", "dark"):
+    n = 0
+    for theme in ("light", "dark"):
+        for name, fn in ART.items():
             (OUT / f"{name}-{theme}.svg").write_text(fn(theme) + "\n", encoding="utf-8")
-    print(f"wrote {len(ART) * 2} files to {OUT.relative_to(ROOT)}")
+            n += 1
+        for key in PAGES:
+            (OUT / f"banner-{key}-{theme}.svg").write_text(banner(key, theme) + "\n", encoding="utf-8")
+            (OUT / f"tile-{key}-{theme}.svg").write_text(tile(key, theme) + "\n", encoding="utf-8")
+            n += 2
+    print(f"wrote {n} files to {OUT.relative_to(ROOT)}")
     return 0
 
 
