@@ -378,8 +378,13 @@ checkpoint records. `scripts/leaderboard.py validate-entry`, `validate-track`
 and `track-facts <task-dir>` validate and derive their public facts; `validate`
 also checks entry references and maintainer-owned trust levels. Historical hashes
 stay unchanged, missing telemetry stays unknown, and community tracks begin as
-exhibition. These contracts prepare later race cards, entry pages and a community
-board; they do not change the site's current standings or rendering.
+exhibition. The main standings count only `reproduced` and `paddock-run`
+results; the community board shows every trust level with its badge. Submitters
+register an Ed25519 public key bound to their GitHub account, then upload signed
+answers to the paddock submission API for re-grading, as defined in the
+[API contract](CONTRIBUTING.md#signed-answers-and-submission-api-contract).
+These contracts prepare later race cards, entry pages and board rendering;
+they do not implement those pages or the submission endpoint.
 
 The open leaderboard is built only from the committed `results/` tree:
 

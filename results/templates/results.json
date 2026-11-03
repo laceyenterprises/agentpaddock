@@ -12,6 +12,10 @@
       "commit": ""
     }
   },
+  "answers_bundle": {
+    "sha256": "",
+    "key_id": ""
+  },
   "harness_configs": {},
   "records": [
     {

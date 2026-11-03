@@ -1322,9 +1322,10 @@ def test_legacy_checkpoint_absence_cannot_verify_card(community_track):
     rows = _track_records()
     for row in rows:
         row.pop("checks")
-    errors, warnings = lb.validate_track(community_track, rows)
-    assert "not recorded" in " ".join(errors)
-    assert not warnings
+    assert lb.validate_track(community_track, rows) == ([], ["checkpoints unverified"])
+    checked = _track_records()[0]
+    checked["checks"] = [{"name": "different", "ok": True, "required": True}]
+    assert lb.validate_track(community_track, rows + [checked])[0]
 
 
 def test_track_facts_disclosure_leaks_and_live_statistics(community_track):
@@ -1551,3 +1552,64 @@ def test_community_cli_commands(community_track):
             assert json.loads(proc.stdout)["conditions"]["network"] == "bridge"
         if command[0] == "validate-track":
             assert "checkpoints unverified" in proc.stderr
+
+
+@pytest.mark.parametrize(
+    "runs,passed,difficulty",
+    [
+        (100, 100, 1),
+        (100, 90, 1),
+        (100, 89, 2),
+        (100, 75, 2),
+        (100, 74, 3),
+        (100, 60, 3),
+        (100, 59, 4),
+        (100, 40, 4),
+        (100, 39, 5),
+        (100, 0, 5),
+        (9, 9, None),
+        (10, 9, 1),
+        (0, 0, None),
+    ],
+)
+def test_track_difficulty_edges(community_track, runs, passed, difficulty):
+    loaded = lb.load_results(FIXTURE)
+    row = _track_records()[0]
+    loaded.records = [
+        dict(row, verdict="passed" if i < passed else "failed") for i in range(runs)
+    ]
+    live = lb.track_facts(community_track, loaded)["live"]
+    assert live["difficulty"] == difficulty
+    assert live["difficulty_reason"] == ("not enough runs" if runs < 10 else None)
+
+
+@pytest.mark.parametrize(
+    "bundle,valid",
+    [
+        ({"sha256": "a" * 64, "key_id": "submitter-key"}, True),
+        ({"sha256": "A" * 64, "key_id": "submitter-key"}, True),
+        ({"sha256": "sha256:" + "a" * 64, "key_id": "key"}, False),
+        ({"sha256": "g" * 64, "key_id": "key"}, False),
+        ({"sha256": "a" * 63, "key_id": "key"}, False),
+        ({"sha256": "a" * 64, "key_id": " "}, False),
+        ({"sha256": "a" * 64, "key_id": 1}, False),
+        ({"sha256": "a" * 64}, False),
+        (None, False),
+    ],
+)
+def test_answers_bundle_shape_only(results, bundle, valid):
+    _edit(results, lambda doc: doc.update(answers_bundle=bundle))
+    if valid:
+        assert lb.load_results(results)
+    else:
+        assert "answers_bundle" in _errors(results)
+
+
+def test_track_difficulty_minimum_uses_only_counted_runs(community_track):
+    loaded = lb.load_results(FIXTURE)
+    row = _track_records()[0]
+    loaded.records = [copy.deepcopy(row) for _ in range(10)]
+    loaded.records[0]["excludedBecause"] = "infra:model_mismatch"
+    assert lb.track_facts(community_track, loaded)["live"]["difficulty"] is None
+    loaded.records[0]["excludedBecause"] = None
+    assert lb.track_facts(community_track, loaded)["live"]["difficulty"] == 1

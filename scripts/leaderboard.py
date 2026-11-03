@@ -479,8 +479,25 @@ def validate_document(
 ) -> list[str]:
     """Every schema problem in one results document; empty when it is valid."""
     errors: list[str] = []
-    if not _keys(name, raw, DOCUMENT_KEYS, errors):
+    if not _keys(
+        name,
+        raw,
+        DOCUMENT_KEYS | ({"answers_bundle"} & raw.keys())
+        if isinstance(raw, dict)
+        else DOCUMENT_KEYS,
+        errors,
+    ):
         return errors
+    if "answers_bundle" in raw:
+        bundle = raw["answers_bundle"]
+        at = f"{name}: answers_bundle"
+        if _keys(at, bundle, {"sha256", "key_id"}, errors):
+            if not isinstance(bundle["sha256"], str) or not re.fullmatch(
+                r"[0-9a-fA-F]{64}", bundle["sha256"]
+            ):
+                errors.append(f"{at}: sha256 must be 64 hex characters")
+            if not _text(bundle["key_id"]):
+                errors.append(f"{at}: key_id must be a non-empty string")
     match = RESULT_NAME.match(name)
     if raw["schema"] != SCHEMA:
         errors.append(f"{name}: schema must be {SCHEMA}")
@@ -1075,7 +1092,7 @@ def validate_track(
     ):
         if not _choice(card["briefing"]["show"], ("full", "excerpt", "none")):
             errors.append("track.briefing: show must be full, excerpt or none")
-    rows = _task_records(task, records)
+    rows = [row for row in _task_records(task, records) if "checks" in row]
     names = {check["name"] for row in rows for check in row.get("checks", [])}
     if not rows:
         warnings.append("checkpoints unverified")
@@ -1116,12 +1133,8 @@ def track_facts(task_dir: Path, results: Results | None = None) -> dict[str, Any
     descriptions, check names and reasons may all contain the answer.
     """
     results = results if results is not None else load_results()
-    # Facts remain readable for legacy exports: absent checks produce unknown
-    # metrics and a warning. validate-track still requires names to be evidenced
-    # whenever any records exist for this version.
-    errors, warnings = validate_track(
-        task_dir, [row for row in results.records if "checks" in row]
-    )
+    # Legacy rows cannot establish checkpoint names.
+    errors, warnings = validate_track(task_dir, results.records)
     if errors:
         raise ResultsError("\n".join(errors))
     from gym.schema import load_task
@@ -1144,7 +1157,11 @@ def track_facts(task_dir: Path, results: Results | None = None) -> dict[str, Any
             files = [
                 path
                 for path in sandbox.rglob("*")
-                if path.is_file() and path.name != FIXTURE_MANIFEST_FILENAME
+                if path.is_file()
+                and path.name != FIXTURE_MANIFEST_FILENAME
+                and not {"expected", "hidden"}.intersection(
+                    path.relative_to(sandbox).parts
+                )
             ]
             file_count = len(files)
             line_count = sum(len(path.read_bytes().splitlines()) for path in files)
@@ -1272,6 +1289,12 @@ def track_facts(task_dir: Path, results: Results | None = None) -> dict[str, Any
             "runs": len(graded),
             "passed": passed,
             "avg_pass_rate": passed / len(graded) if graded else None,
+            "difficulty": (
+                1 + sum(passed / len(graded) < edge for edge in (0.9, 0.75, 0.6, 0.4))
+                if len(graded) >= 10
+                else None
+            ),
+            "difficulty_reason": "not enough runs" if len(graded) < 10 else None,
             "wilson": list(wilson(passed, len(graded))) if graded else None,
             "checkpoints": checkpoints,
             "more_checks": hidden_count + len(unlisted),
