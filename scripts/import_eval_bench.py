@@ -46,6 +46,8 @@ WORKER_CLASSES: dict[str, tuple[str, str]] = {
     "claude-code": ("claude-code", "vendor"),
     "codex": ("codex", "vendor"),
     "gemini": ("antigravity", "vendor"),
+    # Hermes Agent reaches its model through the same proxy.
+    "hermes": ("hermes", "openai-compatible-proxy"),
     "oss-claude-code": ("claude-code", "openai-compatible-proxy"),
     "oss-codex": ("codex", "openai-compatible-proxy"),
     "oss-opencode": ("opencode", "openai-compatible-proxy"),
@@ -92,6 +94,7 @@ MODELS: dict[str, tuple[str, str | None]] = {
     "google/gemini-3.8-flash-medium": ("google/gemini-3.8-flash", "medium"),
     "fireworks/qwen3.8-max": ("fireworks/qwen3.8-max", None),
     "fireworks/qwen3.8-27b": ("fireworks/qwen3.8-27b", None),
+    "openrouter/qwen3.8-27b": ("openrouter/qwen3.8-27b", None),
     "fireworks/kimi-k3": ("fireworks/kimi-k3", None),
     "kimi-k3": ("moonshot/kimi-k3", None),
     "glm-5.2": ("zai/glm-5.2", None),
