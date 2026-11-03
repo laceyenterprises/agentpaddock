@@ -217,6 +217,11 @@ GLYPHS = [
      f'<rect x="8.5" y="17" width="7" height="4.5"/><circle cx="12" cy="7.6" r="1.6" {AF}/>'),
     ("roundel", None, "new", "Roundel: the frame a race-type glyph sits in",
      f'<circle cx="12" cy="12" r="9.5"/><path d="M12 2.5a9.5 9.5 0 0 1 9.5 9.5" {A}/>'),
+    # Contact gets its own glyph so team radio keeps meaning "skills". The crew's sign held over the wall; its angled
+    # pole also reads as a message bubble at small sizes.
+    ("pit-board", None, "new", "Pit board: contact the paddock, for questions, result challenges and feedback",
+     '<rect x="6.5" y="3" width="15" height="11" rx="1.5"/><path d="M10 14L5.5 21.5M10 10.5h8"/>'
+     f'<path d="M10 7h5" {A}/>'),
 ]
 
 SYMBOL = ('<symbol id="{id}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
