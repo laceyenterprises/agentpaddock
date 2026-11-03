@@ -350,7 +350,7 @@ def calls_from_toolcalls_jsonl(
             calls[-1].update(
                 name="bash",
                 original_name=name,
-                original_arguments=calls[-1]["arguments"],
+                original_arguments=dict(calls[-1]["arguments"]),
             )
     return calls
 

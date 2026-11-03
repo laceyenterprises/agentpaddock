@@ -485,6 +485,18 @@ def test_hermes_export_supplies_review_read_evidence(tmp_path, transport):
     assert not next(check for check in checks if check["name"] == "read_evidence")["ok"]
 
 
+def test_hermes_terminal_audit_survives_argument_mutation():
+    call = h.calls_from_toolcalls_jsonl(
+        [_line({"name": "terminal", "arguments": {"command": "cat src/lease.py"}})],
+        worker_class="hermes",
+    )[0]
+
+    call["arguments"]["command"] = "cat src/store.py"
+    call["arguments"]["description"] = "Read store"
+
+    assert call["original_arguments"] == {"command": "cat src/lease.py"}
+
+
 def test_hermes_missing_export_yields_no_calls(tmp_path):
     assert h.collect(dispatch_dir=tmp_path, worker_class="hermes") == []
 
