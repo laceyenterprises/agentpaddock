@@ -1,0 +1,33 @@
+# Worked example from committed graded records; historical settings stay unrecorded.
+id = "opencode-qwen3-8-max"
+display_name = "qwen3.8-max in opencode"
+team = "agent-paddock"
+
+[livery]
+number = 3
+colour = "car-opencode"
+
+[driver]
+provider_id = "fireworks/qwen3.8-max"
+engine_map = "default"
+
+[car]
+harness = "opencode"
+version = "unrecorded"
+config_hash = "sha256:357da891ff08c6bf2db0dd39cf8a29193f0a35a9929e35d89e40e3a9d6101e30"
+
+[car.descriptor]
+harness = "opencode"
+model_transport = "openai-compatible-proxy"
+runner = "agent-os-fleet"
+worker_class = "oss-opencode"
+
+[tires]
+lock = "locks/oss-opencode.lock.json"
+
+[briefing]
+kind = "unrecorded"
+
+[radio]
+# The board does not measure team radio yet.
+status = "unrecorded"

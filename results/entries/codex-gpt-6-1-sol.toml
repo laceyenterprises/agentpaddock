@@ -1,0 +1,33 @@
+# Worked example from committed graded records; historical settings stay unrecorded.
+id = "codex-gpt-6-1-sol"
+display_name = "gpt-6.1-sol in codex"
+team = "agent-paddock"
+
+[livery]
+number = 1
+colour = "car-codex"
+
+[driver]
+provider_id = "openai/gpt-6.1-sol"
+engine_map = "default"
+
+[car]
+harness = "codex"
+version = "unrecorded"
+config_hash = "sha256:b2396403d5070ceacbf491e01a7b44b0ccd37e3755eedcc0154f296e96174b86"
+
+[car.descriptor]
+harness = "codex"
+model_transport = "vendor"
+runner = "agent-os-fleet"
+worker_class = "codex"
+
+[tires]
+lock = "locks/codex.lock.json"
+
+[briefing]
+kind = "unrecorded"
+
+[radio]
+# The board does not measure team radio yet.
+status = "unrecorded"

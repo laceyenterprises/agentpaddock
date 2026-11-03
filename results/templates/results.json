@@ -1,0 +1,64 @@
+{
+  "schema": "paddock-results/v1",
+  "id": "",
+  "date": "",
+  "price_table": "",
+  "source": {
+    "kind": "run",
+    "description": "",
+    "evidence": "",
+    "fork": {
+      "repository": "",
+      "commit": ""
+    }
+  },
+  "harness_configs": {},
+  "records": [
+    {
+      "attempt": 1,
+      "cost": {
+        "usd": null,
+        "source": "unknown",
+        "reason": "model_not_priced"
+      },
+      "excludedBecause": null,
+      "harness": {
+        "name": "",
+        "version": null,
+        "config_hash": ""
+      },
+      "model": {
+        "provider_id": "",
+        "reasoning": null
+      },
+      "paddock_commit": null,
+      "run_id": "",
+      "score": null,
+      "suite": "",
+      "task": "",
+      "task_version": 1,
+      "tokens": {
+        "input": null,
+        "cache": null,
+        "output": null
+      },
+      "verdict": "passed",
+      "wall_seconds": null,
+      "checks": [
+        {
+          "name": "",
+          "ok": true,
+          "required": true
+        }
+      ],
+      "entry": "",
+      "track": {
+        "repository": "",
+        "commit": "",
+        "path": "",
+        "task_version": 1,
+        "sha256": ""
+      }
+    }
+  ]
+}

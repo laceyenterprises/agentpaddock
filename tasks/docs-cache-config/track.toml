@@ -1,0 +1,67 @@
+name = "Cache guide circuit"
+pitch = "Update the guide to agree with the supplied implementation."
+challenge = "docs"
+infographic = "docs"
+
+[[checkpoints]]
+check = "document_captured"
+label = "Documentation check"
+disclose = "count"
+
+[[checkpoints]]
+check = "document_shape"
+label = "Documentation check"
+disclose = "count"
+
+[[checkpoints]]
+check = "fact:entries"
+label = "Documentation check"
+disclose = "count"
+
+[[checkpoints]]
+check = "fact:ttl"
+label = "Documentation check"
+disclose = "count"
+
+[[checkpoints]]
+check = "fact:disabled"
+label = "Documentation check"
+disclose = "count"
+
+[[checkpoints]]
+check = "fact:invalid"
+label = "Documentation check"
+disclose = "count"
+
+[[checkpoints]]
+check = "fact:eviction"
+label = "Documentation check"
+disclose = "count"
+
+[[checkpoints]]
+check = "fact:bypass"
+label = "Documentation check"
+disclose = "count"
+
+[[checkpoints]]
+check = "stale:old"
+label = "Documentation check"
+disclose = "count"
+
+[[checkpoints]]
+check = "known_flags"
+label = "Documentation check"
+disclose = "count"
+
+[[checkpoints]]
+check = "known_config_keys"
+label = "Documentation check"
+disclose = "count"
+
+[[checkpoints]]
+check = "heading:## Cache"
+label = "Documentation check"
+disclose = "count"
+
+[briefing]
+show = "full"

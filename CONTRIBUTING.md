@@ -87,6 +87,176 @@ Rules for a bundle:
   not.
 - One harness configuration and one model per document.
 
+## Submit an entry
+
+Copy [`results/templates/entry.toml`](results/templates/entry.toml) to
+`results/entries/<entry-id>.toml`. An entry is a driver (`provider/model`), a car
+(the harness configuration hash), and an engine map (reasoning level, or
+`default` for a record's null reasoning). Changing any one creates a different
+entry. Set `team` to your GitHub user or organisation; paddock-run entries use
+`agent-paddock`. Choose a car number from 1 to 99 and optionally a `car-*` livery
+colour token from `design/tokens.json`. Livery identifies a car, never a value.
+
+State the harness CLI version, or `unrecorded`, and copy the exact descriptor
+into `[car.descriptor]`. Compute `car.config_hash` with
+`scripts/leaderboard.py`'s `config_hash(descriptor)`: SHA-256 of sorted, compact
+UTF-8 JSON, prefixed `sha256:`. TOML ordering does not affect it. Tires name a
+`locks/<name>.lock.json` file, or use the inline `{schema, agent, tools}` lock
+shape (`gym-tool-surface-lock/v1`). A lock is a declared tool surface, not proof
+of historical native tool availability.
+
+For a new configuration, copy the entry's entire briefing and radio tables
+under the descriptor as well. A briefing is `{kind = "vendor-default"}`, or
+`{sha256 = "sha256:<64 hex>", summary = "One public line"}` for custom
+instruction text. Team radio is `{skills = []}` or a list of skills with a name
+and exactly one version or SHA-256. The board does not measure team radio yet.
+These declarations, including custom instruction hashes and skill versions or
+hashes, affect the configuration hash. Keep private instruction text private.
+
+The three worked examples in `results/entries/` use unchanged descriptors with
+graded committed records. Their briefing is `{kind = "unrecorded"}` and radio
+is `{status = "unrecorded"}` because those historical details were not captured.
+Only the frozen legacy hashes qualify for that exception. Never edit an old
+hash to add provenance retrospectively. Optional record `entry` references must
+resolve and agree on provider id, reasoning and configuration hash (and harness).
+
+```bash
+python3 scripts/leaderboard.py validate-entry
+python3 scripts/leaderboard.py validate-entry results/entries/<entry-id>.toml
+python3 scripts/leaderboard.py validate
+```
+
+## Submit a track
+
+Copy [`results/templates/track.toml`](results/templates/track.toml) beside your
+`tasks/<task-id>/task.toml`. The public track card authors a circuit `name`,
+one-sentence `pitch` without answer hints, `challenge` equal to the task's
+`suite`, and an `infographic` id. Reuse an existing challenge's infographic id;
+a new challenge type names a new id. The initial cards use `hard-review`, `fix`
+and `docs` respectively. Discovery still reads only `*/task.toml`.
+
+List checkpoints in lap order using verifier subcheck names, plain public
+labels, and `disclose`: `label` exposes the label and clear rate; `count`
+contributes only to “N more checks”; `hidden` is omitted. Recorded checks not
+listed in the card also contribute to “N more checks”. Use `count` for docs
+fact names, since those can reveal required facts. `[briefing] show` is `full`
+by default, or `excerpt` or `none`: a future renderer uses this policy for the
+already-public prompt. The derived JSON includes prompt word count, never its
+text. No renderer is added by these contracts.
+
+`validate-track` compares checkpoint names with committed `checks` for this
+exact task, challenge and task version. An unknown name is an error when any
+records exist for that version. With no records, it accepts with “checkpoints
+unverified”. Legacy rows without `checks` mean not recorded and cannot verify
+names. The three worked cards use names emitted by their current verifiers,
+but committed historical exports contain no checks: name validation therefore
+rejects those cards until checkpoint-bearing exports arrive. This deliberately
+does not fabricate or backfill historical checkpoint evidence. The eval-bench
+export carrying checks is a follow-up; existing results still validate.
+`track-facts` remains readable for legacy exports, with a warning and unknown
+checkpoint metrics, while `validate-track` requires recorded evidence.
+
+```bash
+python3 scripts/leaderboard.py validate-track
+python3 scripts/leaderboard.py validate-track tasks/<task-id>
+python3 scripts/leaderboard.py track-facts tasks/<task-id>
+```
+
+`track_facts(task_dir, results)` and `track-facts` return
+`paddock-track-facts/v1` JSON. Static facts are suite/version, staged file and
+line counts, prompt word count, result field names/types (including list item
+shapes), and hidden test count (`expected_tests`, null if unspecified). Counts
+come from the shared public staging helper in a temporary directory; the
+command executes trusted stage scripts, so review a fork before running it.
+It does not grade or run a model. Conditions describe standalone defaults:
+CPU, memory, pids, time limit, read-only root, tmpfs, dropped capabilities and
+**bridge** network mode. Bridge allows network access; offline calibration is
+a separate verifier requirement.
+
+Live facts pool included graded attempts for only this task version, with
+entries identified by the identity triple, avg pass rate and its 95% Wilson
+interval, checkpoint clear rates over attempts recording that check, and
+retirements at the first failed required checkpoint in card order. Undisclosed
+retirements pool under `undisclosed`; absent checkpoint data is counted as
+unrecorded. Rates and fuel are null when unmeasured. The fuel triad is total
+input (fresh plus cached) and output across all included attempts divided by
+races passed, plus the cached share of input. Excluded infrastructure rows do
+not contribute to rates or fuel. External pinned tracks never pool with local
+tasks that happen to have the same id.
+
+Derived fields are never accepted in `track.toml`. Neither cards nor derived
+output may contain verifier descriptions, content under `expected/` or
+`hidden/`, grading reason strings, defect/decoy locations, or correct answer
+values. The facts function projects names and types without enum values or
+field descriptions and never reads or serializes grading-only files.
+
+A community track starts as **exhibition** and never enters standings until a
+maintainer promotes it to the calendar. Calibration, implemented in a later
+runner, requires all of:
+
+- Its verifier passes the reference solution and fails an empty submission.
+- Staging copies nothing from `expected/` or `hidden/`; the verifier carries
+  `GYM-GROUND-TRUTH-NEVER-STAGE`.
+- Two grades of the same submission agree.
+- The track runs offline and inside its track limits.
+- The track is MIT-licensed.
+
+A card's author cannot promote it: exhibition/calendar admission is a
+maintainer decision, separate from authored card data.
+
+## Results from a fork
+
+Use [`results/templates/results.json`](results/templates/results.json) as a
+blank shape alongside the run-bundle procedure. Fill required fields; remove
+optional `entry`, `track` and `source.fork` when not applicable. Delete the
+placeholder `checks` list if checks were not recorded. The existing
+`paddock-results/v1` schema remains: all additions are optional, so existing
+committed documents and hashes retain their meaning. Results discovery reads
+only top-level `results/*.json` and `results/*.json.gz`, never templates.
+
+`from-run` copies a cell's `subchecks` into optional record `checks`, retaining
+only `{name, ok, required}`. `ok` and `required` are booleans; names are unique.
+Absent means not recorded. Any `reason` key is a validation error because it
+can reveal answers. Do not commit raw runs or submitted answers.
+
+Optional document `source.fork` is `{repository, commit}`: an HTTPS repository
+URL without credentials, query or fragment and a full 40-character lowercase
+hex commit. A record for a track outside this repository's tasks additionally
+carries `track = {repository, commit, path, task_version, sha256}`. Its `path`
+is a repository-relative path ending in `/track.toml`, with no traversal or
+grading-only directories. `sha256` is `sha256:<64 hex>` of the pinned track
+card bytes; task version must equal the record's version. Each pin is explicit;
+validation checks its shape without fetching or trusting external code. A
+maintainer must verify the pinned content when re-grading. The source fork is
+provenance, not an authority to set trust or enter an exhibition in standings.
+Records with an external `track` pin are excluded as
+`exhibition:external-track` by the shared aggregation contract. Promotion
+requires a later maintainer calendar workflow; neither trust nor a card
+field can bypass this exclusion.
+
+## Trust levels
+
+`results/meta/trust.json` is maintainer-owned, like `fairness.json`. Its schema
+is `paddock-trust/v1`; `documents` maps exact results filenames (including
+`.gz` when used) to `{level, evidence, sign_off}`. Missing entries default to
+`self-reported`; an empty mapping makes no retrospective trust claims.
+
+| Level | What the evidence establishes |
+|---|---|
+| `self-reported` | Schema-valid submission with costs recomputed from committed prices. |
+| `re-graded` | A maintainer grades submitted answers with the pinned verifier and confirms the verdicts. |
+| `reproduced` | A maintainer re-runs a sample with the entry configuration and obtains results inside its interval. |
+| `paddock-run` | A maintainer attests that the paddock ran the bundle. |
+
+Every level above `self-reported` requires nonempty `evidence` and maintainer
+`sign_off`. Evidence is a list of public HTTPS or repository references using
+the fairness reference rules; self-reported entries may use `[]` and null
+sign-off. Submitters leave promotions to maintainers. `validate` cross-checks
+trust documents and entry references along with costs. Trust metadata defines
+provenance and does not change the existing site's standings yet. Standings
+eligibility and a private handoff for re-grading answers remain maintainer
+policy decisions; submitted answers are never committed.
+
 ## Fairness checklist
 
 `results/meta/fairness.json` holds the checklist every harness configuration is

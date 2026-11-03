@@ -1,0 +1,46 @@
+# Copy to results/entries/<id>.toml. Replace blanks, then validate-entry.
+# Identity: provider_id + engine_map + config_hash. Livery never encodes a value.
+id = ""
+display_name = ""
+team = "" # GitHub user or organisation; agent-paddock for paddock-run entries.
+
+[livery]
+number = 1 # 1..99
+# colour = "car-codex" # Optional car-* token from design/tokens.json.
+
+[driver]
+provider_id = "" # provider/model, exactly as in records.
+engine_map = "default" # Named reasoning level, or default (null in records).
+
+[car]
+harness = ""
+version = "unrecorded" # Prefer the CLI version.
+config_hash = "" # config_hash(car.descriptor), sha256:<64 hex>.
+
+[car.descriptor]
+harness = ""
+# Include everything affecting behaviour besides the model: tools, authority,
+# limits, transport, instruction hashes, and radio versions/hashes. Copy the
+# [briefing] and [radio] tables below under this descriptor too, then hash it.
+# For legacy examples ONLY, copy the existing descriptor exactly and leave
+# briefing.kind and radio.status = "unrecorded". Never rewrite a historical hash.
+[car.descriptor.briefing]
+kind = "vendor-default"
+[car.descriptor.radio]
+skills = []
+
+[tires]
+lock = "locks/codex.lock.json" # Or replace with schema, agent, tools inline:
+# schema = "gym-tool-surface-lock/v1"
+# agent = "codex"
+# tools = ["bash:safe", "read", "write"]
+
+[briefing]
+kind = "vendor-default"
+# For custom instructions replace kind with both:
+# sha256 = "sha256:<64 hex of instruction text>"
+# summary = "One public line about the instructions, with no private content."
+
+[radio]
+# The board does not measure team radio yet.
+skills = [] # [{name = "skill-name", version = "1"}] or {name, sha256}.

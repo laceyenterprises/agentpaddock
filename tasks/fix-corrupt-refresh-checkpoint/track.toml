@@ -1,0 +1,22 @@
+name = "Refresh circuit"
+pitch = "Repair the refresh behaviour while keeping existing behaviour intact."
+challenge = "fix"
+infographic = "fix"
+
+[[checkpoints]]
+check = "edited_only_allowed_files"
+label = "Stay inside the edit boundary"
+disclose = "label"
+
+[[checkpoints]]
+check = "hidden_tests_pass"
+label = "Pass the hidden tests"
+disclose = "label"
+
+[[checkpoints]]
+check = "small_diff"
+label = "Keep the change focused"
+disclose = "label"
+
+[briefing]
+show = "full"

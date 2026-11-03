@@ -29,6 +29,9 @@ bench measures. Use the term when it helps a reader; use the plain word when it 
 | Rulebook | The methodology: how races are built, run and graded. |
 | Setup sheet | A run's configuration, and the hash that pins it. |
 | Track map | How a run works, in four sectors. |
+| Track card | Public description and checkpoint disclosure for one race, separate from derived conditions and results. |
+| Checkpoint | One verifier check, shown by label, count or kept hidden. |
+| Exhibition | A community race awaiting calibration and calendar admission; excluded from standings. |
 | Track limits | The caps a run must stay inside: CPU, memory and time. |
 | Fuel gauge | A spend cap. |
 | Stewards | The grader at the finish line. The driver never sees its checks. |
