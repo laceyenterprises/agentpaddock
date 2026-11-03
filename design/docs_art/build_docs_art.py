@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT / "design" / "glyphs"))
 import paddock_glyphs as pg  # noqa: E402
 
 OUT = ROOT / "design" / "guide" / "assets"
-TOKENS = json.loads((ROOT / "design" / "tokens.json").read_text())["color"]
+TOKENS = json.loads((ROOT / "design" / "tokens.json").read_text(encoding="utf-8"))["color"]
 GLYPHS = {g[0]: g for g in pg.GLYPHS}
 SANS = "Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
 DISPLAY = "Saira, 'Arial Narrow', Arial, sans-serif"
@@ -222,7 +222,7 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
     for name, fn in ART.items():
         for theme in ("light", "dark"):
-            (OUT / f"{name}-{theme}.svg").write_text(fn(theme) + "\n")
+            (OUT / f"{name}-{theme}.svg").write_text(fn(theme) + "\n", encoding="utf-8")
     print(f"wrote {len(ART) * 2} files to {OUT.relative_to(ROOT)}")
     return 0
 
