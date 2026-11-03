@@ -14,8 +14,9 @@ schema.sql".
 These harnesses keep their own record of the calls, and the records survive
 worker teardown:
 
-* pi and opencode keep theirs under the worker directory, which teardown
-  deletes, so their adapters export the calls to
+* pi and opencode keep theirs under the worker directory; hermes keeps its
+  session in its own store under the worker home. Teardown deletes these
+  stores, so their adapters export the calls to
   the host-owned tool-call export before the run
   reads as terminal (``cwp_dispatch.harness_toolcall_export``): one
   ``{"name", "arguments", "call_id"}`` object per line. The file is read only
@@ -50,7 +51,7 @@ worker teardown:
   ``tool_call_update``.
 
 Every parser returns calls in the snapshot's shape, ``{"name", "arguments",
-"call_id"}``, in source order. Normalized agy calls also carry ``original_name``
+"call_id"}``, in source order. Normalized calls also carry ``original_name``
 and ``original_arguments`` for audit. ``arguments`` keeps evidence identifying
 the files the call touched (a command line, a path, a diff target), because that
 is what the verifiers search.
@@ -325,8 +326,10 @@ def calls_from_codex_exec_stdout(lines: Iterable[str]) -> list[dict[str, Any]]:
     return calls
 
 
-def calls_from_toolcalls_jsonl(lines: Iterable[str]) -> list[dict[str, Any]]:
-    """Calls an adapter exported to ``toolcalls.jsonl``, already in snapshot shape."""
+def calls_from_toolcalls_jsonl(
+    lines: Iterable[str], *, worker_class: str | None = None
+) -> list[dict[str, Any]]:
+    """Calls exported to ``toolcalls.jsonl``, with Hermes terminal compatibility."""
     calls: list[dict[str, Any]] = []
     for event in _json_lines(lines):
         name = event.get("name")
@@ -341,6 +344,14 @@ def calls_from_toolcalls_jsonl(lines: Iterable[str]) -> list[dict[str, Any]]:
                 "call_id": call_id if isinstance(call_id, str) else None,
             }
         )
+        if worker_class == "hermes" and name == "terminal":
+            # Hermes read_file already matches the read heuristics. Keep
+            # search_files unchanged, like other harnesses' search tools.
+            calls[-1].update(
+                name="bash",
+                original_name=name,
+                original_arguments=calls[-1]["arguments"],
+            )
     return calls
 
 
@@ -584,9 +595,9 @@ def default_acpx_sessions_dir() -> Path:
     return host_services.current().harness_home() / ".acpx" / "sessions"
 
 
-#: Worker classes whose adapter (``acpx-pi.sh``, ``acpx-opencode.sh``) removes
+#: Worker classes whose adapter removes
 #: ``toolcalls.jsonl`` before the harness starts and writes it after it exits.
-TOOLCALLS_EXPORT_CLASSES = frozenset({"pi", "oss-pi", "opencode", "oss-opencode"})
+TOOLCALLS_EXPORT_CLASSES = frozenset({"pi", "oss-pi", "opencode", "oss-opencode", "hermes"})
 
 _log = logging.getLogger(__name__)
 
@@ -627,7 +638,9 @@ def collect(
             if worker_class == "gemini":
                 return calls_from_agy_stream_json(log_reader("agy"))
             if worker_class in TOOLCALLS_EXPORT_CLASSES:
-                calls = calls_from_toolcalls_jsonl(log_reader("toolcalls"))
+                calls = calls_from_toolcalls_jsonl(
+                    log_reader("toolcalls"), worker_class=worker_class
+                )
                 if calls:
                     return calls
             stdout = list(log_reader("stdout"))
@@ -647,7 +660,7 @@ def collect(
                 return calls
         export = dispatch_dir / "toolcalls.jsonl"
         if worker_class in TOOLCALLS_EXPORT_CLASSES:
-            calls = calls_from_toolcalls_jsonl(_read_lines(export))
+            calls = calls_from_toolcalls_jsonl(_read_lines(export), worker_class=worker_class)
             if calls:
                 return calls
         elif export.exists():

@@ -414,7 +414,7 @@ def test_adapter_exported_toolcalls_jsonl_wins_over_stdout(tmp_path):
 
 
 def test_planted_toolcalls_jsonl_never_replaces_another_harness_record(tmp_path, caplog):
-    # Review of #7339: only the pi and opencode adapters clear toolcalls.jsonl,
+    # Only the registered export adapters clear toolcalls.jsonl,
     # and a codex worker can write to its own dispatch directory. A file there
     # on any other class is a plant, so the real stdout.log is graded.
     dispatch = tmp_path / "dispatch" / "lrq_codex"
@@ -435,10 +435,96 @@ def test_planted_toolcalls_jsonl_never_replaces_another_harness_record(tmp_path,
         assert "fake" not in json.dumps(calls)
         assert "does not export tool calls" in caplog.text
 
-    assert h.TOOLCALLS_EXPORT_CLASSES == {"pi", "oss-pi", "opencode", "oss-opencode"}
+    assert h.TOOLCALLS_EXPORT_CLASSES == {
+        "pi",
+        "oss-pi",
+        "opencode",
+        "oss-opencode",
+        "hermes",
+    }
     for worker_class in sorted(h.TOOLCALLS_EXPORT_CLASSES):
         calls = h.collect(dispatch_dir=dispatch, worker_class=worker_class)
         assert [c["call_id"] for c in calls] == ["fake"], worker_class
+
+
+@pytest.mark.parametrize("transport", ["file", "host"])
+def test_hermes_export_supplies_review_read_evidence(tmp_path, transport):
+    from gym.review_checks import evaluate
+
+    exported = [
+        {"name": "read_file", "arguments": {"path": "src/store.py"}, "call_id": "read"},
+        {
+            "name": "terminal",
+            "arguments": {"command": "echo unread.py && cat src/lease.py"},
+            "call_id": "terminal",
+        },
+        {
+            "name": "search_files",
+            "arguments": {"pattern": "*.py", "target": "files", "path": "unread.py"},
+            "call_id": "search",
+        },
+    ]
+    lines = [_line(call) for call in exported]
+    (tmp_path / "toolcalls.jsonl").write_text("\n".join(lines), encoding="utf-8")
+    calls = h.collect(
+        dispatch_dir=tmp_path,
+        worker_class="hermes",
+        log_reader=(lambda stream: lines if stream == "toolcalls" else [])
+        if transport == "host"
+        else None,
+    )
+    snapshot = toolcalls.build_snapshot([], fallback_calls=calls)
+    assert [call["name"] for call in calls] == ["read_file", "bash", "search_files"]
+    assert snapshot["calls"][1]["original_name"] == "terminal"
+    assert snapshot["calls"][1]["original_arguments"] == exported[1]["arguments"]
+    assert snapshot["calls"][1]["call_id"] == "terminal"
+    assert h.calls_from_toolcalls_jsonl(lines, worker_class="pi") == exported
+    checks = evaluate([], snapshot, clean_control=True, read_files=["src/store.py", "src/lease.py"])
+    assert next(check for check in checks if check["name"] == "read_evidence")["ok"]
+    checks = evaluate([], snapshot, clean_control=True, read_files=["unread.py"])
+    assert not next(check for check in checks if check["name"] == "read_evidence")["ok"]
+
+
+def test_hermes_missing_export_yields_no_calls(tmp_path):
+    assert h.collect(dispatch_dir=tmp_path, worker_class="hermes") == []
+
+
+@pytest.mark.parametrize(
+    "name,arguments",
+    [
+        ("read_file", {"path": "publisher.py"}),
+        ("terminal", {"command": "cat publisher.py"}),
+    ],
+)
+def test_hermes_export_passes_fixture_review_task(tmp_path, name, arguments):
+    from gym import grader, outcomes
+    from gym.grader import Trajectory
+    from gym.schema import load_task
+
+    (tmp_path / "toolcalls.jsonl").write_text(
+        _line({"name": name, "arguments": arguments, "call_id": "fixture-read"}),
+        encoding="utf-8",
+    )
+    task = load_task(REPO_ROOT / "tasks" / "review-publish-guard-order")
+    trajectory = Trajectory(
+        terminal_status="succeeded",
+        submitted_result={
+            "findings": [
+                {
+                    "file": "publisher.py",
+                    "line_start": 2,
+                    "line_end": 2,
+                    "blocking": True,
+                    "category": "correctness",
+                    "summary": "Publishing occurs before the guard.",
+                }
+            ]
+        },
+        transcript_rows=[],
+        control_rows=[],
+        harness_calls=h.collect(dispatch_dir=tmp_path, worker_class="hermes"),
+    )
+    assert grader.grade(task, trajectory).outcome == outcomes.PASSED
 
 
 def test_normalized_commands_preserves_raw_and_quoted_non_commands():

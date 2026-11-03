@@ -1,6 +1,14 @@
 {
   "entries": [
     {
+      "id": "HERMESTOOLCALLS-02",
+      "date": "2026-11-02",
+      "kind": "grading",
+      "excludes": null,
+      "summary": "Hermes runs now supply adapter-exported tool calls to read-evidence checks. Terminal calls receive the bash compatibility name while preserving their original name and arguments.",
+      "boundary": "Earlier Hermes results remain unchanged; failed read-evidence checks may reflect missing capture rather than missing reads. Compare corrected runs separately from runs graded without Hermes exports. Other harnesses are unaffected."
+    },
+    {
       "boundary": "codex x moonshot/kimi-k3 rows before the fix and the post-fix rerun carry different harness config hashes and are never pooled. Other harness and route combinations were unaffected.",
       "date": "2026-09-29",
       "excludes": null,
