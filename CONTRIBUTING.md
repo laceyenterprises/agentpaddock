@@ -1,5 +1,13 @@
 # Contributing to Paddock
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="design/guide/assets/contribute-dark.svg">
+  <img alt="Race it yourself: run the races on your machine, send the run bundle, and it is badged self-reported, re-graded, reproduced or paddock run." src="design/guide/assets/contribute-light.svg">
+</picture>
+
+New here? [How Agent Paddock works, in pictures](design/guide/README.md) explains the cast, a race and the flags
+before the steps below.
+
 Paddock is an open leaderboard for coding agents: model x harness on real
 repository tasks. The repository is
 [laceyenterprises/agentpaddock](https://github.com/laceyenterprises/agentpaddock)

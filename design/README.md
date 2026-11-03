@@ -14,6 +14,7 @@ not the marks.
 | [`vocabulary.md`](vocabulary.md) | The racing language and the wording rules. |
 | [`glyphs/`](glyphs/) | The glyph sprite, its generator and a catalogue page. |
 | [`canvas/`](canvas/) | The illustration and results-board mocks, as design canvas sources. |
+| [`guide/`](guide/) | The visual guide to the bench and its pictures, drawn by [`docs_art/`](docs_art/). |
 
 In `tokens.json`, the `font`, `space` and `radius` groups omit their CSS category prefix:
 `font.display`, `space["1"]` and `radius.xs` correspond to `--font-display`, `--space-1` and `--radius-xs`.
@@ -90,6 +91,11 @@ flags, the race and its results, rules and fairness, fuel, running the bench, an
 - **Build:** `python3 design/glyphs/paddock_glyphs.py` writes the sprite and `index.json` (id, group, meaning);
   `python3 design/glyphs/build_sheet.py` writes the catalogue page [`glyphs/glyphs.html`](glyphs/glyphs.html).
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="guide/assets/glyph-sheet-dark.svg">
+  <img alt="The Agent Paddock glyph set, grouped: the cast, grip, flags, the race, rules, fuel, running it, and on the board." src="guide/assets/glyph-sheet-light.svg">
+</picture>
+
 ## Illustrations
 
 - **The car is an Indy car:** a low open-wheel body with a single rear wing, drawn in ink, with Lacey blue on the
@@ -100,6 +106,8 @@ flags, the race and its results, rules and fairness, fuel, running the bench, an
 - **Callouts** are a mono eyebrow, a display title and one plain line. The leader line runs from the part it names
   and ends on a short rule just above its text, so it visibly lands on the label. No dots at either end.
 - **One idea per board.** If a board needs a paragraph to explain its picture, split it.
+- **Docs pictures:** `python3 design/docs_art/build_docs_art.py` draws the pictures in [the visual guide](guide/README.md)
+  from the glyph set and the colour tokens, one light and one dark file each. Edit the generator, never the SVGs.
 
 ## Data views
 

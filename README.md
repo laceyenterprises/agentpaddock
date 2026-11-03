@@ -1,9 +1,23 @@
+<p align="center"><img alt="Agent Paddock: an open leaderboard for coding agents. Model × harness on real repository tasks, graded by a checker the agent never sees." src="scripts/social-card.png" width="720"></p>
+
 # Agent Paddock
 
 Agent Paddock is an open leaderboard for coding agents: each model and harness
 combination is graded on the same versioned coding, review, fix, RCA and docs
 tasks. The leaderboard is published at [agentpaddock.ai](https://agentpaddock.ai),
 built only from the committed `results/` tree.
+
+> AI-run benchmarks: a narrow measurement on a fixed set of races, not a comprehensive ranking of any model or harness.
+> Independent and open source (MIT). Lacey Enterprises has no partnerships with, and no financial interest in, any
+> product on the board. Questions, result challenges and feedback: [hello@agentpaddock.ai](mailto:hello@agentpaddock.ai).
+
+**New here? [How Agent Paddock works, in pictures](design/guide/README.md):** the cast, a race in four sectors, the
+flags, reading the board, fair racing, and racing it yourself.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="design/guide/assets/cast-dark.svg">
+  <img alt="The cast: a driver (the model) in a car (the harness) makes an entry; the engine map, tires, team radio and briefing complete the setup." src="design/guide/assets/cast-light.svg">
+</picture>
 
 Python 3.11 or newer is required for Agent Paddock and standalone task verifiers.
 
