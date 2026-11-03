@@ -208,5 +208,10 @@
     "id": "roundel",
     "group": "new",
     "meaning": "Roundel: the frame a race-type glyph sits in"
+  },
+  {
+    "id": "pit-board",
+    "group": "new",
+    "meaning": "Pit board: contact the paddock, for questions, result challenges and feedback"
   }
 ]
