@@ -113,7 +113,7 @@ def cast(theme):
         out.append(card(x, 150, 344, 150, gid, name, wrap(desc, 22), theme))
     out.append(text(48 + 344 + 16, 236, "+", 34, theme, "muted", 700, anchor="middle"))
     out.append(text(48 + 376 + 344 + 16, 236, "=", 34, theme, "muted", 700, anchor="middle"))
-    kit = [("engine-map", "Engine map", "The effort level: low to max, or the car's default."),
+    kit = [("engine-map", "Engine map", "The effort level, from low to max."),
            ("tires", "Tires", "The tools the car mounts."),
            ("team-radio", "Team radio", "Skills: coaching during the lap."),
            ("briefing", "Briefing", "The instructions before the lap.")]
