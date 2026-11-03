@@ -100,9 +100,10 @@ GLYPHS = [
      f'<rect x="11" y="9" width="9.5" height="3.6" rx="1.8" {AF}/>'),
     ("car", "harness", "cast", "Car: the harness that runs the model", indy_car(helmet=AF)),
     ("entry", "agent+harness", "cast", "Entry: the driver in the car, one model in one harness",
-     # Helmet centered above the cockpit, with a small clear gap.
-     '<path d="M12.6 13.2V11.18a2.59 2.59 0 0 1 5.18 0v.86a1.15 1.15 0 0 1-1.15 1.15z"/>'
-     f'<rect x="14.98" y="10.03" width="2.81" height="1.3" rx=".65" {AF}/>'
+     # Helmet just behind the cockpit hump, with a small clear gap. Maintainer-chosen position: do not recentre it
+     # over the hump, where it merges with the hump at small sizes.
+     '<path d="M14.6 13.2V11.18a2.59 2.59 0 0 1 5.18 0v.86a1.15 1.15 0 0 1-1.15 1.15z"/>'
+     f'<rect x="16.98" y="10.03" width="2.81" height="1.3" rx=".65" {AF}/>'
      + indy_car(oy=3.0)),
     # Grip and coaching
     ("tires", "tool", "grip", "Tires: the tools, the car's grip on the environment",
