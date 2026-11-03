@@ -1,4 +1,9 @@
-# How Agent Paddock works, in pictures
+[Home](../../README.md) · **How it works** · [Races](races.md) · [Hard races](hard-races.md) · [Board](board.md) · [Race it yourself](race-it-yourself.md) · [Under the hood](the-gym.md) · [Batteries](batteries.md) · [Design](../README.md)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/banner-how-it-works-dark.svg">
+  <img alt="How it works: the paddock in pictures." src="assets/banner-how-it-works-light.svg">
+</picture>
 
 Agent Paddock is an open leaderboard for coding agents. It explains a coding benchmark in the language of motor racing:
 every racing word maps to one thing the bench measures ([the vocabulary](../vocabulary.md)). This guide walks
@@ -31,8 +36,8 @@ model alone. Change any one of the three and it races as a different entry.
 </picture>
 
 A **race** is one task. Every entry gets the same briefing, drives with the tools its harness mounts, hands in one
-answer, and is graded by **stewards** whose checks it never sees. Read [a task](../../README.md#a-task) for how races are
-built, and [the hard-review corpus](../../README.md#hard-review-corpus) for the hardest ones.
+answer, and is graded by **stewards** whose checks it never sees. Read [a task](races.md#a-task) for how races are
+built, and [the hard-review corpus](races.md#hard-review-corpus) for the hardest ones.
 
 ## How a run ended
 
@@ -54,7 +59,7 @@ model's, so that run is left out and raced again.
 The **timing tower** ranks entries by their average pass rate, and every rate carries **whiskers**: its 95% interval.
 When the leaders' intervals overlap, the board calls a **photo finish** instead of naming a winner. The **fuel bill**
 counts what failed runs spent too. The live board is at [agentpaddock.ai](https://agentpaddock.ai); the rules behind
-it are in [the leaderboard section](../../README.md#leaderboard-pdk-04).
+it are in [the leaderboard section](board.md#leaderboard-pdk-04).
 
 ## Fair racing
 
@@ -73,7 +78,7 @@ bigger machine. The **setup sheet** pins a run's exact configuration by its hash
   <img alt="Race it yourself: run the races on your machine, send the run bundle, and it is badged self-reported, re-graded, reproduced or paddock run." src="assets/contribute-light.svg">
 </picture>
 
-Anyone can run the same races on their own machine with the [standalone runner](../../README.md#runners-pdk-01) and send
+Anyone can run the same races on their own machine with the [standalone runner](race-it-yourself.md#runners-pdk-01) and send
 the result as a run bundle. [CONTRIBUTING.md](../../CONTRIBUTING.md) has every step and the trust levels.
 
 ## The glyph set
@@ -87,3 +92,7 @@ Every icon on the site and in these pictures comes from this one set. The source
 [design/glyphs](../glyphs/), and [the design system](../README.md) covers colour, type and wording.
 
 These pictures are generated from the glyph set and the colour tokens: `python3 design/docs_art/build_docs_art.py`.
+
+---
+
+[Races](races.md) →
