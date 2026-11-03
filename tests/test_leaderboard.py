@@ -1072,6 +1072,23 @@ def test_entry_hash_round_trip_and_historical_examples():
         )
 
 
+def test_entry_livery_uses_supplied_root(tmp_path):
+    (tmp_path / "design").mkdir()
+    (tmp_path / "design/tokens.json").write_text(
+        json.dumps({"color": {"car-fixture": "#123456"}})
+    )
+    entry = _community_entry()
+    entry["tires"] = json.loads(
+        (lb.MODULE_ROOT / "locks/codex.lock.json").read_text()
+    )
+    entry["livery"]["colour"] = "car-fixture"
+    assert lb.validate_entry(entry, root=tmp_path) == []
+    entry["livery"]["colour"] = "car-codex"
+    assert lb.validate_entry(entry, root=tmp_path) == [
+        "entry.livery: colour must name a car-* livery token"
+    ]
+
+
 @pytest.mark.parametrize("field", ["briefing", "radio"])
 def test_new_entry_must_hash_provenance(field):
     entry = _community_entry()
@@ -1404,6 +1421,40 @@ def test_track_infographic_reuse(community_track):
     ]
 
 
+def test_track_cli_preserves_first_infographic_mapping(
+    community_track, results, monkeypatch, capsys
+):
+    monkeypatch.setattr(lb, "MODULE_ROOT", results.parent)
+    for name, infographic in (
+        ("a-baseline", "coding"),
+        ("b-conflict", "different"),
+        ("c-baseline", "coding"),
+        ("d-conflict", "different"),
+    ):
+        task = results.parent / "tasks" / name
+        shutil.copytree(community_track, task)
+        card = task / "track.toml"
+        card.write_text(
+            card.read_text().replace(
+                'infographic = "coding"', f'infographic = "{infographic}"'
+            )
+        )
+    assert lb.main(["--results", str(results), "validate-track"]) == 1
+    errors = capsys.readouterr().err.splitlines()
+    assert [
+        error for error in errors if "conflicting infographic ids" in error
+    ] == [
+        "b-conflict: challenge has conflicting infographic ids",
+        "d-conflict: challenge has conflicting infographic ids",
+    ]
+    assert [
+        error for error in errors if "must reuse its infographic id" in error
+    ] == [
+        "b-conflict: track: existing challenge must reuse its infographic id",
+        "d-conflict: track: existing challenge must reuse its infographic id",
+    ]
+
+
 @pytest.mark.parametrize("level", lb.TRUST_LEVELS[1:])
 @pytest.mark.parametrize("missing", ["evidence", "sign_off"])
 def test_elevated_trust_requires_evidence_and_sign_off(results, level, missing):
@@ -1552,6 +1603,29 @@ def test_community_cli_commands(community_track):
             assert json.loads(proc.stdout)["conditions"]["network"] == "bridge"
         if command[0] == "validate-track":
             assert "checkpoints unverified" in proc.stderr
+
+
+@pytest.mark.parametrize("entry_id", [None, "INVALID"])
+def test_entry_cli_filename_check_requires_valid_entry(tmp_path, capsys, entry_id):
+    source = next((lb.DEFAULT_RESULTS / "entries").glob("*.toml")).read_text()
+    invalid = tmp_path / "invalid.toml"
+    invalid.write_text(
+        "\n".join(
+            (f'id = "{entry_id}"' if entry_id is not None else "")
+            if line.startswith("id = ")
+            else line
+            for line in source.splitlines()
+        )
+    )
+    mismatch = tmp_path / "mismatch.toml"
+    mismatch.write_text(source)
+    problems = lb.validate_entry(lb.read_toml(invalid))
+    assert problems
+    assert lb.main(["validate-entry", str(invalid), str(mismatch)]) == 1
+    assert capsys.readouterr().err.splitlines() == [
+        *(f"invalid.toml: {problem}" for problem in problems),
+        "mismatch.toml: filename must match id",
+    ]
 
 
 @pytest.mark.parametrize(

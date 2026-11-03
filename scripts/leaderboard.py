@@ -838,7 +838,7 @@ def validate_entry(raw: Any, *, root: Path = MODULE_ROOT) -> list[str]:
         if not (_is_count(livery["number"]) and 1 <= livery["number"] <= 99):
             errors.append("entry.livery: number must be 1 to 99")
         if "colour" in livery:
-            tokens = json.loads((MODULE_ROOT / "design" / "tokens.json").read_text())
+            tokens = json.loads((root / "design" / "tokens.json").read_text())
             if not _choice(
                 livery["colour"],
                 [name for name in tokens["color"] if name.startswith("car-")],
@@ -1822,11 +1822,9 @@ def _cmd_community(args: argparse.Namespace) -> int:
         paths = args.paths or sorted((args.results / "entries").glob("*.toml"))
         for path in paths:
             raw = read_toml(path)
-            errors.extend(
-                f"{path.name}: {error}"
-                for error in validate_entry(raw, root=args.results.parent)
-            )
-            if raw.get("id") != path.stem:
+            problems = validate_entry(raw, root=args.results.parent)
+            errors.extend(f"{path.name}: {error}" for error in problems)
+            if not problems and raw.get("id") != path.stem:
                 errors.append(f"{path.name}: filename must match id")
     else:
         paths = args.task_dirs or [
@@ -1847,7 +1845,8 @@ def _cmd_community(args: argparse.Namespace) -> int:
                     errors.append(
                         f"{path.parent.name}: challenge has conflicting infographic ids"
                     )
-                infographic_ids[challenge] = infographic
+                if challenge not in infographic_ids:
+                    infographic_ids[challenge] = infographic
         for path in paths:
             problems, warnings = validate_track(
                 path, results.records, infographic_ids=infographic_ids
