@@ -224,8 +224,9 @@ characters of already-redacted `psql` stderr when available.
 
 Pure stdlib core — no worker pool or ledger needed to grade a synthetic trajectory:
 
+Run from the repository root:
+
 ```bash
-cd modules/adversarial-eval-gym
 python3.13 -m venv /tmp/gym-venv && /tmp/gym-venv/bin/pip install pytest
 /tmp/gym-venv/bin/python -m pytest tests -q
 ```

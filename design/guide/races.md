@@ -377,7 +377,7 @@ removal, rather than rename-only recovery.
 
 `tasks/rca-*` are RCA bench tasks seeded from real Agent OS incidents. Each
 stages a **redacted incident artifact** (logs / config) under `incident/`, then
-asks the persona to name the root cause from a **closed-set enum** and cite the
+asks the persona to name the root cause from a **closed-set enum** and cite
 an **evidence id** in the artifact that proves it. The artifact carries planted
 **red herrings** — the plausible-but-wrong theories the responders actually
 chased — and every red herring is also an enum value, so a wrong answer is

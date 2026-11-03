@@ -237,8 +237,9 @@ the SQLite standby.
 
 A dispatched cell is also priced (MEG-03, `gym/cost.py`). `cost_usd` prices the
 metrics at the majority model's published rates in SEW's one price table
-(`tools/searchlight/config/price-table.yaml`, loaded through (private submodule; optional overlay, initialized by declared consumers).
-`sew.cost_model.load_price_table`). The input column is total input, so it is
+(`tools/searchlight/config/price-table.yaml`, loaded through
+`sew.cost_model.load_price_table`; private submodule, optional overlay initialized
+by declared consumers). The input column is total input, so it is
 split into disjoint buckets: fresh input (`token_usage_input` minus cache reads)
 at the input rate, cache reads at the cached-input rate, output at the output
 rate. Reasoning is priced once. For both `codex` and `claude-code`, the ledger's

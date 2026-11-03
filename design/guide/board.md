@@ -53,8 +53,13 @@ python3 scripts/leaderboard.py validate          # schema-check results/
 python3 scripts/build_site.py                    # write site/ (gitignored); open site/index.html
 python3 scripts/build_site.py --check            # fail if site/ or the share card is stale
 python3 scripts/render_social_card.py            # re-render scripts/social-card.png (Chrome, network)
-python3 scripts/import_eval_bench.py --reports ../../docs/reports --check
+python3 scripts/import_eval_bench.py --reports /path/to/exported-reports --check
 ```
+
+Run these commands from the repository root. For the importer, replace
+`/path/to/exported-reports` with the directory containing the published raw
+eval-bench JSON exports listed in `scripts/import_eval_bench.py`; those source
+exports are not included in this repository.
 
 The build fails with a render command if the committed share card is missing.
 The renderer discovers Chrome automatically; `CHROME` overrides discovery with
