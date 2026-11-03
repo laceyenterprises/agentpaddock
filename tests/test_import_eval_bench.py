@@ -257,6 +257,34 @@ def test_haiku_model_labels(label, suffix, reasoning):
     }
 
 
+@pytest.mark.parametrize(
+    "label",
+    ["openrouter/qwen3.8-27b", import_eval_bench.PROXY_PREFIX + "openrouter/qwen3.8-27b"],
+)
+def test_openrouter_qwen_labels(label):
+    # Hermes names the route directly; the proxy harnesses add the proxy prefix.
+    assert import_eval_bench.model_of(label) == {
+        "provider_id": "openrouter/qwen3.8-27b",
+        "reasoning": None,
+    }
+
+
+def test_hermes_worker_class_is_a_proxy_harness():
+    assert import_eval_bench.descriptor("hermes") == {
+        "harness": "hermes",
+        "model_transport": "openai-compatible-proxy",
+        "runner": import_eval_bench.RUNNER,
+        "worker_class": "hermes",
+    }
+
+
+def test_hermes_placeholder_model_is_rejected():
+    # The class default "hermes-agent" names no model; refusing it keeps a row
+    # without model proof out of the results.
+    with pytest.raises(import_eval_bench.SourceError, match="unknown model label"):
+        import_eval_bench.model_of("hermes-agent")
+
+
 def test_unknown_model_label_is_rejected():
     with pytest.raises(import_eval_bench.SourceError, match="unknown model label"):
         import_eval_bench.model_of("synthetic/unknown-model-high")

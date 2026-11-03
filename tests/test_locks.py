@@ -124,7 +124,8 @@ def test_check_passes_on_matching_surface(locks_dir):
 
 
 @pytest.mark.parametrize(
-    "agent", ["oss-codex", "oss-claude-code", "oss-opencode", "oss-pi", "oss-local"]
+    "agent",
+    ["oss-codex", "oss-claude-code", "oss-opencode", "oss-pi", "oss-local", "hermes"],
 )
 def test_shipped_oss_lock_matches_registry(agent):
     registry_path = REPO_ROOT / "modules" / "worker-pool" / "worker-classes.json"

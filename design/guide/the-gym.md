@@ -155,9 +155,9 @@ A model run stores a JSON record under `$HQ_ROOT/gym/results/<model-hash>/`,
 including the exact model ID and model-qualified verdict keys. The command
 prints the result path; it does not update the established baseline. Before
 dispatch, the lock check uses the worker class the task will actually run on,
-including `--worker-class` overrides. The four OSS harness classes and
-`oss-local` each have a committed lock in `locks/`; a missing or drifted class
-lock aborts the suite.
+including `--worker-class` overrides. The four OSS harness classes, `hermes`
+and `oss-local` each have a committed lock in `locks/`; a missing or drifted
+class lock aborts the suite.
 
 `gym-baseline.json` now ships with the AMF-08 first-green baseline established.
 The operator runs `hq gym baseline update --confirm` whenever the last-known-good
