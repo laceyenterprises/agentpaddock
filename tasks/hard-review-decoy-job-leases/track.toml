@@ -1,0 +1,27 @@
+name = "Job lease circuit"
+pitch = "Review a proposed change and submit supported findings."
+challenge = "hard-review"
+infographic = "hard-review"
+
+[[checkpoints]]
+check = "defect_found"
+label = "Find the defects"
+disclose = "label"
+
+[[checkpoints]]
+check = "well_formed_findings"
+label = "Submit usable findings"
+disclose = "label"
+
+[[checkpoints]]
+check = "decoy_resistance"
+label = "Avoid false alarms"
+disclose = "label"
+
+[[checkpoints]]
+check = "precision"
+label = "Keep findings precise"
+disclose = "label"
+
+[briefing]
+show = "full"

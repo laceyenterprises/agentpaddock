@@ -1,0 +1,20 @@
+# Copy beside task.toml. All fields here are authored public copy.
+# Never include verifier descriptions, reasons, answer values, defect/decoy
+# locations, or content from expected/ or hidden/.
+name = ""
+pitch = "" # One sentence on the work; no hints at the answer.
+challenge = "" # Exactly task.toml's suite.
+infographic = "" # Reuse the challenge's existing id; new types name a new id.
+
+[[checkpoints]] # Repeat in lap order using the verifier's recorded names.
+check = ""
+label = "" # Plain words suitable for public display.
+disclose = "label" # label: public label/rate; count: N more checks; hidden: omit.
+# Unlisted recorded checks also contribute to N more checks.
+# Docs fact names should use count, since names can reveal required facts.
+
+[briefing]
+show = "full" # Default if omitted: full. Also excerpt or none.
+# Presentation policy only; prompt.md is already public. Derived JSON never
+# embeds prompt text. Static facts, conditions and live results are derived by
+# track-facts, never added here. Community tracks begin as exhibition (no standings).

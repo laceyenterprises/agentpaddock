@@ -36,6 +36,7 @@ import math
 import re
 import sys
 import tempfile
+import tomllib
 import zlib
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -89,6 +90,7 @@ DOCUMENT_KEYS = {
     "records",
 }
 SOURCE_KEYS = {"kind", "description", "evidence"}
+RECORD_OPTIONAL_KEYS = {"checks", "entry", "track"}
 RECORD_KEYS = {
     "run_id",
     "suite",
@@ -163,7 +165,10 @@ def canonical_json(value: Any) -> str:
 
 def config_hash(descriptor: Mapping[str, Any]) -> str:
     """The ``sha256:`` hash of a harness configuration descriptor's canonical JSON."""
-    return "sha256:" + hashlib.sha256(canonical_json(descriptor).encode("utf-8")).hexdigest()
+    return (
+        "sha256:"
+        + hashlib.sha256(canonical_json(descriptor).encode("utf-8")).hexdigest()
+    )
 
 
 def _is_count(value: Any) -> bool:
@@ -225,7 +230,9 @@ def validate_price_table(name: str, raw: Any) -> list[str]:
     if raw["schema"] != PRICE_SCHEMA:
         errors.append(f"{where}: schema must be {PRICE_SCHEMA}")
     if not match or raw["date"] != match.group(1):
-        errors.append(f"{where}: file name must be <date>.json matching date {raw['date']!r}")
+        errors.append(
+            f"{where}: file name must be <date>.json matching date {raw['date']!r}"
+        )
     if raw["currency"] != "USD" or raw["unit"] != "usd_per_million_tokens":
         errors.append(f"{where}: prices are USD per million tokens")
     if not isinstance(raw["models"], dict):
@@ -244,7 +251,9 @@ def validate_price_table(name: str, raw: Any) -> list[str]:
             if any(rate is not None for rate in rates):
                 errors.append(f"{at}: an unknown source carries no rate")
         elif not all(_is_number(rate) and rate >= 0 for rate in rates):
-            errors.append(f"{at}: a {entry['source']} price needs input, cache and output rates")
+            errors.append(
+                f"{at}: a {entry['source']} price needs input, cache and output rates"
+            )
         if not (isinstance(entry["as_of"], str) and DATE.match(entry["as_of"])):
             errors.append(f"{at}: as_of must be an ISO date")
         elif entry["as_of"] > raw["date"]:
@@ -364,7 +373,9 @@ def validate_fairness(raw: Any) -> list[str]:
         for index, item in enumerate(checklist):
             if _keys(f"{where}: checklist[{index}]", item, {"id", "check"}, errors):
                 if not (_text(item["id"]) and _text(item["check"])):
-                    errors.append(f"{where}: checklist[{index}] needs an id and a check")
+                    errors.append(
+                        f"{where}: checklist[{index}] needs an id and a check"
+                    )
                 elif item["id"] in check_ids:
                     errors.append(f"{where}: checklist ids must be unique")
                 else:
@@ -377,7 +388,11 @@ def validate_fairness(raw: Any) -> list[str]:
     for index, audit in enumerate(audits):
         at = f"{where}: audits[{index}]"
         # Legacy pending entries may omit the additive evidence and sign-off fields.
-        optional = {"evidence", "sign_off"} & audit.keys() if isinstance(audit, dict) else set()
+        optional = (
+            {"evidence", "sign_off"} & audit.keys()
+            if isinstance(audit, dict)
+            else set()
+        )
         if not _keys(at, audit, AUDIT_KEYS | optional, errors):
             continue
         if not _text(audit["harness"]):
@@ -425,12 +440,18 @@ def validate_fairness(raw: Any) -> list[str]:
             else:
                 seen_checks.add(check_id)
             if item["status"] not in CHECK_STATUSES:
-                errors.append(f"{check_at}: status must be one of {', '.join(CHECK_STATUSES)}")
+                errors.append(
+                    f"{check_at}: status must be one of {', '.join(CHECK_STATUSES)}"
+                )
             all_pass = all_pass and item["status"] == "pass"
             if not _text(item["notes"]):
                 errors.append(f"{check_at}: notes must explain the finding")
             sources = item["sources"]
-            if not isinstance(sources, list) or not sources or not all(_text(s) for s in sources):
+            if (
+                not isinstance(sources, list)
+                or not sources
+                or not all(_text(s) for s in sources)
+            ):
                 errors.append(f"{check_at}: sources must contain evidence references")
             elif not all(valid_fairness_source(s) for s in sources):
                 errors.append(
@@ -458,8 +479,25 @@ def validate_document(
 ) -> list[str]:
     """Every schema problem in one results document; empty when it is valid."""
     errors: list[str] = []
-    if not _keys(name, raw, DOCUMENT_KEYS, errors):
+    if not _keys(
+        name,
+        raw,
+        DOCUMENT_KEYS | ({"answers_bundle"} & raw.keys())
+        if isinstance(raw, dict)
+        else DOCUMENT_KEYS,
+        errors,
+    ):
         return errors
+    if "answers_bundle" in raw:
+        bundle = raw["answers_bundle"]
+        at = f"{name}: answers_bundle"
+        if _keys(at, bundle, {"sha256", "key_id"}, errors):
+            if not isinstance(bundle["sha256"], str) or not re.fullmatch(
+                r"[0-9a-fA-F]{64}", bundle["sha256"]
+            ):
+                errors.append(f"{at}: sha256 must be 64 hex characters")
+            if not _text(bundle["key_id"]):
+                errors.append(f"{at}: key_id must be a non-empty string")
     match = RESULT_NAME.match(name)
     if raw["schema"] != SCHEMA:
         errors.append(f"{name}: schema must be {SCHEMA}")
@@ -468,7 +506,16 @@ def validate_document(
             f"{name}: file name must be <date>-<id>.json or <date>-<id>.json.gz from its date and id"
         )
     source = raw["source"]
-    if _keys(f"{name}: source", source, SOURCE_KEYS, errors):
+    if _keys(
+        f"{name}: source",
+        source,
+        SOURCE_KEYS | ({"fork"} & source.keys())
+        if isinstance(source, dict)
+        else SOURCE_KEYS,
+        errors,
+    ):
+        if "fork" in source:
+            _validate_pin(f"{name}: source.fork", source["fork"], errors)
         if source["kind"] not in SOURCE_KINDS:
             errors.append(
                 f"{name}: source.kind must be one of {', '.join(SOURCE_KINDS)}"
@@ -519,15 +566,35 @@ def _validate_record(
     import_kind: bool,
     errors: list[str],
 ) -> None:
-    if not _keys(at, record, RECORD_KEYS, errors):
+    if not _keys(
+        at,
+        record,
+        RECORD_KEYS | (RECORD_OPTIONAL_KEYS & record.keys())
+        if isinstance(record, dict)
+        else RECORD_KEYS,
+        errors,
+    ):
         return
+    if "checks" in record:
+        _validate_checks(at, record["checks"], errors)
+    if "entry" in record and not valid_id(record["entry"]):
+        errors.append(f"{at}: entry must be an entry id")
+    if "track" in record:
+        _validate_pin(f"{at}: track", record["track"], errors, track=True)
+        if (
+            isinstance(record["track"], dict)
+            and record["track"].get("task_version") != record["task_version"]
+        ):
+            errors.append(f"{at}: track.task_version disagrees with record")
     for key in ("run_id", "suite", "task"):
         if not _text(record[key]):
             errors.append(f"{at}: {key} is required")
     version = record["task_version"]
     if not (_is_count(version) and version >= 1):
         errors.append(f"{at}: task_version must be a positive integer")
-    if record["attempt"] is not None and not (_is_count(record["attempt"]) and record["attempt"]):
+    if record["attempt"] is not None and not (
+        _is_count(record["attempt"]) and record["attempt"]
+    ):
         errors.append(f"{at}: attempt must be a positive integer or null")
     harness = record["harness"]
     if _keys(f"{at}: harness", harness, HARNESS_KEYS, errors):
@@ -536,11 +603,14 @@ def _validate_record(
         if harness["version"] is not None and not _text(harness["version"]):
             errors.append(f"{at}: harness.version must be a string or null")
         if not (
-            isinstance(harness["config_hash"], str) and CONFIG_HASH.match(harness["config_hash"])
+            isinstance(harness["config_hash"], str)
+            and CONFIG_HASH.match(harness["config_hash"])
         ):
             errors.append(f"{at}: harness.config_hash must be sha256:<64 hex>")
         elif harness["config_hash"] not in configs:
-            errors.append(f"{at}: harness.config_hash has no descriptor in harness_configs")
+            errors.append(
+                f"{at}: harness.config_hash has no descriptor in harness_configs"
+            )
     model = record["model"]
     provider_id = None
     if _keys(f"{at}: model", model, MODEL_KEYS, errors):
@@ -558,8 +628,12 @@ def _validate_record(
         errors.append(f"{at}: score must be in [0, 1] or null")
     tokens = record["tokens"]
     if _keys(f"{at}: tokens", tokens, set(TOKEN_KEYS), errors):
-        if any(tokens[key] is not None and not _is_count(tokens[key]) for key in TOKEN_KEYS):
-            errors.append(f"{at}: token counts are non-negative integers or null, never guessed")
+        if any(
+            tokens[key] is not None and not _is_count(tokens[key]) for key in TOKEN_KEYS
+        ):
+            errors.append(
+                f"{at}: token counts are non-negative integers or null, never guessed"
+            )
     wall = record["wall_seconds"]
     if wall is not None and not (_is_number(wall) and wall >= 0):
         errors.append(f"{at}: wall_seconds must be a non-negative number or null")
@@ -575,7 +649,9 @@ def _validate_record(
         and verdict in INFRA_VERDICTS
         and not (isinstance(excluded, str) and INFRA_TAG.match(excluded))
     ):
-        errors.append(f"{at}: an infrastructure row carries excludedBecause 'infra:<reason>'")
+        errors.append(
+            f"{at}: an infrastructure row carries excludedBecause 'infra:<reason>'"
+        )
     elif excluded is not None and not (
         isinstance(excluded, str) and (INFRA_TAG.match(excluded) or excluded in tags)
     ):
@@ -590,7 +666,9 @@ def _validate_record(
         and isinstance(provider_id, str)
     ):
         if cost["source"] not in PRICE_SOURCES:
-            errors.append(f"{at}: cost.source must be one of {', '.join(PRICE_SOURCES)}")
+            errors.append(
+                f"{at}: cost.source must be one of {', '.join(PRICE_SOURCES)}"
+            )
         elif cost["source"] == UNKNOWN and cost["usd"] is not None:
             errors.append(f"{at}: a cost with an unknown source has no dollar figure")
         expected = price_cost(tokens, provider_id, table)
@@ -599,6 +677,633 @@ def _validate_record(
                 f"{at}: cost {canonical_json(cost)} differs from the price table's "
                 f"{canonical_json(expected)}"
             )
+
+
+# ---------------------------------------------------------------- community contracts
+
+ENTRY_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+TRUST_LEVELS = ("self-reported", "re-graded", "reproduced", "paddock-run")
+# Frozen legacy descriptors: these predate briefing and radio provenance. Never
+# extend this exception for a new configuration or rewrite an old descriptor.
+LEGACY_CONFIG_HASHES = frozenset(
+    {
+        "sha256:034ed3a1794b154f2a8b7822a6728298c302de53b98f7eb09b24c3e666a85d4a",
+        "sha256:3437a9e6d04d0a214fd46efffb53ea7d0617b5d6be8158647856a4e439f4e887",
+        "sha256:357da891ff08c6bf2db0dd39cf8a29193f0a35a9929e35d89e40e3a9d6101e30",
+        "sha256:b2396403d5070ceacbf491e01a7b44b0ccd37e3755eedcc0154f296e96174b86",
+        "sha256:c32a950b903e12ba3399458aa509c8f02518f8cc08a9afc4c7f853b77534b054",
+        "sha256:cb391ae903fcddac1aa7d7db54bd6a8d713c0f3ac635d5d31188d87500640832",
+        "sha256:da41c66ef7d982fd474eeb1f21329b5d88f6e4f9b268a552d125c22703a57066",
+        "sha256:ecb67e4e298da26d48499874b7ebaf6cf9f5741aefb7786700e6ac3b4337b465",
+    }
+)
+
+
+def valid_id(value: Any) -> bool:
+    return isinstance(value, str) and ENTRY_ID.fullmatch(value) is not None
+
+
+def _choice(value: Any, choices: Iterable[str]) -> bool:
+    return isinstance(value, str) and value in choices
+
+
+def _sha(value: Any) -> bool:
+    return isinstance(value, str) and CONFIG_HASH.fullmatch(value) is not None
+
+
+def _validate_checks(at: str, checks: Any, errors: list[str]) -> None:
+    if not isinstance(checks, list):
+        errors.append(f"{at}: checks must be a list")
+        return
+    names = set()
+    for check in checks:
+        if not _keys(f"{at}: check", check, {"name", "ok", "required"}, errors):
+            continue
+        if (
+            not _text(check["name"])
+            or not isinstance(check["ok"], bool)
+            or not isinstance(check["required"], bool)
+        ):
+            errors.append(f"{at}: check needs a name and boolean ok/required")
+        elif check["name"] in names:
+            errors.append(f"{at}: duplicate check name")
+        else:
+            names.add(check["name"])
+
+
+def _validate_pin(
+    at: str, value: Any, errors: list[str], *, track: bool = False
+) -> None:
+    keys = {"repository", "commit"} | (
+        {"path", "task_version", "sha256"} if track else set()
+    )
+    if not _keys(at, value, keys, errors):
+        return
+    repository = value["repository"]
+    try:
+        parsed = urlsplit(repository) if isinstance(repository, str) else None
+        valid_url = bool(
+            parsed
+            and parsed.scheme == "https"
+            and parsed.hostname
+            and parsed.username is None
+            and parsed.password is None
+            and not parsed.query
+            and not parsed.fragment
+            and not any(c.isspace() for c in repository)
+        )
+    except ValueError:
+        valid_url = False
+    if not valid_url:
+        errors.append(
+            f"{at}: repository must be an HTTPS URL without credentials, query or fragment"
+        )
+    if not isinstance(value["commit"], str) or not re.fullmatch(
+        r"[0-9a-f]{40}", value["commit"]
+    ):
+        errors.append(f"{at}: commit must be 40 lowercase hex characters")
+    if track:
+        path = value["path"]
+        if (
+            not isinstance(path, str)
+            or not path
+            or path.startswith("/")
+            or "\\" in path
+            or any(
+                part in ("", ".", "..", "expected", "hidden")
+                for part in path.split("/")
+            )
+            or not path.endswith("/track.toml")
+        ):
+            errors.append(f"{at}: path must be a relative public track.toml path")
+        if not (_is_count(value["task_version"]) and value["task_version"] >= 1):
+            errors.append(f"{at}: task_version must be positive")
+        if not _sha(value["sha256"]):
+            errors.append(f"{at}: sha256 must be sha256:<64 hex> of track.toml bytes")
+
+
+def read_toml(path: Path) -> dict[str, Any]:
+    try:
+        return tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ResultsError(f"{path.name}: cannot read TOML") from exc
+
+
+def descriptor_hash_matches(descriptor: Mapping[str, Any], key: Any) -> bool:
+    try:
+        json.dumps(descriptor, allow_nan=False)
+        return config_hash(descriptor) == key
+    except (TypeError, ValueError):
+        # TOML supports dates and infinities; a descriptor must be finite JSON.
+        return False
+
+
+def validate_entry(raw: Any, *, root: Path = MODULE_ROOT) -> list[str]:
+    """Validate one setup sheet, including the canonical descriptor hash."""
+    errors: list[str] = []
+    if not _keys(
+        "entry",
+        raw,
+        {
+            "id",
+            "display_name",
+            "team",
+            "livery",
+            "driver",
+            "car",
+            "tires",
+            "briefing",
+            "radio",
+        },
+        errors,
+    ):
+        return errors
+    if not valid_id(raw["id"]):
+        errors.append("entry: id must be lowercase letters, digits and hyphens")
+    if not _text(raw["display_name"]):
+        errors.append("entry: display_name is required")
+    if not isinstance(raw["team"], str) or not re.fullmatch(
+        r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?", raw["team"]
+    ):
+        errors.append("entry: team must be a GitHub user or organisation")
+    livery = raw["livery"]
+    if _keys(
+        "entry.livery",
+        livery,
+        {"number"} | ({"colour"} & livery.keys())
+        if isinstance(livery, dict)
+        else {"number"},
+        errors,
+    ):
+        if not (_is_count(livery["number"]) and 1 <= livery["number"] <= 99):
+            errors.append("entry.livery: number must be 1 to 99")
+        if "colour" in livery:
+            tokens = json.loads((root / "design" / "tokens.json").read_text())
+            if not _choice(
+                livery["colour"],
+                [name for name in tokens["color"] if name.startswith("car-")],
+            ):
+                errors.append("entry.livery: colour must name a car-* livery token")
+    driver = raw["driver"]
+    if _keys("entry.driver", driver, {"provider_id", "engine_map"}, errors):
+        if not isinstance(driver["provider_id"], str) or not PROVIDER_ID.fullmatch(
+            driver["provider_id"]
+        ):
+            errors.append("entry.driver: provider_id must look like provider/model")
+        if not _choice(
+            driver["engine_map"],
+            (
+                "default",
+                "minimal",
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max",
+                "ultra",
+            ),
+        ):
+            errors.append(
+                "entry.driver: engine_map must be a reasoning level or default"
+            )
+    car = raw["car"]
+    if _keys(
+        "entry.car", car, {"harness", "version", "descriptor", "config_hash"}, errors
+    ):
+        if not _text(car["harness"]) or not _text(car["version"]):
+            errors.append("entry.car: harness and version (or unrecorded) are required")
+        descriptor = car["descriptor"]
+        if not isinstance(descriptor, dict) or not descriptor_hash_matches(
+            descriptor, car["config_hash"]
+        ):
+            errors.append("entry.car: config_hash disagrees with descriptor")
+        elif descriptor.get("harness") != car["harness"]:
+            errors.append("entry.car: descriptor harness disagrees")
+        elif car["config_hash"] not in LEGACY_CONFIG_HASHES:
+            if (
+                descriptor.get("briefing") != raw["briefing"]
+                or descriptor.get("radio") != raw["radio"]
+            ):
+                errors.append(
+                    "entry.car: new descriptors must include the exact briefing and radio"
+                )
+            if raw["briefing"] == {"kind": "unrecorded"} or raw["radio"] == {
+                "status": "unrecorded"
+            }:
+                errors.append(
+                    "entry: unrecorded briefing/radio is only for legacy descriptors"
+                )
+    tires = raw["tires"]
+    if isinstance(tires, dict) and set(tires) == {"lock"}:
+        lock = tires["lock"]
+        if not isinstance(lock, str) or not re.fullmatch(
+            r"locks/[a-z0-9-]+\.lock\.json", lock
+        ):
+            errors.append("entry.tires: lock must be locks/<name>.lock.json")
+        else:
+            try:
+                _validate_tool_surface(json.loads((root / lock).read_text()), errors)
+            except (OSError, ValueError):
+                errors.append("entry.tires: lock cannot be read")
+    else:
+        _validate_tool_surface(tires, errors)
+    briefing = raw["briefing"]
+    if briefing not in ({"kind": "vendor-default"}, {"kind": "unrecorded"}):
+        if _keys("entry.briefing", briefing, {"sha256", "summary"}, errors):
+            if (
+                not _sha(briefing["sha256"])
+                or not _text(briefing["summary"])
+                or "\n" in briefing["summary"]
+            ):
+                errors.append(
+                    "entry.briefing: needs sha256 and one-line public summary"
+                )
+    radio = raw["radio"]
+    if radio != {"status": "unrecorded"}:
+        if _keys("entry.radio", radio, {"skills"}, errors):
+            if not isinstance(radio["skills"], list):
+                errors.append("entry.radio: skills must be a list")
+            else:
+                for skill in radio["skills"]:
+                    if (
+                        not isinstance(skill, dict)
+                        or set(skill) not in ({"name", "version"}, {"name", "sha256"})
+                        or not _text(skill.get("name"))
+                        or ("version" in skill and not _text(skill["version"]))
+                        or ("sha256" in skill and not _sha(skill["sha256"]))
+                    ):
+                        errors.append(
+                            "entry.radio: each skill needs name and version or sha256"
+                        )
+    if (
+        isinstance(car, dict)
+        and _sha(car.get("config_hash"))
+        and car["config_hash"] in LEGACY_CONFIG_HASHES
+    ):
+        if briefing != {"kind": "unrecorded"} or radio != {"status": "unrecorded"}:
+            errors.append(
+                "entry: legacy descriptors require unrecorded briefing and radio"
+            )
+    return errors
+
+
+def _validate_tool_surface(raw: Any, errors: list[str]) -> None:
+    if _keys("entry.tires", raw, {"schema", "agent", "tools"}, errors):
+        tools = raw["tools"]
+        if (
+            raw["schema"] != "gym-tool-surface-lock/v1"
+            or not _text(raw["agent"])
+            or not isinstance(tools, list)
+            or any(not _text(tool) for tool in tools)
+        ):
+            errors.append("entry.tires: invalid tool-surface lock")
+
+
+def entry_matches(entry: Mapping[str, Any], record: Mapping[str, Any]) -> bool:
+    return (
+        entry["driver"]["provider_id"] == record["model"]["provider_id"]
+        and entry["driver"]["engine_map"] == (record["model"]["reasoning"] or "default")
+        and entry["car"]["config_hash"] == record["harness"]["config_hash"]
+        and entry["car"]["harness"] == record["harness"]["name"]
+    )
+
+
+def load_entries(results_dir: Path, errors: list[str]) -> dict[str, Any]:
+    entries = {}
+    for path in sorted((results_dir / "entries").glob("*.toml")):
+        try:
+            raw = read_toml(path)
+            problems = validate_entry(raw, root=results_dir.parent)
+            errors.extend(f"entries/{path.name}: {problem}" for problem in problems)
+            if not problems:
+                if raw["id"] != path.stem:
+                    errors.append(f"entries/{path.name}: filename must match id")
+                entries[raw["id"]] = raw
+        except ResultsError as exc:
+            errors.append(str(exc))
+    return entries
+
+
+def validate_trust(raw: Any, documents: Mapping[str, Any]) -> list[str]:
+    errors: list[str] = []
+    if not _keys("meta/trust.json", raw, {"schema", "documents"}, errors):
+        return errors
+    if raw["schema"] != "paddock-trust/v1" or not isinstance(raw["documents"], dict):
+        return ["meta/trust.json: invalid schema or documents mapping"]
+    for name, trust in raw["documents"].items():
+        at = f"meta/trust.json: {name}"
+        if name not in documents:
+            errors.append(f"{at}: unknown results document")
+        if not _keys(at, trust, {"level", "evidence", "sign_off"}, errors):
+            continue
+        if not _choice(trust["level"], TRUST_LEVELS):
+            errors.append(f"{at}: invalid trust level")
+        evidence = trust["evidence"]
+        if not isinstance(evidence, list) or any(
+            not isinstance(item, str) or not valid_fairness_source(item)
+            for item in evidence
+        ):
+            errors.append(
+                f"{at}: evidence must be a list of public evidence references"
+            )
+        if trust["sign_off"] is not None and not _text(trust["sign_off"]):
+            errors.append(f"{at}: sign_off must be text or null")
+        if trust["level"] != "self-reported" and (
+            not evidence or not _text(trust["sign_off"])
+        ):
+            errors.append(
+                f"{at}: elevated trust requires evidence and maintainer sign_off"
+            )
+    return errors
+
+
+def _load_gym() -> None:
+    if "gym" not in sys.modules:
+        package_dir = MODULE_ROOT / "lib" / "python" / "gym"
+        spec = importlib.util.spec_from_file_location(
+            "gym",
+            package_dir / "__init__.py",
+            submodule_search_locations=[str(package_dir)],
+        )
+        if spec is None or spec.loader is None:
+            raise ResultsError("cannot load gym contracts")
+        package = importlib.util.module_from_spec(spec)
+        sys.modules["gym"] = package
+        try:
+            spec.loader.exec_module(package)
+        except Exception:
+            sys.modules.pop("gym", None)
+            raise
+
+
+def _task_records(
+    task: Any, records: Iterable[Mapping[str, Any]]
+) -> list[Mapping[str, Any]]:
+    # External pins never silently pool with a local task sharing the same id.
+    return [
+        record
+        for record in records
+        if "track" not in record
+        and record["task"] == task.id
+        and record["suite"] == task.suite
+        and record["task_version"] == task.task_version
+    ]
+
+
+def validate_track(
+    task_dir: Path,
+    records: Iterable[Mapping[str, Any]] = (),
+    *,
+    infographic_ids: Mapping[str, str] | None = None,
+) -> tuple[list[str], list[str]]:
+    """Validate authored fields only; never execute or inspect verifier source."""
+    _load_gym()
+    from gym.schema import load_task, TaskSchemaError
+
+    errors: list[str] = []
+    warnings: list[str] = []
+    try:
+        task = load_task(task_dir)
+        card = read_toml(task_dir / "track.toml")
+    except (ResultsError, TaskSchemaError, OSError):
+        return ["cannot read task.toml or track.toml"], warnings
+    if not _keys(
+        "track",
+        card,
+        {"name", "pitch", "challenge", "infographic", "checkpoints"}
+        | ({"briefing"} & card.keys()),
+        errors,
+    ):
+        return errors, warnings
+    for key in ("name", "pitch", "infographic"):
+        if not _text(card[key]) or "\n" in card[key]:
+            errors.append(f"track: {key} must be one line of public text")
+    if card["challenge"] != task.suite:
+        errors.append("track: challenge must equal task suite")
+    if (
+        infographic_ids
+        and task.suite in infographic_ids
+        and card["infographic"] != infographic_ids[task.suite]
+    ):
+        errors.append("track: existing challenge must reuse its infographic id")
+    if "briefing" in card and _keys(
+        "track.briefing", card["briefing"], {"show"}, errors
+    ):
+        if not _choice(card["briefing"]["show"], ("full", "excerpt", "none")):
+            errors.append("track.briefing: show must be full, excerpt or none")
+    rows = [row for row in _task_records(task, records) if "checks" in row]
+    names = {check["name"] for row in rows for check in row.get("checks", [])}
+    if not rows:
+        warnings.append("checkpoints unverified")
+    checkpoints = card["checkpoints"]
+    if not isinstance(checkpoints, list):
+        errors.append("track: checkpoints must be a list")
+        return errors, warnings
+    seen = set()
+    for checkpoint in checkpoints:
+        if not _keys(
+            "track.checkpoint", checkpoint, {"check", "label", "disclose"}, errors
+        ):
+            continue
+        check = checkpoint["check"]
+        if (
+            not _text(check)
+            or not _text(checkpoint["label"])
+            or "\n" in checkpoint["label"]
+        ):
+            errors.append("track: checkpoint check and plain label are required")
+            continue
+        if check in seen:
+            errors.append("track: duplicate checkpoint")
+        seen.add(check)
+        if not _choice(checkpoint["disclose"], ("label", "count", "hidden")):
+            errors.append("track: disclose must be label, count or hidden")
+        if rows and check not in names:
+            errors.append(
+                f"track: checkpoint {check!r} is not recorded for this task version"
+            )
+    return errors, warnings
+
+
+def track_facts(task_dir: Path, results: Results | None = None) -> dict[str, Any]:
+    """Public projection for a local task. Only trusted staging code is executed.
+
+    Never serialize task metadata wholesale: enum values, field/verifier
+    descriptions, check names and reasons may all contain the answer.
+    """
+    results = results if results is not None else load_results()
+    # Legacy rows cannot establish checkpoint names.
+    errors, warnings = validate_track(task_dir, results.records)
+    if errors:
+        raise ResultsError("\n".join(errors))
+    from gym.schema import load_task
+    from gym.staging import run_stage_scripts, FIXTURE_MANIFEST_FILENAME
+    from gym.standalone import (
+        DEFAULT_CPUS,
+        DEFAULT_MEMORY_MB,
+        DEFAULT_PIDS_LIMIT,
+        DEFAULT_TIMEOUT_SECONDS,
+        DEFAULT_NETWORK,
+    )
+
+    task = load_task(task_dir)
+    card = read_toml(task_dir / "track.toml")
+    # The staging helper withholds expected/ and hidden/ from stage scripts.
+    with tempfile.TemporaryDirectory(prefix="paddock-track-") as temporary:
+        sandbox = Path(temporary)
+        try:
+            run_stage_scripts(task, sandbox)
+            files = [
+                path
+                for path in sandbox.rglob("*")
+                if path.is_file()
+                and path.name != FIXTURE_MANIFEST_FILENAME
+                and not {"expected", "hidden"}.intersection(
+                    path.relative_to(sandbox).parts
+                )
+            ]
+            file_count = len(files)
+            line_count = sum(len(path.read_bytes().splitlines()) for path in files)
+        except Exception as exc:
+            # Stage stderr and filenames are not public output.
+            raise ResultsError(
+                "track staging failed; inspect trusted staging locally"
+            ) from exc
+    prompt = task.dispatch.get("prompt", "prompt.md")
+    prompt_path = (task_dir / prompt).resolve()
+    if not prompt_path.is_relative_to(task_dir.resolve()) or {
+        "expected",
+        "hidden",
+    } & set(prompt_path.relative_to(task_dir.resolve()).parts):
+        raise ResultsError("prompt must be a public task file")
+    prompt_words = len(prompt_path.read_text(encoding="utf-8").split())
+    rows = _task_records(task, results.records)
+    graded = [row for row in rows if included(row)]
+    passed = sum(row["verdict"] == PASSED for row in graded)
+    checkpoints = []
+    hidden_count = 0
+    for index, checkpoint in enumerate(card["checkpoints"]):
+        if checkpoint["disclose"] == "hidden":
+            continue
+        if checkpoint["disclose"] == "count":
+            hidden_count += 1
+            continue
+        check_rows = [
+            check
+            for row in graded
+            for check in row.get("checks", [])
+            if check["name"] == checkpoint["check"]
+        ]
+        clear = sum(check["ok"] for check in check_rows)
+        checkpoints.append(
+            {
+                "position": index + 1,
+                "label": checkpoint["label"],
+                "recorded": len(check_rows),
+                "clear_rate": clear / len(check_rows) if check_rows else None,
+            }
+        )
+    listed = {checkpoint["check"] for checkpoint in card["checkpoints"]}
+    unlisted = {
+        check["name"] for row in rows for check in row.get("checks", [])
+    } - listed
+    retirements: Counter[str] = Counter()
+    retirement_unrecorded = 0
+    for row in graded:
+        checks = {check["name"]: check for check in row.get("checks", [])}
+        if not checks:
+            retirement_unrecorded += 1
+            continue
+        for index, checkpoint in enumerate(card["checkpoints"]):
+            check = checks.get(checkpoint["check"])
+            if check and check["required"] and not check["ok"]:
+                key = (
+                    str(index + 1)
+                    if checkpoint["disclose"] == "label"
+                    else "undisclosed"
+                )
+                retirements[key] += 1
+                break
+    totals = {key: sum(row["tokens"][key] or 0 for row in graded) for key in TOKEN_KEYS}
+    measured = bool(graded) and all(
+        all(row["tokens"][key] is not None for key in TOKEN_KEYS) for row in graded
+    )
+    total_input = totals["input"] + totals["cache"]
+    fuel = {
+        "input_per_pass": total_input / passed if measured and passed else None,
+        "cached_percent": 100 * totals["cache"] / total_input
+        if measured and total_input
+        else None,
+        "output_per_pass": totals["output"] / passed if measured and passed else None,
+    }
+    identities = sorted(
+        {
+            (
+                row["model"]["provider_id"],
+                row["model"]["reasoning"] or "default",
+                row["harness"]["config_hash"],
+            )
+            for row in rows
+        }
+    )
+    return {
+        "schema": "paddock-track-facts/v1",
+        "suite": task.suite,
+        "task_version": task.task_version,
+        "staged": {"files": file_count, "lines": line_count},
+        "prompt_words": prompt_words,
+        "result_shape": [
+            {
+                "name": spec.name,
+                "type": spec.type,
+                **(
+                    {
+                        "items": [
+                            {"name": item.name, "type": item.type}
+                            for item in spec.items
+                        ]
+                    }
+                    if spec.items
+                    else {}
+                ),
+            }
+            for spec in task.result_schema
+        ],
+        "expected_tests": task.hidden_tests_expected_tests,
+        "conditions": {
+            "cpus": DEFAULT_CPUS,
+            "memory_mb": DEFAULT_MEMORY_MB,
+            "pids": DEFAULT_PIDS_LIMIT,
+            "time_limit_seconds": DEFAULT_TIMEOUT_SECONDS,
+            "read_only_root": True,
+            "tmpfs": "/tmp:rw,exec,mode=1777",
+            "dropped_capabilities": ["ALL"],
+            "network": DEFAULT_NETWORK,
+        },
+        "live": {
+            "entries": [
+                {"provider_id": model, "engine_map": effort, "config_hash": key}
+                for model, effort, key in identities
+            ],
+            "runs": len(graded),
+            "passed": passed,
+            "avg_pass_rate": passed / len(graded) if graded else None,
+            "difficulty": (
+                1 + sum(passed / len(graded) < edge for edge in (0.9, 0.75, 0.6, 0.4))
+                if len(graded) >= 10
+                else None
+            ),
+            "difficulty_reason": "not enough runs" if len(graded) < 10 else None,
+            "wilson": list(wilson(passed, len(graded))) if graded else None,
+            "checkpoints": checkpoints,
+            "more_checks": hidden_count + len(unlisted),
+            "retirements": dict(retirements),
+            "retirement_unrecorded": retirement_unrecorded,
+            "fuel": fuel,
+        },
+        "warnings": warnings,
+    }
 
 
 # ---------------------------------------------------------------- loading
@@ -611,6 +1316,8 @@ class Results:
     changelog: list[dict[str, Any]]
     fairness: dict[str, Any]
     records: list[dict[str, Any]] = field(default_factory=list)
+
+    trust: dict[str, Any] = field(default_factory=dict)
 
     def configs(self) -> dict[str, dict[str, Any]]:
         merged: dict[str, dict[str, Any]] = {}
@@ -693,12 +1400,28 @@ def load_results(results_dir: Path = DEFAULT_RESULTS) -> Results:
         for run_id, count in sorted(run_ids.items())
         if count > 1
     )
+    entries = load_entries(results_dir, errors)
+    for name, document in documents.items():
+        for record in document["records"]:
+            if "entry" in record:
+                entry = entries.get(record["entry"])
+                if entry is None:
+                    errors.append(f"{name}: entry {record['entry']!r} does not resolve")
+                elif not entry_matches(entry, record):
+                    errors.append(
+                        f"{name}: entry {record['entry']} disagrees with record model, reasoning or config_hash"
+                    )
+    trust = {}
+    trust_path = results_dir / "meta" / "trust.json"
+    if trust_path.exists():
+        trust = _read_json(trust_path, errors, "meta/trust.json")
+        errors.extend(validate_trust(trust, documents))
     if errors:
         raise ResultsError("\n".join(errors))
     records = [
         record for document in documents.values() for record in document["records"]
     ]
-    return Results(documents, tables, changelog, fairness or {}, records)
+    return Results(documents, tables, changelog, fairness or {}, records, trust or {})
 
 
 def write_document(path: Path, document: Mapping[str, Any]) -> None:
@@ -748,7 +1471,17 @@ def render_document(document: Mapping[str, Any]) -> str:
 
 def included(record: Mapping[str, Any]) -> bool:
     """A record counts in n when no gate excludes it and a verifier graded it."""
-    return record["excludedBecause"] is None and record["verdict"] in GRADED_VERDICTS
+    return (
+        "track" not in record
+        and record["excludedBecause"] is None
+        and record["verdict"] in GRADED_VERDICTS
+    )
+
+
+def exclusion_reason(record: Mapping[str, Any]) -> str:
+    if "track" in record:
+        return "exhibition:external-track"
+    return record["excludedBecause"] or f"infra:{record['verdict']}"
 
 
 def row_key(record: Mapping[str, Any]) -> tuple[str, str, str, str, str]:
@@ -780,7 +1513,9 @@ def summarize(records: list[Mapping[str, Any]]) -> dict[str, Any]:
         sum(token_totals) / passed if passed and n and measured == n else None  # type: ignore[arg-type]
     )
     costs = [record["cost"] for record in graded]
-    priced = all(cost["source"] in PRICED_SOURCES and _is_number(cost["usd"]) for cost in costs)
+    priced = all(
+        cost["source"] in PRICED_SOURCES and _is_number(cost["usd"]) for cost in costs
+    )
     if passed and n and priced:
         sources = {cost["source"] for cost in costs}
         cost_per_pass = {
@@ -795,9 +1530,7 @@ def summarize(records: list[Mapping[str, Any]]) -> dict[str, Any]:
             "reason": "no_passes" if n and not passed else "not_every_attempt_priced",
         }
     excluded = Counter(
-        record["excludedBecause"] or f"infra:{record['verdict']}"
-        for record in records
-        if not included(record)
+        exclusion_reason(record) for record in records if not included(record)
     )
     return {
         "passed": passed,
@@ -818,7 +1551,8 @@ def boards(records: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
     records at different task versions form separate boards."""
     grouped: dict[tuple[str, int], list[Mapping[str, Any]]] = defaultdict(list)
     for record in records:
-        grouped[(record["suite"], record["task_version"])].append(record)
+        if "track" not in record:
+            grouped[(record["suite"], record["task_version"])].append(record)
     versions_per_suite = Counter(suite for suite, _ in grouped)
     out = []
     for (suite, version), members in sorted(grouped.items()):
@@ -861,7 +1595,9 @@ def matrix(records: list[Mapping[str, Any]]) -> dict[str, Any]:
         harness, model = key[:3], key[3:]
         harnesses.add(harness)
         models.add(model)
-        cells[(harness, model)][(record["suite"], record["task_version"])].append(record)
+        cells[(harness, model)][(record["suite"], record["task_version"])].append(
+            record
+        )
     table = {
         cell: {suite: summarize(members) for suite, members in sorted(by_suite.items())}
         for cell, by_suite in cells.items()
@@ -907,7 +1643,9 @@ def discrimination(records: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
 
 def exclusion_counts(records: list[Mapping[str, Any]]) -> Counter[str]:
     return Counter(
-        record["excludedBecause"] for record in records if record["excludedBecause"] is not None
+        exclusion_reason(record)
+        for record in records
+        if record["excludedBecause"] is not None or "track" in record
     )
 
 
@@ -934,26 +1672,15 @@ def records_from_run(
     """
     # Load the checkout package directly, as standalone repo scripts do, without
     # changing the interpreter's search path or requiring a package install.
-    if "gym" not in sys.modules:
-        package_dir = MODULE_ROOT / "lib" / "python" / "gym"
-        spec = importlib.util.spec_from_file_location(
-            "gym", package_dir / "__init__.py", submodule_search_locations=[str(package_dir)]
-        )
-        if spec is None or spec.loader is None:
-            raise ResultsError("cannot load the gym telemetry contracts")
-        package = importlib.util.module_from_spec(spec)
-        sys.modules["gym"] = package
-        try:
-            spec.loader.exec_module(package)
-        except Exception:
-            sys.modules.pop("gym", None)
-            raise
+    _load_gym()
     from gym.cost import PRICEABLE_TOKEN_SOURCES, REASONING_INSIDE_OUTPUT
     from gym.metrics import model_matches
 
     suite = summary["suite"]
     if not _text(suite) or suite == "all":
-        raise ResultsError("from-run requires a single suite; mixed-suite 'all' is unsupported")
+        raise ResultsError(
+            "from-run requires a single suite; mixed-suite 'all' is unsupported"
+        )
     requested_model = model["provider_id"]
     requested_class = worker_class or harness["name"]
 
@@ -969,7 +1696,9 @@ def records_from_run(
         metrics = cell.get("metrics") or {}
         provenance = cell.get("execution_provenance") or {}
         observed = metrics.get("observed_models") or {}
-        if not isinstance(observed, dict) or any(not _is_count(n) for n in observed.values()):
+        if not isinstance(observed, dict) or any(
+            not _is_count(n) for n in observed.values()
+        ):
             raise ResultsError(
                 f"cells[{index}]: observed_models must map model IDs to token counts"
             )
@@ -984,7 +1713,9 @@ def records_from_run(
             total = sum(observed.values())
             if total > 0:
                 model_verified = True
-                requested = sum(n for identity, n in observed.items() if matches(identity))
+                requested = sum(
+                    n for identity, n in observed.items() if matches(identity)
+                )
                 mismatch |= requested * 2 <= total
         for identity, expected in (
             (metrics.get("worker_class"), requested_class),
@@ -1023,9 +1754,13 @@ def records_from_run(
             and isinstance(sources, list)
             and sources
             and all(
-                isinstance(source, str) and source in PRICEABLE_TOKEN_SOURCES for source in sources
+                isinstance(source, str) and source in PRICEABLE_TOKEN_SOURCES
+                for source in sources
             )
-            and REASONING_INSIDE_OUTPUT.get(metrics.get("worker_class") or requested_class) is True
+            and REASONING_INSIDE_OUTPUT.get(
+                metrics.get("worker_class") or requested_class
+            )
+            is True
             and observed
             and all(matches(identity) for identity in observed)
             and _is_count(total_input)
@@ -1037,7 +1772,9 @@ def records_from_run(
         else:
             tokens = {"input": None, "cache": None, "output": None}
         wall = metrics.get("wall_seconds")
-        run_id = cell.get("launchRequestId") or f"{bundle_id}:{suite}:{cell['task']}:{index}"
+        run_id = (
+            cell.get("launchRequestId") or f"{bundle_id}:{suite}:{cell['task']}:{index}"
+        )
         records.append(
             {
                 "run_id": run_id,
@@ -1056,7 +1793,71 @@ def records_from_run(
                 "cost": price_cost(tokens, model["provider_id"], table),
             }
         )
+        if "subchecks" in cell:
+            checks = cell["subchecks"]
+            if not isinstance(checks, list) or any(
+                not isinstance(check, dict) for check in checks
+            ):
+                raise ResultsError(
+                    f"cells[{index}]: subchecks must be a list of objects"
+                )
+            records[-1]["checks"] = [
+                {key: check.get(key) for key in ("name", "ok", "required")}
+                for check in checks
+            ]
+            problems: list[str] = []
+            _validate_checks(f"cells[{index}]", records[-1]["checks"], problems)
+            if problems:
+                raise ResultsError("\n".join(problems))
     return records
+
+
+def _cmd_community(args: argparse.Namespace) -> int:
+    results = load_results(args.results)
+    if args.command == "track-facts":
+        print(json.dumps(track_facts(args.task_dir, results), indent=2))
+        return 0
+    errors: list[str] = []
+    if args.command == "validate-entry":
+        paths = args.paths or sorted((args.results / "entries").glob("*.toml"))
+        for path in paths:
+            raw = read_toml(path)
+            problems = validate_entry(raw, root=args.results.parent)
+            errors.extend(f"{path.name}: {error}" for error in problems)
+            if not problems and raw.get("id") != path.stem:
+                errors.append(f"{path.name}: filename must match id")
+    else:
+        paths = args.task_dirs or [
+            path.parent for path in sorted((MODULE_ROOT / "tasks").glob("*/track.toml"))
+        ]
+        infographic_ids: dict[str, str] = {}
+        for path in sorted(
+            set((MODULE_ROOT / "tasks").glob("*/track.toml"))
+            | {directory / "track.toml" for directory in paths}
+        ):
+            card = read_toml(path)
+            challenge, infographic = card.get("challenge"), card.get("infographic")
+            if isinstance(challenge, str) and isinstance(infographic, str):
+                if (
+                    challenge in infographic_ids
+                    and infographic_ids[challenge] != infographic
+                ):
+                    errors.append(
+                        f"{path.parent.name}: challenge has conflicting infographic ids"
+                    )
+                if challenge not in infographic_ids:
+                    infographic_ids[challenge] = infographic
+        for path in paths:
+            problems, warnings = validate_track(
+                path, results.records, infographic_ids=infographic_ids
+            )
+            errors.extend(f"{path.name}: {error}" for error in problems)
+            for warning in warnings:
+                print(f"{path.name}: warning: {warning}", file=sys.stderr)
+    if errors:
+        raise ResultsError("\n".join(errors))
+    print(f"{args.command}: valid ({len(paths)} files)")
+    return 0
 
 
 def _cmd_validate(args: argparse.Namespace) -> int:
@@ -1075,7 +1876,10 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 def _cmd_from_run(args: argparse.Namespace) -> int:
     summary = json.loads(args.run.read_text(encoding="utf-8"))
     descriptor = json.loads(args.harness_config.read_text(encoding="utf-8"))
-    if not isinstance(descriptor, dict) or descriptor.get("reasoning_level") != args.reasoning:
+    if (
+        not isinstance(descriptor, dict)
+        or descriptor.get("reasoning_level") != args.reasoning
+    ):
         raise ResultsError(
             "harness descriptor reasoning_level must match --reasoning (null for default)"
         )
@@ -1088,7 +1892,11 @@ def _cmd_from_run(args: argparse.Namespace) -> int:
     records = records_from_run(
         summary,
         bundle_id=args.id,
-        harness={"name": args.harness, "version": args.harness_version, "config_hash": key},
+        harness={
+            "name": args.harness,
+            "version": args.harness_version,
+            "config_hash": key,
+        },
         model={"provider_id": args.model, "reasoning": args.reasoning},
         worker_class=descriptor.get("worker_class"),
         paddock_commit=args.paddock_commit,
@@ -1098,7 +1906,11 @@ def _cmd_from_run(args: argparse.Namespace) -> int:
         "schema": SCHEMA,
         "id": args.id,
         "date": args.date,
-        "source": {"kind": "run", "description": args.description, "evidence": args.evidence},
+        "source": {
+            "kind": "run",
+            "description": args.description,
+            "evidence": args.evidence,
+        },
         "price_table": table_date,
         "harness_configs": {key: descriptor},
         "records": records,
@@ -1114,24 +1926,49 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--results", type=Path, default=DEFAULT_RESULTS)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("validate", help="validate results/")
-    run = sub.add_parser("from-run", help="write a results document from a run's --json summary")
+    entry_parser = sub.add_parser("validate-entry", help="validate entry setup sheets")
+    entry_parser.add_argument("paths", nargs="*", type=Path)
+    track_parser = sub.add_parser("validate-track", help="validate public track cards")
+    track_parser.add_argument("task_dirs", nargs="*", type=Path)
+    facts_parser = sub.add_parser(
+        "track-facts", help="print public track facts as JSON (runs trusted staging)"
+    )
+    facts_parser.add_argument("task_dir", type=Path)
+    run = sub.add_parser(
+        "from-run", help="write a results document from a run's --json summary"
+    )
     run.add_argument("run", type=Path, help="the paddock run --json output")
     run.add_argument("--id", required=True)
     run.add_argument("--date", required=True)
-    run.add_argument("--harness", required=True, help="harness CLI name, e.g. claude-code")
-    run.add_argument("--harness-version", required=True, help="the CLI's --version output")
     run.add_argument(
-        "--harness-config", type=Path, required=True, help="JSON descriptor of the configuration"
+        "--harness", required=True, help="harness CLI name, e.g. claude-code"
     )
-    run.add_argument("--model", required=True, help="provider id, e.g. anthropic/claude-opus-5-5")
+    run.add_argument(
+        "--harness-version", required=True, help="the CLI's --version output"
+    )
+    run.add_argument(
+        "--harness-config",
+        type=Path,
+        required=True,
+        help="JSON descriptor of the configuration",
+    )
+    run.add_argument(
+        "--model", required=True, help="provider id, e.g. anthropic/claude-opus-5-5"
+    )
     run.add_argument("--reasoning", default=None)
     run.add_argument("--paddock-commit", required=True)
-    run.add_argument("--price-table", default=None, help="price table date (default: newest)")
+    run.add_argument(
+        "--price-table", default=None, help="price table date (default: newest)"
+    )
     run.add_argument("--description", required=True)
     run.add_argument("--evidence", required=True, help="the reproduction command")
     args = parser.parse_args(argv)
     try:
-        return _cmd_validate(args) if args.command == "validate" else _cmd_from_run(args)
+        if args.command == "validate":
+            return _cmd_validate(args)
+        if args.command == "from-run":
+            return _cmd_from_run(args)
+        return _cmd_community(args)
     except ResultsError as exc:
         print(str(exc), file=sys.stderr)
         return 1

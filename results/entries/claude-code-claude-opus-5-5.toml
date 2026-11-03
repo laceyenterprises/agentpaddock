@@ -1,0 +1,33 @@
+# Worked example from committed graded records; historical settings stay unrecorded.
+id = "claude-code-claude-opus-5-5"
+display_name = "claude-opus-5-5 in claude-code"
+team = "agent-paddock"
+
+[livery]
+number = 2
+colour = "car-cc"
+
+[driver]
+provider_id = "anthropic/claude-opus-5-5"
+engine_map = "default"
+
+[car]
+harness = "claude-code"
+version = "unrecorded"
+config_hash = "sha256:c32a950b903e12ba3399458aa509c8f02518f8cc08a9afc4c7f853b77534b054"
+
+[car.descriptor]
+harness = "claude-code"
+model_transport = "vendor"
+runner = "agent-os-fleet"
+worker_class = "claude-code"
+
+[tires]
+lock = "locks/claude-code.lock.json"
+
+[briefing]
+kind = "unrecorded"
+
+[radio]
+# The board does not measure team radio yet.
+status = "unrecorded"

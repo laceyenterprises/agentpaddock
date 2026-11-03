@@ -264,7 +264,9 @@ def test_fairness_review_and_maintainer_sign_off_are_separate():
         (lambda a: a.update(sign_off=42), "sign_off must be non-empty text or null"),
     ],
 )
-def test_fairness_evidence_rejects_incomplete_or_contradictory_audits(mutation, message):
+def test_fairness_evidence_rejects_incomplete_or_contradictory_audits(
+    mutation, message
+):
     raw = _evidenced_fairness()
     mutation(raw["audits"][0])
     assert message in "\n".join(lb.validate_fairness(raw))
@@ -291,7 +293,9 @@ def test_fairness_audit_dates(status, date):
 def test_fairness_evidence_covers_all_unique_checklist_ids():
     raw = _evidenced_fairness()
     raw["checklist"].append({"id": "model", "check": "Native model identity."})
-    assert "evidence must cover every checklist item" in "\n".join(lb.validate_fairness(raw))
+    assert "evidence must cover every checklist item" in "\n".join(
+        lb.validate_fairness(raw)
+    )
     raw["checklist"][-1]["id"] = "tools"
     assert "checklist ids must be unique" in "\n".join(lb.validate_fairness(raw))
 
@@ -301,7 +305,9 @@ def test_sign_off_cannot_bypass_evidence_and_pending_review_dates_are_validated(
     audit = raw["audits"][0]
     audit.update(status="passed", sign_off="Fixture sign-off")
     audit.pop("evidence")
-    assert "evidence must cover every checklist item" in "\n".join(lb.validate_fairness(raw))
+    assert "evidence must cover every checklist item" in "\n".join(
+        lb.validate_fairness(raw)
+    )
     audit.update(status="pending", sign_off=None, date="unknown")
     assert "date must be an ISO date or null" in "\n".join(lb.validate_fairness(raw))
 
@@ -311,24 +317,52 @@ def test_sign_off_cannot_bypass_evidence_and_pending_review_dates_are_validated(
     [
         (lambda d: d["records"][0].update(extra=1), "unknown extra"),
         (lambda d: d["records"][0].pop("task_version"), "missing task_version"),
-        (lambda d: d["records"][0].update(task_version=0), "task_version must be a positive"),
-        (lambda d: d["records"][5].update(excludedBecause=None), "infrastructure row carries"),
-        (lambda d: d["records"][0].update(excludedBecause="pre-NOPE-01"), "nor a changelog"),
+        (
+            lambda d: d["records"][0].update(task_version=0),
+            "task_version must be a positive",
+        ),
+        (
+            lambda d: d["records"][5].update(excludedBecause=None),
+            "infrastructure row carries",
+        ),
+        (
+            lambda d: d["records"][0].update(excludedBecause="pre-NOPE-01"),
+            "nor a changelog",
+        ),
         (lambda d: d["records"][0].update(verdict="maybe"), "is not a gym outcome"),
         (lambda d: d["records"][0].update(score=1.5), "score must be in [0, 1]"),
-        (lambda d: d["records"][0]["tokens"].update(input=-1), "token counts are non-negative"),
-        (lambda d: d["records"][0]["tokens"].update(input=1.5), "token counts are non-negative"),
-        (lambda d: d["records"][0].update(paddock_commit=None), "names the paddock commit"),
-        (lambda d: d["records"][0]["model"].update(provider_id="nope"), "provider/model"),
         (
-            lambda d: d["records"][0]["harness"].update(config_hash="sha256:" + "0" * 64),
+            lambda d: d["records"][0]["tokens"].update(input=-1),
+            "token counts are non-negative",
+        ),
+        (
+            lambda d: d["records"][0]["tokens"].update(input=1.5),
+            "token counts are non-negative",
+        ),
+        (
+            lambda d: d["records"][0].update(paddock_commit=None),
+            "names the paddock commit",
+        ),
+        (
+            lambda d: d["records"][0]["model"].update(provider_id="nope"),
+            "provider/model",
+        ),
+        (
+            lambda d: d["records"][0]["harness"].update(
+                config_hash="sha256:" + "0" * 64
+            ),
             "no descriptor in harness_configs",
         ),
         (
-            lambda d: d["harness_configs"].update({"sha256:" + "1" * 64: {"harness": "x"}}),
+            lambda d: d["harness_configs"].update(
+                {"sha256:" + "1" * 64: {"harness": "x"}}
+            ),
             "does not hash to its key",
         ),
-        (lambda d: d["records"][0]["cost"].update(usd=0.01), "differs from the price table"),
+        (
+            lambda d: d["records"][0]["cost"].update(usd=0.01),
+            "differs from the price table",
+        ),
         (
             lambda d: d["records"][6].update(
                 cost={"usd": 0.5, "source": "unknown", "reason": None}
@@ -364,8 +398,14 @@ def test_import_documents_may_omit_the_paddock_commit(results: Path):
 @pytest.mark.parametrize(
     ("entry", "message"),
     [
-        ({"input": 1.0, "cache": None, "output": 1.0, "source": "unknown"}, "carries no rate"),
-        ({"input": None, "cache": None, "output": None, "source": "published-rate"}, "needs input"),
+        (
+            {"input": 1.0, "cache": None, "output": 1.0, "source": "unknown"},
+            "carries no rate",
+        ),
+        (
+            {"input": None, "cache": None, "output": None, "source": "published-rate"},
+            "needs input",
+        ),
         ({"source": "estimate"}, "source must be one of"),
         ({"as_of": "2026-02-01"}, "as_of is after the table's date"),
         ({"reference": ""}, "names its reference"),
@@ -403,12 +443,21 @@ def test_price_cost_is_a_number_only_with_a_priced_source():
     }
     assert lb.price_cost(MEASURED, "bolt/coder-small", table)["source"] == lb.RECONCILED
     unmeasured = dict(MEASURED, cache=None)
-    assert lb.price_cost(unmeasured, "acme/coder-large", table)["reason"] == "tokens_not_measured"
+    assert (
+        lb.price_cost(unmeasured, "acme/coder-large", table)["reason"]
+        == "tokens_not_measured"
+    )
     assert lb.price_cost(MEASURED, "nova/coder-unpriced", table)["reason"] == (
         "model_not_in_price_table"
     )
-    assert lb.price_cost(MEASURED, "local/coder-tiny", table)["reason"] == "price_source_unknown"
-    assert lb.price_cost(MEASURED, "acme/coder-large", None)["reason"] == "price_table_missing"
+    assert (
+        lb.price_cost(MEASURED, "local/coder-tiny", table)["reason"]
+        == "price_source_unknown"
+    )
+    assert (
+        lb.price_cost(MEASURED, "acme/coder-large", None)["reason"]
+        == "price_table_missing"
+    )
     for model in ("nova/coder-unpriced", "local/coder-tiny"):
         assert lb.price_cost(MEASURED, model, table)["usd"] is None
 
@@ -442,7 +491,9 @@ def test_wilson_matches_the_published_intervals():
 
 def _rows(records, suite="coding", version=1):
     board = next(
-        b for b in lb.boards(records) if b["suite"] == suite and b["task_version"] == version
+        b
+        for b in lb.boards(records)
+        if b["suite"] == suite and b["task_version"] == version
     )
     return {(row["key"][0], row["key"][3]): row for row in board["rows"]}
 
@@ -452,7 +503,11 @@ def test_boards_score_only_included_rows_and_price_per_pass():
     acme = rows[("alpha-cli", "acme/coder-large")]
     assert (acme["passed"], acme["n"]) == (2, 3)
     assert acme["tokens_per_pass"] == 3 * 520_000 / 2
-    assert acme["cost_per_pass"] == {"usd": 0.72, "source": "published-rate", "reason": None}
+    assert acme["cost_per_pass"] == {
+        "usd": 0.72,
+        "source": "published-rate",
+        "reason": None,
+    }
     bolt = rows[("beta-cli", "bolt/coder-small")]
     assert (bolt["passed"], bolt["n"]) == (1, 2)
     assert bolt["excluded"] == {"infra:agent_error": 1}
@@ -460,7 +515,9 @@ def test_boards_score_only_included_rows_and_price_per_pass():
     unpriced = rows[("beta-cli", "nova/coder-unpriced")]
     assert unpriced["cost_per_pass"]["usd"] is None
     assert unpriced["cost_per_pass"]["source"] == lb.UNKNOWN
-    assert rows[("alpha-cli", "local/coder-tiny")]["cost_per_pass"]["source"] == lb.UNKNOWN
+    assert (
+        rows[("alpha-cli", "local/coder-tiny")]["cost_per_pass"]["source"] == lb.UNKNOWN
+    )
 
 
 def test_mixed_sources_report_the_weaker_one():
@@ -572,7 +629,10 @@ def test_render_document_is_stable_json():
 
 def _convert(cell, suite="coding", **kwargs):
     return lb.records_from_run(
-        {"suite": suite, "cells": [dict(task="coding-alpha", verdict="passed", **cell)]},
+        {
+            "suite": suite,
+            "cells": [dict(task="coding-alpha", verdict="passed", **cell)],
+        },
         bundle_id="test-bundle",
         harness={"name": "codex", "version": "1", "config_hash": "sha256:" + "a" * 64},
         model={"provider_id": "acme/coder-large", "reasoning": "high"},
@@ -600,11 +660,21 @@ def _metrics(**updates):
     [
         ({"model_mismatch": True}, "infra:model_mismatch"),
         (
-            {"metrics": {"worker_class": "claude-code", "majority_model": "acme/coder-large"}},
+            {
+                "metrics": {
+                    "worker_class": "claude-code",
+                    "majority_model": "acme/coder-large",
+                }
+            },
             "infra:model_mismatch",
         ),
         (
-            {"metrics": {"worker_class": "codex", "majority_model": "bolt/coder-small"}},
+            {
+                "metrics": {
+                    "worker_class": "codex",
+                    "majority_model": "bolt/coder-small",
+                }
+            },
             "infra:model_mismatch",
         ),
         (
@@ -617,7 +687,12 @@ def _metrics(**updates):
             "infra:model_mismatch",
         ),
         (
-            {"execution_provenance": {"harness": "claude-code", "model": "acme/coder-large"}},
+            {
+                "execution_provenance": {
+                    "harness": "claude-code",
+                    "model": "acme/coder-large",
+                }
+            },
             "infra:model_mismatch",
         ),
         (
@@ -636,7 +711,9 @@ def test_conversion_excludes_attribution_failures(cell, tag):
 
 
 def test_standalone_provenance_verifies_identity_without_pricing():
-    record = _convert({"execution_provenance": {"harness": "codex", "model": "acme/coder-large"}})
+    record = _convert(
+        {"execution_provenance": {"harness": "codex", "model": "acme/coder-large"}}
+    )
     assert lb.included(record)
     assert record["cost"]["source"] == lb.UNKNOWN
 
@@ -702,7 +779,10 @@ def test_unhashable_values_report_validation_errors(results, field, value):
     ],
 )
 def test_conversion_excludes_conflicting_reasoning(cell):
-    cell = {"execution_provenance": {"harness": "codex", "model": "acme/coder-large"}, **cell}
+    cell = {
+        "execution_provenance": {"harness": "codex", "model": "acme/coder-large"},
+        **cell,
+    }
     assert _convert(cell)["excludedBecause"] == "infra:reasoning_mismatch"
 
 
@@ -711,7 +791,12 @@ def test_conversion_excludes_conflicting_reasoning(cell):
     [
         ("codex-exec-json", {"acme/coder-large": 100}, None, True),
         ("claude-code-exec-json", {"acme/coder-large": 100}, None, False),
-        ("codex-exec-json", {"acme/coder-large": 100, "bolt/coder-small": 0}, None, False),
+        (
+            "codex-exec-json",
+            {"acme/coder-large": 100, "bolt/coder-small": 0},
+            None,
+            False,
+        ),
         ("codex-exec-json", {"bolt/coder-small": 100}, "infra:model_mismatch", False),
     ],
 )
@@ -732,7 +817,9 @@ def test_cli_conversion_round_trips_actual_ledger_metrics(
                 "token_usage_output": 100,
                 "token_usage_reasoning": 0,
                 "token_usage_running_total": 1100,
-                "token_usage_by_model_json": {m: {"output": n} for m, n in observed.items()},
+                "token_usage_by_model_json": {
+                    m: {"output": n} for m, n in observed.items()
+                },
                 "resolved_reasoning_level": "high",
             }
         ],
@@ -806,7 +893,9 @@ def test_cli_conversion_round_trips_actual_ledger_metrics(
         timeout=20,
     )
     assert converted.returncode == 0, converted.stdout + converted.stderr
-    record = next(r for r in lb.load_results(results).records if r["run_id"] == "lrq-converted")
+    record = next(
+        r for r in lb.load_results(results).records if r["run_id"] == "lrq-converted"
+    )
     assert record["excludedBecause"] == excluded
     assert (record["cost"]["usd"] is not None) == priced
     if priced:
@@ -852,19 +941,26 @@ def test_conversion_verifies_fleet_worker_class_distinct_from_harness():
     metrics["worker_class"] = "oss-codex"
     record = _convert({"metrics": metrics}, worker_class="oss-codex")
     assert lb.included(record)
-    assert record["cost"]["source"] == lb.UNKNOWN  # output contract not registered for this class
+    assert (
+        record["cost"]["source"] == lb.UNKNOWN
+    )  # output contract not registered for this class
 
 
 @pytest.mark.parametrize("worker_class", [None, ""])
 def test_conversion_keeps_tokens_without_worker_class(worker_class):
     metrics = _metrics()
     metrics["worker_class"] = worker_class
-    record = _convert({"metrics": metrics, "execution_provenance": {"harness": "codex"}})
+    record = _convert(
+        {"metrics": metrics, "execution_provenance": {"harness": "codex"}}
+    )
     assert record["tokens"] == {"input": 600, "cache": 400, "output": 100}
 
 
 def test_fallback_run_ids_are_namespaced_by_bundle():
-    summary = {"suite": "coding", "cells": [{"task": "coding-alpha", "verdict": "passed"}]}
+    summary = {
+        "suite": "coding",
+        "cells": [{"task": "coding-alpha", "verdict": "passed"}],
+    }
     kwargs = dict(
         harness={"name": "codex"},
         model={"provider_id": "acme/coder-large", "reasoning": None},
@@ -886,7 +982,9 @@ def test_legacy_passed_audit_requires_evidence_with_or_without_sign_off(sign_off
     audit.pop("sign_off")
     if sign_off is not None:
         audit["sign_off"] = sign_off
-    assert "evidence must cover every checklist item" in "\n".join(lb.validate_fairness(raw))
+    assert "evidence must cover every checklist item" in "\n".join(
+        lb.validate_fairness(raw)
+    )
 
 
 def test_legacy_pending_audit_remains_readable():
@@ -901,11 +999,17 @@ def test_legacy_pending_audit_remains_readable():
 @pytest.mark.parametrize(
     "source",
     [
-        "not a reference", "http://vendor.example/docs", "https://",
-        "https://vendor.example/bad path", "https://[invalid",
-        "scripts/../leaderboard.py:1", "scripts/./leaderboard.py:1",
-        "scripts//leaderboard.py:1", "scripts/leaderboard.py:0",
-        "scripts/leaderboard.py:1junk", "unknown.field",
+        "not a reference",
+        "http://vendor.example/docs",
+        "https://",
+        "https://vendor.example/bad path",
+        "https://[invalid",
+        "scripts/../leaderboard.py:1",
+        "scripts/./leaderboard.py:1",
+        "scripts//leaderboard.py:1",
+        "scripts/leaderboard.py:0",
+        "scripts/leaderboard.py:1junk",
+        "unknown.field",
     ],
 )
 def test_fairness_rejects_malformed_source_references(source):
@@ -917,12 +1021,669 @@ def test_fairness_rejects_malformed_source_references(source):
 @pytest.mark.parametrize(
     "source",
     [
-        "https://vendor.example/docs?a=1&b=2", "scripts/leaderboard.py:1",
+        "https://vendor.example/docs?a=1&b=2",
+        "scripts/leaderboard.py:1",
         "results/fixture.json:45 records[harness.name=codex].model.provider_id (49 records)",
-        "run.tools", "records[model.reasoning=<unknown>]", "harness_configs[sha256:abc]",
+        "run.tools",
+        "records[model.reasoning=<unknown>]",
+        "harness_configs[sha256:abc]",
     ],
 )
 def test_fairness_accepts_supported_source_references(source):
     raw = _evidenced_fairness()
     raw["audits"][0]["evidence"][0]["sources"] = [source]
     assert lb.validate_fairness(raw) == []
+
+
+# Community setup sheets, public track facts and fork result provenance.
+
+
+def _community_entry():
+    raw = lb.read_toml(lb.MODULE_ROOT / "results/templates/entry.toml")
+    raw.update(id="fixture-entry", display_name="Fixture entry", team="agent-paddock")
+    raw["driver"]["provider_id"] = "acme/coder-large"
+    raw["car"].update(harness="codex", version="1")
+    raw["car"]["descriptor"]["harness"] = "codex"
+    raw["car"]["config_hash"] = lb.config_hash(raw["car"]["descriptor"])
+    return raw
+
+
+def test_entry_hash_round_trip_and_historical_examples():
+    entry = _community_entry()
+    assert lb.validate_entry(entry) == []
+    assert entry["car"]["config_hash"] == lb.config_hash(entry["car"]["descriptor"])
+    old_hash = entry["car"]["config_hash"]
+    entry["car"]["descriptor"]["radio"]["skills"].append(
+        {"name": "review", "version": "2"}
+    )
+    assert lb.config_hash(entry["car"]["descriptor"]) != old_hash
+    assert "config_hash" in " ".join(lb.validate_entry(entry))
+    loaded = lb.load_results()
+    for path in (lb.DEFAULT_RESULTS / "entries").glob("*.toml"):
+        example = lb.read_toml(path)
+        assert not lb.validate_entry(example)
+        assert any(
+            lb.included(row) and lb.entry_matches(example, row)
+            for row in loaded.records
+        )
+        assert (
+            loaded.configs()[example["car"]["config_hash"]]
+            == example["car"]["descriptor"]
+        )
+
+
+def test_entry_livery_uses_supplied_root(tmp_path):
+    (tmp_path / "design").mkdir()
+    (tmp_path / "design/tokens.json").write_text(
+        json.dumps({"color": {"car-fixture": "#123456"}})
+    )
+    entry = _community_entry()
+    entry["tires"] = json.loads(
+        (lb.MODULE_ROOT / "locks/codex.lock.json").read_text()
+    )
+    entry["livery"]["colour"] = "car-fixture"
+    assert lb.validate_entry(entry, root=tmp_path) == []
+    entry["livery"]["colour"] = "car-codex"
+    assert lb.validate_entry(entry, root=tmp_path) == [
+        "entry.livery: colour must name a car-* livery token"
+    ]
+
+
+@pytest.mark.parametrize("field", ["briefing", "radio"])
+def test_new_entry_must_hash_provenance(field):
+    entry = _community_entry()
+    entry["car"]["descriptor"].pop(field)
+    entry["car"]["config_hash"] = lb.config_hash(entry["car"]["descriptor"])
+    assert "exact briefing and radio" in " ".join(lb.validate_entry(entry))
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda e: e["livery"].update(number=0),
+        lambda e: e["livery"].update(number=100),
+        lambda e: e["livery"].update(number=True),
+        lambda e: e["livery"].update(colour="red"),
+        lambda e: e["tires"].update(lock="../other.lock.json"),
+        lambda e: e["driver"].update(engine_map="invented"),
+        lambda e: e["briefing"].update(kind="unrecorded"),
+    ],
+)
+def test_invalid_entry_fields(mutation):
+    entry = _community_entry()
+    mutation(entry)
+    assert lb.validate_entry(entry)
+
+
+def _reference_entry(results):
+    entry = _community_entry()
+    # JSON inline tables serialize directly as TOML inline tables for this
+    # flat fixture descriptor; provenance uses regular nested TOML tables.
+    path = results / "entries" / "fixture-entry.toml"
+    path.parent.mkdir()
+    template = (lb.MODULE_ROOT / "results/templates/entry.toml").read_text()
+    template = template.replace('id = ""', 'id = "fixture-entry"', 1)
+    template = template.replace(
+        'display_name = ""', 'display_name = "Fixture entry"', 1
+    )
+    template = template.replace('team = ""', 'team = "agent-paddock"', 1)
+    template = template.replace(
+        'provider_id = ""', 'provider_id = "acme/coder-large"', 1
+    )
+    template = template.replace('harness = ""', 'harness = "codex"')
+    template = template.replace(
+        'config_hash = ""', f'config_hash = "{entry["car"]["config_hash"]}"', 1
+    )
+    path.write_text(template)
+    (results.parent / "locks").mkdir()
+    shutil.copy(
+        lb.MODULE_ROOT / "locks/codex.lock.json",
+        results.parent / "locks/codex.lock.json",
+    )
+
+    def attach(doc):
+        descriptor = entry["car"]["descriptor"]
+        for record in doc["records"]:
+            if record["model"]["provider_id"] == "acme/coder-large":
+                # Make a deliberately minimal document for this reference test.
+                record["harness"] = {
+                    "name": "codex",
+                    "version": "1",
+                    "config_hash": lb.config_hash(descriptor),
+                }
+                record["model"]["reasoning"] = None
+                record["entry"] = "fixture-entry"
+                doc["records"] = [record]
+                doc["harness_configs"] = {lb.config_hash(descriptor): descriptor}
+                break
+        else:
+            raise AssertionError("fixture has no matching model")
+
+    _edit(results, attach)
+    return path
+
+
+@pytest.mark.parametrize("field", ["provider_id", "reasoning", "config_hash"])
+def test_entry_reference_identity_mismatch_rejected(results, field):
+    _reference_entry(results)
+    assert lb.load_results(results)
+
+    def mutate(doc):
+        row = doc["records"][0]
+        if field == "config_hash":
+            descriptor = dict(doc["harness_configs"][row["harness"][field]])
+            descriptor["different"] = True
+            key = lb.config_hash(descriptor)
+            doc["harness_configs"] = {key: descriptor}
+            row["harness"][field] = key
+        else:
+            row["model"][field] = "high" if field == "reasoning" else "acme/other"
+            row["cost"] = lb.price_cost(
+                row["tokens"],
+                row["model"]["provider_id"],
+                lb.load_results(FIXTURE).price_tables["2026-01-02"],
+            )
+
+    _edit(results, mutate)
+    assert "disagrees with record" in _errors(results)
+
+
+def test_missing_entry_rejected(results):
+    _edit(results, lambda doc: doc["records"][0].update(entry="missing"))
+    assert "does not resolve" in _errors(results)
+
+
+def test_checks_are_optional_and_reasons_rejected(results):
+    _edit(
+        results,
+        lambda doc: doc["records"][0].update(
+            checks=[{"name": "quality", "ok": False, "required": True}]
+        ),
+    )
+    assert lb.load_results(results).records[0]["checks"][0]["ok"] is False
+    _edit(
+        results,
+        lambda doc: doc["records"][0]["checks"][0].update(
+            reason="private grading detail"
+        ),
+    )
+    assert "unknown reason" in _errors(results)
+
+
+@pytest.mark.parametrize(
+    "checks",
+    [
+        None,
+        {},
+        [None],
+        [{"name": "x", "ok": 1, "required": True}],
+        [{"name": "x", "ok": True, "required": False}] * 2,
+    ],
+)
+def test_invalid_checks_are_errors(results, checks):
+    _edit(results, lambda doc: doc["records"][0].update(checks=checks))
+    assert "check" in _errors(results)
+
+
+def test_from_run_copies_checks_without_reasons():
+    rows = lb.records_from_run(
+        {
+            "suite": "coding",
+            "cells": [
+                {
+                    "task": "coding-alpha",
+                    "verdict": "passed",
+                    "subchecks": [
+                        {
+                            "name": "quality",
+                            "ok": True,
+                            "required": True,
+                            "reason": "private detail",
+                        }
+                    ],
+                }
+            ],
+        },
+        bundle_id="fixture",
+        harness={"name": "codex", "version": "1", "config_hash": "sha256:" + "a" * 64},
+        model={"provider_id": "acme/coder-large", "reasoning": None},
+        paddock_commit="abcdef1",
+        table=_table(),
+    )
+    assert rows[0]["checks"] == [{"name": "quality", "ok": True, "required": True}]
+    assert "reason" not in rows[0]["checks"][0]
+
+
+@pytest.fixture
+def community_track(tmp_path):
+    task = tmp_path / "track"
+    task.mkdir()
+    (task / "task.toml").write_text("""id = "fixture-track"
+suite = "coding"
+task_version = 2
+[dispatch]
+prompt = "prompt.md"
+[[stages]]
+run = "stage.sh"
+[result_schema]
+answer = {type = "enum", enum = ["ANSWER_SENTINEL"], description = "ANSWER_SENTINEL"}
+[verifier]
+entrypoint = "verifier.py"
+description = "ANSWER_SENTINEL"
+""")
+    (task / "prompt.md").write_text("Do the task.")
+    (task / "stage.sh").write_text("""set -eu
+# The copied task must not expose either grading-only directory.
+test ! -e expected
+test ! -e hidden
+printf 'public input\\nsecond line\\n' > "$1/input.txt"
+""")
+    for directory in ("expected", "hidden"):
+        (task / directory).mkdir()
+        (task / directory / "secret.txt").write_text("ANSWER_SENTINEL")
+    (task / "verifier.py").write_text("# ANSWER_SENTINEL\n")
+    (task / "track.toml").write_text("""name = "Fixture circuit"
+pitch = "Solve the supplied task."
+challenge = "coding"
+infographic = "coding"
+[[checkpoints]]
+check = "quality"
+label = "Quality"
+disclose = "label"
+[[checkpoints]]
+check = "ANSWER_SENTINEL"
+label = "COUNT_LABEL_SENTINEL"
+disclose = "count"
+[[checkpoints]]
+check = "secret"
+label = "HIDDEN_LABEL_SENTINEL"
+disclose = "hidden"
+""")
+    return task
+
+
+def _track_records():
+    rows = copy.deepcopy(lb.load_results(FIXTURE).records[:2])
+    for i, row in enumerate(rows):
+        row.update(
+            task="fixture-track",
+            suite="coding",
+            task_version=2,
+            verdict="passed" if i == 0 else "failed",
+            excludedBecause=None,
+            checks=[
+                {"name": "quality", "ok": i == 0, "required": True},
+                {"name": "ANSWER_SENTINEL", "ok": False, "required": True},
+                {"name": "secret", "ok": False, "required": True},
+                {"name": "unlisted", "ok": False, "required": False},
+            ],
+            tokens={"input": 10, "cache": 30, "output": 2},
+        )
+    return rows
+
+
+def test_checkpoint_names_verified_by_exact_task_version(community_track):
+    rows = _track_records()
+    assert lb.validate_track(community_track, rows) == ([], [])
+    rows[0]["checks"] = rows[1]["checks"] = []
+    errors, warnings = lb.validate_track(community_track, rows)
+    assert errors and "not recorded" in " ".join(errors)
+    assert not warnings
+    for row in rows:
+        row["task_version"] = 1
+    assert lb.validate_track(community_track, rows) == ([], ["checkpoints unverified"])
+    assert lb.validate_track(community_track, []) == ([], ["checkpoints unverified"])
+
+
+def test_legacy_checkpoint_absence_cannot_verify_card(community_track):
+    rows = _track_records()
+    for row in rows:
+        row.pop("checks")
+    assert lb.validate_track(community_track, rows) == ([], ["checkpoints unverified"])
+    checked = _track_records()[0]
+    checked["checks"] = [{"name": "different", "ok": True, "required": True}]
+    assert lb.validate_track(community_track, rows + [checked])[0]
+
+
+def test_track_facts_disclosure_leaks_and_live_statistics(community_track):
+    loaded = lb.load_results(FIXTURE)
+    loaded.records = _track_records()
+    # An old version and an external fork of the same task must never pool.
+    old = copy.deepcopy(loaded.records[0])
+    old["task_version"] = 1
+    external = copy.deepcopy(loaded.records[0])
+    external["track"] = {}
+    loaded.records.extend([old, external])
+    facts = lb.track_facts(community_track, loaded)
+    text = json.dumps(facts)
+    for secret in (
+        "ANSWER_SENTINEL",
+        "COUNT_LABEL_SENTINEL",
+        "HIDDEN_LABEL_SENTINEL",
+        "secret.txt",
+        "unlisted",
+    ):
+        assert secret not in text
+    assert facts["staged"] == {"files": 1, "lines": 2}
+    assert facts["prompt_words"] == 3
+    assert facts["result_shape"] == [{"name": "answer", "type": "enum"}]
+    assert facts["conditions"]["network"] == "bridge"
+    assert facts["conditions"]["read_only_root"] is True
+    live = facts["live"]
+    assert live["runs"] == 2 and live["passed"] == 1
+    assert live["avg_pass_rate"] == 0.5
+    assert live["wilson"] == list(lb.wilson(1, 2))
+    assert live["checkpoints"] == [
+        {"position": 1, "label": "Quality", "recorded": 2, "clear_rate": 0.5}
+    ]
+    assert live["more_checks"] == 2  # One count-only, one unlisted, no hidden.
+    assert live["retirements"] == {"undisclosed": 1, "1": 1}
+    assert live["fuel"] == {
+        "input_per_pass": 80,
+        "cached_percent": 75,
+        "output_per_pass": 4,
+    }
+
+
+def test_track_facts_unknown_measurements_and_exclusions(community_track):
+    loaded = lb.load_results(FIXTURE)
+    loaded.records = _track_records()
+    loaded.records[0]["excludedBecause"] = "infra:model_mismatch"
+    loaded.records[1]["tokens"]["cache"] = None
+    facts = lb.track_facts(community_track, loaded)
+    assert facts["live"]["runs"] == 1
+    assert facts["live"]["avg_pass_rate"] == 0
+    assert all(value is None for value in facts["live"]["fuel"].values())
+    loaded.records = []
+    facts = lb.track_facts(community_track, loaded)
+    assert facts["live"]["avg_pass_rate"] is None
+    assert facts["live"]["wilson"] is None
+
+
+@pytest.mark.parametrize(
+    "edit",
+    [
+        lambda text: text + "\nexpected_tests = 5\n",
+        lambda text: text.replace('challenge = "coding"', 'challenge = "docs"'),
+        lambda text: text.replace('disclose = "label"', 'disclose = "invalid"'),
+        lambda text: text + '\n[briefing]\nshow = "invalid"\n',
+    ],
+)
+def test_invalid_track_authored_data(community_track, edit):
+    path = community_track / "track.toml"
+    path.write_text(edit(path.read_text()))
+    assert lb.validate_track(community_track)[0]
+
+
+def test_track_infographic_reuse(community_track):
+    assert lb.validate_track(community_track, infographic_ids={"coding": "different"})[
+        0
+    ]
+
+
+def test_track_cli_preserves_first_infographic_mapping(
+    community_track, results, monkeypatch, capsys
+):
+    monkeypatch.setattr(lb, "MODULE_ROOT", results.parent)
+    for name, infographic in (
+        ("a-baseline", "coding"),
+        ("b-conflict", "different"),
+        ("c-baseline", "coding"),
+        ("d-conflict", "different"),
+    ):
+        task = results.parent / "tasks" / name
+        shutil.copytree(community_track, task)
+        card = task / "track.toml"
+        card.write_text(
+            card.read_text().replace(
+                'infographic = "coding"', f'infographic = "{infographic}"'
+            )
+        )
+    assert lb.main(["--results", str(results), "validate-track"]) == 1
+    errors = capsys.readouterr().err.splitlines()
+    assert [
+        error for error in errors if "conflicting infographic ids" in error
+    ] == [
+        "b-conflict: challenge has conflicting infographic ids",
+        "d-conflict: challenge has conflicting infographic ids",
+    ]
+    assert [
+        error for error in errors if "must reuse its infographic id" in error
+    ] == [
+        "b-conflict: track: existing challenge must reuse its infographic id",
+        "d-conflict: track: existing challenge must reuse its infographic id",
+    ]
+
+
+@pytest.mark.parametrize("level", lb.TRUST_LEVELS[1:])
+@pytest.mark.parametrize("missing", ["evidence", "sign_off"])
+def test_elevated_trust_requires_evidence_and_sign_off(results, level, missing):
+    trust = {
+        "level": level,
+        "evidence": ["https://example.com/evidence"],
+        "sign_off": "maintainer",
+    }
+    trust[missing] = [] if missing == "evidence" else None
+    (results / "meta/trust.json").write_text(
+        json.dumps({"schema": "paddock-trust/v1", "documents": {FIXTURE_DOC: trust}})
+    )
+    assert "elevated trust requires" in _errors(results)
+
+
+def test_trust_defaults_and_valid_evidence(results):
+    assert lb.load_results(results).trust == {}
+    for level in lb.TRUST_LEVELS:
+        trust = {
+            "level": level,
+            "evidence": ["https://example.com/evidence"],
+            "sign_off": "maintainer",
+        }
+        assert (
+            lb.validate_trust(
+                {"schema": "paddock-trust/v1", "documents": {FIXTURE_DOC: trust}},
+                {FIXTURE_DOC: {}},
+            )
+            == []
+        )
+    assert lb.validate_trust(
+        {"schema": "paddock-trust/v1", "documents": {"missing.json": trust}}, {}
+    )
+
+
+def _fork_pin():
+    return {"repository": "https://example.com/community/paddock", "commit": "a" * 40}
+
+
+def test_additive_fork_fields_validate(results):
+    def mutate(doc):
+        doc["source"]["fork"] = _fork_pin()
+        doc["records"][0]["track"] = {
+            **_fork_pin(),
+            "path": "tasks/community/track.toml",
+            "task_version": doc["records"][0]["task_version"],
+            "sha256": "sha256:" + "b" * 64,
+        }
+
+    _edit(results, mutate)
+    assert lb.load_results(results)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda pin: pin.update(repository="http://example.com/paddock"),
+        lambda pin: pin.update(commit="abcdef1"),
+        lambda pin: pin.update(path="../track.toml"),
+        lambda pin: pin.update(path="tasks/hidden/track.toml"),
+        lambda pin: pin.update(task_version=99),
+        lambda pin: pin.update(sha256="bad"),
+    ],
+)
+def test_fork_pin_validation(results, mutation):
+    def mutate(doc):
+        pin = {
+            **_fork_pin(),
+            "path": "tasks/community/track.toml",
+            "task_version": doc["records"][0]["task_version"],
+            "sha256": "sha256:" + "b" * 64,
+        }
+        mutation(pin)
+        doc["records"][0]["track"] = pin
+
+    _edit(results, mutate)
+    assert "track" in _errors(results)
+
+
+def test_templates_not_discovered_as_results():
+    assert all(
+        path.parent == lb.DEFAULT_RESULTS
+        for path in lb.result_paths(lb.DEFAULT_RESULTS)
+    )
+
+
+def test_external_track_exhibition_never_scores():
+    row = copy.deepcopy(lb.load_results(FIXTURE).records[0])
+    row.update(verdict="passed", excludedBecause=None)
+    assert lb.included(row)
+    row["track"] = {
+        **_fork_pin(),
+        "path": "tasks/community/track.toml",
+        "task_version": row["task_version"],
+        "sha256": "sha256:" + "b" * 64,
+    }
+    assert not lb.included(row)
+    assert lb.boards([row]) == []
+    summary = lb.summarize([row])
+    assert summary["n"] == 0 and summary["rate"] is None
+    assert summary["excluded"] == {"exhibition:external-track": 1}
+    assert lb.exclusion_counts([row]) == {"exhibition:external-track": 1}
+
+
+@pytest.mark.parametrize("value", [[], {}, 1, None])
+def test_malformed_entry_hash_is_a_validation_error(value):
+    entry = _community_entry()
+    entry["car"]["config_hash"] = value
+    assert lb.validate_entry(entry)
+
+
+def test_toml_only_descriptor_values_rejected():
+    import datetime
+
+    entry = _community_entry()
+    entry["car"]["descriptor"]["date"] = datetime.date(2026, 1, 1)
+    assert lb.validate_entry(entry)
+
+
+def test_legacy_track_facts_remain_readable(community_track):
+    loaded = lb.load_results(FIXTURE)
+    loaded.records = _track_records()
+    for row in loaded.records:
+        row.pop("checks")
+    facts = lb.track_facts(community_track, loaded)
+    assert facts["warnings"] == ["checkpoints unverified"]
+    assert facts["live"]["retirement_unrecorded"] == 2
+    assert facts["live"]["checkpoints"][0]["clear_rate"] is None
+
+
+def test_community_cli_commands(community_track):
+    commands = [
+        ["validate-entry"],
+        ["validate-track", str(community_track)],
+        ["track-facts", str(community_track)],
+    ]
+    for command in commands:
+        proc = subprocess.run(
+            [sys.executable, str(lb.MODULE_ROOT / "scripts/leaderboard.py"), *command],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert proc.returncode == 0, proc.stderr
+        if command[0] == "track-facts":
+            assert json.loads(proc.stdout)["conditions"]["network"] == "bridge"
+        if command[0] == "validate-track":
+            assert "checkpoints unverified" in proc.stderr
+
+
+@pytest.mark.parametrize("entry_id", [None, "INVALID"])
+def test_entry_cli_filename_check_requires_valid_entry(tmp_path, capsys, entry_id):
+    source = next((lb.DEFAULT_RESULTS / "entries").glob("*.toml")).read_text()
+    invalid = tmp_path / "invalid.toml"
+    invalid.write_text(
+        "\n".join(
+            (f'id = "{entry_id}"' if entry_id is not None else "")
+            if line.startswith("id = ")
+            else line
+            for line in source.splitlines()
+        )
+    )
+    mismatch = tmp_path / "mismatch.toml"
+    mismatch.write_text(source)
+    problems = lb.validate_entry(lb.read_toml(invalid))
+    assert problems
+    assert lb.main(["validate-entry", str(invalid), str(mismatch)]) == 1
+    assert capsys.readouterr().err.splitlines() == [
+        *(f"invalid.toml: {problem}" for problem in problems),
+        "mismatch.toml: filename must match id",
+    ]
+
+
+@pytest.mark.parametrize(
+    "runs,passed,difficulty",
+    [
+        (100, 100, 1),
+        (100, 90, 1),
+        (100, 89, 2),
+        (100, 75, 2),
+        (100, 74, 3),
+        (100, 60, 3),
+        (100, 59, 4),
+        (100, 40, 4),
+        (100, 39, 5),
+        (100, 0, 5),
+        (9, 9, None),
+        (10, 9, 1),
+        (0, 0, None),
+    ],
+)
+def test_track_difficulty_edges(community_track, runs, passed, difficulty):
+    loaded = lb.load_results(FIXTURE)
+    row = _track_records()[0]
+    loaded.records = [
+        dict(row, verdict="passed" if i < passed else "failed") for i in range(runs)
+    ]
+    live = lb.track_facts(community_track, loaded)["live"]
+    assert live["difficulty"] == difficulty
+    assert live["difficulty_reason"] == ("not enough runs" if runs < 10 else None)
+
+
+@pytest.mark.parametrize(
+    "bundle,valid",
+    [
+        ({"sha256": "a" * 64, "key_id": "submitter-key"}, True),
+        ({"sha256": "A" * 64, "key_id": "submitter-key"}, True),
+        ({"sha256": "sha256:" + "a" * 64, "key_id": "key"}, False),
+        ({"sha256": "g" * 64, "key_id": "key"}, False),
+        ({"sha256": "a" * 63, "key_id": "key"}, False),
+        ({"sha256": "a" * 64, "key_id": " "}, False),
+        ({"sha256": "a" * 64, "key_id": 1}, False),
+        ({"sha256": "a" * 64}, False),
+        (None, False),
+    ],
+)
+def test_answers_bundle_shape_only(results, bundle, valid):
+    _edit(results, lambda doc: doc.update(answers_bundle=bundle))
+    if valid:
+        assert lb.load_results(results)
+    else:
+        assert "answers_bundle" in _errors(results)
+
+
+def test_track_difficulty_minimum_uses_only_counted_runs(community_track):
+    loaded = lb.load_results(FIXTURE)
+    row = _track_records()[0]
+    loaded.records = [copy.deepcopy(row) for _ in range(10)]
+    loaded.records[0]["excludedBecause"] = "infra:model_mismatch"
+    assert lb.track_facts(community_track, loaded)["live"]["difficulty"] is None
+    loaded.records[0]["excludedBecause"] = None
+    assert lb.track_facts(community_track, loaded)["live"]["difficulty"] == 1

@@ -1,0 +1,22 @@
+// Template only: remove comments and replace placeholders before signing.
+// Never commit the filled bundle or answer files. See CONTRIBUTING for canonical JSON.
+{
+  "manifest": {
+    // Ed25519 public-key registration returns this id; it is signed too.
+    "key_id": "",
+    "runs": [
+      {
+        "run_id": "",
+        "answer_file": "answers/run-001.json",
+        // Bare SHA-256 of the exact answer file bytes (64 hex characters).
+        "sha256": "",
+        "results_document": "results/2026-01-01-example.json",
+        // Full 40-character fork commit and pinned task/verifier version.
+        "fork_commit": "",
+        "verifier": {"task": "", "task_version": 1}
+      }
+    ]
+  },
+  // Base64 Ed25519 signature over canonical manifest JSON, including key_id.
+  "signature": ""
+}

@@ -87,6 +87,232 @@ Rules for a bundle:
   not.
 - One harness configuration and one model per document.
 
+## Submit an entry
+
+Copy [`results/templates/entry.toml`](results/templates/entry.toml) to
+`results/entries/<entry-id>.toml`. An entry is a driver (`provider/model`), a car
+(the harness configuration hash), and an engine map (reasoning level, or
+`default` for a record's null reasoning). Changing any one creates a different
+entry. Set `team` to your GitHub user or organisation; paddock-run entries use
+`agent-paddock`. Choose a car number from 1 to 99 and optionally a `car-*` livery
+colour token from `design/tokens.json`. Livery identifies a car, never a value.
+
+State the harness CLI version, or `unrecorded`, and copy the exact descriptor
+into `[car.descriptor]`. Compute `car.config_hash` with
+`scripts/leaderboard.py`'s `config_hash(descriptor)`: SHA-256 of sorted, compact
+UTF-8 JSON, prefixed `sha256:`. TOML ordering does not affect it. Tires name a
+`locks/<name>.lock.json` file, or use the inline `{schema, agent, tools}` lock
+shape (`gym-tool-surface-lock/v1`). A lock is a declared tool surface, not proof
+of historical native tool availability.
+
+For a new configuration, copy the entry's entire briefing and radio tables
+under the descriptor as well. A briefing is `{kind = "vendor-default"}`, or
+`{sha256 = "sha256:<64 hex>", summary = "One public line"}` for custom
+instruction text. Team radio is `{skills = []}` or a list of skills with a name
+and exactly one version or SHA-256. The board does not measure team radio yet.
+These declarations, including custom instruction hashes and skill versions or
+hashes, affect the configuration hash. Keep private instruction text private.
+
+The three worked examples in `results/entries/` use unchanged descriptors with
+graded committed records. Their briefing is `{kind = "unrecorded"}` and radio
+is `{status = "unrecorded"}` because those historical details were not captured.
+Only the frozen legacy hashes qualify for that exception. Never edit an old
+hash to add provenance retrospectively. Optional record `entry` references must
+resolve and agree on provider id, reasoning and configuration hash (and harness).
+
+```bash
+python3 scripts/leaderboard.py validate-entry
+python3 scripts/leaderboard.py validate-entry results/entries/<entry-id>.toml
+python3 scripts/leaderboard.py validate
+```
+
+## Submit a track
+
+Copy [`results/templates/track.toml`](results/templates/track.toml) beside your
+`tasks/<task-id>/task.toml`. The public track card authors a circuit `name`,
+one-sentence `pitch` without answer hints, `challenge` equal to the task's
+`suite`, and an `infographic` id. Reuse an existing challenge's infographic id;
+a new challenge type names a new id. The initial cards use `hard-review`, `fix`
+and `docs` respectively. Discovery still reads only `*/task.toml`.
+
+List checkpoints in lap order using verifier subcheck names, plain public
+labels, and `disclose`: `label` exposes the label and clear rate; `count`
+contributes only to “N more checks”; `hidden` is omitted. Recorded checks not
+listed in the card also contribute to “N more checks”. Use `count` for docs
+fact names, since those can reveal required facts. `[briefing] show` is `full`
+by default, or `excerpt` or `none`: a future renderer uses this policy for the
+already-public prompt. The derived JSON includes prompt word count, never its
+text. No renderer is added by these contracts.
+
+`validate-track` compares checkpoint names only with committed records carrying
+`checks` for the exact task, challenge and version. If no such records carry
+`checks`, it accepts with “checkpoints unverified”, including when legacy rows
+without `checks` exist. When records carrying `checks` exist (even an empty
+list), a name absent from all of them is an error. The three worked cards
+therefore validate today with that warning. No historical evidence is
+fabricated or backfilled. `track-facts` uses the same rule and reports unknown
+checkpoint metrics until checkpoint-bearing exports arrive.
+
+```bash
+python3 scripts/leaderboard.py validate-track
+python3 scripts/leaderboard.py validate-track tasks/<task-id>
+python3 scripts/leaderboard.py track-facts tasks/<task-id>
+```
+
+`track_facts(task_dir, results)` and `track-facts` return
+`paddock-track-facts/v1` JSON. Static facts are suite/version, staged file and
+line counts, prompt word count, result field names/types (including list item
+shapes), and hidden test count (`expected_tests`, null if unspecified). Counts
+come from the shared public staging helper in a temporary directory; the
+command executes trusted stage scripts, so review a fork before running it.
+It does not grade or run a model. Conditions describe standalone defaults:
+CPU, memory, pids, time limit, read-only root, tmpfs, dropped capabilities and
+**bridge** network mode. Bridge allows network access; offline calibration is
+a separate verifier requirement.
+
+Live facts pool included graded attempts for only this task version, with
+entries identified by the identity triple, avg pass rate and its 95% Wilson
+interval, and `difficulty` from 1 to 5. Difficulty uses that average pass rate:
+90% or more is 1; 75% to below 90% is 2; 60% to below 75% is 3;
+40% to below 60% is 4; below 40% is 5. Below 10 counted runs,
+`difficulty` is null and `difficulty_reason` is "not enough runs"; otherwise
+the reason is null. Live facts also include checkpoint clear rates over attempts
+recording that check, and
+retirements at the first failed required checkpoint in card order. Undisclosed
+retirements pool under `undisclosed`; absent checkpoint data is counted as
+unrecorded. Rates and fuel are null when unmeasured. The fuel triad is total
+input (fresh plus cached) and output across all included attempts divided by
+races passed, plus the cached share of input. Excluded infrastructure rows do
+not contribute to rates or fuel. External pinned tracks never pool with local
+tasks that happen to have the same id.
+
+Derived fields are never accepted in `track.toml`. Neither cards nor derived
+output may contain verifier descriptions, content under `expected/` or
+`hidden/`, grading reason strings, defect/decoy locations, or correct answer
+values. The facts function projects names and types without enum values or
+field descriptions and never reads or serializes grading-only files.
+
+A community track starts as **exhibition** and never enters standings until a
+maintainer promotes it to the calendar. Calibration, implemented in a later
+runner, requires all of:
+
+- Its verifier passes the reference solution and fails an empty submission.
+- Staging copies nothing from `expected/` or `hidden/`; the verifier carries
+  `GYM-GROUND-TRUTH-NEVER-STAGE`.
+- Two grades of the same submission agree.
+- The track runs offline and inside its track limits.
+- The track is MIT-licensed.
+
+A card's author cannot promote it: exhibition/calendar admission is a
+maintainer decision, separate from authored card data.
+
+## Results from a fork
+
+Use [`results/templates/results.json`](results/templates/results.json) as a
+blank shape alongside the run-bundle procedure. Fill required fields; remove
+optional `entry`, `track`, `answers_bundle` and `source.fork` when not applicable.
+Delete the
+placeholder `checks` list if checks were not recorded. The existing
+`paddock-results/v1` schema remains: all additions are optional, so existing
+committed documents and hashes retain their meaning. Results discovery reads
+only top-level `results/*.json` and `results/*.json.gz`, never templates.
+
+`from-run` copies a cell's `subchecks` into optional record `checks`, retaining
+only `{name, ok, required}`. `ok` and `required` are booleans; names are unique.
+Absent means not recorded. Any `reason` key is a validation error because it
+can reveal answers. Do not commit raw runs or submitted answers.
+
+Optional document `source.fork` is `{repository, commit}`: an HTTPS repository
+URL without credentials, query or fragment and a full 40-character lowercase
+hex commit. A record for a track outside this repository's tasks additionally
+carries `track = {repository, commit, path, task_version, sha256}`. Its `path`
+is a repository-relative path ending in `/track.toml`, with no traversal or
+grading-only directories. `sha256` is `sha256:<64 hex>` of the pinned track
+card bytes; task version must equal the record's version. Each pin is explicit;
+validation checks its shape without fetching or trusting external code. A
+maintainer must verify the pinned content when re-grading. The source fork is
+provenance, not an authority to set trust or enter an exhibition in standings.
+Records with an external `track` pin are excluded as
+`exhibition:external-track` by the shared aggregation contract. Promotion
+requires a later maintainer calendar workflow; neither trust nor a card
+field can bypass this exclusion.
+
+## Trust levels
+
+`results/meta/trust.json` is maintainer-owned, like `fairness.json`. Its schema
+is `paddock-trust/v1`; `documents` maps exact results filenames (including
+`.gz` when used) to `{level, evidence, sign_off}`. Missing entries default to
+`self-reported`; an empty mapping makes no retrospective trust claims.
+
+| Level | What the evidence establishes |
+|---|---|
+| `self-reported` | Schema-valid submission with costs recomputed from committed prices. |
+| `re-graded` | A maintainer grades submitted answers with the pinned verifier and confirms the verdicts. |
+| `reproduced` | A maintainer re-runs a sample with the entry configuration and obtains results inside its interval. |
+| `paddock-run` | A maintainer attests that the paddock ran the bundle. |
+
+Every level above `self-reported` requires nonempty `evidence` and maintainer
+`sign_off`. Evidence is a list of public HTTPS or repository references using
+the fairness reference rules; self-reported entries may use `[]` and null
+sign-off. Submitters leave promotions to maintainers. `validate` cross-checks
+trust documents and entry references along with costs. The main standings count
+only `reproduced` and `paddock-run` results.
+The community board shows every trust level, each with its badge. Exhibition
+admission remains separate. These are the rules for the forthcoming board
+rendering; this contract change does not implement those pages.
+
+## Signed answers and submission API contract
+
+To request re-grading, first obtain a signing key id from the paddock by
+registering a signing public key, then submit the signed answers bundle to the
+paddock submission API. Generate the Ed25519 key pair locally and register only
+the public key: the private key should never leave the submitter's machine.
+Key registration is bound to the authenticated submitter's GitHub account.
+Never commit answers or private keys. Publish only verdict agreement and safe
+evidence references.
+
+The [annotated bundle template](results/templates/answers-bundle.jsonc) defines
+the envelope. Its manifest lists each `run_id`, the repository-relative answer
+file path and its bare 64-hex SHA-256, the results document it belongs to, the
+full fork commit, and the verifier's task id and version. `key_id` is inside
+the manifest so the signature binds it too. Run ids and answer paths must be
+unique; paths cannot be absolute, traverse parents or name links. Upload the
+UTF-8 JSON envelope with the answer files as multipart form data. Each file
+must match its manifest digest; no unlisted files are accepted.
+
+Sign the canonical manifest JSON bytes with Ed25519. Canonical JSON here is
+UTF-8, keys sorted lexicographically at every object level, no insignificant
+whitespace, Unicode preserved without normalization, and no optional slash
+escaping. Manifest values use strings and integers only (plus arrays and
+objects); no floats or duplicate object keys. Use `canonical_json` from
+`scripts/leaderboard.py` for this encoding. Keep the runs array order as
+submitted. Encode the 64-byte signature with standard padded Base64.
+`sha256` identifying the bundle is the bare hex digest of the canonical full
+JSON envelope (manifest plus signature); answer bytes are bound by their
+manifest digests.
+
+An optional results-document field is
+`"answers_bundle": {"sha256": "<64 hex>", "key_id": "<non-empty string>"}`.
+It names the bundle a maintainer re-grades from. `validate` checks only this
+shape, without fetching a bundle, looking up keys or verifying signatures.
+
+The following relative API paths are a contract for a separately built
+endpoint. Authentication establishes the GitHub account for every operation;
+a submitter may upload and read only their own bundles. No server, key store,
+client or network implementation is included here.
+
+| Operation | Request | Success response | Errors |
+|---|---|---|---|
+| `POST /submission/keys` | JSON `{"algorithm":"Ed25519","public_key":"<Base64 32-byte public key>"}` | `201 {"key_id":"<id>","github_account":"<authenticated account>","algorithm":"Ed25519"}` | `400` malformed key or unsupported algorithm; `401` unauthenticated; `409` key already registered (returns existing key id for the same account) |
+| `POST /submission/bundles` | Multipart `bundle` (JSON envelope) and `answers` (files at manifest paths) | `202 {"sha256":"<bundle digest>","key_id":"<id>","status":"pending"}` | `400` malformed manifest, duplicate ids, unsafe paths or missing/extra files; `401` unauthenticated; `403` key not owned by account; `404` unknown key; `422` invalid signature, answer digest mismatch or incompatible results/fork/verifier pin; `409` duplicate bundle (returns existing digest and status) |
+| `GET /submission/bundles/{sha256}` | Bundle digest in path; no body | `200 {"sha256":"<digest>","key_id":"<id>","status":"pending\|re-grading\|complete\|rejected","verdict_agreement":null,"evidence":[]}` | `400` malformed digest; `401` unauthenticated; `403` not owned by account; `404` unknown bundle |
+
+A completed status carries `verdict_agreement` as a boolean and public-safe
+`evidence` references. Pending or re-grading statuses use null agreement;
+rejected status adds a safe `error` code without answer text or grading
+reasons. Maintainers re-grade using the pinned task version and fork commit;
+a valid signature establishes authorship, never trust promotion.
+
 ## Fairness checklist
 
 `results/meta/fairness.json` holds the checklist every harness configuration is

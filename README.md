@@ -193,6 +193,8 @@ modules/adversarial-eval-gym/
   scripts/render_social_card.py  # headless Chrome: card source -> social-card.png
   scripts/import_eval_bench.py # eval-bench evidence -> results/ (PDK-04)
   results/               # leaderboard results, price tables, changelog, fairness (PDK-04)
+  results/entries/       # driver configuration setup sheets, pinned by config hash
+  results/templates/     # blank entry, track and fork-results contracts
   design/                # design system: tokens, glyphs, vocabulary, illustration mocks (PDKDESIGN-01)
   CONTRIBUTING.md        # run bundles, reproduction, vendor corrections (PDK-04)
   bin/hq-gym             # hq gym wrapper (routed from worker-pool/bin/hq)
@@ -369,6 +371,20 @@ fails if any other module, or a script, imports an Agent OS package or a
 host-plugin module.
 
 ## Leaderboard (PDK-04)
+
+Community [entry, track and fork-results contracts](CONTRIBUTING.md#submit-an-entry)
+provide driver configuration setup sheets, public track cards and optional
+checkpoint records. `scripts/leaderboard.py validate-entry`, `validate-track`
+and `track-facts <task-dir>` validate and derive their public facts; `validate`
+also checks entry references and maintainer-owned trust levels. Historical hashes
+stay unchanged, missing telemetry stays unknown, and community tracks begin as
+exhibition. The main standings count only `reproduced` and `paddock-run`
+results; the community board shows every trust level with its badge. Submitters
+register an Ed25519 public key bound to their GitHub account, then upload signed
+answers to the paddock submission API for re-grading, as defined in the
+[API contract](CONTRIBUTING.md#signed-answers-and-submission-api-contract).
+These contracts prepare later race cards, entry pages and board rendering;
+they do not implement those pages or the submission endpoint.
 
 The open leaderboard is built only from the committed `results/` tree:
 
