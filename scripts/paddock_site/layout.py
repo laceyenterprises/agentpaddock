@@ -312,23 +312,28 @@ def social_meta(title: str, url: str) -> str:
     )
 
 
-def _current(route: Route, current: str) -> str:
-    return ' aria-current="page"' if route.file == current else ""
+def _current(route: Route, current: str, nav_current: str | None = None) -> str:
+    active = current if nav_current is None else nav_current
+    return ' aria-current="page"' if route.file == active else ""
 
 
-def nav_bar(routes: Sequence[Route], current: str) -> str:
+def nav_bar(
+    routes: Sequence[Route], current: str, *, nav_current: str | None = None
+) -> str:
     """The inline nav, shown at 720 px and wider."""
     links = "".join(
-        f'<a href="{href(route.file, current)}"{_current(route, current)}>{esc(route.label)}</a>'
+        f'<a href="{href(route.file, current)}"{_current(route, current, nav_current)}>{esc(route.label)}</a>'
         for route in nav_routes(tuple(routes), BAR)
     )
     return f'<nav class="nav-wide" aria-label="Main">{links}</nav>'
 
 
-def nav_panel(routes: Sequence[Route], current: str) -> str:
+def nav_panel(
+    routes: Sequence[Route], current: str, *, nav_current: str | None = None
+) -> str:
     """The menu panel below 720 px: every nav item, each with its glyph."""
     links = "".join(
-        f'<a href="{href(route.file, current)}"{_current(route, current)}>'
+        f'<a href="{href(route.file, current)}"{_current(route, current, nav_current)}>'
         f"{glyphs.icon(route.nav_glyph)}{esc(route.label)}</a>"
         for route in nav_routes(tuple(routes), BAR, PANEL)
     )
@@ -337,13 +342,15 @@ def nav_panel(routes: Sequence[Route], current: str) -> str:
     )
 
 
-def header(routes: Sequence[Route], current: str) -> str:
+def header(
+    routes: Sequence[Route], current: str, *, nav_current: str | None = None
+) -> str:
     return (
         '<header class="nav"><div class="wrap">'
-        f'<div class="nav-bar">{brand(up(current))}{nav_bar(routes, current)}'
+        f'<div class="nav-bar">{brand(up(current))}{nav_bar(routes, current, nav_current=nav_current)}'
         '<button type="button" class="nav-burger" aria-expanded="false" '
         f'aria-controls="site-menu" aria-label="Menu" hidden>{MENU_STROKES}{CLOSE_STROKES}</button>'
-        f"</div>{nav_panel(routes, current)}</div></header>"
+        f"</div>{nav_panel(routes, current, nav_current=nav_current)}</div></header>"
     )
 
 
@@ -351,12 +358,14 @@ def _footer_group(title: str, links: str) -> str:
     return f"<div><h2>{esc(title)}</h2><ul>{links}</ul></div>"
 
 
-def footer(routes: Sequence[Route], current: str) -> str:
+def footer(
+    routes: Sequence[Route], current: str, *, nav_current: str | None = None
+) -> str:
     """Disclaimer, independence line, every page and the source links."""
 
     def item(route: Route) -> str:
         return (
-            f'<li><a href="{href(route.file, current)}"{_current(route, current)}>'
+            f'<li><a href="{href(route.file, current)}"{_current(route, current, nav_current)}>'
             f"{esc(route.label)}</a></li>"
         )
 
@@ -396,12 +405,14 @@ def page(
     url: str,
     canonical: bool = False,
     main_class: str = "",
+    nav_current: str | None = None,
 ) -> str:
     """One whole page in the shared layout.
 
     ``current`` is the page's output file (``"learn/index.html"``), which sets
-    every relative link and the ``aria-current`` marks; ``url`` is its public
-    address for the share tags.
+    every relative link. ``nav_current`` selects the route for ``aria-current``
+    marks and defaults to ``current``; ``url`` is its public address for the
+    share tags.
     """
     root = up(current)
     head_link = f'<link rel="canonical" href="{SITE_URL}">' if canonical else ""
@@ -420,7 +431,7 @@ def page(
         + f'<link rel="stylesheet" href="{root}paddock.css">\n'
         f'<script src="{root}{SCRIPT_NAME}" defer></script>\n</head>\n<body>\n'
         f"{sprite()}\n"
-        f"{header(routes, current)}\n"
+        f"{header(routes, current, nav_current=nav_current)}\n"
         f'<main class="wrap">{inner}</main>\n'
-        f"{footer(routes, current)}\n</body>\n</html>\n"
+        f"{footer(routes, current, nav_current=nav_current)}\n</body>\n</html>\n"
     )

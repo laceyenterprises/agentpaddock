@@ -422,7 +422,8 @@ def document(
     name = filename or active
     return layout.page(
         routes=ROUTES,
-        current=active,
+        current=name,
+        nav_current=active,
         title=title,
         body=body,
         url=SITE_URL if name == "index.html" else SITE_URL + name,

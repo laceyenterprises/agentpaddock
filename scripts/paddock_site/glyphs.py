@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import html
 import re
+from functools import lru_cache
 from pathlib import Path
 
 DESIGN = Path(__file__).resolve().parents[2] / "design"
@@ -84,9 +85,15 @@ _SYMBOL_RE = re.compile(r"<symbol\b[^>]*>.*?</symbol>", re.DOTALL)
 _ID_RE = re.compile(r'<symbol\b[^>]*\bid="([^"]+)"')
 
 
+@lru_cache(maxsize=1)
+def _published_symbols(path: Path) -> tuple[str, ...]:
+    """Read and parse a sprite once per build process."""
+    return tuple(_SYMBOL_RE.findall(path.read_text(encoding="utf-8")))
+
+
 def published_symbols(path: Path = SPRITE_PATH) -> list[str]:
-    """The ``<symbol>`` elements of the published sprite, in file order."""
-    return _SYMBOL_RE.findall(path.read_text(encoding="utf-8"))
+    """The published symbols in file order, as a fresh list of cached markup."""
+    return list(_published_symbols(path))
 
 
 def published_ids(path: Path = SPRITE_PATH) -> list[str]:

@@ -1079,6 +1079,60 @@ def _between(page: str, start: str, end: str) -> str:
     return page.split(start, 1)[1].split(end, 1)[0]
 
 
+@pytest.mark.parametrize(
+    ("active", "header_marks"),
+    [
+        ("index.html", 0),
+        ("learn/index.html", 2),
+        ("contact/index.html", 1),
+        ("methodology.html", 0),
+    ],
+)
+@pytest.mark.parametrize(
+    "filename", ["board-example.html", "boards/example/index.html"]
+)
+def test_document_uses_output_path_for_links_and_active_route_for_marks(
+    active, header_marks, filename
+):
+    page = build_site.document("Example", active, "<h1>Example</h1>", filename=filename)
+    root = "../" * filename.count("/")
+    for asset in ("paddock.css", "paddock.js", "favicon.svg"):
+        assert f'"{root}{asset}"' in page
+    assert f'property="og:url" content="{build_site.SITE_URL}{filename}"' in page
+    header = _between(page, '<header class="nav">', "</header>")
+    footer = _between(page, '<footer class="footer">', "</footer>")
+    assert {r.file for r in build_site.ROUTES} <= _local_links(filename, footer)
+    for section, count in ((header, header_marks), (footer, 1)):
+        assert f'class="brand" href="{root}index.html"' in section
+        marked = re.findall(r'<a href="([^"]+)" aria-current="page"', section)
+        assert marked == [root + active] * count
+
+
+def test_sprite_reads_and_parses_each_path_once_and_returns_independent_lists(
+    tmp_path, monkeypatch
+):
+    paths = [tmp_path / "first.svg", tmp_path / "second.svg"]
+    for path, glyph_id in zip(paths, ("first", "second")):
+        path.write_text(
+            f'<svg><symbol id="{glyph_id}"></symbol></svg>', encoding="utf-8"
+        )
+    reads = []
+    read_text = Path.read_text
+
+    def counted_read(path, *args, **kwargs):
+        reads.append(path)
+        return read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", counted_read)
+    for path, glyph_id in zip(paths, ("first", "second")):
+        first = site_glyphs.sprite(path=path)
+        symbols = site_glyphs.published_symbols(path)
+        symbols.clear()
+        assert site_glyphs.sprite(path=path) == first
+        assert site_glyphs.published_ids(path) == [glyph_id]
+        assert reads.count(path) == 1
+
+
 def test_every_registered_route_builds_into_the_output(tmp_path):
     out = tmp_path / "site"
     assert build_site.main(["--results", str(FIXTURE), "--out", str(out)]) == 0

@@ -296,9 +296,9 @@ if (d >= 8) t = cap(LV[j]) + ' adds ' + d + ' points over ' + LV[pj] + more;
 else if (d <= -8) t = cap(LV[j]) + ' passes ' + (-d) + ' points less often than ' + LV[pj] + more;
 else t = cap(LV[j]) + ' lands within a few points of ' + LV[pj] + more;
 }
-if (j === bestJ) t += ' This is its best level here, honest range included.';
-else { const b = lad.levels[bestJ]; t += (cur[4] >= b[3]) ? ' Its honest range overlaps ' + LV[bestJ] + "'s, so the two are a statistical tie." : ' Clearly behind ' + LV[bestJ] + '.'; }
 const b = lad.levels[bestJ];
+if (j === bestJ) t += ' This is its best level here, honest range included.';
+else { t += (cur[4] >= b[3]) ? ' Its honest range overlaps ' + LV[bestJ] + "'s, so the two are a statistical tie." : ' Clearly behind ' + LV[bestJ] + '.'; }
 if (j !== bestJ && cur[2] != null && b[2] != null && cur[2] >= 2 * b[2]) t += ' It costs ' + (cur[2] / b[2]).toFixed(1) + ' times as much per run as ' + LV[bestJ] + '.';
 return t;
 };

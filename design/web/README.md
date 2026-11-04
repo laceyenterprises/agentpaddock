@@ -60,6 +60,11 @@ part of the design contract:
 header, nav, menu panel and footer, `glyphs.py` the inlined sprite and the
 race-type roundel). Each page carries `<meta name="paddock-site" content="pdw-1">`.
 Every link is relative, so a directory route is linked as its `index.html`.
+`layout.page(current=...)` uses the physical output file to calculate those
+links. Its optional `nav_current` selects the highlighted route and defaults
+to `current`; `document(..., filename=...)` supplies the output filename and
+active route separately. Glyph markup is read and parsed once per build
+process, then reused across pages.
 
 The bar shows at 720 px and wider; below that a menu button opens the panel,
 which holds the bar's items and the panel-only ones, each with its glyph. A
