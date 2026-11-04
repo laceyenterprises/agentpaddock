@@ -468,7 +468,7 @@ def build(reports: Path, results: Path) -> dict[str, str]:
                 )
         for name in v2_sources:
             table = price_table(
-                EVAL_BENCH_PRICE_TABLES.get(name, EVAL_BENCH_PRICE_TABLE)
+                EVAL_BENCH_PRICE_TABLES.get(Path(name).name, EVAL_BENCH_PRICE_TABLE)
             )
             document, published, unrecorded = import_eval_bench(
                 reports / name, table, existing_run_ids
