@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent Paddock: how a race works</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Saira:ital,wght@1,500;1,800&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,700;1,800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#007BFF}a:hover{color:#0057B3}
+@keyframes pdk-in-a{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pdk-in-b{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.in-a{animation:pdk-in-a .4s ease-out}
+.in-b{animation:pdk-in-b .4s ease-out}
+.pdk-g4{grid-template-columns:repeat(2,minmax(0,1fr))}
+.pdk-g6{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (min-width:560px){.pdk-g4{grid-template-columns:repeat(4,minmax(0,1fr))}.pdk-g6{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.hscroll{scrollbar-width:none}
+.hscroll::-webkit-scrollbar{display:none}
+
+.pdk-wide{display:flex}
+.pdk-burger{display:none}
+@media (max-width:719px){.pdk-wide{display:none}.pdk-burger{display:inline-flex}}
+@media (min-width:720px){.pdk-panel{display:none}}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #FFFFFF; color: #111111; font-family: Inter, -apple-system, Helvetica, Arial, sans-serif; --pdk-accent: {{acc}}; --pdk-green: #00C27A; --pdk-red: #E5202E; --pdk-yellow: #F5B700;">
+
+<header style="position: sticky; top: 0; z-index: 5; background: rgba(255,255,255,0.94); border-bottom: 1px solid #E3E7EC;">
+<div style="max-width: 1120px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+<a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #111111;" aria-label="Agent Paddock home">
+<svg viewBox="0 0 100 100" style="width: 34px; height: 34px;" aria-hidden="true"><g transform="translate(9 0) skewX(-10)"><rect x="18" y="16" width="64" height="68" rx="7" fill="#111111"></rect><rect x="26" y="26" width="8" height="12" fill="#007BFF"></rect><rect x="38" y="26" width="36" height="12" fill="#FFFFFF"></rect><rect x="26" y="44" width="8" height="12" fill="#00C27A"></rect><rect x="38" y="44" width="26" height="12" fill="#FFFFFF"></rect><rect x="26" y="62" width="8" height="12" fill="#E0703A"></rect><rect x="38" y="62" width="16" height="12" fill="#FFFFFF"></rect></g></svg>
+<span style="font-family: Saira, 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 19px; letter-spacing: 0.04em;">AGENT PADDOCK</span>
+</a>
+<nav class="pdk-wide" style="gap: 6px; margin-left: auto; align-items: center;" aria-label="Main">
+<a href="Learn.dc.html" aria-current="page" style="flex: none; padding: 10px 14px; border-radius: 999px; font-size: 15px; font-weight: 600; color: #FFFFFF; background: #111111; text-decoration: none;">Learn</a>
+<a href="Races.dc.html" style="flex: none; padding: 10px 14px; border-radius: 999px; font-size: 15px; font-weight: 500; color: #111111; text-decoration: none;">Races</a>
+<a href="Standings.dc.html" style="flex: none; padding: 10px 14px; border-radius: 999px; font-size: 15px; font-weight: 500; color: #111111; text-decoration: none;">Standings</a>
+<a href="Garage.dc.html" style="flex: none; padding: 10px 14px; border-radius: 999px; font-size: 15px; font-weight: 500; color: #111111; text-decoration: none;">Garage</a>
+<a href="PitWall.dc.html" style="flex: none; padding: 10px 14px; border-radius: 999px; font-size: 15px; font-weight: 500; color: #111111; text-decoration: none;">Pit wall</a>
+</nav>
+<button type="button" class="pdk-burger" onClick="{{toggleMenu}}" aria-expanded="{{menuOpen}}" aria-label="Menu" style="margin-left: auto; width: 48px; height: 48px; align-items: center; justify-content: center; border-radius: 14px; border: 1.5px solid #E3E7EC; background: #FFFFFF; color: #111111; cursor: pointer;"><sc-if value="{{menuClosed}}" hint-placeholder-val="{{true}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" style="width: 26px; height: 26px;" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"></path></svg></sc-if><sc-if value="{{menuOpen}}" hint-placeholder-val="{{false}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" style="width: 26px; height: 26px;" aria-hidden="true"><path d="M5.5 5.5l13 13M18.5 5.5l-13 13"></path></svg></sc-if></button>
+
+</div>
+<sc-if value="{{menuOpen}}" hint-placeholder-val="{{false}}">
+<nav class="pdk-panel in-a" aria-label="Main" style="max-width: 1120px; margin: 0 auto; padding: 4px 20px 16px; background: #FFFFFF; display: flex; flex-direction: column;">
+<a href="Learn.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 700;"><span style="color: var(--pdk-accent, #007BFF); display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><path d="M4 17.7C4 15 7 15 7 11.5M7 11.5C7 8 10.5 6.5 13 8.5M18.5 7.5c.4-2 1.5-3 3-3"></path><path d="M13 8.5c2.5 2 5 1.5 5.5-1" style="stroke:var(--pdk-accent, currentColor)"></path><circle cx="4" cy="19.5" r="1.8"></circle><circle cx="7" cy="11.5" r="1.6" fill="currentColor" stroke="none"></circle><circle cx="13" cy="8.5" r="1.6" fill="currentColor" stroke="none"></circle><circle cx="18.5" cy="7.5" r="1.6" fill="currentColor" stroke="none"></circle></svg></span>Learn</a>
+<a href="Races.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 2.5V6M16 2.5V6"></path><rect x="7" y="12.5" width="2" height="2" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect><rect x="11" y="12.5" width="2" height="2" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect><rect x="9" y="14.5" width="2" height="2" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect><rect x="13" y="14.5" width="2" height="2" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect><rect x="7" y="16.5" width="2" height="2" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect><rect x="11" y="16.5" width="2" height="2" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect></svg></span>Races</a>
+<a href="Standings.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2"></rect><path d="M8 12h1.5M12 12h4M8 16.5h1.5M12 16.5h4"></path><path d="M8 7.5h1.5M12 7.5h4" style="stroke:var(--pdk-accent, currentColor)"></path></svg></span>Standings</a>
+<a href="Garage.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><rect x="4.5" y="4.5" width="15" height="16.5" rx="2"></rect><path d="M9 3h6v3H9zM8 11h8M8 16h8"></path><circle cx="10" cy="11" r="1.7" fill="currentColor" stroke="none"></circle><circle cx="14" cy="16" r="1.7" stroke="none" style="fill:var(--pdk-accent, currentColor)"></circle></svg></span>Garage</a>
+<a href="PitWall.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><rect x="2.5" y="3.5" width="8.5" height="8" rx="1.5"></rect><rect x="13" y="3.5" width="8.5" height="8" rx="1.5"></rect><path d="M2 14.5h20M5 14.5v7M19 14.5v7M15.3 6.8h4M15.3 9h2.6"></path><path d="M4.6 9.2l1.7-2 1.5 1.3 1.7-2.2" style="stroke:var(--pdk-accent, currentColor)"></path></svg></span>Pit wall</a>
+<a href="Community.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><path d="M14.6 13.2V11.18a2.59 2.59 0 0 1 5.18 0v.86a1.15 1.15 0 0 1-1.15 1.15z"></path><rect x="16.98" y="10.03" width="2.81" height="1.3" rx=".65" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect><path d="M2.6 19.2 L2.6 16.4 L6.6 16.4 L7.4 17 L10 17 C10.6 15.5 11.4 14.4 12.6 14.4 C13.4 14.4 13.8 15 13.9 15.8 L14.2 16.3 L16.8 16.3 L17.3 15.8 C19 16.2 21 17 22.6 18.6 L22.6 19.2 Z"></path><path d="M1.5 10 L6.5 10 M2.6 10 L2.6 16.4"></path><circle cx="6.30" cy="19.60" r="2.90" fill="currentColor" stroke="none"></circle><circle cx="18.50" cy="19.80" r="2.60" fill="currentColor" stroke="none"></circle></svg></span>Community</a>
+<a href="Driver.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><path d="M3.5 18.5V12a8.5 8.5 0 0 1 17 0v3a3.5 3.5 0 0 1-3.5 3.5z"></path><rect x="11" y="9" width="9.5" height="3.6" rx="1.8" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect></svg></span>Drivers</a>
+<a href="Entry.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><rect x="9" y="7.5" width="6" height="13.5" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect><path d="M3 21v-8.5h6v-5h6v8h6V21z"></path></svg></span>An entry's season</a>
+<a href="Rulebook.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><path d="M12 6.5C10 5 7 4.5 3 4.5v14c4 0 7 .5 9 2 2-1.5 5-2 9-2v-14c-4 0-7 .5-9 2zM12 6.5v14"></path><path d="M15.5 5.6v5.9l1.5-1.5 1.5 1.5V5.2" style="stroke:var(--pdk-accent, currentColor)"></path></svg></span>Rulebook</a>
+<a href="Dictionary.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><rect x="4.5" y="3" width="15" height="18" rx="2"></rect><path d="M8 7.5h8M8 11h5"></path><path d="M8 18c0-2.6 1.8-4 4.5-4H16" style="stroke:var(--pdk-accent, currentColor)"></path></svg></span>Dictionary</a>
+<a href="RaceYourself.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><path d="M3 3.5h18M3 20.5h18M8 20.5V18M13 20.5V18M18 20.5V18"></path><path d="M3 9h18" stroke-dasharray="3 2.5"></path><path d="M5 13.5h11M13.5 11l2.5 2.5-2.5 2.5" style="stroke:var(--pdk-accent, currentColor)"></path></svg></span>Race it yourself</a>
+<a href="Contact.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><rect x="6.5" y="3" width="15" height="11" rx="1.5"></rect><path d="M10 14L5.5 21.5M10 10.5h8"></path><path d="M10 7h5" style="stroke:var(--pdk-accent, currentColor)"></path></svg></span>Contact and about</a>
+</nav>
+</sc-if>
+</header>
+
+<main style="max-width: 1120px; margin: 0 auto; padding: 0 20px 72px; display: flex; flex-direction: column; gap: 80px;">
+
+<section style="margin-top: 36px; display: flex; flex-direction: column; gap: 14px; max-width: 720px;">
+<span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; color: #4F5761;">LEARN</span>
+<h1 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: clamp(44px, 11vw, 80px); line-height: 0.92;">How an agent runs a race.</h1>
+<p style="margin: 0; font-size: 19px; line-height: 1.5; color: #4F5761;">Four sectors, the same for every entry. Tap the track to drive the next one.</p>
+</section>
+
+<section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 28px; align-items: center;">
+<div onClick="{{next}}" role="button" tabindex="0" aria-label="Drive to the next sector" style="border-radius: 24px; background: #F4F6F9; padding: 18px; cursor: pointer; display: flex; flex-direction: column; gap: 8px;">
+<svg viewBox="0 0 340 150" style="width: 100%; height: auto;" role="img" aria-label="A lap in four sectors; the car is at sector {{sectorNo}}">
+<path d="M24 118 C74 118 74 42 134 42 C194 42 194 108 254 108 C300 108 300 40 322 34" fill="none" stroke="#DCE0E6" stroke-width="22" stroke-linecap="round"></path>
+<path d="M24 118 C74 118 74 42 134 42 C194 42 194 108 254 108 C300 108 300 40 322 34" fill="none" stroke="{{acc}}" stroke-width="4" stroke-linecap="round" stroke-dasharray="{{dash}}" style="transition: stroke-dasharray .6s ease"></path>
+<g font-family="Saira Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="14" text-anchor="middle">
+<g onClick="{{jump0}}" style="cursor: pointer;"><circle cx="24" cy="118" r="17" fill="transparent"></circle><circle cx="24" cy="118" r="13" fill="{{dot0}}" stroke="#111111" stroke-width="2.5"></circle><text x="24" y="123" fill="{{num0}}">1</text></g>
+<g onClick="{{jump1}}" style="cursor: pointer;"><circle cx="134" cy="42" r="17" fill="transparent"></circle><circle cx="134" cy="42" r="13" fill="{{dot1}}" stroke="#111111" stroke-width="2.5"></circle><text x="134" y="47" fill="{{num1}}">2</text></g>
+<g onClick="{{jump2}}" style="cursor: pointer;"><circle cx="254" cy="108" r="17" fill="transparent"></circle><circle cx="254" cy="108" r="13" fill="{{dot2}}" stroke="#111111" stroke-width="2.5"></circle><text x="254" y="113" fill="{{num2}}">3</text></g>
+<g onClick="{{jump3}}" style="cursor: pointer;"><circle cx="322" cy="34" r="17" fill="transparent"></circle><circle cx="322" cy="34" r="13" fill="{{dot3}}" stroke="#111111" stroke-width="2.5"></circle><text x="322" y="39" fill="{{num3}}">4</text></g>
+</g>
+<g style="transform: {{carXf}}; transition: transform .6s cubic-bezier(.3,.7,.2,1);">
+<circle cx="0" cy="0" r="9" fill="{{acc}}" stroke="#FFFFFF" stroke-width="3"></circle>
+</g>
+</svg>
+<span style="font-size: 14px; color: #626C78; text-align: center;">{{tapHint}}</span>
+</div>
+<div class="{{secClass}}" style="display: flex; flex-direction: column; gap: 14px;">
+<div style="display: flex; align-items: center; gap: 14px;">
+<sc-if value="{{sec.gBriefing}}" hint-placeholder-val="{{true}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 48px; height: 48px;" aria-hidden="true"><rect x="4.5" y="3" width="15" height="18" rx="2"></rect><path d="M8 7.5h8M8 11h5"></path><path d="M8 18c0-2.6 1.8-4 4.5-4H16" style="stroke:var(--pdk-accent, currentColor)"></path></svg></sc-if>
+<sc-if value="{{sec.gTrack}}" hint-placeholder-val="{{false}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 48px; height: 48px;" aria-hidden="true"><path d="M12 1.5a10.5 10.5 0 1 0 .01 0zM12 7a5 5 0 1 1-.01 0z" fill="currentColor" fill-rule="evenodd" stroke="none"></path><circle cx="12" cy="12" r="7.8" stroke-width="1.6" style="stroke:var(--pdk-accent, currentColor)"></circle><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"></circle></svg></sc-if>
+<sc-if value="{{sec.gHandIn}}" hint-placeholder-val="{{false}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 48px; height: 48px;" aria-hidden="true"><rect x="5.000" y="4.0" width="3.625" height="4.5" fill="currentColor" stroke="none"></rect><rect x="12.250" y="4.0" width="3.625" height="4.5" fill="currentColor" stroke="none"></rect><rect x="8.625" y="8.5" width="3.625" height="4.5" fill="currentColor" stroke="none"></rect><rect x="15.875" y="8.5" width="3.625" height="4.5" fill="currentColor" stroke="none"></rect><path d="M5 4h14.5v9H5z"></path><path d="M5 21.5V3"></path></svg></sc-if>
+<sc-if value="{{sec.gStewards}}" hint-placeholder-val="{{false}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 48px; height: 48px;" aria-hidden="true"><path d="M4 21.5V8M20 21.5V8"></path><rect x="2.5" y="3" width="19" height="5"></rect><path d="M4 18h16" stroke-dasharray="2 2"></path><path d="M8.5 12.2l2.5 2.5 4.5-4.5" style="stroke:var(--pdk-accent, currentColor)"></path></svg></sc-if>
+<div style="display: flex; flex-direction: column; gap: 2px;">
+<span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; color: #4F5761;">SECTOR {{sectorNo}} OF 4</span>
+<span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 34px; line-height: 1;">{{sec.title}}</span>
+</div>
+</div>
+<p style="margin: 0; font-size: 18px; line-height: 1.55;">{{sec.body}}</p>
+<p style="margin: 0; padding: 14px 16px; border-radius: 14px; background: #EAF3FF; font-size: 16px; line-height: 1.5;"><b>Notice:</b> {{sec.notice}}</p>
+<div style="display: flex; gap: 10px;">
+<button type="button" onClick="{{back}}" style="min-height: 48px; padding: 0 20px; border-radius: 999px; border: 1.5px solid #111111; background: #FFFFFF; font: 600 16px Inter, sans-serif; cursor: pointer;">Back</button>
+<button type="button" onClick="{{next}}" style="min-height: 48px; padding: 0 22px; border-radius: 999px; border: 0; background: {{acc}}; color: #FFFFFF; font: 600 16px Inter, sans-serif; cursor: pointer;">{{nextLabel}}</button>
+</div>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 18px;">
+<span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; color: #4F5761;">TRY IT · THE ENGINE MAP</span>
+<h2 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: clamp(34px, 8vw, 54px); line-height: 0.95;">Does thinking harder help?</h2>
+<p style="margin: 0; font-size: 17px; line-height: 1.5; color: #4F5761; max-width: 640px;">{{ladderSub}}</p>
+<div class="hscroll" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px;" role="radiogroup" aria-label="Driver">
+<sc-for list="{{ladderChips}}" as="dc" hint-placeholder-count="6">
+<button type="button" role="radio" aria-checked="{{dc.on}}" onClick="{{dc.pick}}" style="flex: none; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1.5px solid {{dc.border}}; background: {{dc.bg}}; color: {{dc.fg}}; font: 600 15px Inter, sans-serif; cursor: pointer;">{{dc.name}}</button>
+</sc-for>
+</div>
+<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; max-width: 560px;">
+<sc-for list="{{maps}}" as="m" hint-placeholder-count="5">
+<button type="button" onClick="{{m.pick}}" aria-pressed="{{m.on}}" aria-disabled="{{m.off}}" title="{{m.why}}" style="min-height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border-radius: 16px; border: 1.5px {{m.dash}} {{m.border}}; background: {{m.bg}}; color: #111111; opacity: {{m.op}}; font: 600 13px Inter, sans-serif; cursor: {{m.cursor}};">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 32px; height: 32px;" aria-hidden="true"><circle cx="12" cy="13.5" r="6.5"></circle><path d="M12 2.5v2M4.6 6.1l1.4 1.4M19.4 6.1 18 7.5M2 13.5h2M20 13.5h2"></path><path d="{{m.needle}}" style="stroke:var(--pdk-accent, currentColor)"></path></svg>
+{{m.label}}
+</button>
+</sc-for>
+</div>
+<div class="{{mapClass}}" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; align-items: end; max-width: 760px;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 72px; line-height: 1;">{{mapNow.pct}}</span>
+<span style="font-size: 16px; color: #4F5761;">{{mapNow.runs}} · {{mapNow.usd}} per run</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<div style="position: relative; height: 22px; border-radius: 6px; background: #F4F6F9;" role="img" aria-label="Pass rate {{mapNow.pct}}, honest range {{mapNow.range}}">
+<span style="position: absolute; left: 0; top: 0; bottom: 0; width: {{mapNow.w}}; border-radius: 6px; background: {{acc}}; transition: width .5s ease;"></span>
+<span style="position: absolute; left: {{mapNow.lo}}; width: {{mapNow.span}}; top: 9px; height: 4px; background: #111111; transition: all .5s ease;"></span>
+</div>
+<span style="font-size: 14px; color: #626C78;">Honest range: {{mapNow.range}}</span>
+</div>
+</div>
+<p class="{{mapClass}}" style="margin: 0; font-size: 17px; line-height: 1.5; max-width: 720px;">{{mapNow.note}}</p>
+<span style="font-size: 13px; line-height: 1.45; color: #626C78; max-width: 720px;">{{ladderCaption}}</span>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 18px; max-width: 760px;">
+<div style="display: flex; align-items: center; gap: 10px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><path d="M3.5 7v10M20.5 7v10M3.5 12h17"></path><circle cx="14" cy="12" r="2.8" stroke="none" style="fill:var(--pdk-accent, currentColor)"></circle></svg><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; color: #4F5761;">TRY IT · HONEST RANGES</span></div>
+<h2 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: clamp(34px, 8vw, 54px); line-height: 0.95;">How sure is 96.3%?</h2>
+<p style="margin: 0; font-size: 17px; line-height: 1.5; color: #4F5761;">A pass rate is a measurement from a handful of races, so it comes with a range: where the true rate most likely sits. Change the number of runs and the passes, and watch the range move.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;" role="radiogroup" aria-label="Number of runs">
+<sc-for list="{{sizes}}" as="z" hint-placeholder-count="3">
+<button type="button" role="radio" aria-checked="{{z.on}}" onClick="{{z.pick}}" style="min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1.5px solid {{z.border}}; background: {{z.bg}}; color: {{z.fg}}; font: 600 15px Inter, sans-serif; cursor: pointer;">{{z.name}}</button>
+</sc-for>
+</div>
+<div style="padding: 22px; border-radius: 24px; background: #F4F6F9; display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+<div style="display: flex; align-items: center; gap: 10px;">
+<button type="button" onClick="{{less}}" aria-label="One fewer pass" style="width: 48px; height: 48px; border-radius: 14px; border: 1.5px solid #111111; background: #FFFFFF; font: 700 24px Inter, sans-serif; cursor: pointer;">−</button>
+<span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 34px; min-width: 120px; text-align: center; font-variant-numeric: tabular-nums;">{{hrK}} of {{hrN}}</span>
+<button type="button" onClick="{{more}}" aria-label="One more pass" style="width: 48px; height: 48px; border-radius: 14px; border: 1.5px solid #111111; background: #FFFFFF; font: 700 24px Inter, sans-serif; cursor: pointer;">+</button>
+</div>
+<span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 56px; line-height: 1;">{{hrPct}}</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px;" role="img" aria-label="Honest range {{hrRange}}">
+<div style="position: relative; height: 22px;"><span style="position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: #DCE0E6;"></span><span style="position: absolute; left: {{hrLo}}; width: {{hrSpan}}; top: 7px; height: 8px; border-radius: 4px; background: #9AA3AF; transition: all .5s ease;"></span><span style="position: absolute; left: {{hrDot}}; top: 3px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: {{acc}}; border: 3px solid #FFFFFF; box-sizing: border-box; transition: left .5s ease;"></span></div>
+<div style="position: relative; height: 16px;"><span style="position: absolute; left: 0%; top: 0; transform: translateX(0); font-size: 11px; color: #626C78;">0%</span><span style="position: absolute; left: 25%; top: 0; transform: translateX(-50%); font-size: 11px; color: #626C78;">25%</span><span style="position: absolute; left: 50%; top: 0; transform: translateX(-50%); font-size: 11px; color: #626C78;">50%</span><span style="position: absolute; left: 75%; top: 0; transform: translateX(-50%); font-size: 11px; color: #626C78;">75%</span><span style="position: absolute; left: 100%; top: 0; transform: translateX(-100%); font-size: 11px; color: #626C78;">100%</span></div>
+</div>
+<span style="font-size: 17px; line-height: 1.5;">Honest range: <b>{{hrRange}}</b>. {{hrNote}}</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<span style="font-size: 18px; font-weight: 600;">How the range is worked out</span>
+<div style="display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px 12px; font-size: 16px; line-height: 1.5;">
+<span style="font: 700 18px 'Saira Condensed', sans-serif; color: {{acc}};">1</span><span>Start with the score: <b>p</b> = passes ÷ runs. Here, {{hrK}} ÷ {{hrN}} = {{hrP}}.</span>
+<span style="font: 700 18px 'Saira Condensed', sans-serif; color: {{acc}};">2</span><span>Decide how sure to be. We use 95%, which sets <b>z</b> = 1.96.</span>
+<span style="font: 700 18px 'Saira Condensed', sans-serif; color: {{acc}};">3</span><span>Wilson's score interval pulls the centre a little toward 50% and sets the width from <b>p</b> and the number of runs <b>n</b>:</span>
+</div>
+<pre style="margin: 0; padding: 16px; border-radius: 14px; background: #0E1116; color: #E6EAF0; font: 13px/1.7 'JetBrains Mono', ui-monospace, Menlo, monospace; white-space: pre-wrap;">centre     = (p + z²/2n) ÷ (1 + z²/n)
+half-width = z × √( p(1 − p)/n + z²/4n² ) ÷ (1 + z²/n)
+range      = centre − half-width  to  centre + half-width</pre>
+<div style="display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px 12px; font-size: 16px; line-height: 1.5;">
+<span style="font: 700 18px 'Saira Condensed', sans-serif; color: {{acc}};">4</span><span>Why Wilson and not a flat plus-or-minus? It never runs past 0% or 100%, and it stays honest at the edges: {{hrPerfect}}</span>
+</div>
+<span style="font-size: 16px; line-height: 1.5; color: #4F5761;">Rule of thumb: to halve the range, run about four times as many races. And the board's one rule: <b style="color: #111111;">when two entries' ranges overlap, it calls them a tie.</b></span>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 18px;">
+<span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; color: #4F5761;">TRY IT · CHANGE THE CAR</span>
+<h2 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: clamp(34px, 8vw, 54px); line-height: 0.95;">Same driver. Different car.</h2>
+<p style="margin: 0; font-size: 17px; line-height: 1.5; color: #4F5761; max-width: 640px;">{{carSub}}</p>
+<div class="hscroll" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px;" role="radiogroup" aria-label="Driver">
+<sc-for list="{{carDriverChips}}" as="dc" hint-placeholder-count="6">
+<button type="button" role="radio" aria-checked="{{dc.on}}" onClick="{{dc.pick}}" style="flex: none; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1.5px solid {{dc.border}}; background: {{dc.bg}}; color: {{dc.fg}}; font: 600 15px Inter, sans-serif; cursor: pointer;">{{dc.name}}</button>
+</sc-for>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; max-width: 760px;">
+<sc-for list="{{cars}}" as="c" hint-placeholder-count="4">
+<button type="button" onClick="{{c.pick}}" aria-pressed="{{c.on}}" style="flex: none; min-height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 16px 0 12px; border-radius: 16px; border: 1.5px solid {{c.border}}; background: {{c.bg}}; color: #111111; font: 600 16px Inter, sans-serif; cursor: pointer; text-align: left;">
+<span style="width: 6px; height: 32px; border-radius: 2px; background: {{c.livery}};"></span>{{c.name}}
+</button>
+</sc-for>
+</div>
+<div class="{{carClass}}" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px; padding: 22px; border-radius: 24px; background: #F4F6F9; max-width: 760px;">
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; color: #4F5761;">{{carNow.eyebrow}}</span>
+<span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 76px; line-height: 0.9;">{{carNow.pct}}</span>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+<div style="padding: 12px 14px; border-radius: 14px; background: #FFFFFF; display: flex; flex-direction: column; gap: 4px;"><span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #626C78;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 20px; height: 20px; flex: none;" aria-hidden="true"><rect x="5.000" y="4.0" width="3.625" height="4.5" fill="currentColor" stroke="none"></rect><rect x="12.250" y="4.0" width="3.625" height="4.5" fill="currentColor" stroke="none"></rect><rect x="8.625" y="8.5" width="3.625" height="4.5" fill="currentColor" stroke="none"></rect><rect x="15.875" y="8.5" width="3.625" height="4.5" fill="currentColor" stroke="none"></rect><path d="M5 4h14.5v9H5z"></path><path d="M5 21.5V3"></path></svg>Races passed</span><span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 26px; line-height: 1;">{{carNow.of}}</span></div>
+<div style="padding: 12px 14px; border-radius: 14px; background: #FFFFFF; display: flex; flex-direction: column; gap: 4px;"><span style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #626C78;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 20px; height: 20px; flex: none;" aria-hidden="true"><path d="M4 21.5v-17A1.5 1.5 0 0 1 5.5 3h7A1.5 1.5 0 0 1 14 4.5v17M2.5 21.5h13M14 9.5h2a1.5 1.5 0 0 1 1.5 1.5v5.5a1.5 1.5 0 0 0 3 0V8.5L18 6"></path><rect x="6.5" y="6" width="5" height="4.5" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect></svg>Fuel bill</span><span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 26px; line-height: 1;">{{carNow.usd}}</span><span style="font-size: 12px; color: #626C78;">per race passed</span></div>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px; justify-content: center;">
+<span style="font-size: 13px; font-weight: 600; color: #4F5761;">{{carsLabel}}</span>
+<sc-for list="{{carBars}}" as="b" hint-placeholder-count="4">
+<div style="display: grid; grid-template-columns: 92px minmax(0, 1fr) 52px; gap: 10px; align-items: center; font-size: 14px;">
+<span style="font-weight: {{b.weight}};">{{b.name}}</span>
+<span style="height: 12px; border-radius: 4px; background: #FFFFFF;"><span style="display: block; height: 12px; width: {{b.w}}; border-radius: 4px; background: {{b.color}}; transition: background .3s, width .4s;"></span></span>
+<span style="text-align: right; font-variant-numeric: tabular-nums; font-weight: {{b.weight}};">{{b.pct}}</span>
+</div>
+</sc-for>
+<span style="font-size: 13px; line-height: 1.45; color: #626C78;">{{barCaption}}</span>
+</div>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 18px;">
+<span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; color: #4F5761;">READ THE FLAGS</span>
+<h2 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: clamp(34px, 8vw, 54px); line-height: 0.95;">Every run ends under a flag.</h2>
+<div class="pdk-g6" style="display: grid; gap: 10px; max-width: 760px;">
+<sc-for list="{{flags}}" as="f" hint-placeholder-count="6">
+<button type="button" onClick="{{f.pick}}" aria-pressed="{{f.on}}" style="min-height: 92px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border-radius: 16px; border: 1.5px solid {{f.border}}; background: {{f.bg}}; color: #111111; font: 600 14px Inter, sans-serif; cursor: pointer;">
+<sc-if value="{{f.checkered}}" hint-placeholder-val="{{false}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 34px; height: 34px;" aria-hidden="true"><rect x="5.000" y="4.0" width="3.625" height="4.5" fill="currentColor" stroke="none"></rect><rect x="12.250" y="4.0" width="3.625" height="4.5" fill="currentColor" stroke="none"></rect><rect x="8.625" y="8.5" width="3.625" height="4.5" fill="currentColor" stroke="none"></rect><rect x="15.875" y="8.5" width="3.625" height="4.5" fill="currentColor" stroke="none"></rect><path d="M5 4h14.5v9H5z"></path><path d="M5 21.5V3"></path></svg></sc-if>
+<sc-if value="{{f.dnf}}" hint-placeholder-val="{{false}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 34px; height: 34px;" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M9 9l6 6M15 9l-6 6" style="stroke:var(--pdk-red, #E5202E)"></path></svg></sc-if>
+<sc-if value="{{f.solid}}" hint-placeholder-val="{{false}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 34px; height: 34px;" aria-hidden="true"><path d="M5 4h14.5v9H5z" stroke="none" fill="{{f.color}}"></path><path d="M5 21.5V3"></path></svg></sc-if>
+{{f.name}}
+</button>
+</sc-for>
+</div>
+<div class="{{flagClass}}" style="padding: 18px 20px; border-radius: 18px; background: #F4F6F9; max-width: 760px; display: flex; flex-direction: column; gap: 4px;">
+<span style="font-size: 18px; font-weight: 600;">{{flagNow.name}} · {{flagNow.counted}}</span>
+<span style="font-size: 16px; line-height: 1.5; color: #4F5761;">{{flagNow.body}}</span>
+</div>
+</section>
+
+<section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
+<a href="Race.dc.html" style="display: flex; flex-direction: column; gap: 6px; padding: 24px; border-radius: 22px; background: #0E1116; color: #F2F4F7; text-decoration: none;"><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; color: #8B94A3;">NEXT</span><span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 32px;">Watch the hardest race</span></a>
+<a href="Garage.dc.html" style="display: flex; flex-direction: column; gap: 6px; padding: 24px; border-radius: 22px; background: #F4F6F9; color: #111111; text-decoration: none;"><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; color: #4F5761;">OR</span><span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 32px;">Build your own entry</span></a>
+</section>
+<footer data-pdk="footer" style="display: flex; flex-direction: column; gap: 6px; padding-top: 24px; border-top: 1px solid #E3E7EC; color: #626C78; font-size: 14px; line-height: 1.5;">
+<span style="font-family: Saira, 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; color: #111111;">AGENT PADDOCK</span>
+<span>AI-run benchmarks: a narrow measurement on a fixed set of races, not a comprehensive ranking of any model or harness.</span>
+<span>Independent and open source (MIT). Lacey Enterprises has no partnerships with, and no financial interest in, any product on the board.</span>
+<nav aria-label="Footer" style="display: flex; flex-wrap: wrap; gap: 4px 18px;"><a href="Rulebook.dc.html" style="color: #4F5761; font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Rulebook</a> <a href="Dictionary.dc.html" style="color: #4F5761; font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Dictionary</a> <a href="Community.dc.html" style="color: #4F5761; font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Community</a> <a href="RaceYourself.dc.html" style="color: #4F5761; font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Race it yourself</a> <a href="Contact.dc.html" style="color: #4F5761; font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Contact and about</a></nav>
+</footer>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#007BFF","options":["#007BFF","#111111","#00C27A"]},"$preview":{"width":390,"height":3000}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const acc = this.props.accent ?? '#007BFF';
+const secs = [
+{ title: 'The briefing', gBriefing: true, x: 24, y: 118, body: 'The driver gets its instructions: the task and the code to work on. Every entry gets exactly the same briefing, word for word.', notice: 'A review briefing is about 120 words. The answer is never in it.' },
+{ title: 'On the track', gTrack: true, x: 134, y: 42, body: 'The model drives its car. It reads files, runs commands and edits code with the tools its harness mounts: its tires. Nobody helps it mid-race.', notice: 'A hard review lap takes about seven minutes. Fuel burns the whole way.' },
+{ title: 'The hand-in', gHandIn: true, x: 254, y: 108, body: 'It writes its answer to one file and stops. Whatever it handed in is all the stewards will see.', notice: 'A run that hands in nothing is a DNF, short for did not finish, however close it got.' },
+{ title: 'The stewards', gStewards: true, x: 322, y: 34, body: 'Stewards check the answer against checks the driver never saw: hidden tests, planted defects and decoys. Pass every required check and it takes the checkered flag.', notice: 'On the hardest race, only one run in five gets through all of them.' }
+];
+const i = s.sec ?? 0;
+const sec = secs[i];
+const pct = (i + 1) / 4;
+const total = 400;
+const LIV = { 'Pi': '#007BFF', 'Codex': '#10A37A', 'Claude Code': '#E0703A', 'OpenCode': '#C2185B', 'Antigravity': '#D99A00' };
+const chipSt = (on) => ({ border: on ? '#111111' : '#E3E7EC', bg: on ? '#111111' : '#FFFFFF', fg: on ? '#FFFFFF' : '#111111' });
+const usd = (c) => c == null ? 'no price' : '$' + (c < 0.1 ? c.toFixed(3) : c.toFixed(2));
+const LADDERS = [{"driver":"Claude Opus 5.5","car":"Claude Code","levels":[[2,9,0.529,6.3,54.7],[5,9,0.552,26.7,81.1],[22,43,0.576,36.8,65.4],[26,33,1.18,62.2,89.3],[9,10,3.639,59.6,98.2]]},{"driver":"Claude Sonnet 5.5","car":"Claude Code","levels":[[4,9,0.275,18.9,73.3],[4,9,0.325,18.9,73.3],[12,19,0.263,41.0,80.9],[7,9,0.523,45.3,93.7],[8,9,3.071,56.5,98.0]]},{"driver":"Claude Haiku 5.5","car":"Claude Code","levels":[[6,9,0.024,35.4,87.9],[6,9,0.027,35.4,87.9],[7,11,0.039,35.4,84.8],[5,9,0.08,26.7,81.1],[4,9,0.363,18.9,73.3]]},{"driver":"GPT-6.1 Sol","car":"Codex","levels":[[8,9,0.059,56.5,98.0],[57,69,0.073,72.0,89.8],[44,63,0.087,57.6,79.8],[21,33,0.113,46.6,77.8],[6,9,0.131,35.4,87.9]]},{"driver":"GPT-6 Luna","car":"Codex","levels":[[1,9,0.003,2.0,43.5],[5,9,0.003,26.7,81.1],[7,9,0.005,45.3,93.7],[8,9,0.008,56.5,98.0],[7,9,0.008,45.3,93.7]]},{"driver":"Gemini 3.8 Flash","car":"Pi","levels":[[21,33,0.689,46.6,77.8],[33,40,0.366,68.1,91.3],[25,30,0.512,66.4,92.7],null,null]}];
+const LV = ['low', 'medium', 'high', 'xhigh', 'max'];
+const NEEDLE = ['M12 13.5L8 13.5', 'M12 13.5L9.17 10.67', 'M12 13.5L12 9.5', 'M12 13.5L14.83 10.67', 'M12 13.5L16 13.5'];
+const li = s.ld ?? 0;
+const lad = LADDERS[li];
+const avail = lad.levels.map((x, j) => x ? j : -1).filter((j) => j >= 0);
+const rateOf = (x) => x[0] / x[1] * 100;
+const bestJ = avail.slice().sort((p, q) => (lad.levels[q][3] - lad.levels[p][3]) || (rateOf(lad.levels[q]) - rateOf(lad.levels[p])) || ((lad.levels[p][2] ?? 0) - (lad.levels[q][2] ?? 0)))[0];
+const mi = avail.includes(s.map) ? s.map : bestJ;
+const m = lad.levels[mi];
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+const noteFor = (j) => {
+const cur = lad.levels[j]; const r = rateOf(cur);
+const pj = avail.filter((x) => x < j).slice(-1)[0];
+let t;
+if (pj == null) { t = 'At ' + LV[j] + ', ' + Math.round(r) + '% of runs pass, for ' + usd(cur[2]) + ' a run.'; }
+else {
+const prev = lad.levels[pj]; const d = Math.round(r - rateOf(prev)); const cd = (cur[2] != null && prev[2] != null) ? cur[2] - prev[2] : null;
+const more = cd != null && cd > 0.0005 ? ', for ' + usd(cd) + ' more a run.' : (cd != null && cd < -0.0005 ? ', and costs less.' : '.');
+if (d >= 8) t = cap(LV[j]) + ' adds ' + d + ' points over ' + LV[pj] + more;
+else if (d <= -8) t = cap(LV[j]) + ' passes ' + (-d) + ' points less often than ' + LV[pj] + more;
+else t = cap(LV[j]) + ' lands within a few points of ' + LV[pj] + more;
+}
+if (j === bestJ) t += ' This is its best level here, honest range included.';
+else { const b = lad.levels[bestJ]; t += (cur[4] >= b[3]) ? ' Its honest range overlaps ' + LV[bestJ] + "'s, so the two are a statistical tie." : ' Clearly behind ' + LV[bestJ] + '.'; }
+const b = lad.levels[bestJ];
+if (j !== bestJ && cur[2] != null && b[2] != null && cur[2] >= 2 * b[2]) t += ' It costs ' + (cur[2] / b[2]).toFixed(1) + ' times as much per run as ' + LV[bestJ] + '.';
+return t;
+};
+const mapList = LV.map((L, j) => { const ok = !!lad.levels[j]; return { label: L, needle: NEEDLE[j], on: j === mi, border: j === mi ? acc : '#E3E7EC', bg: j === mi ? '#EAF3FF' : '#FFFFFF', off: !ok, op: ok ? 1 : 0.38, dash: ok ? 'solid' : 'dashed', cursor: ok ? 'pointer' : 'not-allowed', why: ok ? '' : lad.driver + ' has no ' + L + ' level', pick: () => { if (ok) this.setState({ map: j }); } }; });
+const ladderChips = LADDERS.map((x, k) => ({ name: x.driver, on: k === li, ...chipSt(k === li), pick: () => this.setState({ ld: k, map: s.map ?? mi }) }));
+const missing = LV.filter((L, j) => !lad.levels[j]);
+const SAME = [{"driver":"Gemini 3.8 Flash","effort":"high","cars":[["Pi",96.3,52,0.2847],["OpenCode",94.4,51,0.2853],["Antigravity",92.6,50,0.3099],["Claude Code",88.9,48,0.28]]},{"driver":"GPT-6.1 Sol","effort":"high","cars":[["Pi",96.3,52,0.0348],["Codex",94.4,51,0.054],["Claude Code",92.6,50,0.097],["OpenCode",90.7,49,0.0817]]},{"driver":"Claude Opus 5.5","effort":"provider default","cars":[["Codex",92.6,50,0.2728],["OpenCode",88.9,48,0.1644],["Pi",88.9,48,0.1745]]},{"driver":"Claude Sonnet 5.5","effort":"provider default","cars":[["OpenCode",92.6,50,0.0759],["Pi",92.6,50,0.0741],["Codex",83.3,45,0.1289]]},{"driver":"DeepSeek V4.1 Flash","effort":"provider default","cars":[["Pi",90.7,49,0.0293],["Claude Code",88.9,48,0.1131],["OpenCode",87.0,47,0.0345],["Codex",83.3,45,0.0384]]},{"driver":"Kimi K3","effort":"provider default","cars":[["Pi",90.7,49,0.1161],["OpenCode",87.0,47,0.168],["Claude Code",83.3,45,0.2162],["Codex",81.5,44,0.1216]]},{"driver":"GLM 5.3 Flash","effort":"provider default","cars":[["Pi",87.0,47,0.0103],["OpenCode",83.3,45,0.0156],["Codex",81.5,44,0.0129],["Claude Code",79.6,43,0.042]]}];
+const di = s.cd ?? 0;
+const sd = SAME[di];
+const heldCar = sd.cars.findIndex((c) => c[0] === s.carName);
+const ci = heldCar >= 0 ? heldCar : 0;
+const carFell = !!s.carName && heldCar < 0;
+const cn = sd.cars[ci];
+const vals = sd.cars.map((c) => c[1]);
+const floor = Math.min(80, Math.floor((Math.min(...vals) - 2) / 5) * 5);
+const cars = sd.cars.map((d, k) => ({ name: d[0], livery: LIV[d[0]] || '#9AA3AF', on: k === ci, border: k === ci ? acc : '#E3E7EC', bg: k === ci ? '#EAF3FF' : '#FFFFFF', pick: () => this.setState({ carName: d[0] }) }));
+const carBars = sd.cars.map((d, k) => ({ name: d[0], pct: d[1] + '%', w: ((d[1] - floor) / (100 - floor) * 100).toFixed(0) + '%', color: k === ci ? (LIV[d[0]] || acc) : '#B4BBC5', weight: k === ci ? 700 : 400 }));
+const carDriverChips = SAME.map((x, k) => ({ name: x.driver, on: k === di, ...chipSt(k === di), pick: () => this.setState({ cd: k, carName: s.carName || cn[0] }) }));
+const wilson = (k, n) => { const z = 1.959964; if (!n) return [0, 0]; const p = k / n; const d = 1 + z * z / n; const c = (p + z * z / (2 * n)) / d; const h = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d; return [Math.max(0, c - h) * 100, Math.min(1, c + h) * 100]; };
+const SIZES = [[9, 'One challenge · 9 runs', 7], [54, 'The calendar · 54 races', 52], [162, 'One race, whole field · 162 runs', 29]];
+const zi = s.hz ?? 1;
+const hn = SIZES[zi][0];
+const hk = Math.max(0, Math.min(hn, s.hk ?? SIZES[zi][2]));
+const [hlo, hhi] = wilson(hk, hn);
+const hp = hk / hn * 100;
+const [plo] = wilson(hn, hn);
+const sizes = SIZES.map((x, j) => ({ name: x[1], on: j === zi, border: j === zi ? '#111111' : '#E3E7EC', bg: j === zi ? '#111111' : '#FFFFFF', fg: j === zi ? '#FFFFFF' : '#111111', pick: () => this.setState({ hz: j, hk: x[2] }) }));
+const flagDefs = [
+{ name: 'Checkered', checkered: true, counted: 'counted', body: 'Finished: the run passed every required check.' },
+{ name: 'DNF', dnf: true, counted: 'counted', body: 'Did not finish: it missed a check or handed in nothing. It counts against the entry.' },
+{ name: 'Red', solid: true, color: '#E5202E', counted: 'not counted', body: 'Infrastructure, not the model: a proxy restart, a crashed host. The run is left out and raced again.' },
+{ name: 'Black', solid: true, color: '#111111', counted: 'not counted', body: 'An integrity hold: something looks off, so a person reviews it before it counts.' },
+{ name: 'Yellow', solid: true, color: '#F5B700', counted: 'not yet', body: 'An audit is pending. The result waits until it is checked.' },
+{ name: 'Green', solid: true, color: '#00C27A', counted: 'not a result', body: 'Lights out: the run is on the track right now.' }
+];
+const fi = s.flag ?? 0;
+const flags = flagDefs.map((d, k) => ({ ...d, on: k === fi, border: k === fi ? acc : '#E3E7EC', bg: k === fi ? '#EAF3FF' : '#FFFFFF', pick: () => this.setState({ flag: k }) }));
+return {
+menuOpen: !!s.menu, menuClosed: !s.menu, toggleMenu: () => this.setState({ menu: !s.menu }),
+acc,
+sec, sectorNo: i + 1, secClass: i % 2 ? 'in-a' : 'in-b',
+carXf: 'translate(' + sec.x + 'px, ' + sec.y + 'px)',
+dash: (total * pct).toFixed(0) + ' ' + total,
+back: () => this.setState({ sec: Math.max(0, i - 1) }),
+jump0: (e) => { e && e.stopPropagation && e.stopPropagation(); this.setState({ sec: 0 }); },
+jump1: (e) => { e && e.stopPropagation && e.stopPropagation(); this.setState({ sec: 1 }); },
+jump2: (e) => { e && e.stopPropagation && e.stopPropagation(); this.setState({ sec: 2 }); },
+jump3: (e) => { e && e.stopPropagation && e.stopPropagation(); this.setState({ sec: 3 }); },
+dot0: i === 0 ? '#111111' : '#FFFFFF', dot1: i === 1 ? '#111111' : '#FFFFFF', dot2: i === 2 ? '#111111' : '#FFFFFF', dot3: i === 3 ? '#111111' : '#FFFFFF',
+num0: i === 0 ? '#FFFFFF' : '#111111', num1: i === 1 ? '#FFFFFF' : '#111111', num2: i === 2 ? '#FFFFFF' : '#111111', num3: i === 3 ? '#FFFFFF' : '#111111',
+tapHint: i === 3 ? 'Tap the track to start another lap' : 'Tap the track, or a sector number', 
+next: () => this.setState({ sec: i === 3 ? 0 : i + 1 }),
+nextLabel: i === 3 ? 'Another lap' : 'Next sector',
+sizes, hrK: hk, hrN: hn, hrPct: hp.toFixed(1) + '%', hrP: (hk / hn).toFixed(3),
+hrLo: hlo.toFixed(1) + '%', hrSpan: (hhi - hlo).toFixed(1) + '%', hrDot: hp.toFixed(1) + '%', hrRange: hlo.toFixed(1) + '% to ' + hhi.toFixed(1) + '%',
+hrNote: 'That is ' + (hhi - hlo).toFixed(0) + ' points wide' + (hn === 9 ? ': nine runs can only say so much.' : '.'),
+hrPerfect: 'a perfect ' + hn + ' of ' + hn + ' gives ' + plo.toFixed(1) + '% to 100%, not a flat 100%, because a few more runs could still miss one.',
+less: () => this.setState({ hk: Math.max(0, hk - 1) }), more: () => this.setState({ hk: Math.min(hn, hk + 1) }),
+maps: mapList, ladderChips,
+ladderSub: lad.driver + ' in ' + lad.car + ', on the nine hard-review races. Turn the engine map up and watch the pass rate and the bill.',
+ladderCaption: 'Every counted run of ' + lad.driver + ' in ' + lad.car + ' on hard review.' + (missing.length ? ' Greyed out: ' + missing.join(' and ') + ', which its provider does not offer.' : ''),
+mapNow: { pct: Math.round(rateOf(m)) + '%', runs: m[0] + ' of ' + m[1] + ' runs passed', usd: usd(m[2]), w: rateOf(m).toFixed(1) + '%', lo: m[3] + '%', span: (m[4] - m[3]).toFixed(1) + '%', range: m[3] + '% to ' + m[4] + '%', note: noteFor(mi) },
+mapClass: (li + mi) % 2 ? 'in-a' : 'in-b',
+cars, carBars, carDriverChips, carsLabel: 'All ' + sd.cars.length + ' cars',
+carSub: sd.driver + ' at ' + (sd.effort === 'provider default' ? "its provider's default engine map" : 'a ' + sd.effort + ' engine map') + ', across all 54 races. Only the harness changes.' + (carFell ? ' It has not raced in ' + s.carName + ', so this shows its best car.' : ''),
+carNow: { pct: cn[1] + '%', of: cn[2] + ' of 54', usd: usd(cn[3]), eyebrow: (sd.driver + ' in ' + cn[0]).toUpperCase() },
+carClass: (di + ci) % 2 ? 'in-a' : 'in-b',
+barCaption: 'Bars start at ' + floor + '%: the field is close, so the differences sit at the top.',
+flags, flagNow: flagDefs[fi], flagClass: fi % 2 ? 'in-a' : 'in-b'
+};
+}
+}
+</script>
+</body>
+</html>

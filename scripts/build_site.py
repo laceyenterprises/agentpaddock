@@ -1,4 +1,4 @@
-"""Build the Agent Paddock leaderboard site from ``results/`` only (PDK-04).
+"""Build the Agent Paddock site from ``results/`` only (PDK-04, PDW-02).
 
 The input is the committed ``results/`` tree (see ``scripts/leaderboard.py``):
 results documents, dated price tables, the grading changelog and the fairness
@@ -18,6 +18,13 @@ The share image is the one file not built here: ``scripts/render_social_card.py`
 renders ``scripts/social_card.html`` to the committed ``scripts/social-card.png``,
 which the build copies. The PNG carries the SHA-256 of the card source, so
 ``--check`` reports a stale card without a browser.
+
+Every page shares one layout (``scripts/paddock_site/``): the header with the
+lockup and the nav, the menu panel, the footer, the inlined glyph sprite and
+the design tokens. The pages themselves are registered in
+``paddock_site/routes.py`` and built by the functions :data:`ROUTES` names
+below; a route without a builder shows a placeholder until its PDW page ticket
+lands. ``design/web/README.md`` maps every route to its prototype and ticket.
 """
 
 from __future__ import annotations
@@ -34,88 +41,32 @@ from typing import Any, Mapping, Sequence
 
 import leaderboard as lb
 
-#: The product's public name; the command, packages and paths stay ``paddock``.
-PRODUCT = "Agent Paddock"
-REPO_URL = "https://github.com/laceyenterprises/agentpaddock"
-SITE_URL = "https://agentpaddock.ai/"
-GTM_CONTAINER_ID = "GTM-P52SNL3D"
+from paddock_site import layout, placeholder
+from paddock_site import routes as site_routes
+from paddock_site.layout import (  # re-exported for callers and tests
+    CARD_ALT as CARD_ALT,
+    CARD_NAME,
+    CARD_SIZE,
+    DESCRIPTION,
+    GTM_CONTAINER_ID as GTM_CONTAINER_ID,
+    MARK,
+    PRODUCT,
+    REPO_URL,
+    SCRIPT_NAME,
+)
+from paddock_site.routes import SITE_URL
+
 DEFAULT_OUT = lb.MODULE_ROOT / "site"
 CARD_TEMPLATE = lb.MODULE_ROOT / "scripts" / "social_card.html"
 CARD_PNG = lb.MODULE_ROOT / "scripts" / "social-card.png"
-CARD_NAME = "social-card.png"
-CARD_SIZE = (1200, 630)
 #: The PNG tEXt keyword holding the SHA-256 of the card source it was rendered from.
 CARD_KEY = "agentpaddock-card-source-sha256"
-CARD_ALT = (
-    "Agent Paddock: an open leaderboard for coding agents. Model × harness on real "
-    "repository tasks, graded by a checker the agent never sees. agentpaddock.ai"
-)
 CARD_MARK_SLOT = "<!-- broadcast-mark -->"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
-PAGES = (
-    ("index.html", "Leaderboard"),
-    ("matrix.html", "Harness × model"),
-    ("tasks.html", "Tasks"),
-    ("changelog.html", "Changelog"),
-    ("methodology.html", "Methodology"),
-)
-
+#: Page styles for today's board pages; the stylesheet puts the design tokens
+#: before them and the shared layout after them (``layout.stylesheet``).
 STYLE = """
-:root {
-  /* paper and ink (Searchlight family) */
-  --paper: #FFFFFF;
-  --soft: #F4F6F9;
-  --rule: #E3E7EC;
-  --ink: #111111;
-  --ink-2: #4F5761;
-  --muted: #626C78;
-  /* Lacey Enterprises brand: blue = interactive, green = the finish */
-  --blue: #007BFF;
-  --blue-ink: #0057B3;
-  --blue-soft: #EAF3FF;
-  --go: #00C27A;
-  --go-ink: #007A4D;
-  --go-soft: #E2F7EE;
-  /* flags */
-  --red: #E5202E;
-  --red-ink: #B3121C;
-  --amber: #F5B700;
-  --amber-ink: #8A5A00;
-  /* the timing tower never changes with the theme */
-  --tower: #0E1116;
-  --tower-2: #171B22;
-  --tower-rule: #262C35;
-  --tower-fg: #F2F4F7;
-  --tower-mute: #8B94A3;
-  --tower-lit: #2BD99A;
-  /* team liveries: one colour per car (harness), used in every chart */
-  --car-cc: #E0703A;
-  --car-codex: #10A37A;
-  --car-opencode: #C2185B;
-  --car-pi: #007BFF;
-  --car-agy: #D99A00;
-
-  --display: "Saira Condensed", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
-  --body: "Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-
-  --radius-card: 18px;
-  --radius-inner: 12px;
-  --ease: cubic-bezier(.2, .8, .2, 1);
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #0C0F13; --soft: #141920; --rule: #262C35; --ink: #F2F4F7; --ink-2: #B9C1CC; --muted: #8B94A3;
-    --blue: #3D9BFF; --blue-ink: #7DBBFF; --blue-soft: #0F2238;
-    --go: #2BD99A; --go-ink: #5BE3AE; --go-soft: #0D2A20;
-    --red: #FF4D4F; --red-ink: #FF8587; --amber: #FFC83D; --amber-ink: #FFD36B;
-    --tower: #161B22; --tower-2: #1D232C; --tower-rule: #2B323C;
-    --car-cc: #F08A55; --car-codex: #2BC495; --car-opencode: #E8558E; --car-pi: #3D9BFF; --car-agy: #FFC83D;
-    color-scheme: dark;
-  }
-}
-
 /* ---------- base ---------- */
 html { -webkit-text-size-adjust: 100%; }
 body {
@@ -160,30 +111,6 @@ h2.h2 { font: 700 clamp(30px, 4vw, 44px)/1.05 var(--display); letter-spacing: -.
 }
 .eng b { color: var(--ink-2); font-weight: 500; }
 
-/* ---------- nav ---------- */
-.nav {
-  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
-  background: color-mix(in srgb, var(--paper) 92%, transparent);
-  backdrop-filter: saturate(1.4) blur(10px); -webkit-backdrop-filter: saturate(1.4) blur(10px);
-  border-bottom: 1px solid var(--rule);
-}
-.nav .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
-.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; flex: none; }
-.brand svg { width: 34px; height: 34px; display: block; flex: none; }
-/* stacked lockup: both lines take the brand colour; weight alone separates them */
-.wordmark {
-  display: inline-flex; flex-direction: column; align-items: flex-start;
-  font-family: "Saira", var(--display); font-style: italic; line-height: .95; text-transform: uppercase;
-}
-.wordmark-agent { font-weight: 500; font-size: 13px; letter-spacing: .04em; }
-.wordmark-name { font-weight: 800; font-size: 21px; letter-spacing: .01em; }
-.nav-links { display: flex; gap: 4px; margin-left: auto; overflow-x: auto; scrollbar-width: none; min-width: 0; }
-.nav-links::-webkit-scrollbar { display: none; }
-.nav-links a {
-  color: var(--ink-2); text-decoration: none; font-size: 14.5px; font-weight: 500; padding: 8px 12px; border-radius: 999px;
-  white-space: nowrap; transition: background .2s var(--ease), color .2s var(--ease);
-}
-.nav-links a:hover, .nav-links a[aria-current="page"] { background: var(--soft); color: var(--ink); }
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px;
   border-radius: 999px; font: 600 15px/1 var(--body); text-decoration: none; border: 1.5px solid var(--ink);
@@ -270,17 +197,6 @@ h2.h2 { font: 700 clamp(30px, 4vw, 44px)/1.05 var(--display); letter-spacing: -.
 .flag-chip svg { width: 14px; height: 14px; }
 
 
-/* ---------- footer ---------- */
-.footer { background: var(--tower); color: var(--tower-fg); padding-block: 0 40px; }
-.footer .checker { margin-bottom: 40px; }
-.footer-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 32px; }
-.footer h4 { margin: 0 0 10px; font: 600 11.5px/1.2 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--tower-mute); }
-.footer a { color: var(--tower-fg); text-decoration: none; display: block; padding: 3px 0; font-size: 14.5px; }
-.footer a:hover { color: var(--tower-lit); }
-.footer p { color: var(--tower-mute); font-size: 14px; }
-.footer .brand { color: var(--tower-fg); margin-bottom: 12px; }
-.footer-base { margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--tower-rule); font: 400 12px var(--mono); color: var(--tower-mute); display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
-
 /* ---------- standings page ---------- */
 .page-hero { padding-block: 56px 32px; }
 .page-hero h1 { font: italic 800 clamp(44px, 6.4vw, 76px)/.95 var(--display); text-transform: uppercase; letter-spacing: -.01em; margin-top: 14px; }
@@ -298,10 +214,8 @@ table.grid { border-collapse: collapse; width: 100%; min-width: 680px; font-vari
 .grid td.empty { color: var(--muted); }
 
 * { box-sizing: border-box; }
-.symbols { position: absolute; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 a:hover { color: var(--blue-ink); }
-.brand:hover { color: var(--ink); }
 html { scroll-padding-top: 90px; }
 .wrap { max-width: 1488px; min-width: 0; }
 main { padding-bottom: 64px; }
@@ -309,7 +223,6 @@ h2 { font: 700 36px/1.1 var(--display); margin: 40px 0 20px; }
 h3 { font: 600 24px/1.3 var(--display); margin: 28px 0 12px; }
 h4 { margin: 24px 0 12px; }
 p, ul, ol, pre { margin-block: 12px; }
-.footer p a { display: inline; }
 .note { color: var(--muted); font-size: 13px; }
 .page-hero { max-width: 100%; }
 .page-hero h1 { overflow-wrap: anywhere; }
@@ -368,45 +281,22 @@ summary { cursor: pointer; font-weight: 600; }
 .chart .muted { fill: var(--muted); }
 .prose > p, .prose > ul, .prose > ol { max-width: 72ch; }
 pre { overflow-x: auto; padding: 20px; background: var(--soft); border-radius: var(--radius-inner); }
-.footer .brand { display: inline-flex; }
-.footer .brand { --ink: var(--tower-fg); --paper: var(--tower); }
-.footer .brand svg { width: 46px; height: 46px; }
-.footer .wordmark-agent { font-size: 17px; }
-.footer .wordmark-name { font-size: 28px; }
-.footer-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
 @media (max-width: 1279px) {
   .tower-table { min-width: 1200px; }
 }
 @media (max-width: 960px) {
-  .nav .wrap { gap: 12px; }
-  .nav-links a { padding-inline: 10px; }
   .cards { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 640px) {
   .wrap { padding-inline: 16px; }
-  .nav .wrap { height: 56px; gap: 12px; }
-  .nav .gh { display: none; }
-  .nav .brand svg { width: 32px; height: 32px; }
-  .nav .wordmark-agent { font-size: 12px; }
-  .nav .wordmark-name { font-size: 19px; }
-  .nav-links { margin-left: 0; }
-  .nav-links a { font-size: 13px; }
   .page-hero { padding-top: 36px; }
   .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .card { padding: 18px; }
-  .footer-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: .01ms !important; }
 }
 """
-
-MARK = """<g transform="translate(9 0) skewX(-10)">
-    <rect x="18" y="16" width="64" height="68" rx="7" fill="var(--ink)"/>
-    <rect x="26" y="26" width="8" height="12" fill="#007BFF"/><rect x="38" y="26" width="36" height="12" fill="var(--paper)"/>
-    <rect x="26" y="44" width="8" height="12" fill="#00C27A"/><rect x="38" y="44" width="26" height="12" fill="var(--paper)"/>
-    <rect x="26" y="62" width="8" height="12" fill="#E0703A"/><rect x="38" y="62" width="16" height="12" fill="var(--paper)"/>
-  </g>"""
 
 FAVICON = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">\n'
@@ -496,47 +386,8 @@ def excluded_text(excluded: Mapping[str, int]) -> str:
 
 
 def brand() -> str:
-    """The one brand lockup: the Broadcast mark beside AGENT stacked over PADDOCK.
-
-    The header and the footer both render this; the stylesheet sizes each.
-    """
-    return (
-        '<a class="brand" href="index.html" aria-label="Agent Paddock home">'
-        '<svg viewBox="0 0 100 100" aria-hidden="true"><use href="#broadcast"/></svg>'
-        '<span class="wordmark"><span class="wordmark-agent">AGENT</span>'
-        '<span class="wordmark-name">PADDOCK</span></span></a>'
-    )
-
-
-def page_url(active: str) -> str:
-    """The page's canonical absolute URL; the overview is the site root."""
-    return SITE_URL if active == "index.html" else SITE_URL + active
-
-
-def social_meta(title: str, url: str) -> str:
-    """Open Graph and Twitter card tags; every URL is absolute on agentpaddock.ai."""
-    image = SITE_URL + CARD_NAME
-    width, height = CARD_SIZE
-    tags = (
-        ("property", "og:type", "website"),
-        ("property", "og:site_name", PRODUCT),
-        ("property", "og:title", title),
-        ("property", "og:description", DESCRIPTION),
-        ("property", "og:url", url),
-        ("property", "og:image", image),
-        ("property", "og:image:width", str(width)),
-        ("property", "og:image:height", str(height)),
-        ("property", "og:image:type", "image/png"),
-        ("property", "og:image:alt", CARD_ALT),
-        ("name", "twitter:card", "summary_large_image"),
-        ("name", "twitter:title", title),
-        ("name", "twitter:description", DESCRIPTION),
-        ("name", "twitter:image", image),
-        ("name", "twitter:image:alt", CARD_ALT),
-    )
-    return "".join(
-        f'<meta {kind}="{key}" content="{esc(value)}">\n' for kind, key, value in tags
-    )
+    """The one brand lockup, as the header and footer of a root page render it."""
+    return layout.brand()
 
 
 def hero(eyebrow: str, title: str, lede: str = "") -> str:
@@ -556,13 +407,11 @@ def document(
     canonical: bool = False,
     filename: str | None = None,
 ) -> str:
-    """One page; ``filename`` is the output name when it differs from ``active``."""
-    current = ' aria-current="page"'
-    nav = "".join(
-        f'<a href="{name}"{current if name == active else ""}>{esc(label)}</a>'
-        for name, label in PAGES
-    )
-    head_link = f'<link rel="canonical" href="{SITE_URL}">' if canonical else ""
+    """One of today's board pages in the shared layout.
+
+    ``active`` is the route the page belongs to (its nav and footer mark);
+    ``filename`` is the output name when it differs, as for a board page.
+    """
     # Other pages keep their content but share the same table and page treatments.
     body = body.replace(
         '<div class="scroll"><table>', '<div class="grid-wrap"><table class="grid">'
@@ -570,49 +419,15 @@ def document(
     body = re.sub(r"<th\b(?![^>]*\bscope=)([^>]*)>", r'<th scope="col"\1>', body)
     if active not in ("index.html", "matrix.html") and "<h1>" not in body:
         body = re.sub(r"<h2>(.*?)</h2>", lambda m: hero(PRODUCT, m[1]), body, count=1)
-    prose = ' class="prose"' if active == "methodology.html" else ""
-    return (
-        "<!doctype html>\n"
-        '<html lang="en">\n<head>\n<meta charset="utf-8">\n'
-        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        f"<title>{esc(title)} · {PRODUCT}</title>\n{head_link}\n"
-        + social_meta(f"{title} · {PRODUCT}", page_url(filename or active))
-        + "<!-- Google consent defaults: analytics storage denied in the EEA, UK, Switzerland and listed territories; no consent UI; ad storage off everywhere -->\n"
-        "<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}\n"
-        "gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'granted'});\n"
-        "gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',region:['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IS','IE','IT','LV','LI','LT','LU','MT','NL','NO','PL','PT','RO','SK','SI','ES','SE','GB','CH','AX','GF','GP','MQ','RE','YT','MF','GI','JE','GG','IM']});</script>\n"
-        "<!-- Google Tag Manager -->\n"
-        "<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':\n"
-        "new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],\n"
-        "j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=\n"
-        "'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);\n"
-        f"}})(window,document,'script','dataLayer','{GTM_CONTAINER_ID}');</script>\n"
-        "<!-- End Google Tag Manager -->\n"
-        '<link rel="icon" href="favicon.svg" type="image/svg+xml">\n'
-        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
-        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700'
-        "&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Saira:ital,wght@1,500;1,800"
-        '&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,800&amp;display=swap" rel="stylesheet">\n'
-        '<link rel="stylesheet" href="paddock.css">\n</head>\n<body>\n'
-        '<svg width="0" height="0" aria-hidden="true" class="symbols">'
-        f'<defs><symbol id="broadcast" viewBox="0 0 100 100">{MARK}</symbol></defs></svg>\n'
-        f'<header class="nav"><nav class="wrap" aria-label="Main">{brand()}'
-        f'<div class="nav-links">{nav}</div>'
-        f'<a class="btn ghost sm gh" href="{REPO_URL}">GitHub</a></nav></header>\n'
-        f'<main class="wrap"><div{prose}>\n{body}\n</div></main>\n'
-        '<footer class="footer"><div class="checker"></div><div class="wrap">'
-        f'<div class="footer-grid"><div>{brand()}'
-        "<p>Built only from the committed <code>results/</code> of "
-        f'<a href="{REPO_URL}">laceyenterprises/agentpaddock</a>. '
-        f'Submit a run or a correction: <a href="{REPO_URL}/blob/main/CONTRIBUTING.md">'
-        "CONTRIBUTING</a>.</p>"
-        "<p>This site uses Google Analytics to count visits. "
-        "Google Tag Manager loads on every page; analytics cookies are disabled for visitors in the EEA, the UK, Switzerland and listed territories.</p></div><div>"
-        f'<a href="{REPO_URL}">GitHub</a>'
-        f'<a href="{REPO_URL}/blob/main/CONTRIBUTING.md">CONTRIBUTING</a>'
-        f'<a href="{REPO_URL}/blob/main/LICENSE">MIT LICENSE</a></div></div>'
-        '<div class="footer-base">A Lacey Enterprises project · MIT licensed · '
-        "© 2026 Lacey Enterprises LLC</div></div></footer>\n</body>\n</html>\n"
+    name = filename or active
+    return layout.page(
+        routes=ROUTES,
+        current=active,
+        title=title,
+        body=body,
+        url=SITE_URL if name == "index.html" else SITE_URL + name,
+        canonical=canonical,
+        main_class="prose" if active == "methodology.html" else "",
     )
 
 
@@ -640,9 +455,6 @@ def board_title(board: Mapping[str, Any]) -> str:
     )
 
 
-DESCRIPTION = (
-    "An open leaderboard for coding agents: model × harness on real repository tasks."
-)
 COMPARABILITY = (
     "Each board ranks harness × model combinations on one suite by pass rate with a 95% "
     "Wilson interval; rows are not comparable across suites or task versions."
@@ -1227,6 +1039,22 @@ def card_problem(png: bytes) -> str:
     return ""
 
 
+#: Every page the site builds, in nav order. Today's board pages are built by
+#: the functions above; a page ticket adds its builder here (which also keeps
+#: its merge inside the pages workflow's ``scripts/build_site.py`` path filter).
+ROUTES = site_routes.registry(
+    {
+        "": index_page,
+        "matrix.html": matrix_page,
+        "tasks.html": tasks_page,
+        "changelog.html": changelog_page,
+        "methodology.html": methodology_page,
+    }
+)
+#: ``(output file, title)`` for every registered page.
+PAGES = tuple((route.file, route.title) for route in ROUTES)
+
+
 def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
     """Site files; raises ``ResultsError`` on invalid results or ``FileNotFoundError`` for a missing card."""
     results = lb.load_results(results_dir)
@@ -1236,20 +1064,22 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
         raise FileNotFoundError(
             f"{CARD_NAME} is missing; run python3 scripts/render_social_card.py"
         ) from exc
-    return {
-        "index.html": index_page(results),
-        "matrix.html": matrix_page(results),
-        "tasks.html": tasks_page(results),
-        "changelog.html": changelog_page(results),
-        "methodology.html": methodology_page(results),
-        "paddock.css": STYLE,
-        "favicon.svg": FAVICON,
-        CARD_NAME: card,
-        **{
-            board_filename(board): board_page(board)
-            for board in lb.boards(results.records)
-        },
-    }
+    files: dict[str, str | bytes] = {}
+    for route in ROUTES:
+        files[route.file] = (
+            route.builder(results) if route.builder else placeholder.page(route, ROUTES)
+        )
+    files.update(
+        {
+            "paddock.css": layout.stylesheet(STYLE),
+            SCRIPT_NAME: layout.SCRIPT,
+            "favicon.svg": FAVICON,
+            CARD_NAME: card,
+        }
+    )
+    for board in lb.boards(results.records):
+        files[board_filename(board)] = board_page(board)
+    return files
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1285,6 +1115,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     args.out.mkdir(parents=True, exist_ok=True)
     for name, content in files.items():
+        (args.out / name).parent.mkdir(parents=True, exist_ok=True)
         if isinstance(content, bytes):
             (args.out / name).write_bytes(content)
         else:

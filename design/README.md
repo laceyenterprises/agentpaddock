@@ -21,6 +21,7 @@ not the marks.
 | [`vocabulary.md`](vocabulary.md) | The racing language and the wording rules. |
 | [`glyphs/`](glyphs/) | The glyph sprite, its generator and a catalogue page. |
 | [`canvas/`](canvas/) | The illustration and results-board mocks, as design canvas sources. |
+| [`web/`](web/) | The approved design of the public site (one design file per page) and its route map. |
 | [`guide/`](guide/) | The visual guide to the bench and its pictures, drawn by [`docs_art/`](docs_art/). |
 
 In `tokens.json`, the `font`, `space` and `radius` groups omit their CSS category prefix:
