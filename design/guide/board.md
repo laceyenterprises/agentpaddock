@@ -83,7 +83,11 @@ submitting a run bundle and the vendor-correction process.
 The per-attempt `eval-bench-evidence/v2` importer is ready for registration as
 `(published_filename, import_eval_bench)` in `SOURCES` once that export is
 published. `build()` imports legacy sources first at their pinned 2026-10-10
-prices, then v2 rows at the 2026-10-25 table. It skips grading ids already in
+prices, then v2 rows at each export's own table: `EVAL_BENCH_PRICE_TABLES`
+pins a published export to the table it was published with (the 2026-10-29
+export to 2026-10-25), and an unlisted export uses `EVAL_BENCH_PRICE_TABLE`.
+A later export at a newer table therefore leaves earlier documents
+byte-identical. It skips grading ids already in
 legacy imports or other committed results, preserves per-version regrades, and
 reports counts for published ids and `version-unrecorded` rows on stderr.
 Its own prior `eval-bench` output is excluded from that lookup so regeneration

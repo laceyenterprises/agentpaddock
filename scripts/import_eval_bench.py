@@ -38,6 +38,12 @@ import leaderboard
 
 PRICE_TABLE = "2026-10-10"
 EVAL_BENCH_PRICE_TABLE = "2026-10-25"
+#: Each published eval-bench export keeps the price table it was published with,
+#: so registering a later export at a newer table never re-renders an earlier
+#: document. A source not listed here is priced at EVAL_BENCH_PRICE_TABLE.
+EVAL_BENCH_PRICE_TABLES: dict[str, str] = {
+    "REPORT-eval-bench-2026-10-29.raw.json.gz": "2026-10-25",
+}
 RUNNER = "agent-os-fleet"
 PROXY_PREFIX = "litellm-local-openai/"
 
@@ -460,8 +466,10 @@ def build(reports: Path, results: Path) -> dict[str, str]:
                 existing_run_ids.update(
                     record["run_id"] for record in document["records"]
                 )
-        table = price_table(EVAL_BENCH_PRICE_TABLE)
         for name in v2_sources:
+            table = price_table(
+                EVAL_BENCH_PRICE_TABLES.get(Path(name).name, EVAL_BENCH_PRICE_TABLE)
+            )
             document, published, unrecorded = import_eval_bench(
                 reports / name, table, existing_run_ids
             )

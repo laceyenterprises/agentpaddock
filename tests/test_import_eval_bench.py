@@ -171,7 +171,12 @@ def test_legacy_rows_are_version_one_and_unmeasured(legacy_records):
 def test_eval_bench_rows_have_measured_tokens_and_valid_pricing(result_store):
     document = result_store.documents["2026-10-29-eval-bench.json.gz"]
     assert document["id"] == "eval-bench"
-    assert document["price_table"] == import_eval_bench.EVAL_BENCH_PRICE_TABLE
+    assert (
+        document["price_table"]
+        == import_eval_bench.EVAL_BENCH_PRICE_TABLES[
+            "REPORT-eval-bench-2026-10-29.raw.json.gz"
+        ]
+    )
     table = result_store.price_tables[document["price_table"]]
     measured = priced = 0
     for record in document["records"]:
@@ -529,6 +534,63 @@ def test_explicit_model_effort_still_rejects_conflicting_field(label):
         import_eval_bench.SourceError, match="contradicts reasoningLevel"
     ):
         import_eval_bench.model_of(label, "low")
+
+
+@pytest.mark.parametrize(
+    "first",
+    [
+        V2_SAMPLE.name,
+        Path(V2_SAMPLE.name),
+        str(Path("exports") / V2_SAMPLE.name),
+        Path("exports") / V2_SAMPLE.name,
+    ],
+)
+def test_each_eval_bench_export_keeps_its_own_price_table(tmp_path, monkeypatch, first):
+    reports, results = tmp_path / "reports", tmp_path / "results"
+    reports.mkdir()
+    shutil.copytree(lb.DEFAULT_RESULTS / "prices", results / "prices")
+    # A newer table with every input rate doubled.
+    newer = json.loads((results / "prices" / "2026-10-25.json").read_text())
+    newer["date"] = "2026-11-01"
+    for entry in newer["models"].values():
+        if isinstance(entry.get("input"), (int, float)):
+            entry["input"] *= 2
+    (results / "prices" / "2026-11-01.json").write_text(json.dumps(newer))
+    (reports / first).parent.mkdir(parents=True, exist_ok=True)
+    (reports / first).write_bytes(V2_SAMPLE.read_bytes())
+    later = json.loads(V2_SAMPLE.read_text())
+    later["generatedAt"] = "2026-11-01"
+    # A distinct run survives deduplication against the earlier export.
+    later["rows"] = [later["rows"][0]]
+    later["rows"][0]["runId"] = _synthetic_id(1001)
+    second = "later-eval-bench.raw.json"
+    (reports / second).write_text(json.dumps(later))
+    v2 = import_eval_bench.import_eval_bench
+    monkeypatch.setattr(import_eval_bench, "SOURCES", ((first, v2),))
+    alone = import_eval_bench.build(reports, results)
+    monkeypatch.setattr(import_eval_bench, "SOURCES", ((first, v2), (second, v2)))
+    # Publishing the later export: pin the earlier one, move the default forward.
+    monkeypatch.setattr(
+        import_eval_bench, "EVAL_BENCH_PRICE_TABLES", {V2_SAMPLE.name: "2026-10-25"}
+    )
+    monkeypatch.setattr(import_eval_bench, "EVAL_BENCH_PRICE_TABLE", "2026-11-01")
+    files = import_eval_bench.build(reports, results)
+    earlier = "2026-10-18-eval-bench.json.gz"
+    # The earlier document is byte-identical; the later one uses the newer table.
+    assert files[earlier] == alone[earlier]
+    assert json.loads(files[earlier])["price_table"] == "2026-10-25"
+    later_document = json.loads(files["2026-11-01-eval-bench.json.gz"])
+    assert later_document["price_table"] == "2026-11-01"
+    earlier_record = _v2_record(json.loads(alone[earlier]), 1)
+    later_record = _v2_record(later_document, 1001)
+    assert later_record["tokens"] == earlier_record["tokens"]
+    # Only input doubles: 1000 * (4 - 2) / 1,000,000 adds $0.002.
+    assert earlier_record["cost"]["usd"] == 0.0052
+    assert later_record["cost"] == {
+        "usd": pytest.approx(earlier_record["cost"]["usd"] + 0.002),
+        "source": "published-rate",
+        "reason": None,
+    }
 
 
 @pytest.mark.parametrize("compressed", [False, True])
