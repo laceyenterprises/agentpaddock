@@ -1,0 +1,8 @@
+# Runtime dependencies of the submission Lambda (lib/api/src).
+#
+# The code is otherwise standard library only. Ed25519 verification is
+# implemented in paddock_api/ed25519.py (RFC 8032) and tested against the RFC
+# vectors and, where installed, OpenSSL. boto3 ships in the AWS Lambda
+# Python 3.12 runtime, so deploys install nothing. The pin covers running the
+# DynamoDB and S3 stores outside Lambda.
+boto3>=1.34,<2
