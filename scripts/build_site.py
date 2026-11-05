@@ -47,8 +47,9 @@ from typing import Any, Mapping, Sequence
 import leaderboard as lb
 
 from paddock_site import data as site_data
-from paddock_site import layout, placeholder
+from paddock_site import community, contact, dictionary, kit, layout, pit_lane, placeholder
 from paddock_site import races as race_pages
+from paddock_site import rulebook
 from paddock_site import routes as site_routes
 from paddock_site import standings as standings_pages
 from paddock_site.layout import (  # re-exported for callers and tests
@@ -1048,6 +1049,11 @@ def card_problem(png: bytes) -> str:
     return ""
 
 
+def _site_page(module):
+    """A PDW page: the results, the site data (``data/*.json``, parsed) and the routes."""
+    return lambda build: module.page(build.results, build.data, build.routes)
+
+
 #: Every page the site builds, in nav order. Today's board pages are built by
 #: the functions above; a page ticket adds its builder here (which also keeps
 #: its merge inside the pages workflow's ``scripts/build_site.py`` path filter).
@@ -1066,6 +1072,11 @@ ROUTES = site_routes.registry(
         "tasks.html": _from_results(tasks_page),
         "changelog.html": _from_results(changelog_page),
         "methodology.html": _from_results(methodology_page),
+    "community/": _site_page(community),
+    "rulebook/": _site_page(rulebook),
+    "dictionary/": _site_page(dictionary),
+    "race-it-yourself/": _site_page(pit_lane),
+    "contact/": _site_page(contact),
     }
 )
 #: ``(output file, title)`` for every registered page.
@@ -1100,8 +1111,8 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
     files.update(standings_pages.entry_pages(inputs))
     files.update(
         {
-            "paddock.css": layout.stylesheet(STYLE + race_pages.CSS + standings_pages.CSS),
-            SCRIPT_NAME: layout.SCRIPT + race_pages.SCRIPT,
+            "paddock.css": layout.stylesheet(STYLE + race_pages.CSS + standings_pages.CSS + kit.CSS),
+            SCRIPT_NAME: layout.SCRIPT + race_pages.SCRIPT + kit.SCRIPT,
             standings_pages.SCRIPT_NAME: standings_pages.SCRIPT,
             "favicon.svg": FAVICON,
             CARD_NAME: card,
