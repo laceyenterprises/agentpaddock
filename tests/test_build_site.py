@@ -192,7 +192,7 @@ def test_a_result_without_a_price_source_renders_cost_unknown():
 
 def test_pages_show_boards_matrix_tasks_changelog_and_methodology():
     files = build_site.build(FIXTURE)
-    index = files["index.html"]
+    index = files["leaderboard.html"]
     assert "<h3>review</h3>" in index and "task version 2" in index
     assert "Also: task version 1 · 1 task · 1 entry →" in index
     assert "95% Wilson" in index
@@ -471,7 +471,14 @@ def test_brand_assets_and_navigation_on_every_page():
             for t, a in elements
             if t == "a" and a.get("aria-current") == "page"
         }
-        assert current == {"index.html" if name.startswith("board-") else name}
+        if name.startswith("board-"):
+            expected = {build_site.LEADERBOARD}
+        elif name == "index.html":
+            # Home is linked by the lockup, which carries no current mark.
+            expected = set()
+        else:
+            expected = {name}
+        assert current == expected, name
         assert f"{build_site.REPO_URL}/blob/main/LICENSE" in page
         assert "© 2026 Lacey Enterprises LLC" in page
     favicon = files["favicon.svg"]
@@ -483,7 +490,7 @@ def test_brand_assets_and_navigation_on_every_page():
 def test_overview_features_one_board_per_suite_and_preserves_old_anchors():
     results = lb.load_results(FIXTURE)
     files = build_site.build(FIXTURE)
-    index = files["index.html"]
+    index = files["leaderboard.html"]
     current = index.split('<h2 id="current-boards">')[1].split("</section>")[0]
     assert "<table" not in index
     assert "<h1>Leaderboard</h1>" in index and build_site.DESCRIPTION in index
@@ -539,7 +546,7 @@ def test_featured_board_has_the_most_tasks_and_lists_the_others(tmp_path: Path):
     assert build_site.featured_board(triad)["task_version"] == 2
     files = build_site.build(results)
     assert build_site.build(results) == files
-    index = files["index.html"]
+    index = files["leaderboard.html"]
     (card,) = [
         c
         for c in re.findall(r'<article class="card".*?</article>', index)
@@ -634,6 +641,10 @@ def test_matrix_shades_each_suite_cell_by_its_pass_rate():
 
 def test_committed_results_overview_size():
     assert (
+        len(build_site.build(lb.DEFAULT_RESULTS)["leaderboard.html"].encode("utf-8"))
+        < 150_000
+    )
+    assert (
         len(build_site.build(lb.DEFAULT_RESULTS)["index.html"].encode("utf-8"))
         < 150_000
     )
@@ -656,7 +667,11 @@ PRODUCT_NAME_ALLOWLIST = re.compile(
     r"|agentpaddock"  # the domain, repository and distribution
     r"|\bPADDOCK_[A-Z0-9_]+"  # environment variables
     r'|"paddock-site-[a-z]+/v\d+"'  # site data schema ids (PDW-03)
+    r"|'paddock-live/v\d+'"  # the live feed schema id the home script checks (PDW-04)
     r'|"paddock-(?:run|bench)"'  # the trust level and its origin, as JSON values
+    # Home's approved copy (design/web/Main.dc.html), the paddock as a place:
+    r"|Learn the paddock in 60 seconds\."
+    r"|Independent and open source: about the paddock<"
 )
 
 
@@ -679,6 +694,8 @@ def _stray_product_names(page: str) -> list[str]:
         ("<title>Tasks · Paddock</title>", True),
         ('<span class="wordmark">PADDOCK</span>', True),
         ("the paddock commit", True),
+        ("<h2>Learn the paddock in 60 seconds.</h2>", False),
+        ("Learn the paddock commit", True),
     ],
 )
 def test_product_name_allowlist(text, stray):
@@ -699,6 +716,12 @@ def test_every_page_title_and_eyebrow_names_agent_paddock():
         titles = re.findall(r"<title>(.*?)</title>", head)
         assert len(titles) == 1 and titles[0].endswith(" · Agent Paddock"), name
     for name, _ in build_site.PAGES:
+        if name == "index.html":
+            # Home's eyebrow names the product and what it is.
+            assert re.search(
+                r'<span class="eyebrow">Agent Paddock: [^<]+</span><h1>', files[name]
+            )
+            continue
         assert '<span class="eyebrow">Agent Paddock</span><h1>' in files[name], name
     methodology = files["methodology.html"]
     assert "the eval bench that preceded Agent Paddock," in methodology
@@ -1088,7 +1111,7 @@ def _between(page: str, start: str, end: str) -> str:
 @pytest.mark.parametrize(
     ("active", "header_marks"),
     [
-        ("index.html", 0),
+        ("leaderboard.html", 0),
         ("learn/index.html", 2),
         ("contact/index.html", 1),
         ("methodology.html", 0),
@@ -1291,7 +1314,7 @@ def test_placeholders_carry_no_numbers_and_link_home():
         main = _between(page, '<main class="wrap">', "</main>")
         text = " ".join(" ".join(Text(main).text).split())
         assert not re.search(r"\d", text), (route.path, text)
-        assert "index.html" in _local_links(route.file, main), route.path
+        assert build_site.LEADERBOARD in _local_links(route.file, main), route.path
         assert f"<h1>{html.escape(route.title)}</h1>" in main
 
 
@@ -1828,3 +1851,333 @@ def test_build_writes_site_data_beside_the_pages(tmp_path):
     files = build_site.build(results)
     assert files["data/standings.json"] == _site_files(results)["data/standings.json"]
     assert "data/races/hard-review-alpha.json" in files
+
+
+# ---------------------------------------------------------------- home (PDW-04)
+
+from paddock_site import home as site_home  # noqa: E402
+from paddock_site import site_config  # noqa: E402
+
+#: Numbers and names the prototype shows as samples; the real page computes its own.
+PROTOTYPE_SAMPLES = (
+    "96.3%",
+    "52 of the 54",
+    "17.9%",
+    "Tool calls v2",
+    "$0.035",
+    "$0.285",
+    "GPT-6.1 Sol",
+    "Gemini 3.8 Flash",
+    "Qwen 3.8 27B",
+    "87.5% to 99.0%",
+)
+
+
+def _home(files) -> str:
+    return _between(files["index.html"], '<main class="wrap">', "</main>")
+
+
+def _readme_footer_lines() -> list[str]:
+    readme = (WEB_DESIGN / "README.md").read_text(encoding="utf-8")
+    bullet = readme.split("**Every page's footer**", 1)[1].split("\n- **", 1)[0]
+    lines = re.findall(r'"([^"]+)"', " ".join(bullet.split()))
+    assert len(lines) == 2, lines
+    return lines
+
+
+def test_home_builds_from_the_site_data_fixtures(tmp_path):
+    results = _site_tree(tmp_path)
+    files = build_site.build(results)
+    assert build_site.build(results) == files
+    main = _home(files)
+    standings = json.loads(files["data/standings.json"])
+    races = json.loads(files["data/races.json"])
+    # The photo finish names the tied leaders from the data.
+    leaders = [e for e in standings["entries"] if e["place"] == 1]
+    assert len(leaders) == 2 and all(e["tie"] for e in leaders)
+    finish = _between(main, '<section class="home-pf">', "</section>")
+    assert "A photo finish." in finish
+    assert (
+        f"Two entries finished {leaders[0]['k']} of the {leaders[0]['n']} races."
+        in finish
+    )
+    for leader in leaders:
+        assert html.escape(site_home.entry_name(leader)) in finish
+    assert finish.count('<a class="home-leader" href="standings/index.html">') == 2
+    assert site_home.pct(leaders[0]["rate"]) in finish
+    # The hardest race and the challenge row read races.json.
+    calendar = [r for r in races["races"] if r["calendar"]]
+    hardest = min(calendar, key=lambda r: r["rate"])
+    card = _between(main, '<a class="home-card home-card-dark"', "</a>")
+    assert (
+        html.escape(hardest["name"]) in card and site_home.pct(hardest["rate"]) in card
+    )
+    assert f"of {hardest['n']} runs finished" in card
+    for row in races["challenges"]:
+        members = [r for r in calendar if r["challenge"] == row["challenge"]]
+        assert row["races"] == len(members)
+        assert (row["k"], row["n"]) == (
+            sum(r["k"] for r in members),
+            sum(r["n"] for r in members),
+        )
+        label = site_glyphs.RACE_TYPES[row["challenge"]][0]
+        assert f"{label} · {site_home.pct(row['rate'])} average pass rate" in main
+    # The hardest challenge is preselected and named as such.
+    pressed = re.findall(
+        r'<button type="button" class="challenge-card" data-pick="challenge" '
+        r'aria-pressed="true".*?<span class="challenge-name">([^<]+)</span>',
+        main,
+    )
+    assert pressed == ["Hard review"]
+    assert "The hardest challenge on the calendar." in main
+    # No prototype sample value reaches the page.
+    text = " ".join(" ".join(Text(main).text).split())
+    for sample in PROTOTYPE_SAMPLES:
+        assert sample not in text, sample
+    assert "Learn the paddock in 60 seconds." in main
+    assert "Seven challenges. One is brutal." in main
+
+
+def test_home_fuel_card_compares_a_shared_finish(tmp_path):
+    standings = {
+        "entries": [
+            {
+                "id": "a",
+                "driver": "d/one",
+                "car": "pi",
+                "map": "default",
+                "place": 1,
+                "costPerPass": 0.04,
+            },
+            {
+                "id": "b",
+                "driver": "d/two",
+                "car": "pi",
+                "map": "high",
+                "place": 1,
+                "costPerPass": 0.32,
+            },
+            {
+                "id": "c",
+                "driver": "d/three",
+                "car": "codex",
+                "map": "low",
+                "place": 3,
+                "costPerPass": 0.01,
+            },
+        ]
+    }
+    card = site_home.fuel_card(standings)
+    assert "Same finish. 8× the mileage." in card
+    assert "d/one in pi passes a race for $0.040." in card
+    assert "d/two in pi · high, tied on the finish, pays $0.320." in card
+    # Without two priced entries sharing a place, the card makes no comparison.
+    alone = site_home.fuel_card({"entries": standings["entries"][1:]})
+    assert "Same finish" not in alone and "The fuel bill." in alone
+
+
+def test_home_without_trusted_results_says_so(tmp_path):
+    demoted = {BENCH: {"level": "self-reported", "evidence": [], "sign_off": None}}
+    main = _home(build_site.build(_site_tree(tmp_path, demoted)))
+    assert "The grid is forming." in main and "home-leader" not in main
+    assert "Not decided yet" in main
+    assert "a fixed calendar of tasks" in main
+    # The committed leaderboard fixture is not trusted either, and still builds.
+    assert "The grid is forming." in _home(build_site.build(FIXTURE))
+
+
+def test_home_ticker_reads_the_configured_feed_and_falls_back_to_labelled_samples(
+    tmp_path,
+):
+    results = _site_tree(tmp_path)
+    main = _home(build_site.build(results))
+    ticker = _between(main, '<section class="home-ticker"', "</section>")
+    feed = re.search(r'data-feed="([^"]*)"', ticker)[1]
+    assert (
+        feed == site_config.DEFAULT_LIVE_FEED_URL == "https://api.agentpaddock.ai/live"
+    )
+    assert 'data-source="sample"' in ticker
+    assert (
+        f'<span class="home-ticker-stamp" data-stamp>{site_home.SAMPLE_STAMP}</span>'
+        in ticker
+    )
+    assert site_home.SAMPLE_STAMP == "Sample runs"
+    samples = json.loads(html.unescape(re.search(r'data-samples="([^"]*)"', ticker)[1]))
+    kinds = [tick["kind"] for tick in samples]
+    assert set(kinds) == {"passed", "dnf", "rerun"} and kinds[-1] == "rerun"
+    standings = json.loads(build_site.build(results)["data/standings.json"])
+    names = {site_home.entry_name(e) for e in standings["entries"]}
+    assert all(t["who"] in names for t in samples if t["kind"] != "rerun")
+    # The first sample is drawn on the page without JavaScript.
+    assert html.escape(samples[0]["who"]) in ticker
+    # An infrastructure rerun is the red flag, never DNF.
+    assert site_home.TICK_FLAGS["rerun"] == ("flag-red", "RED · RERUN")
+    for word in ("rerun", "red", "infra", "infrastructure"):
+        assert site_home.TICK_ALIASES[word] == "rerun"
+    script = build_site.build(results)["paddock.js"]
+    assert script.count(site_home.SCRIPT) == 1
+    for needle in (
+        "'paddock-live/v1'",
+        "AbortController",
+        "4000",
+        "t.infra === true",
+        "Live from the bench",
+        "useSamples()",
+        "textContent",
+    ):
+        assert needle in site_home.SCRIPT, needle
+    assert "innerHTML" not in site_home.SCRIPT
+    assert site_home.SCRIPT.index("t.infra === true") < site_home.SCRIPT.index("KINDS[")
+    # The feed URL is a setting: overridden, turned off or refused.
+    other = _home(build_site.build(results, {"live_feed_url": "live.json"}))
+    assert 'data-feed="live.json"' in other
+    off = _home(build_site.build(results, {"live_feed_url": ""}))
+    assert 'data-feed=""' in off
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "http://api.agentpaddock.ai/live",
+        "https://user:" + "secret@api.example/live",  # built from fragments
+        "/live",
+        "javascript:alert(1)",
+        'live.json" onload="x',
+        "//api.agentpaddock.ai/live",
+        3,
+    ],
+)
+def test_site_config_refuses_a_bad_feed_url(value):
+    with pytest.raises(site_config.ConfigError):
+        site_config.resolve({"live_feed_url": value})
+
+
+def test_site_config_cli_override_and_refusals(tmp_path, capsys):
+    assert site_config.resolve() == {"live_feed_url": site_config.DEFAULT_LIVE_FEED_URL}
+    with pytest.raises(site_config.ConfigError, match="unknown"):
+        site_config.resolve({"live_feed": "x"})
+    config = tmp_path / "site.json"
+    config.write_text('{"live_feed_url": "data/live.json"}', encoding="utf-8")
+    out = tmp_path / "out"
+    args = ["--results", str(FIXTURE), "--out", str(out), "--config", str(config)]
+    assert build_site.main(args) == 0
+    assert 'data-feed="data/live.json"' in (out / "index.html").read_text("utf-8")
+    assert build_site.main(args + ["--check"]) == 0
+    config.write_text('["not an object"]', encoding="utf-8")
+    assert build_site.main(args) == 1
+    assert "site config refused" in capsys.readouterr().err
+
+
+def test_home_tiles_and_roundels_use_glyph_set_symbols_only(tmp_path):
+    files = build_site.build(_site_tree(tmp_path))
+    main = _home(files)
+    marks = {mark for _label, mark, _body in site_glyphs.RACE_TYPES.values()}
+    uses = re.findall(r'<use href="#([^"]+)"', main)
+    assert set(uses) <= PUBLISHED_GLYPHS | marks
+    # Race-type marks appear only inside a roundel frame.
+    for mark in marks:
+        assert main.count(f'<use href="#{mark}"/>') == main.count(
+            f'<use href="#roundel"/><g transform="translate(5.4 5.4) scale(0.55)"><use href="#{mark}"/>'
+        )
+    learn = _between(main, '<div class="cast-grid"', "</div>")
+    tiles = re.findall(r'<button type="button" class="cast-tile".*?</button>', learn)
+    assert [re.search(r'<use href="#([^"]+)"', t)[1] for t in tiles] == [
+        "driver",
+        "car",
+        "engine-map",
+        "tires",
+        "team-radio",
+        "stewards",
+        "fuel",
+    ]
+    assert [re.search(r"<span>([^<]+)</span>", t)[1] for t in tiles] == [
+        term for term, _glyph, _body in site_home.CAST
+    ]
+    assert "The board does not measure skills yet." in main
+    row = _between(main, "data-challenge-row>", "</div>")
+    roundels = re.findall(r'<svg class="roundel roundel-([a-z-]+)', row)
+    assert roundels == list(site_glyphs.RACE_TYPES) and len(roundels) == 7
+    for glyph, _name in site_home.TICK_FLAGS.values():
+        assert glyph in PUBLISHED_GLYPHS
+    for glyph in (
+        "start-lights",
+        "flag-green",
+        "photo-finish",
+        "rulebook",
+        "fuel-bill",
+    ):
+        assert f'<use href="#{glyph}"/>' in main, glyph
+    # The tiles are 4 columns below 720 px and 7 across wider.
+    css = files["paddock.css"]
+    assert (
+        ".cast-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));"
+        in css
+    )
+    wide = site_home.CSS.split("@media (min-width: 720px) {", 1)[1].split("\n}\n", 1)[0]
+    assert ".cast-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }" in wide
+
+
+def test_home_swipe_cue_shows_below_720_px_only(tmp_path):
+    main = _home(build_site.build(_site_tree(tmp_path)))
+    cue = _between(
+        main, '<div class="swipe-cue swipe-only" aria-hidden="true">', "</div>"
+    )
+    assert "Swipe for all seven" in cue and cue.count("data-dot") == 7
+    assert '<span class="challenge-fade swipe-only" aria-hidden="true">' in main
+    css = site_home.CSS
+    wide = css.split("@media (min-width: 720px) {", 1)[1].split("\n}\n", 1)[0]
+    assert ".swipe-only { display: none; }" in wide
+    assert ".swipe-only" not in css.replace(wide, "")
+    # Below 720 px the row scrolls sideways with narrower cards so the next peeks.
+    rules = _css_rules(css.replace(wide, ""))
+    assert "overflow-x: auto" in rules[".challenge-row"]
+    assert "flex: 0 0 92px" in rules[".challenge-card"]
+    assert "overflow: visible" in wide and "repeat(7, minmax(0, 1fr))" in wide
+    # Touch targets: every home button and tile is at least 44 px tall.
+    for selector in (
+        ".cast-tile",
+        ".challenge-card",
+        ".home-start",
+        ".home-why summary",
+    ):
+        height = re.search(r"min-height: (\d+)px", rules[selector])
+        assert height and int(height[1]) >= 44, selector
+
+
+def test_home_results_note_follows_the_photo_finish(tmp_path):
+    main = _home(build_site.build(_site_tree(tmp_path)))
+    note_at = main.index('data-pdk="results-note"')
+    assert (
+        main.index('<section class="home-pf">')
+        < note_at
+        < main.index('<section class="home-learn">')
+    )
+    note = _between(main, 'data-pdk="results-note"', "</section>")
+    assert '<use href="#rulebook"/>' in note
+    assert site_home.RESULTS_NOTE_TITLE == "How to read these results"
+    assert ">How to read these results</h2>" in note
+    assert (
+        "These are AI-run benchmarks: AI agents race a fixed calendar of 2 tasks, and the "
+        "same automated checks grade every run. The board shows how each entry did on "
+        "these races. It is not a comprehensive ranking, and different tasks or settings "
+        "can give a different order." in note
+    )
+    assert (
+        '<a href="contact/index.html">Independent and open source: about the paddock</a>'
+        in note
+    )
+    assert '<a href="rulebook/index.html">Read the method</a>' in note
+
+
+def test_every_footer_carries_both_optics_lines_verbatim_and_links_contact(tmp_path):
+    lines = _readme_footer_lines()
+    assert lines == [layout.FOOTER_DISCLAIMER, layout.FOOTER_INDEPENDENCE]
+    for name, page in _html_pages(build_site.build(_site_tree(tmp_path))).items():
+        footer = _between(page, '<footer class="footer">', "</footer>")
+        for line in lines:
+            assert footer.count(line) == 1, (name, line)
+        contact = layout.href("contact/index.html", name)
+        assert re.search(
+            rf'<a href="{re.escape(contact)}"( aria-current="page")?>Contact and about</a>',
+            footer,
+        ), name

@@ -74,7 +74,7 @@ today's leaderboard; the ticket replaces it by registering its builder in
 
 | Route | Output file | Nav | Glyph | Built by today | Ticket |
 |---|---|---|---|---|---|
-| `/` | `index.html` | lockup | none | today's leaderboard | PDW-04 |
+| `/` | `index.html` | lockup | none | home (`paddock_site/home.py`) | PDW-04 |
 | `/learn/` | `learn/index.html` | bar | `track-map` | placeholder | PDW-05 |
 | `/races/` | `races/index.html` | bar | `race-calendar` | placeholder | PDW-06 |
 | `/standings/` | `standings/index.html` | bar | `timing-tower` | placeholder | PDW-07 |
@@ -87,6 +87,7 @@ today's leaderboard; the ticket replaces it by registering its builder in
 | `/dictionary/` | `dictionary/index.html` | panel | `briefing` | placeholder | PDW-09 |
 | `/race-it-yourself/` | `race-it-yourself/index.html` | panel | `pit-lane` | placeholder | PDW-09 |
 | `/contact/` | `contact/index.html` | panel | `pit-board` | placeholder | PDW-09 |
+| `/leaderboard.html` | `leaderboard.html` | footer | none | today's leaderboard, moved off `/` by PDW-04 | kept until PDW-07's standings replace it |
 | `/matrix.html` | `matrix.html` | footer | none | today's harness × model matrix | kept until a PDW page replaces it |
 | `/tasks.html` | `tasks.html` | footer | none | today's task list | kept until a PDW page replaces it |
 | `/changelog.html` | `changelog.html` | footer | none | today's grading changelog | kept until a PDW page replaces it |
@@ -116,7 +117,7 @@ these files, never copied. Nothing under `site/` is committed.
 | File | Schema | Shapes it serves |
 |---|---|---|
 | `data/standings.json` | `paddock-site-standings/v1` | `Standings.dc.html`, home |
-| `data/races.json` | `paddock-site-races/v1` | `Races.dc.html` |
+| `data/races.json` | `paddock-site-races/v1` | `Races.dc.html`, home |
 | `data/races/<race-id>.json` | `paddock-site-race/v1` | `Race.dc.html` |
 | `data/entries/<entry-id>.json` | `paddock-site-entry/v1` | `Entry.dc.html` |
 | `data/drivers.json` | `paddock-site-drivers/v1` | `Driver.dc.html`, the `Learn.dc.html` ladders |
@@ -130,3 +131,22 @@ and the page says so. A race is a local task at its `task.toml` version. The
 calendar is the races with at least ten counted runs. Standings place the
 entries with a first result on every calendar race and list the rest as
 `partial`. Checkpoints appear only as the race's track card discloses them.
+
+## Home (PDW-04)
+
+`/` rebuilds `Main.dc.html` in `scripts/paddock_site/home.py`; its styles ride
+in `paddock.css` and its behaviour in `paddock.js`, which does nothing on any
+other page. Its numbers come from `data/standings.json` (the leaders, the
+photo finish, the fuel card), `data/races.json` (the hardest race and the
+`challenges` list: every counted run on the calendar's races, pooled by
+challenge) and the leaders' `data/entries/<entry-id>.json` (the ticker's sample
+runs). The board pages that used to live at `/` moved to `/leaderboard.html`.
+
+The live ticker reads the site config's `live_feed_url`
+(`scripts/paddock_site/site_config.py`; default `https://api.agentpaddock.ai/live`,
+override with `python3 scripts/build_site.py --config FILE`, where `FILE` is a
+JSON object). The page fetches it with a four-second timeout, every minute
+while visible, and rotates the ticks. A missing, slow or invalid feed shows the
+built-in sample runs, labelled "Sample runs": recorded first results of the
+leading entries and one example of the red flag. An infrastructure rerun shows
+the red flag, never DNF.

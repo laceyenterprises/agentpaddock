@@ -9,6 +9,8 @@ page shares:
 - ``placeholder``: the short page a route shows until its page ticket lands.
 - ``data``: the site data layer (PDW-03), ``data/*.json`` computed from
   ``results/`` through ``scripts/leaderboard.py``, trust filter included.
+- ``home``: the home page (PDW-04), its styles and its script.
+- ``site_config``: build-time settings such as the live ticker's feed URL.
 
 It is named ``paddock_site`` rather than ``site``: ``site`` is a standard
 library module (imported at interpreter start, so a ``site`` package here
