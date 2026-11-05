@@ -12,6 +12,7 @@ import struct
 import subprocess
 import sys
 import zlib
+from collections import defaultdict
 from copy import deepcopy
 from html.parser import HTMLParser
 from pathlib import Path
@@ -3272,3 +3273,295 @@ def test_learn_driver_chips_keep_two_providers_of_one_model_apart():
     assert learn.embed({"a": "</script><b>&"}) == (
         '{"a":"\\u003c/script\\u003e\\u003cb\\u003e\\u0026"}'
     )
+
+# ---------------------------------------------------------------- garage, pit wall and drivers (PDW-08)
+#
+# The data pages read only the data files above. They are checked on the
+# synthetic tree, whose drivers cover every garage state, and on the committed
+# results.
+
+from paddock_site import drivers as site_drivers  # noqa: E402
+from paddock_site import garage as site_garage  # noqa: E402
+from paddock_site import pit_wall as site_pit_wall  # noqa: E402
+from paddock_site import views as site_views  # noqa: E402
+
+
+def _data_pages(results: Path):
+    files = build_site.build(results)
+    return files, site_views.SiteData.parse(files)
+
+
+@pytest.fixture(scope="module")
+def committed_pages():
+    return _data_pages(lb.DEFAULT_RESULTS)
+
+
+def _data_page_names(files) -> list[str]:
+    return [
+        name
+        for name in files
+        if name.startswith(("garage/", "pit-wall/", "drivers/"))
+        and name.endswith(".html")
+    ]
+
+
+def test_garage_level_availability_comes_from_the_data(tmp_path):
+    files, site = _data_pages(_site_tree(tmp_path))
+    view = site_garage.model(site)
+    drivers = {driver["id"]: driver for driver in view["drivers"]}
+
+    def open_levels(driver: str) -> list[str]:
+        return [level for level, why in drivers[driver]["levels"].items() if not why]
+
+    # Every level a driver has a counted run at, in any car and any document
+    # (trusted or not), is open; the rest are closed with a reason.
+    raced = defaultdict(set)
+    for entry in site.placed + site.partial + list(site.community["entries"]):
+        raced[entry["driver"]].add(entry["map"])
+    assert set(drivers) == set(raced)
+    for driver, maps in raced.items():
+        assert set(open_levels(driver)) == maps & set(site_views.LEVELS), driver
+        assert list(drivers[driver]["levels"]) == list(site_views.LEVELS)
+    assert open_levels("acme/coder-large") == ["low", "high"]
+    assert drivers["acme/coder-large"]["levels"]["max"] == (
+        "No counted run has Coder Large at max; it has raced at low and high."
+    )
+    # A level seen only in a self-reported document still opens the level.
+    assert open_levels("bolt/coder-small") == ["default", "max"]
+    assert drivers["local/coder-tiny"]["levels"]["high"] == (
+        "Coder Tiny has raced at one engine map only: provider default."
+    )
+    assert "It runs at one setting only." in drivers["local/coder-tiny"]["note"]
+    # Featured drivers (a placed entry) first; a partial-only driver has no page.
+    assert [d["id"] for d in view["drivers"] if d["featured"]] == [
+        "acme/coder-large",
+        "bolt/coder-small",
+    ]
+    assert drivers["local/coder-tiny"]["page"] is None
+
+    # A raced entry carries its standings result; an unchecked one only its badge.
+    key = site_garage.key
+    top = site.placed[0]
+    raced_entry = view["entries"][key(top["driver"], top["car"], top["map"])]
+    assert (raced_entry["k"], raced_entry["n"], raced_entry["place"]) == (
+        top["k"],
+        top["n"],
+        "=1st",
+    )
+    assert view["unverified"] == {
+        key("bolt/coder-small", "gamma-cli", "max"): "self-reported"
+    }
+    assert key("bolt/coder-small", "gamma-cli", "max") not in view["entries"]
+    # Open but unraced: acme at high in a car it never raced.
+    unraced = key("acme/coder-large", "gamma-cli", "high")
+    assert unraced not in view["entries"] and unraced not in view["unverified"]
+    partial = view["entries"][key("local/coder-tiny", "alpha-cli", "default")]
+    assert partial["place"] == "not placed" and not partial["placed"]
+
+    page = files["garage/index.html"]
+    main = _between(page, '<main class="wrap">', "</main>")
+    assert view["start"] == [top["driver"], top["car"], top["map"]]
+    assert main.count('aria-disabled="true"') == 4  # acme opens on low and high only
+    assert 'data-state="unraced" hidden' in main
+    assert f'href="../{site_garage.RACE_IT_YOURSELF}"' in main
+    assert "Nobody has raced this yet." in main
+    assert f'data-slot="pct">{site_views.pct(top["rate"])}<' in main
+    embedded = json.loads(_between(page, 'id="garage-data">', "</script>"))
+    assert embedded["drivers"] == view["drivers"]
+    assert set(embedded["entries"]) == set(view["entries"])
+
+
+def test_garage_offers_every_committed_driver_and_its_levels(committed_pages):
+    files, site = committed_pages
+    view = site_garage.model(site)
+    assert [level[0] for level in view["levels"]] == [
+        "default",
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+    ]
+    for driver in view["drivers"]:
+        for level, why in driver["levels"].items():
+            assert bool(why) != any(
+                key.startswith(f"{driver['id']}|") and key.endswith(f"|{level}")
+                for key in [*view["entries"], *view["unverified"]]
+            ), (driver["id"], level)
+    for entry in site.placed:
+        raced = view["entries"][
+            site_garage.key(entry["driver"], entry["car"], entry["map"])
+        ]
+        assert raced["placed"] and raced["pct"] == site_views.pct(entry["rate"])
+
+
+@pytest.mark.parametrize(
+    ("k", "n", "tone"),
+    [
+        (0, 1, 1),
+        (1, 3, 1),
+        (1, 2, 2),
+        (69, 100, 2),
+        (7, 10, 3),
+        (4, 5, 4),
+        (9, 10, 5),
+        (19, 20, 6),
+        (53, 54, 6),
+        (1, 1, 7),
+    ],
+)
+def test_pit_wall_shades_by_the_token_bins(k, n, tone):
+    assert site_pit_wall.bin_of(k, n) == tone
+
+
+def _pit_wall_rows(page: str) -> list[dict]:
+    body = _between(page, "<tbody>", "</tbody>")
+    rows = []
+    for row in re.findall(r"<tr (.*?)</tr>", body):
+        cells = re.findall(r'data-k="(\d+)" data-n="(\d+)"', row)
+        rows.append(
+            {
+                "car": re.search(r'data-car="([^"]+)"', row)[1],
+                "cells": [(int(k), int(n)) for k, n in cells[:-1]],
+                "total": tuple(map(int, cells[-1])),
+            }
+        )
+    return rows
+
+
+def _check_pit_wall(files, site) -> None:
+    view = site_pit_wall.model(site)
+    columns = view["columns"]
+    assert [c["races"] for c in columns] and sum(c["races"] for c in columns) == len(
+        site.calendar
+    )
+    assert [row["id"] for row in view["rows"]] == [e["id"] for e in site.placed]
+    for row, entry in zip(view["rows"], site.placed):
+        assert sum(cell["k"] for cell in row["cells"]) == entry["k"] == row["k"]
+        assert (
+            sum(cell["n"] for cell in row["cells"]) == entry["n"] == len(site.calendar)
+        )
+        for cell, column in zip(row["cells"], columns):
+            assert cell["n"] == column["races"], (row["id"], column["challenge"])
+    # The page shows exactly those numbers, in standings order.
+    page = files["pit-wall/index.html"]
+    shown = _pit_wall_rows(page)
+    assert len(shown) == len(site.placed)
+    for got, entry in zip(shown, site.placed):
+        assert got["car"] == entry["car"]
+        assert got["total"] == (entry["k"], entry["n"])
+        assert sum(k for k, _ in got["cells"]) == entry["k"]
+        assert got["cells"] == [
+            (entry["challenges"][c["challenge"]]["k"], c["races"]) for c in columns
+        ]
+    # Every column sorts; the table and the car chips carry the sideways cue.
+    assert page.count('class="pw-sort"') == len(columns) + 2
+    assert page.count("data-hscroll ") + page.count("data-hscroll>") >= 2
+    assert "Scroll sideways for every challenge" in page
+
+
+def test_pit_wall_heatmap_totals_equal_standings(tmp_path, committed_pages):
+    _check_pit_wall(*_data_pages(_site_tree(tmp_path)))
+    _check_pit_wall(*committed_pages)
+
+
+def _check_driver_pages(files, site) -> None:
+    featured = list(dict.fromkeys(entry["driver"] for entry in site.placed))
+    slugs = site_drivers.slugs(featured)
+    expected = {site_drivers.page_file(slugs[d]) for d in featured}
+    built = {n for n in files if n.startswith("drivers/") and n != site_drivers.INDEX}
+    assert built == expected
+    index = files[site_drivers.INDEX]
+    assert {f"drivers/{slugs[d]}/index.html" for d in featured} <= _local_links(
+        site_drivers.INDEX, index
+    )
+    names = site_views.driver_names(e["driver"] for e in site.placed + site.partial)
+    for driver in featured:
+        name = site_drivers.page_file(slugs[driver])
+        page = files[name]
+        entries = [e for e in site.placed if e["driver"] == driver]
+        best = entries[0]
+        assert f"<h1>{html.escape(names[driver])}</h1>" in page
+        assert f'<span class="big-num">{site_views.pct(best["rate"])}</span>' in page
+        assert page.count('class="dv-row"') == len(entries)
+        assert page.count("data-slips=") == len(entries)
+        # The page is marked as the drivers route and links back to every driver.
+        mark = f'href="{layout.href(site_drivers.INDEX, name)}" aria-current="page"'
+        assert mark in page
+        assert {f"drivers/{slugs[d]}/index.html" for d in featured} <= _local_links(
+            name, page
+        )
+        assert "Cheapest way to run" in page or "no fuel bill to compare" in page
+
+
+def test_every_driver_page_builds(tmp_path, committed_pages):
+    _check_driver_pages(*_data_pages(_site_tree(tmp_path)))
+    _check_driver_pages(*committed_pages)
+    files, site = committed_pages
+    assert len([n for n in files if n.startswith("drivers/")]) > 2
+
+
+def test_data_pages_link_resolve_and_use_only_published_glyphs(committed_pages):
+    files, _ = committed_pages
+    names = _data_page_names(files)
+    assert {"garage/index.html", "pit-wall/index.html", "drivers/index.html"} <= set(
+        names
+    )
+    for name in names:
+        page = files[name]
+        for link in _local_links(name, page):
+            assert link in files, (name, link)
+        ids = set(re.findall(r'<symbol id="([^"]+)"', page))
+        assert set(re.findall(r'<use href="#([^"]+)"', page)) <= ids, name
+        assert page.count('<svg class="symbols"') == 1, name
+        assert not _stray_product_names(page), (name, _stray_product_names(page))
+        assert "faster" not in page.lower(), name
+        head = page.split("<head>", 1)[1].split("</head>", 1)[0]
+        assert re.findall(r"<title>(.*?)</title>", head)[0].endswith(" · Agent Paddock")
+
+
+def test_data_pages_wait_for_trust_sign_off_without_numbers(tmp_path):
+    demoted = {BENCH: {"level": "self-reported", "evidence": [], "sign_off": None}}
+    files, _ = _data_pages(_site_tree(tmp_path, demoted))
+    assert {n for n in files if n.startswith("drivers/")} == {site_drivers.INDEX}
+    for name in ("garage/index.html", "pit-wall/index.html", site_drivers.INDEX):
+        main = _between(files[name], '<main class="wrap">', "</main>")
+        text = " ".join(" ".join(Text(main).text).split())
+        assert "Waiting on checks." in text, name
+        assert not re.search(r"\d", text), (name, text)
+        assert "data-garage" not in main and "data-pitwall" not in main
+
+
+@pytest.mark.parametrize(
+    ("provider_id", "name"),
+    [
+        ("openai/gpt-6.1-sol", "GPT-6.1 Sol"),
+        ("anthropic/claude-opus-5-5", "Claude Opus 5.5"),
+        ("google/gemini-3.8-flash", "Gemini 3.8 Flash"),
+        ("together/deepseek-v4.1-flash", "DeepSeek V4.1 Flash"),
+        ("openrouter/qwen3.8-27b", "Qwen 3.8 27B"),
+        ("zai/glm-5.2", "GLM 5.2"),
+        ("moonshot/kimi-k3", "Kimi K3"),
+    ],
+)
+def test_driver_names_read_like_the_design(provider_id, name):
+    assert site_views.model_name(provider_id) == name
+
+
+def test_driver_names_that_collide_name_their_host():
+    names = site_views.driver_names(
+        ["moonshot/kimi-k3", "fireworks/kimi-k3", "zai/glm-5.2"]
+    )
+    assert names == {
+        "fireworks/kimi-k3": "Kimi K3 · Fireworks",
+        "moonshot/kimi-k3": "Kimi K3 · Moonshot",
+        "zai/glm-5.2": "GLM 5.2",
+    }
+
+
+def test_embedded_page_data_cannot_close_its_script():
+    block = site_views.json_script("x", {"name": "</script><b>&"})
+    assert block.count("</script>") == 1 and "<b>" not in block
+    assert json.loads(
+        _between(block, '<script type="application/json" id="x">', "</script>")
+    ) == {"name": "</script><b>&"}
