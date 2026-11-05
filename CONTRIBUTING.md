@@ -277,11 +277,12 @@ The community board shows every trust level, each with its badge. Exhibition
 admission remains separate.
 
 The site data layer (`scripts/paddock_site/data.py`) applies these rules when
-it writes `data/*.json` for the pages. Standings, race and entry files count
-only `reproduced` and `paddock-run` documents. `data/community.json` lists
-every document and entry with its level. With no trusted document, every file
-says `"state": "awaiting-trust-sign-off"` and lists nothing, so a page never
-falls back to untrusted results.
+it writes `data/*.json` for the pages. Standings, race, entry and driver files
+count only `reproduced` and `paddock-run` documents. With no trusted document,
+these files say `"state": "awaiting-trust-sign-off"` and list nothing, so those
+pages never fall back to untrusted results. `data/community.json` remains
+`"state": "live"` whenever results documents exist, listing every document
+and entry with its trust badge.
 
 ## Signed answers and submission API contract
 

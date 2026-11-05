@@ -1628,6 +1628,26 @@ def test_site_data_counts_only_trusted_documents(tmp_path):
     assert fork_rows[0]["place"] == 1
 
 
+@pytest.mark.parametrize("copy_record", [dict, deepcopy], ids=["shallow", "deep"])
+def test_site_data_resolves_trust_for_copied_first_results(
+    tmp_path, monkeypatch, copy_record
+):
+    signed = {
+        "level": "reproduced",
+        "evidence": ["https://example.com/evidence"],
+        "sign_off": "maintainer",
+    }
+    results = _site_tree(tmp_path, {FORK: signed})
+    expected = _site_files(results)
+    first_results = lb.first_results
+    monkeypatch.setattr(
+        lb,
+        "first_results",
+        lambda documents: [copy_record(record) for record in first_results(documents)],
+    )
+    assert _site_files(results) == expected
+
+
 def test_an_empty_trusted_set_awaits_sign_off_and_never_falls_back(tmp_path):
     demoted = {BENCH: {"level": "self-reported", "evidence": [], "sign_off": None}}
     files = _site_files(_site_tree(tmp_path, demoted))
@@ -1643,6 +1663,7 @@ def test_an_empty_trusted_set_awaits_sign_off_and_never_falls_back(tmp_path):
     for name in ("standings.json", "races.json", "drivers.json"):
         assert _site_json(files, name)["state"] == "awaiting-trust-sign-off"
     community = _site_json(files, "community.json")
+    assert community["state"] == "live"
     assert {row["trust"] for row in community["documents"]} == {"self-reported"}
     assert community["entries"]
     # The committed fixture's single run document is not the bench: awaiting too.

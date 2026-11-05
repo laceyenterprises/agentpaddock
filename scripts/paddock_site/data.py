@@ -7,14 +7,14 @@ board order, places and ties, prices, difficulty bands and checkpoint
 disclosure. Nothing here re-derives one of those; a missing number becomes a
 small public helper in ``leaderboard.py`` with its own test.
 
-The trust filter (CONTRIBUTING.md "Trust levels"): standings, race and entry
-files count only documents at ``reproduced`` or ``paddock-run``. The
+The trust filter (CONTRIBUTING.md "Trust levels"): standings, race, entry and
+driver files count only documents at ``reproduced`` or ``paddock-run``. The
 paddock's own bench is ``paddock-run`` unless ``results/meta/trust.json`` says
 otherwise; everything else defaults to ``self-reported``
-(:func:`leaderboard.document_trust`). ``community.json`` lists every document
-and every level with its badge. With no trusted document, every file says
-``"state": "awaiting-trust-sign-off"`` and lists nothing: the pages never fall
-back to untrusted data.
+(:func:`leaderboard.document_trust`). With no trusted document, these files say
+``"state": "awaiting-trust-sign-off"`` and list nothing: those pages never fall
+back to untrusted data. ``community.json`` remains ``"state": "live"`` whenever
+results documents exist, listing every document and entry with its trust badge.
 
 Races are the local tasks at the version their ``task.toml`` names. The
 calendar is the races with at least :data:`leaderboard.DIFFICULTY_MIN_RUNS`
@@ -214,7 +214,8 @@ class SiteData:
     #: The first counted trusted result per identity on a local race, by race.
     firsts: dict[tuple[str, str, int], list[Mapping[str, Any]]]
     calendar: list[Race]
-    record_trust: dict[int, str]
+    #: Resolved document trust by globally unique run id.
+    record_trust: dict[str, str]
     #: Entry ids for every identity in every document, trusted or not, so an
     #: entry keeps one id on every page.
     ids: dict[tuple, str]
@@ -242,7 +243,7 @@ def model(results: lb.Results, tasks_dir: Path) -> SiteData:
         if trust[name][0] in lb.TRUSTED_LEVELS
     }
     record_trust = {
-        id(record): trust[name][0]
+        record["run_id"]: trust[name][0]
         for name, document in trusted.items()
         for record in document["records"]
     }
@@ -324,7 +325,7 @@ def _entry_rows(data: SiteData) -> tuple[list[dict], list[dict], dict[tuple, str
                 **summary,
                 "records": records,
                 "full": {race_key(record) for record in season} == calendar,
-                "trust": _lowest_trust(data.record_trust[id(r)] for r in season),
+                "trust": _lowest_trust(data.record_trust[r["run_id"]] for r in season),
                 "challenges": {
                     suite: lb.summarize(members)
                     for suite, members in sorted(challenges.items())
