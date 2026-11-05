@@ -78,9 +78,9 @@ the build writes.
 | Route | Output file | Nav | Glyph | Built by today | Ticket |
 |---|---|---|---|---|---|
 | `/` | `index.html` | lockup | none | today's leaderboard | PDW-04 |
-| `/learn/` | `learn/index.html` | bar | `track-map` | placeholder | PDW-05 |
 | `/races/` | `races/index.html` | bar | `race-calendar` | the races grid | PDW-06 |
 | `/standings/` | `standings/index.html` | bar | `timing-tower` | the timing tower | PDW-07 |
+| `/learn/` | `learn/index.html` | bar | `track-map` | the Learn page (`learn.py`, `learn/learn.js`) | PDW-05 |
 | `/garage/` | `garage/index.html` | bar | `setup-sheet` | placeholder | PDW-08 |
 | `/pit-wall/` | `pit-wall/index.html` | bar | `pit-wall` | placeholder | PDW-08 |
 | `/community/` | `community/index.html` | panel | `entry` | `paddock_site/community.py` | PDW-09 |
@@ -229,3 +229,34 @@ data files and never from the prototypes.
   flag). Without it the board shows the pass ranking with ranges, every row.
 - With no trusted results both pages show the awaiting-trust state and no
   entry page is built.
+
+## Learn page (PDW-05)
+
+`/learn/` rebuilds `Learn.dc.html` from `data/drivers.json`
+(`scripts/paddock_site/learn.py`). The module turns the file into a view: every
+state each lab can show, with its words already written, and the rules for
+what stays on screen (`show` tables). The page renders the first state of each
+lab, embeds the view as JSON and `learn/learn.js` only switches between states.
+
+- **Sector stepper.** Tapping the track drives the next sector, a sector number
+  jumps to it, and after sector 4 a tap starts another lap.
+- **Engine map.** One chip per driver, on the car with the most levels on the
+  dial (then the most runs). The dial always shows low, medium, high, xhigh and
+  max; a level the driver has not raced in that car is greyed with the reason,
+  and levels off the dial (the car's own default, ultra) are named in the
+  caption. The best level is the one whose honest range starts highest. The
+  level on screen is held when the driver changes, or falls back to the best
+  with a note. Notes call overlapping ranges a statistical tie and name a cost
+  ratio from twice as much.
+- **Honest ranges.** 9, 54 or 162 runs, starting at the car lab's top result and
+  keeping its pass rate when the size changes. Every range is a
+  `leaderboard.wilson` value from a table in the view, explained in four steps
+  with the formula and live numbers.
+- **Same driver, different car.** The car on screen is held across drivers, or
+  falls back to the driver's best-placed car with a note. Bars start at 80%
+  unless a value sits below 82%, and the caption says where they start.
+- **Flags.** The six flags of `design/vocabulary.md`; DNF (did not finish) is
+  spelled out at its first use.
+
+Copy carries no numbers of its own: the prototype's sample figures (briefing
+length, lap time, the hardest race's rate) are not on the page.

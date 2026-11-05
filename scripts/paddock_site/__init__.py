@@ -12,6 +12,7 @@ page shares:
 - ``races``: the races grid and one page per calendar race (PDW-06), read
   from the site data.
 - ``names``: the races' short names, plain words with acronyms spelled out.
+- ``learn``: the Learn page (PDW-05), its labs and ``learn/learn.js``.
 
 It is named ``paddock_site`` rather than ``site``: ``site`` is a standard
 library module (imported at interpreter start, so a ``site`` package here
