@@ -3044,6 +3044,88 @@ def test_home_without_trusted_results_says_so(tmp_path):
     assert "The grid is forming." in _home(build_site.build(FIXTURE))
 
 
+@pytest.mark.parametrize(
+    ("finishes", "dnfs", "expected"),
+    [
+        (1, 3, ["passed", "dnf", "dnf", "dnf"]),
+        (0, 3, ["dnf", "dnf", "dnf"]),
+        (3, 0, ["passed", "passed", "passed"]),
+        (0, 0, []),
+        (3, 1, ["passed", "dnf", "passed", "passed"]),
+        (3, 3, ["passed", "dnf", "passed", "dnf"]),
+        (1, 6, ["passed", "dnf", "dnf", "dnf"]),
+    ],
+)
+def test_home_sample_ticks_fill_budget_with_unpaired_results(finishes, dnfs, expected):
+    entries = {}
+    for i in range(max(finishes, dnfs)):
+        entries[str(i)] = {
+            "driver": f"Driver {i}",
+            "car": "Car",
+            "races": [
+                {
+                    "calendar": True,
+                    "passed": passed,
+                    "challenge": "coding",
+                    "name": f"Race {i}",
+                }
+                for passed, count in ((True, finishes), (False, dnfs))
+                if i < count
+            ],
+        }
+    standings = {"entries": [{"id": key} for key in entries]}
+    ticks = site_home.sample_ticks(standings, entries)
+    assert [tick["kind"] for tick in ticks] == expected + ["rerun"]
+    assert len({(tick["who"], tick["kind"]) for tick in ticks}) == len(ticks)
+
+
+def test_home_ticker_drops_prototype_kinds_and_preserves_supported_flags():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required to execute the ticker JavaScript")
+    # Execute the emitted normalizer, using its actual alias and flag tables.
+    tables = site_home.SCRIPT.split("  var FLAGS = ", 1)[1].split("  var stamp =", 1)[0]
+    normalizer = site_home.SCRIPT.split("  var text = function", 1)[1].split(
+        "  var samples = [];", 1
+    )[0]
+    script = (
+        "var FLAGS = "
+        + tables
+        + "var each = function (list, fn) { list.forEach(fn); };\n"
+        + "var text = function"
+        + normalizer
+        + """
+var tick = function (kind, extra) {
+  return Object.assign({kind: kind, who: 'Driver in Car', what: 'Run'}, extra);
+};
+var invalid = Object.getOwnPropertyNames(Object.prototype).concat(['unknown']);
+var rejected = clean(invalid.map(function (kind) { return tick(kind); }));
+var aliases = clean(Object.keys(KINDS).map(function (kind) { return tick(kind.toUpperCase()); }));
+var reruns = clean([
+  tick('dnf', {infra: true}), tick('constructor', {infrastructure: true}),
+  tick('__proto__', {rerun: true}), tick('unknown', {flagName: 'RED · RERUN'})
+]);
+var mixed = clean([tick('passed'), tick('constructor'), tick('__proto__'), tick('dnf')]);
+console.log(JSON.stringify({rejected: rejected, aliases: aliases, reruns: reruns, mixed: mixed}));
+"""
+    )
+    result = subprocess.run(
+        [node, "-e", script], capture_output=True, text=True, check=True, timeout=10
+    )
+    normalized = json.loads(result.stdout)
+    assert normalized["rejected"] == []
+    assert [t["kind"] for t in normalized["aliases"]] == list(
+        site_home.TICK_ALIASES.values()
+    )
+    assert [t["kind"] for t in normalized["reruns"]] == ["rerun"] * 4
+    assert [t["kind"] for t in normalized["mixed"]] == ["passed", "dnf"]
+    assert all(
+        tick["kind"] in site_home.TICK_FLAGS
+        for ticks in normalized.values()
+        for tick in ticks
+    )
+
+
 def test_home_ticker_reads_the_configured_feed_and_falls_back_to_labelled_samples(
     tmp_path,
 ):

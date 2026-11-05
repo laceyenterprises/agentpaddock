@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import math
+from itertools import zip_longest
 from typing import Any, Mapping, Sequence
 
 from . import glyphs, layout
@@ -283,11 +284,12 @@ def sample_ticks(
                     }
                 )
     ticks: list[dict[str, str]] = []
-    for finish, dnf in zip(finishes, dnfs + [None] * len(finishes)):
-        ticks.append(finish)
+    for finish, dnf in zip_longest(finishes, dnfs):
+        if finish:
+            ticks.append(finish)
         if dnf:
             ticks.append(dnf)
-    ticks = (ticks or dnfs)[:4]
+    ticks = ticks[:4]
     ticks.append(
         {
             "who": "Any entry",
@@ -949,9 +951,10 @@ def _script() -> str:
   var kindOf = function (t) {
     // An infrastructure rerun is a red flag, never a DNF.
     if (t.infra === true || t.infrastructure === true || t.rerun === true) return 'rerun';
-    var kind = KINDS[String(t.kind || '').toLowerCase()];
+    var raw = String(t.kind || '').toLowerCase();
+    var kind = Object.prototype.hasOwnProperty.call(KINDS, raw) ? KINDS[raw] : null;
     if (!kind && /rerun|^\\s*red\\b/i.test(String(t.flagName || ''))) return 'rerun';
-    return kind || null;
+    return kind && Object.prototype.hasOwnProperty.call(FLAGS, kind) ? kind : null;
   };
   var clean = function (list) {
     var out = [];
