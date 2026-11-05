@@ -81,10 +81,10 @@ the build writes.
 | `/races/` | `races/index.html` | bar | `race-calendar` | the races grid | PDW-06 |
 | `/standings/` | `standings/index.html` | bar | `timing-tower` | the timing tower | PDW-07 |
 | `/learn/` | `learn/index.html` | bar | `track-map` | the Learn page (`learn.py`, `learn/learn.js`) | PDW-05 |
-| `/garage/` | `garage/index.html` | bar | `setup-sheet` | placeholder | PDW-08 |
-| `/pit-wall/` | `pit-wall/index.html` | bar | `pit-wall` | placeholder | PDW-08 |
+| `/garage/` | `garage/index.html` | bar | `setup-sheet` | the garage (`garage.py`) | PDW-08 |
+| `/pit-wall/` | `pit-wall/index.html` | bar | `pit-wall` | the pit wall (`pit_wall.py`) | PDW-08 |
 | `/community/` | `community/index.html` | panel | `entry` | `paddock_site/community.py` | PDW-09 |
-| `/drivers/` | `drivers/index.html` | panel | `driver` | placeholder | PDW-08 |
+| `/drivers/` | `drivers/index.html` | panel | `driver` | the featured drivers, plus `drivers/<driver-id>/index.html` each (`drivers.py`) | PDW-08 |
 | `/entries/` | `entries/index.html` | panel | `podium` | every entry's season, listed | PDW-07 |
 | `/rulebook/` | `rulebook/index.html` | panel | `rulebook` | placeholder | PDW-09 |
 | `/dictionary/` | `dictionary/index.html` | panel | `briefing` | placeholder | PDW-09 |
@@ -260,3 +260,34 @@ lab, embeds the view as JSON and `learn/learn.js` only switches between states.
 
 Copy carries no numbers of its own: the prototype's sample figures (briefing
 length, lap time, the hardest race's rate) are not on the page.
+
+## Data pages (PDW-08)
+
+The garage, the pit wall and the drivers are data pages: `scripts/build_site.py`
+lists them in `DATA_PAGES`, and each builder gets the parsed data files
+(`paddock_site/views.py`, which also turns ids into display names), the route
+and the registry, and returns every file it writes. They read no results
+document directly. The registry adapts each data-page builder to its single-page
+interface; the site build also retains auxiliary files returned by the bundle.
+
+Driver display names use the same set of trusted and community driver IDs on
+all three pages; names shared by several hosts gain a host suffix. Links to
+featured driver pages use the same collision-disambiguated slugs everywhere.
+
+- **Garage** (`garage.py`): a level is open for a driver when a counted run of
+  that driver at that level exists in any car and any document, trusted or not;
+  every other level is greyed out with the reason. A raced combination shows its
+  standings result. One raced only in untrusted documents points at the
+  community board. An open but unraced combination shows "Nobody has raced this
+  yet" and links to `/race-it-yourself/`. The selection lives in the address so
+  a build can be shared. It opens on the best standings entry at one of the six
+  supported maps, falling back to an open driver level when none qualifies.
+- **Pit wall** (`pit_wall.py`): every placed entry by challenge, shaded with the
+  `--viz-seq` ramp of `design/tokens.css`. The page script adds the car filter,
+  the percent-or-count switch and column sort. Clicking the active column again
+  reverses its order; a newly selected column starts best-first (fuel starts
+  cheapest-first). Missing values stay last in either direction.
+- **Drivers** (`drivers.py`): a driver with at least one placed entry, so a
+  complete calendar, gets `/drivers/<driver-id>/`: best entry, car-by-car bars,
+  wins and slips by challenge, and cheapest against best on fuel.
+  `/drivers/` lists them.

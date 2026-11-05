@@ -49,7 +49,8 @@ from typing import Any, Mapping, Sequence
 import leaderboard as lb
 
 from paddock_site import data as site_data
-from paddock_site import community, contact, dictionary, kit, layout, learn, pit_lane, placeholder
+from paddock_site import community, contact, dictionary, garage, kit, layout, learn, pit_lane, pit_wall, placeholder, views
+from paddock_site import drivers as site_drivers
 from paddock_site import races as race_pages
 from paddock_site import rulebook
 from paddock_site import routes as site_routes
@@ -1062,12 +1063,34 @@ def learn_page(build: site_routes.Build) -> str:
     return learn.page(route, build.routes, build.data["data/drivers.json"])
 
 
+#: Pages cut from the site data files (PDW-08): route path -> builder taking
+#: the parsed data (``views.SiteData``), the route and the registry, and
+#: returning ``{output file: page}``. A data page may write more than its own
+#: route's file, as ``/drivers/`` writes one page per driver.
+DATA_PAGES = {
+    "garage/": garage.page,
+    "pit-wall/": pit_wall.page,
+    "drivers/": site_drivers.pages,
+}
+#: Page styles and scripts of the data pages, in the one stylesheet and script.
+DATA_CSS = views.CSS + garage.CSS + pit_wall.CSS + site_drivers.CSS
+DATA_SCRIPT = views.SCRIPT + garage.SCRIPT + pit_wall.SCRIPT + site_drivers.SCRIPT
+
 #: Every page the site builds, in nav order. Today's board pages are built by
 #: the functions above; a page ticket adds its builder here (which also keeps
 #: its merge inside the pages workflow's ``scripts/build_site.py`` path filter).
 def _from_results(page: Any) -> site_routes.Builder:
     """A builder for one of today's board pages, which read only the results."""
     return lambda build: page(build.results)
+
+
+def _from_data_page(path: str, page: Any) -> site_routes.Builder:
+    """Adapt a data-page bundle to the registry's single-page interface."""
+    def render(build: site_routes.Build) -> str:
+        route = next(route for route in build.routes if route.path == path)
+        return page(views.SiteData(build.data), route, build.routes)[route.file]
+
+    return render
 
 
 ROUTES = site_routes.registry(
@@ -1081,11 +1104,12 @@ ROUTES = site_routes.registry(
         "tasks.html": _from_results(tasks_page),
         "changelog.html": _from_results(changelog_page),
         "methodology.html": _from_results(methodology_page),
-    "community/": _site_page(community),
-    "rulebook/": _site_page(rulebook),
-    "dictionary/": _site_page(dictionary),
-    "race-it-yourself/": _site_page(pit_lane),
-    "contact/": _site_page(contact),
+        "community/": _site_page(community),
+        "rulebook/": _site_page(rulebook),
+        "dictionary/": _site_page(dictionary),
+        "race-it-yourself/": _site_page(pit_lane),
+        "contact/": _site_page(contact),
+        **{path: _from_data_page(path, page) for path, page in DATA_PAGES.items()},
     }
 )
 #: ``(output file, title)`` for every registered page.
@@ -1105,6 +1129,7 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
     # the pages built from them read the same values.
     site = site_data.site(results, results_dir.parent / "tasks")
     data_files = site_data.render_files(site)
+    parsed_data = views.SiteData.parse(data_files)
     inputs = site_routes.Build(
         results,
         {name: json.loads(text) for name, text in data_files.items()},
@@ -1112,16 +1137,21 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
     )
     files: dict[str, str | bytes] = {}
     for route in ROUTES:
-        files[route.file] = (
-            route.builder(inputs) if route.builder else placeholder.page(route, ROUTES)
-        )
+        if route.path in DATA_PAGES:
+            files.update(DATA_PAGES[route.path](parsed_data, route, ROUTES))
+        else:
+            files[route.file] = (
+                route.builder(inputs) if route.builder else placeholder.page(route, ROUTES)
+            )
     # One page per calendar race (PDW-06) and per standings entry (PDW-07).
     files.update(race_pages.race_pages(site, ROUTES))
     files.update(standings_pages.entry_pages(inputs))
     files.update(
         {
-            "paddock.css": layout.stylesheet(STYLE + race_pages.CSS + standings_pages.CSS + kit.CSS + learn.CSS),
-            SCRIPT_NAME: layout.SCRIPT + race_pages.SCRIPT + kit.SCRIPT,
+            "paddock.css": layout.stylesheet(
+                STYLE + race_pages.CSS + standings_pages.CSS + kit.CSS + learn.CSS + DATA_CSS
+            ),
+            SCRIPT_NAME: layout.SCRIPT + race_pages.SCRIPT + kit.SCRIPT + DATA_SCRIPT,
             standings_pages.SCRIPT_NAME: standings_pages.SCRIPT,
         learn.SCRIPT_FILE: learn.SCRIPT,
             "favicon.svg": FAVICON,

@@ -14,6 +14,10 @@ page shares:
 - ``names``: the races' short names, plain words with acronyms spelled out.
 - ``learn``: the Learn page (PDW-05), its labs and ``learn/learn.js``.
 
+- ``views``: the parsed data files and display labels the data pages share.
+- ``garage``, ``pit_wall``, ``drivers``: the data pages (PDW-08), built only
+  from ``data/*.json``.
+
 It is named ``paddock_site`` rather than ``site``: ``site`` is a standard
 library module (imported at interpreter start, so a ``site`` package here
 could never be imported), and the publication scan skips every directory
