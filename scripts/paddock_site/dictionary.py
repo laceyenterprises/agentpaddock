@@ -53,8 +53,8 @@ def _calendar(races: int) -> str:
     return "Every race, grouped by challenge"
 
 
-#: Glyph id -> visitor wording (from the prototype). ``{calendar}`` is filled
-#: from the site data.
+#: Glyph id -> visitor wording (from the prototype). The race calendar's
+#: ``{calendar}`` is filled from the site data; other meanings are literal.
 WORDING: dict[str, Wording] = {
     "driver": Wording("Driver", "The model behind the wheel", "drivers/"),
     "car": Wording("Car", "The harness that runs the model", "garage/"),
@@ -160,7 +160,11 @@ def terms(races: int = 0, path: Path = INDEX_PATH) -> list[Term]:
                 glyph,
                 group,
                 wording.term,
-                wording.meaning.format(calendar=_calendar(races)),
+                (
+                    wording.meaning.format(calendar=_calendar(races))
+                    if glyph == "race-calendar"
+                    else wording.meaning
+                ),
                 wording.where,
                 wording.where_label,
             )

@@ -2722,6 +2722,25 @@ def test_pit_lane_refuses_a_missing_source_block(tmp_path):
     assert site_pit_lane.fenced_blocks(text, "## A") == ["one \\\n  two"]
 
 
+def test_pit_lane_citations_use_heading_anchors_and_are_unique_per_step():
+    page = build_site.build(FIXTURE)["race-it-yourself/index.html"]
+    repo = "https://github.com/laceyenterprises/agentpaddock/blob/main/"
+    expected = (
+        "README.md#quick-start",
+        "design/guide/race-it-yourself.md#runners-pdk-01",
+        "design/guide/race-it-yourself.md#runners-pdk-01",
+        "CONTRIBUTING.md#submit-results-a-run-bundle",
+        "CONTRIBUTING.md#submit-results-a-run-bundle",
+        "CONTRIBUTING.md#trust-levels",
+    )
+    for number, target in enumerate(expected, start=1):
+        step = _between(page, f'id="step-{number}"', '<div class="step-foot">')
+        citations = re.findall(r'<p class="from">From <a href="([^"]+)">', step)
+        assert citations == [repo + target]
+    results_step = _between(page, 'id="step-5"', "</li>")
+    assert len(CODE_BOX.findall(results_step)) == 2
+
+
 def test_every_dictionary_term_has_a_sprite_symbol_and_the_index_is_covered():
     index = json.loads(
         (REPO / "design" / "glyphs" / "index.json").read_text(encoding="utf-8")
@@ -2751,6 +2770,23 @@ def test_every_dictionary_term_has_a_sprite_symbol_and_the_index_is_covered():
 def test_dictionary_calendar_count_comes_from_the_site_data():
     assert "All 7 races" in site_dictionary.terms(7)[15].meaning
     assert not re.search(r"\d", site_dictionary.terms(0)[15].meaning)
+
+
+@pytest.mark.parametrize(
+    "meaning",
+    ["Literal {name}", "Literal {", "Literal }", "Literal {calendar}"],
+)
+def test_dictionary_fallback_meanings_preserve_braces(tmp_path, meaning):
+    index = tmp_path / "index.json"
+    index.write_text(
+        json.dumps(
+            [{"id": "new-term", "group": "cast", "meaning": f"New term: {meaning}"}]
+        ),
+        encoding="utf-8",
+    )
+    (term,) = site_dictionary.terms(7, index)
+    assert term.term == "New term"
+    assert term.meaning == meaning
 
 
 def test_every_rule_restates_a_source_section_that_exists():

@@ -43,7 +43,8 @@ class Command(NamedTuple):
     def href(self) -> str:
         from .rulebook import slug
 
-        return f"{layout.REPO_URL}/blob/main/{self.document}#{slug(self.section)}"
+        section = self.section.lstrip("#").strip()
+        return f"{layout.REPO_URL}/blob/main/{self.document}#{slug(section)}"
 
 
 class SourceError(ValueError):
@@ -188,14 +189,13 @@ def _from(source: Command) -> str:
 def _step(number: int, step: Step, root: Path) -> str:
     total = len(STEPS)
     boxes = ""
-    sources: list[Command] = []
+    sources: dict[str, Command] = {}
     for name in step.commands:
         source = COMMANDS[name]
         boxes += kit.code_box(command(source, root), f"Step {number}: {step.title}")
-        if source not in sources:
-            sources.append(source)
+        sources.setdefault(source.href, source)
     if step.source is not None:
-        sources.append(step.source)
+        sources.setdefault(step.source.href, step.source)
     extra = kit.ladder() if step.glyph == "scrutineering" else ""
     hint = "Tap to start over" if number == total else "Tap the card for the next step"
     button = "Start over" if number == total else "Next step"
@@ -208,7 +208,7 @@ def _step(number: int, step: Step, root: Path) -> str:
         + boxes
         + extra
         + f'<p class="notice"><b>Notice:</b> {esc(step.notice)}</p>'
-        + "".join(_from(source) for source in sources)
+        + "".join(_from(source) for source in sources.values())
         + f'<div class="step-foot"><span class="hint">{hint}</span>'
         f'<button type="button" class="btn ghost sm next">{button}</button></div>'
         "</li>"
