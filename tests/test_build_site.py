@@ -1420,6 +1420,34 @@ disclose = "hidden"
 """
 
 
+#: The rest of the review race's task.toml: enough for track-facts to stage it.
+ALPHA_TASK = """
+[dispatch]
+prompt = "prompt.md"
+
+[[stages]]
+run = "stage.sh"
+
+[result_schema]
+verdict = { type = "string" }
+
+[verifier]
+entrypoint = "verifier.py"
+"""
+#: Each synthetic task's public prompt. The docs prompt's first paragraph runs
+#: past the excerpt's word limit.
+PROMPTS = {
+    "hard-review-alpha": "# Review the alpha change\n\n"
+    "Read change.diff and pr.md before you judge the change.\n\n"
+    "Write bench-result.json with your findings.\n",
+    "docs-beta": "Bring the guide up to date. "
+    + " ".join(f"word{index}" for index in range(70))
+    + "\n\nDOCS_SECOND_PARAGRAPH stays out of an excerpt.\n",
+    "fix-gamma": "Fix the gamma bug.\n",
+    "coding-old": "Solve the old race.\n",
+}
+
+
 def _checks(**failed: bool) -> list[dict]:
     names = {
         "read": "read_files",
@@ -1576,9 +1604,21 @@ def _site_tree(tmp_path: Path, trust: dict | None = None) -> Path:
         (tasks / task_id / "task.toml").write_text(
             f'id = "{task_id}"\ntask_version = {version}\n'
             f'title = "{title}"\nsuite = "{suite}"\n'
+            + (ALPHA_TASK if task_id == "hard-review-alpha" else "")
         )
+        (tasks / task_id / "prompt.md").write_text(PROMPTS[task_id])
         if card:
             (tasks / task_id / "track.toml").write_text(card)
+    # The review race is a whole task, so track-facts stages it: two files.
+    alpha = tasks / "hard-review-alpha"
+    (alpha / "stage.sh").write_text(
+        "set -eu\nprintf 'one\\ntwo\\nthree\\n' > \"$1/change.diff\"\n"
+        "printf 'notes\\n' > \"$1/pr.md\"\n"
+    )
+    (alpha / "verifier.py").write_text("# synthetic\n")
+    for directory in ("expected", "hidden"):
+        (alpha / directory).mkdir()
+        (alpha / directory / "answer.txt").write_text("ANSWER_SENTINEL\n")
     return results
 
 
@@ -2207,3 +2247,398 @@ def test_standings_and_entry_pages_name_no_hidden_check(tmp_path):
         uses = set(re.findall(r'<use href="#([^"]+)"', text))
         marks = {mark for _l, mark, _b in site_glyphs.RACE_TYPES.values()}
         assert uses <= PUBLISHED_GLYPHS | marks | {"broadcast"}, (name, uses)
+
+
+# ---------------------------------------------------------------- races (PDW-06)
+#
+# The races grid and one page per calendar race, built from the synthetic
+# site tree above. Every number on them is checked against the data files.
+
+from paddock_site import names as site_names  # noqa: E402
+from paddock_site import races as site_races  # noqa: E402
+
+
+def _race_site(tmp_path: Path) -> tuple[Path, dict]:
+    results = _site_tree(tmp_path)
+    return results, build_site.build(results)
+
+
+def _attr_json(page: str, name: str):
+    """The JSON a page holds in its one ``data-<name>`` attribute."""
+    (raw,) = re.findall(rf'data-{name}="([^"]*)"', page)
+    return json.loads(html.unescape(raw))
+
+
+def _texts(page: str, css_class: str) -> list[str]:
+    """The text of every ``<span class="<css_class>">`` on the page."""
+    return [
+        html.unescape(text)
+        for text in re.findall(rf'<span class="{css_class}">([^<]*)</span>', page)
+    ]
+
+
+def test_races_build_one_page_per_calendar_race(tmp_path):
+    _, files = _race_site(tmp_path)
+    races = json.loads(files["data/races.json"])["races"]
+    calendar = [race["id"] for race in races if race["calendar"]]
+    assert calendar and len(calendar) < len(races)  # one raced race is off it
+    pages = {name for name in files if re.fullmatch(r"races/[^/]+/index\.html", name)}
+    assert pages == {site_races.race_file(race) for race in calendar}
+    grid = files["races/index.html"]
+    cards = re.findall(r'<a class="rc-card" href="([^"]+)"', grid)
+    assert [_resolve("races/index.html", href) for href in cards] == [
+        site_races.race_file(race["id"])
+        for race in sorted(
+            (race for race in races if race["calendar"]),
+            key=lambda race: (race["rate"], race["shortName"].lower(), race["id"]),
+        )
+    ]
+    assert f"<h1>{len(calendar)} races. Pick one.</h1>" in grid
+    for race in races:
+        if not race["calendar"]:
+            continue
+        card = grid.split(f'href="{race["id"]}/index.html"', 1)[1].split("</a>", 1)[0]
+        assert f'data-rate="{race["rate"]:.6f}"' in card
+        assert f"{race['k']} of {race['n']} runs" in card
+        assert f"{race['entries']} entries" in card
+        assert html.escape(race["shortName"]) in card
+        page = files[site_races.race_file(race["id"])]
+        # The page links back to the grid and marks Races as the current route.
+        assert '<a href="../index.html">All 2 races</a>' in page
+        assert 'href="../../races/index.html" aria-current="page">Races</a>' in page
+        assert f"<h1>{html.escape(race['shortName'])}</h1>" in page
+    # The challenge chips count the calendar's races per challenge.
+    for challenge in {race["challenge"] for race in races if race["calendar"]}:
+        chip = grid.split(f'data-challenge="{challenge}">', 1)[1].split("</button>", 1)[
+            0
+        ]
+        count = sum(r["calendar"] and r["challenge"] == challenge for r in races)
+        assert f'<span class="rc-chip-n">{count}</span>' in chip
+        assert 'class="roundel' in chip
+    # The committed results build a page for every one of their calendar races.
+    real = build_site.build(lb.DEFAULT_RESULTS)
+    real_calendar = [
+        race["id"]
+        for race in json.loads(real["data/races.json"])["races"]
+        if race["calendar"]
+    ]
+    assert real_calendar
+    for race in real_calendar:
+        assert site_races.race_file(race) in real
+
+
+def test_race_pages_hold_the_site_invariants(tmp_path):
+    _, files = _race_site(tmp_path)
+    pages = {
+        name: page
+        for name, page in _html_pages(files).items()
+        if name.startswith("races/")
+    }
+    assert len(pages) == 3
+    published = set(re.findall(r'<symbol id="([^"]+)"', layout.sprite()))
+    for name, page in pages.items():
+        assert page.count("<script") == 3 and "<style" not in page, name
+        assert page.count("<h1>") == 1, name
+        head = page.split("<head>", 1)[1].split("</head>", 1)[0]
+        assert re.search(r"<title>[^<]+ · Agent Paddock</title>", head), name
+        assert set(re.findall(r'<use href="#([^"]+)"', page)) <= published, name
+        for _, attrs in Elements(page).items:
+            if "href" in attrs and not urlsplit(attrs["href"]).scheme:
+                target = _resolve(name, attrs["href"])
+                assert target in files, (name, target)
+    script = files["paddock.js"]
+    assert site_races.SCRIPT in script and script.startswith(layout.SCRIPT)
+    assert str(site_races.PLAYBACK_MS) in pages["races/hard-review-alpha/index.html"]
+    assert site_races.PLAYBACK_MS == 1600
+
+
+def test_race_page_funnel_comes_from_the_data(tmp_path):
+    _, files = _race_site(tmp_path)
+    race = json.loads(files["data/races/hard-review-alpha.json"])
+    page = files["races/hard-review-alpha/index.html"]
+    views = _attr_json(page, "funnel")
+    funnel = race["funnel"]
+    assert [(v["mode"], v["key"]) for v in views] == (
+        [("all", "")]
+        + [("car", car) for car in funnel["byCar"]]
+        + [
+            ("driver", driver)
+            for driver, counts in funnel["byDriver"].items()
+            if counts[0] >= site_races.DRIVER_MIN_RUNS
+        ]
+    )
+    # A driver below the five-run line is in the data and not on the page.
+    assert any(
+        counts[0] < site_races.DRIVER_MIN_RUNS for counts in funnel["byDriver"].values()
+    )
+    everyone = views[0]
+    counts = funnel["all"]
+    assert everyone["n"] == counts[0] == funnel["runs"]
+    assert everyone["widths"] == [
+        round(site_races.RIBBON_PX * c / counts[0], 1) for c in counts
+    ]
+    # Stations: lights out, each named checkpoint, the finish.
+    names = _texts(page, "rc-station-name")
+    assert names == ["Lights out", *race["checkpoints"], "Checkered flag"]
+    stats = _texts(page, "rc-station-stat")
+    assert stats[0] == f"{counts[0]} runs start"
+    for k in range(1, len(race["checkpoints"]) + 1):
+        before, after = counts[k - 1], counts[k]
+        assert stats[k] == f"{after / before:.0%} clear · {before - after} retire"
+    assert stats[-1] == f"{counts[-1]} of {counts[0]} finish"
+    # The worst checkpoint is the one most runs retire at, called out in red.
+    drops = [counts[k - 1] - counts[k] for k in range(1, len(race["checkpoints"]) + 1)]
+    worst = drops.index(max(drops)) + 1
+    assert everyone["worst"] == worst
+    assert f'<li class="rc-station is-lit is-worst" data-station="{worst}">' in page
+    assert f"The worst checkpoint is <b>{race['checkpoints'][worst - 1]}</b>" in page
+    # Every car's view adds up to the same lap as its own data.
+    for view in views[1:]:
+        data = funnel["byCar" if view["mode"] == "car" else "byDriver"][view["key"]]
+        assert view["n"] == data[0]
+        assert view["stats"][-1] == f"{data[-1]} of {data[0]} finish"
+
+
+def test_race_page_classification_comes_from_the_data(tmp_path):
+    _, files = _race_site(tmp_path)
+    race = json.loads(files["data/races/hard-review-alpha.json"])
+    page = files["races/hard-review-alpha/index.html"]
+    classification = race["classification"]
+    finishers = classification["finishers"]
+    rows = re.findall(r'<li class="rc-finisher"[^>]*>.*?</li>', page)
+    assert len(rows) == len(finishers)
+    for position, (row, finisher) in enumerate(zip(rows, finishers), 1):
+        assert f">P{position}</span>" in row
+        assert f'data-lap="{finisher["lapSeconds"]}"' in row
+        assert f'data-usd="{finisher["costUsd"]}"' in row
+        assert f"{html.escape(finisher['driver'])} <span>in " in row
+        assert site_races.lap_text(finisher["lapSeconds"]) in row
+    assert (
+        f'<h2 class="rc-h2">{len(finishers)} finished. '
+        f"{classification['retired']} did not.</h2>"
+    ) in page
+    retirements = classification["retirements"]
+    dnf = page.split('<ul class="rc-dnf-rows">', 1)[1].split("</ul>", 1)[0]
+    shown = re.findall(
+        r'<span class="rc-dnf-name">([^<]*)</span>.*?<span class="rc-dnf-n">(\d+)</span>',
+        dnf,
+    )
+    expected = [(c["label"], str(c["runs"])) for c in retirements["checkpoints"]]
+    if retirements["undisclosed"]:
+        expected.append(
+            ("At checks the track card does not name", str(retirements["undisclosed"]))
+        )
+    assert shown == expected
+    # Over ten finishers: the first ten, then "Show all" (the script hides the rest).
+    many = dict(race)
+    many["classification"] = dict(
+        classification, finishers=[finishers[0]] * 12, retired=0
+    )
+    more = site_races.race_page(many, None, 2, build_site.ROUTES)
+    assert "Show all 12 finishers" in more and 'data-first="10"' in more
+
+
+def test_race_page_shows_the_briefing_as_the_track_card_allows(tmp_path):
+    results = _site_tree(tmp_path)
+    tasks = results.parent / "tasks"
+    card = tasks / "docs-beta" / "track.toml"
+    base = (
+        'name = "Beta circuit"\npitch = "Update the guide."\n'
+        'challenge = "docs"\ninfographic = "docs"\ncheckpoints = []\n'
+    )
+    prompt = PROMPTS["docs-beta"]
+    first, second = prompt.split("\n\n")
+
+    def page(show: str | None) -> str:
+        if show is None:
+            card.unlink(missing_ok=True)
+        else:
+            card.write_text(base + f'[briefing]\nshow = "{show}"\n')
+        return build_site.build(results)["races/docs-beta/index.html"]
+
+    def brief(text: str) -> str:
+        return f'<div class="rc-brief-text">{html.escape(text)}</div>'
+
+    for show in (None, "full"):
+        full = page(show)
+        assert brief(first) in full, show
+        assert brief(second.strip()) in full, show
+        assert "<summary>Read it all</summary>" in full
+    excerpt = page("excerpt")
+    words = first.split()
+    assert len(words) > site_data.EXCERPT_WORDS
+    cut = " ".join(words[: site_data.EXCERPT_WORDS]) + " …"
+    assert brief(cut) in excerpt
+    assert words[site_data.EXCERPT_WORDS] not in excerpt
+    assert "DOCS_SECOND_PARAGRAPH" not in excerpt
+    assert "Read it all" not in excerpt
+    hidden = page("none")
+    assert "word0" not in hidden and "DOCS_SECOND_PARAGRAPH" not in hidden
+    assert "keeps this race's briefing off the site" in hidden
+    # No data file ever holds the prompt's text.
+    for name, text in build_site.build(results).items():
+        if name.startswith("data/"):
+            assert "word0" not in text and "Read change.diff" not in text, name
+    # A heading opens the review prompt: the lead runs through the first paragraph.
+    alpha = build_site.build(results)["races/hard-review-alpha/index.html"]
+    head, lead, rest = PROMPTS["hard-review-alpha"].strip().split("\n\n")
+    assert brief(f"{head}\n\n{lead}") in alpha and brief(rest) in alpha
+
+
+@pytest.mark.parametrize("show", ["excerpt", "full"])
+@pytest.mark.parametrize("separator", ["\n\n\n\n", "\n \n\t\n\n"])
+def test_briefing_skips_blank_paragraphs_after_heading(tmp_path, show, separator):
+    results = _site_tree(tmp_path)
+    task = results.parent / "tasks" / "hard-review-alpha"
+    heading, lead, rest = PROMPTS["hard-review-alpha"].strip().split("\n\n")
+    (task / "prompt.md").write_text(heading + separator + lead + "\n\n" + rest)
+    card = task / "track.toml"
+    card.write_text(card.read_text() + f'\n[briefing]\nshow = "{show}"\n')
+
+    files = build_site.build(results)
+    page = files["races/hard-review-alpha/index.html"]
+    assert '<div class="rc-brief-text"></div>' not in page
+    if show == "excerpt":
+        assert f'<div class="rc-brief-text">{html.escape(lead)}</div>' in page
+        assert "Read it all" not in page
+        assert rest not in page
+    else:
+        opening, disclosure = page.split("<details", 1)
+        assert html.escape(lead) in opening
+        assert html.escape(rest) in disclosure
+
+
+@pytest.mark.parametrize("prompt_bytes", [None, b"\xff"])
+def test_site_build_tolerates_unreadable_track_prompt(tmp_path, prompt_bytes):
+    results = _site_tree(tmp_path)
+    prompt = results.parent / "tasks" / "hard-review-alpha" / "prompt.md"
+    if prompt_bytes is None:
+        prompt.unlink()
+    else:
+        prompt.write_bytes(prompt_bytes)
+
+    files = build_site.build(results)
+    race = json.loads(files["data/races/hard-review-alpha.json"])
+    assert race["track"] is None
+    assert race["briefing"] == {"show": "full", "words": None}
+    page = files["races/hard-review-alpha/index.html"]
+    assert "On the track ·" not in page
+    assert '<div class="rc-brief-text">' not in page
+    for chip in site_races.sealed_circuit(lb.track_conditions()):
+        assert f"<li>{html.escape(chip)}</li>" in page
+
+
+def test_no_page_names_a_checkpoint_the_track_card_hides(tmp_path):
+    results, files = _race_site(tmp_path)
+    for name, text in _text_files(files):
+        for sentinel in (*SENTINELS, "ANSWER_SENTINEL"):
+            assert sentinel not in text, (name, sentinel)
+        if name.endswith(".html"):
+            assert "fact:" not in text, name
+    # Disclosing a counted checkpoint by label names it; hidden and counted
+    # checkpoints stay unnamed on every page.
+    card = results.parent / "tasks" / "hard-review-alpha" / "track.toml"
+    card.write_text(
+        card.read_text().replace(
+            'label = "COUNT_LABEL_SENTINEL"\ndisclose = "count"',
+            'label = "COUNT_LABEL_SENTINEL"\ndisclose = "label"',
+        )
+    )
+    shown = build_site.build(results)["races/hard-review-alpha/index.html"]
+    assert "COUNT_LABEL_SENTINEL" in shown
+    assert "HIDDEN_LABEL_SENTINEL" not in shown and "FACT_LABEL_SENTINEL" not in shown
+
+
+def test_race_page_track_files_and_sealed_circuit_come_from_track_facts(tmp_path):
+    results, files = _race_site(tmp_path)
+    page = files["races/hard-review-alpha/index.html"]
+    facts = lb.track_facts(
+        results.parent / "tasks" / "hard-review-alpha", lb.load_results(results)
+    )
+    staged = facts["staged"]
+    assert (staged["files"], staged["lines"]) == (2, 4)
+    assert f"On the track · {staged['files']} files, {staged['lines']} lines" in page
+    chips = site_races.sealed_circuit(facts["conditions"])
+    assert facts["conditions"] == lb.track_conditions()
+    assert chips[:4] == [
+        "2 processor cores",
+        "2 GiB memory",
+        "256 processes at most",
+        "60-minute time limit",
+    ]
+    for chip in chips:
+        assert f"<li>{html.escape(chip)}</li>" in page
+    # A race without a card has no staged counts, and the same sealed circuit.
+    docs = files["races/docs-beta/index.html"]
+    assert "On the track ·" not in docs
+    for chip in chips:
+        assert f"<li>{html.escape(chip)}</li>" in docs
+
+
+def test_races_grid_awaits_trust_sign_off_without_cards(tmp_path):
+    demoted = {BENCH: {"level": "self-reported", "evidence": [], "sign_off": None}}
+    results = _site_tree(tmp_path, demoted)
+    files = build_site.build(results)
+    grid = files["races/index.html"]
+    assert "<h1>Races are on their way.</h1>" in grid
+    assert "rc-card" not in grid and "data-races-grid" not in grid
+    assert not [name for name in files if re.fullmatch(r"races/.+/index\.html", name)]
+
+
+def test_card_stage_bars_mark_the_weakest_in_red():
+    race = {
+        "id": "hard-review-x",
+        "challenge": "hard-review",
+        "shortName": "X",
+        "title": "T",
+        "rate": 0.4,
+        "k": 4,
+        "n": 10,
+        "entries": 3,
+        "medianLapSeconds": 125.0,
+        "medianCostUsd": 0.0421,
+        "stages": {
+            "checkpoints": [
+                {"label": "Read", "recorded": 10, "clearRate": 0.9},
+                {"label": "Verdict", "recorded": 10, "clearRate": 0.5},
+                {"label": "Clean", "recorded": 10, "clearRate": 1.0},
+            ],
+            "moreChecks": 2,
+        },
+    }
+    card = site_races.race_card(race, "x/index.html")
+    assert re.findall(r'<li class="rc-stage([^"]*)">', card) == ["", " is-weak", ""]
+    assert '<span class="rc-rate is-red">40%</span>' in card
+    assert "and 2 more checks" in card
+    assert "2:05 lap" in card and "$0.042 a run" in card
+    race["stages"] = None
+    assert "Stages not recorded yet." in site_races.race_card(race, "x/index.html")
+    race.update(rate=None, k=0, n=0)
+    uncounted = site_races.race_card(race, "x/index.html")
+    assert 'data-rate=""' in uncounted
+    assert '<span class="rc-rate">n/a</span>' in uncounted
+    assert "0 of 0 runs" in uncounted
+
+
+@pytest.mark.parametrize(
+    ("task_id", "suite", "card", "name"),
+    [
+        ("coding-pr-not-found-terminal", "coding", None, "Pull request not found"),
+        ("rca-fk-drain", "rca", None, "Foreign-key drain"),
+        (
+            "hard-review-decoy-job-leases",
+            "hard-review",
+            "Job lease circuit",
+            "Decoy job leases",
+        ),
+        ("community-thing", "coding", "Thing circuit", "Thing circuit"),
+        ("coding-pr-db-fix", "coding", None, "Pull request database fix"),
+    ],
+)
+def test_short_names_spell_out_acronyms(task_id, suite, card, name):
+    assert site_names.short_name(task_id, suite, card) == name
+
+
+def test_every_local_task_has_a_short_name():
+    for path in (Path(__file__).resolve().parents[1] / "tasks").glob("*/task.toml"):
+        assert path.parent.name in site_names.SHORT_NAMES, path.parent.name

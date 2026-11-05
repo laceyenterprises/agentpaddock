@@ -17,9 +17,11 @@
   },
   "id": "hard-review-alpha",
   "name": "Alpha circuit",
+  "shortName": "Alpha circuit",
   "title": "Synthetic review race",
   "challenge": "hard-review",
   "version": 2,
+  "pitch": "Review a proposed change.",
   "calendar": true,
   "n": 14,
   "k": 7,
@@ -74,6 +76,26 @@
         1
       ]
     }
+  },
+  "briefing": {
+    "show": "full",
+    "words": 19
+  },
+  "track": {
+    "files": 2,
+    "lines": 4
+  },
+  "conditions": {
+    "cpus": 2.0,
+    "memory_mb": 2048,
+    "pids": 256,
+    "time_limit_seconds": 3600.0,
+    "read_only_root": true,
+    "tmpfs": "/tmp:rw,exec,mode=1777",
+    "dropped_capabilities": [
+      "ALL"
+    ],
+    "network": "bridge"
   },
   "classification": {
     "starters": 5,

@@ -19,6 +19,7 @@
     {
       "id": "docs-beta",
       "name": "Beta",
+      "shortName": "Beta",
       "title": "Synthetic docs race",
       "challenge": "docs",
       "version": 1,
@@ -38,6 +39,7 @@
     {
       "id": "fix-gamma",
       "name": "Gamma",
+      "shortName": "Gamma",
       "title": "Synthetic fix race",
       "challenge": "fix",
       "version": 1,
@@ -57,6 +59,7 @@
     {
       "id": "hard-review-alpha",
       "name": "Alpha circuit",
+      "shortName": "Alpha circuit",
       "title": "Synthetic review race",
       "challenge": "hard-review",
       "version": 2,

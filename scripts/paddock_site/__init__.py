@@ -9,6 +9,9 @@ page shares:
 - ``placeholder``: the short page a route shows until its page ticket lands.
 - ``data``: the site data layer (PDW-03), ``data/*.json`` computed from
   ``results/`` through ``scripts/leaderboard.py``, trust filter included.
+- ``races``: the races grid and one page per calendar race (PDW-06), read
+  from the site data.
+- ``names``: the races' short names, plain words with acronyms spelled out.
 
 It is named ``paddock_site`` rather than ``site``: ``site`` is a standard
 library module (imported at interpreter start, so a ``site`` package here

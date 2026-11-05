@@ -1857,3 +1857,36 @@ def test_docs_fact_checks_are_never_disclosed_by_name():
     assert "FACT_SENTINEL" not in json.dumps(summary)
     assert summary["more_checks"] == 1
     assert summary["retirements"] == {"undisclosed": 1}
+
+
+@pytest.mark.parametrize(
+    ("card", "show"),
+    [
+        ({}, "full"),
+        ({"briefing": {}}, "full"),
+        ({"briefing": {"show": "excerpt"}}, "excerpt"),
+        ({"briefing": {"show": "none"}}, "none"),
+        ({"briefing": {"show": "everything"}}, "none"),
+        ({"briefing": "full"}, "none"),
+    ],
+)
+def test_briefing_show_defaults_to_full_and_refuses_unknown_values(card, show):
+    assert lb.briefing_show(card) == show
+
+
+def test_public_prompt_path_refuses_grading_and_outside_files(community_track):
+    assert (
+        lb.public_prompt_path(community_track)
+        == (community_track / "prompt.md").resolve()
+    )
+    for prompt in ("expected/secret.txt", "hidden/secret.txt", "../outside.md"):
+        with pytest.raises(lb.ResultsError, match="public task file"):
+            lb.public_prompt_path(community_track, prompt)
+
+
+def test_track_conditions_are_the_conditions_track_facts_reports(community_track):
+    loaded = lb.load_results(FIXTURE)
+    assert lb.track_facts(community_track, loaded)["conditions"] == (
+        lb.track_conditions()
+    )
+    assert lb.track_conditions()["network"] == "bridge"
