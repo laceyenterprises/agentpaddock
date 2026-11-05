@@ -458,10 +458,35 @@ def _raced(data: SiteData) -> list[Race]:
     return [data.races[key] for key in sorted(data.runs, key=lambda key: key[1])]
 
 
+def _challenge_summaries(data: SiteData) -> list[dict[str, Any]]:
+    """Every counted run on the calendar's races, pooled by challenge (PDW-04)."""
+    by_challenge: dict[str, list[Race]] = defaultdict(list)
+    for race in data.calendar:
+        by_challenge[race.suite].append(race)
+    summaries = []
+    for challenge, members in sorted(by_challenge.items()):
+        summary = lb.summarize(
+            [run for race in members for run in data.runs.get(race.key, [])]
+        )
+        summaries.append(
+            {
+                "challenge": challenge,
+                "races": len(members),
+                "n": summary["n"],
+                "k": summary["passed"],
+                "rate": summary["rate"],
+                "lo": summary["ci"][0],
+                "hi": summary["ci"][1],
+            }
+        )
+    return summaries
+
+
 def races(data: SiteData) -> dict[str, Any]:
     return {
         **_head(data, "races", "every counted run on each race"),
         "races": [_race_summary(data, race) for race in _raced(data)],
+        "challenges": _challenge_summaries(data),
     }
 
 

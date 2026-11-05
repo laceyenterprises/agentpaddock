@@ -13,6 +13,7 @@ byte-identical pages.
     python3 scripts/build_site.py                 # write site/
     python3 scripts/build_site.py --check         # fail if site/ is stale
     python3 scripts/build_site.py --results DIR --out DIR
+    python3 scripts/build_site.py --config FILE   # override site settings (JSON)
 
 The share image is the one file not built here: ``scripts/render_social_card.py``
 renders ``scripts/social_card.html`` to the committed ``scripts/social-card.png``,
@@ -28,7 +29,11 @@ lands. ``design/web/README.md`` maps every route to its prototype and ticket.
 
 The pages' numbers come from the data files under ``data/``
 (``paddock_site/data.py``, PDW-03), built from the same ``results/`` and the
-``tasks/`` beside it. The build makes them first and hands them to every page
+``tasks/`` beside it. Home (``paddock_site/home.py``, PDW-04) reads them, and
+its live ticker reads the feed URL from the site config
+(``paddock_site/site_config.py``); today's leaderboard moved to
+``leaderboard.html``.
+The build makes them first and hands them to every page
 builder with the results; the Learn page (``paddock_site/learn.py``, PDW-05)
 reads ``data/drivers.json``.
 """
@@ -44,7 +49,7 @@ import struct
 import sys
 import zlib
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 import leaderboard as lb
 
@@ -53,6 +58,7 @@ from paddock_site import community, contact, dictionary, garage, kit, layout, le
 from paddock_site import drivers as site_drivers
 from paddock_site import races as race_pages
 from paddock_site import rulebook
+from paddock_site import home, site_config
 from paddock_site import routes as site_routes
 from paddock_site import standings as standings_pages
 from paddock_site.layout import (  # re-exported for callers and tests
@@ -69,6 +75,8 @@ from paddock_site.layout import (  # re-exported for callers and tests
 from paddock_site.routes import SITE_URL
 
 DEFAULT_OUT = lb.MODULE_ROOT / "site"
+#: Today's leaderboard and its board pages' nav home, until PDW-07 replaces them.
+LEADERBOARD = "leaderboard.html"
 CARD_TEMPLATE = lb.MODULE_ROOT / "scripts" / "social_card.html"
 CARD_PNG = lb.MODULE_ROOT / "scripts" / "social-card.png"
 #: The PNG tEXt keyword holding the SHA-256 of the card source it was rendered from.
@@ -424,7 +432,7 @@ def document(
         '<div class="scroll"><table>', '<div class="grid-wrap"><table class="grid">'
     )
     body = re.sub(r"<th\b(?![^>]*\bscope=)([^>]*)>", r'<th scope="col"\1>', body)
-    if active not in ("index.html", "matrix.html") and "<h1>" not in body:
+    if active not in (LEADERBOARD, "matrix.html") and "<h1>" not in body:
         body = re.sub(r"<h2>(.*?)</h2>", lambda m: hero(PRODUCT, m[1]), body, count=1)
     name = filename or active
     return layout.page(
@@ -508,13 +516,7 @@ def board_filename(board: Mapping[str, Any]) -> str:
 
 
 def livery(key: tuple) -> str:
-    token = {
-        "claude-code": "car-cc",
-        "codex": "car-codex",
-        "opencode": "car-opencode",
-        "pi": "car-pi",
-        "antigravity": "car-agy",
-    }.get(key[0], "tower-mute")
+    token = layout.CAR_LIVERY.get(key[0], "tower-mute")
     return f'<div class="livery" style="--c:var(--{token})" aria-hidden="true"></div>'
 
 
@@ -571,7 +573,7 @@ def board_page(board: Mapping[str, Any]) -> str:
     )
     return document(
         board_title(board),
-        "index.html",
+        LEADERBOARD,
         body + board_html(board),
         filename=board_filename(board),
     )
@@ -606,6 +608,8 @@ def board_card(board: Mapping[str, Any], others: Sequence[Mapping[str, Any]]) ->
 
 
 def index_page(results: lb.Results) -> str:
+    """Today's leaderboard, kept at ``leaderboard.html`` until PDW-07's standings
+    replace it; home (``/``) is the PDW-04 page."""
     boards = lb.boards(results.records)
     graded = sum(lb.included(record) for record in results.records)
     by_suite: dict[str, list[dict[str, Any]]] = {}
@@ -640,7 +644,7 @@ def index_page(results: lb.Results) -> str:
         '<a href="methodology.html">methodology</a> before drawing conclusions: most cells '
         "are small.</p>"
     )
-    return document("Leaderboard", "index.html", body, canonical=True)
+    return document("Leaderboard", LEADERBOARD, body)
 
 
 def matrix_page(results: lb.Results) -> str:
@@ -1047,9 +1051,24 @@ def card_problem(png: bytes) -> str:
     return ""
 
 
-def _site_page(module):
-    """A PDW page: the results, the site data (``data/*.json``, parsed) and the routes."""
-    return lambda build: module.page(build.results, build.data, build.routes)
+def _from_results(builder: Callable[[lb.Results], str]) -> site_routes.Builder:
+    return lambda build: builder(build.results)
+
+
+def home_page(build: site_routes.Build) -> str:
+    standings = build.data["data/standings.json"]
+    entries = {
+        row["id"]: build.data[f"data/entries/{row['id']}.json"]
+        for row in standings["entries"][:6]
+        if f"data/entries/{row['id']}.json" in build.data
+    }
+    return home.page(
+        routes=build.routes,
+        standings=standings,
+        races=build.data["data/races.json"],
+        entries=entries,
+        config=build.config,
+    )
 
 
 def learn_page(build: site_routes.Build) -> str:
@@ -1074,9 +1093,9 @@ DATA_SCRIPT = views.SCRIPT + garage.SCRIPT + pit_wall.SCRIPT + site_drivers.SCRI
 #: Every page the site builds, in nav order. Today's board pages are built by
 #: the functions above; a page ticket adds its builder here (which also keeps
 #: its merge inside the pages workflow's ``scripts/build_site.py`` path filter).
-def _from_results(page: Any) -> site_routes.Builder:
-    """A builder for one of today's board pages, which read only the results."""
-    return lambda build: page(build.results)
+#: Every builder takes the shared site build inputs.
+def _site_page(module: Any) -> site_routes.Builder:
+    return lambda build: module.page(build.results, build.data, build.routes)
 
 
 def _from_data_page(path: str, page: Any) -> site_routes.Builder:
@@ -1090,7 +1109,8 @@ def _from_data_page(path: str, page: Any) -> site_routes.Builder:
 
 ROUTES = site_routes.registry(
     {
-        "": _from_results(index_page),
+        "": home_page,
+        LEADERBOARD: _from_results(index_page),
         "learn/": learn_page,
         "races/": race_pages.grid_page,
         "standings/": standings_pages.standings_page,
@@ -1111,8 +1131,11 @@ ROUTES = site_routes.registry(
 PAGES = tuple((route.file, route.title) for route in ROUTES)
 
 
-def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
-    """Site files; raises ``ResultsError`` on invalid results or ``FileNotFoundError`` for a missing card."""
+def build(
+    results_dir: Path = lb.DEFAULT_RESULTS, config: Mapping[str, Any] | None = None
+) -> dict[str, str | bytes]:
+    """Site files; raises ``ResultsError`` on invalid results, ``ConfigError`` on
+    an invalid site config or ``FileNotFoundError`` for a missing card."""
     results = lb.load_results(results_dir)
     try:
         card = CARD_PNG.read_bytes()
@@ -1126,9 +1149,7 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
     data_files = site_data.render_files(site)
     parsed_data = views.SiteData.parse(data_files)
     inputs = site_routes.Build(
-        results,
-        {name: json.loads(text) for name, text in data_files.items()},
-        ROUTES,
+        results, parsed_data.files, ROUTES, site_config.resolve(config)
     )
     files: dict[str, str | bytes] = {}
     for route in ROUTES:
@@ -1144,11 +1165,11 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
     files.update(
         {
             "paddock.css": layout.stylesheet(
-                STYLE + race_pages.CSS + standings_pages.CSS + kit.CSS + learn.CSS + DATA_CSS
+                STYLE + race_pages.CSS + standings_pages.CSS + kit.CSS + learn.CSS + DATA_CSS + home.CSS
             ),
-            SCRIPT_NAME: layout.SCRIPT + race_pages.SCRIPT + kit.SCRIPT + DATA_SCRIPT,
+            SCRIPT_NAME: layout.SCRIPT + race_pages.SCRIPT + kit.SCRIPT + DATA_SCRIPT + home.SCRIPT,
             standings_pages.SCRIPT_NAME: standings_pages.SCRIPT,
-        learn.SCRIPT_FILE: learn.SCRIPT,
+            learn.SCRIPT_FILE: learn.SCRIPT,
             "favicon.svg": FAVICON,
             CARD_NAME: card,
         }
@@ -1166,11 +1187,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--check", action="store_true", help="fail if --out differs from a build"
     )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="a JSON object overriding site settings such as live_feed_url",
+    )
     args = parser.parse_args(argv)
     try:
-        files = build(args.results)
+        files = build(args.results, site_config.load(args.config))
     except lb.ResultsError as exc:
         print(f"results/ does not validate:\n{exc}", file=sys.stderr)
+        return 1
+    except site_config.ConfigError as exc:
+        print(f"site config refused: {exc}", file=sys.stderr)
         return 1
     except FileNotFoundError as exc:
         print(exc, file=sys.stderr)
