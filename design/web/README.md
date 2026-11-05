@@ -76,7 +76,7 @@ today's leaderboard; the ticket replaces it by registering its builder in
 |---|---|---|---|---|---|
 | `/` | `index.html` | lockup | none | today's leaderboard | PDW-04 |
 | `/learn/` | `learn/index.html` | bar | `track-map` | placeholder | PDW-05 |
-| `/races/` | `races/index.html` | bar | `race-calendar` | placeholder | PDW-06 |
+| `/races/` | `races/index.html` | bar | `race-calendar` | the races grid | PDW-06 |
 | `/standings/` | `standings/index.html` | bar | `timing-tower` | the timing tower | PDW-07 |
 | `/garage/` | `garage/index.html` | bar | `setup-sheet` | placeholder | PDW-08 |
 | `/pit-wall/` | `pit-wall/index.html` | bar | `pit-wall` | placeholder | PDW-08 |
@@ -96,7 +96,7 @@ today's leaderboard; the ticket replaces it by registering its builder in
 `/drivers/` and `/entries/` are the menu's landing pages for the per-driver
 (`/drivers/<driver-id>/`) and per-entry (`/entries/<entry-id>/`) routes above;
 PDW-08 and PDW-07 decide what each lands on. One race (`/races/<race-id>/`) is
-built by PDW-06.
+built by PDW-06, one page per calendar race (see "Races" below).
 
 Race types draw as roundels: the published `roundel` frame with the race-type
 mark inside, as in `Races.dc.html`: coding `coding-worker`, fix `diff`, hard
@@ -130,6 +130,40 @@ and the page says so. A race is a local task at its `task.toml` version. The
 calendar is the races with at least ten counted runs. Standings place the
 entries with a first result on every calendar race and list the rest as
 `partial`. Checkpoints appear only as the race's track card discloses them.
+
+## Races (PDW-06)
+
+`scripts/paddock_site/races.py` builds `/races/` and one page per calendar
+race at `/races/<race-id>/`, reading only `data/races.json` and
+`data/races/<race-id>.json`. `/races/` is a route builder registered in
+`scripts/build_site.py` that takes a `routes.Build` like the standings pages.
+The race pages are built from the same computed site data, which also carries
+each race's briefing prompt.
+
+- **The grid**: one card per calendar race in hardest-first order (avg pass
+  rate, lowest first; red under 50%), with challenge chips (counts and
+  roundels), an A to Z order, the first 12 cards and then "Show all". A card
+  holds the stage bars (the weakest in red) or "Stages not recorded yet",
+  entries, median lap and median fuel. Without JavaScript every card shows.
+- **A race page**: the header roundel, the avg pass rate with its 95% range,
+  the difficulty band; the lap funnel (All runs, By car, By driver for drivers
+  with five or more runs recording checks) with its worst checkpoint called
+  out and playback at 1.6 s per checkpoint; the classification of each
+  entry's first run (lap or fuel order, top 10 then all) and where the rest
+  retired; the briefing; the staged files and the sealed circuit.
+- **Short names** are plain words with acronyms spelled out, from the
+  prototype's renames (`scripts/paddock_site/names.py`).
+- **The briefing** follows the track card's `[briefing] show`: `full` shows
+  the prompt word for word (its opening, then "Read it all"), `excerpt` its
+  first paragraph cut at 60 words, `none` nothing. A card without
+  `[briefing]`, or a task without a card, shows `full`, the documented
+  default. The prompt text is never written to a data file.
+- **The track and the sealed circuit** come from `leaderboard.py
+  track-facts`: staged file and line counts when the race has a card
+  `track-facts` accepts, and its conditions (`leaderboard.track_conditions`)
+  for every race. No file names are shown: `track-facts` reports counts only.
+- One script, `paddock.js`, carries the menu and these pages' controls; each
+  part runs only when its markup is on the page.
 
 ## Standings and entry pages (PDW-07)
 

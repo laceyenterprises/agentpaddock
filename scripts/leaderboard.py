@@ -1279,6 +1279,60 @@ def checkpoint_summary(
     }
 
 
+#: A track card's ``[briefing] show`` values; a card without one shows ``full``.
+BRIEFING_SHOWS = ("full", "excerpt", "none")
+
+
+def briefing_show(card: Mapping[str, Any]) -> str:
+    """How a race's already-public prompt may be presented: ``full``,
+    ``excerpt`` or ``none``. A card without ``[briefing]`` (or a task without a
+    card) shows ``full``, the documented default; an unknown value shows
+    ``none``, the cautious reading of a card ``validate-track`` would refuse.
+    """
+    briefing = card.get("briefing")
+    if briefing is None:
+        return "full"
+    show = briefing.get("show", "full") if isinstance(briefing, Mapping) else None
+    return show if show in BRIEFING_SHOWS else "none"
+
+
+def public_prompt_path(task_dir: Path, prompt: str = "prompt.md") -> Path:
+    """The task's prompt file, refused unless it is a public file of the task:
+    inside ``task_dir`` and outside ``expected/`` and ``hidden/``."""
+    root = task_dir.resolve()
+    path = (task_dir / prompt).resolve()
+    if not path.is_relative_to(root) or {"expected", "hidden"} & set(
+        path.relative_to(root).parts
+    ):
+        raise ResultsError("prompt must be a public task file")
+    return path
+
+
+def track_conditions() -> dict[str, Any]:
+    """The sealed circuit ``track-facts`` reports: the standalone runner's
+    defaults for CPU, memory, processes, time, root, tmpfs, capabilities and
+    network. They are the same for every local task."""
+    _load_gym()
+    from gym.standalone import (
+        DEFAULT_CPUS,
+        DEFAULT_MEMORY_MB,
+        DEFAULT_NETWORK,
+        DEFAULT_PIDS_LIMIT,
+        DEFAULT_TIMEOUT_SECONDS,
+    )
+
+    return {
+        "cpus": DEFAULT_CPUS,
+        "memory_mb": DEFAULT_MEMORY_MB,
+        "pids": DEFAULT_PIDS_LIMIT,
+        "time_limit_seconds": DEFAULT_TIMEOUT_SECONDS,
+        "read_only_root": True,
+        "tmpfs": "/tmp:rw,exec,mode=1777",
+        "dropped_capabilities": ["ALL"],
+        "network": DEFAULT_NETWORK,
+    }
+
+
 def track_facts(task_dir: Path, results: Results | None = None) -> dict[str, Any]:
     """Public projection for a local task. Only trusted staging code is executed.
 
@@ -1292,13 +1346,6 @@ def track_facts(task_dir: Path, results: Results | None = None) -> dict[str, Any
         raise ResultsError("\n".join(errors))
     from gym.schema import load_task
     from gym.staging import run_stage_scripts, FIXTURE_MANIFEST_FILENAME
-    from gym.standalone import (
-        DEFAULT_CPUS,
-        DEFAULT_MEMORY_MB,
-        DEFAULT_PIDS_LIMIT,
-        DEFAULT_TIMEOUT_SECONDS,
-        DEFAULT_NETWORK,
-    )
 
     task = load_task(task_dir)
     card = read_toml(task_dir / "track.toml")
@@ -1323,13 +1370,7 @@ def track_facts(task_dir: Path, results: Results | None = None) -> dict[str, Any
             raise ResultsError(
                 "track staging failed; inspect trusted staging locally"
             ) from exc
-    prompt = task.dispatch.get("prompt", "prompt.md")
-    prompt_path = (task_dir / prompt).resolve()
-    if not prompt_path.is_relative_to(task_dir.resolve()) or {
-        "expected",
-        "hidden",
-    } & set(prompt_path.relative_to(task_dir.resolve()).parts):
-        raise ResultsError("prompt must be a public task file")
+    prompt_path = public_prompt_path(task_dir, task.dispatch.get("prompt", "prompt.md"))
     prompt_words = len(prompt_path.read_text(encoding="utf-8").split())
     rows = _task_records(task, results.records)
     graded = [row for row in rows if included(row)]
@@ -1381,16 +1422,7 @@ def track_facts(task_dir: Path, results: Results | None = None) -> dict[str, Any
             for spec in task.result_schema
         ],
         "expected_tests": task.hidden_tests_expected_tests,
-        "conditions": {
-            "cpus": DEFAULT_CPUS,
-            "memory_mb": DEFAULT_MEMORY_MB,
-            "pids": DEFAULT_PIDS_LIMIT,
-            "time_limit_seconds": DEFAULT_TIMEOUT_SECONDS,
-            "read_only_root": True,
-            "tmpfs": "/tmp:rw,exec,mode=1777",
-            "dropped_capabilities": ["ALL"],
-            "network": DEFAULT_NETWORK,
-        },
+        "conditions": track_conditions(),
         "live": {
             "entries": [
                 {"provider_id": model, "engine_map": effort, "config_hash": key}

@@ -148,9 +148,9 @@ labels, and `disclose`: `label` exposes the label and clear rate; `count`
 contributes only to “N more checks”; `hidden` is omitted. Recorded checks not
 listed in the card also contribute to “N more checks”. Use `count` for docs
 fact names, since those can reveal required facts. `[briefing] show` is `full`
-by default, or `excerpt` or `none`: a future renderer uses this policy for the
-already-public prompt. The derived JSON includes prompt word count, never its
-text. No renderer is added by these contracts.
+by default, or `excerpt` or `none`: each race page on the site uses this policy
+for the already-public prompt (`excerpt` shows its first paragraph). The derived
+JSON includes prompt word count, never its text.
 
 `validate-track` compares checkpoint names only with committed records carrying
 `checks` for the exact task, challenge and version. If no such records carry

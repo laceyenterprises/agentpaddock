@@ -29,6 +29,13 @@ adds to "N more checks"; ``hidden``: omitted). A docs fact check is never
 named. A race whose counted runs carry no ``checks`` has null stages, funnel
 and retirements.
 
+A race file also carries the track card's ``[briefing] show`` policy, the
+staged file and line counts ``leaderboard.track_facts`` reports for a race with
+a card it accepts, and the sealed circuit (``leaderboard.track_conditions``).
+The briefing's text is never in a data file; :func:`briefing` gives a page
+exactly what the policy allows. :func:`site` computes the model and every
+file's value once, so the pages (``races.py``) read the numbers the files hold.
+
 ``scripts/build_site.py`` writes the files under ``site/data/``; nothing under
 ``site/`` is committed. Every file carries ``schema``, ``generatedAt`` (the
 date of the newest results document, so the same ``results/`` builds the same
@@ -54,6 +61,8 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 import leaderboard as lb
+
+from . import names
 
 LIVE = "live"
 AWAITING = "awaiting-trust-sign-off"
@@ -84,6 +93,16 @@ class Race:
     name: str
     #: The card's checkpoints in lap order, or ``()`` without a card.
     checkpoints: tuple[Mapping[str, Any], ...]
+    #: The plain-words name the pages show (``names.short_name``).
+    short_name: str = ""
+    #: The card's one-sentence pitch, or None without a card.
+    pitch: str | None = None
+    #: The card's ``[briefing] show`` policy (``leaderboard.briefing_show``).
+    briefing: str = "full"
+    #: The task directory and its prompt file name, as ``task.toml`` names it.
+    task_dir: Path | None = None
+    prompt: str = "prompt.md"
+    has_card: bool = False
 
     @property
     def key(self) -> tuple[str, str, int]:
@@ -114,6 +133,9 @@ def load_races(tasks_dir: Path) -> dict[tuple[str, str, int], Race]:
         card = lb.read_toml(card_path) if card_path.is_file() else {}
         name = card.get("name")
         title = task.get("title")
+        pitch = card.get("pitch")
+        dispatch = task.get("dispatch")
+        prompt = dispatch.get("prompt") if isinstance(dispatch, dict) else None
         race = Race(
             id=task_id,
             suite=suite,
@@ -121,6 +143,14 @@ def load_races(tasks_dir: Path) -> dict[tuple[str, str, int], Race]:
             title=title if isinstance(title, str) else None,
             name=name if isinstance(name, str) else race_name(task_id, suite),
             checkpoints=tuple(card.get("checkpoints") or ()),
+            short_name=names.short_name(
+                task_id, suite, name if isinstance(name, str) else None
+            ),
+            pitch=pitch if isinstance(pitch, str) else None,
+            briefing=lb.briefing_show(card),
+            task_dir=path.parent,
+            prompt=prompt if isinstance(prompt, str) else "prompt.md",
+            has_card=card_path.is_file(),
         )
         races[race.key] = race
     return races
@@ -405,6 +435,7 @@ def _race_summary(data: SiteData, race: Race) -> dict[str, Any]:
     return {
         "id": race.id,
         "name": race.name,
+        "shortName": race.short_name,
         "title": race.title,
         "challenge": race.suite,
         "version": race.version,
@@ -488,6 +519,80 @@ def _retirements(race: Race, firsts: Sequence[Mapping[str, Any]]) -> dict[str, A
     }
 
 
+def _track(data: SiteData, race: Race) -> dict[str, Any]:
+    """The briefing policy, the track's staged files and the sealed circuit.
+
+    Staged file and line counts and the briefing's word count come from
+    ``leaderboard.track_facts``, which needs a valid track card; without one
+    (or when its staging fails) ``track`` is null and ``words`` too. The sealed
+    circuit is ``leaderboard.track_conditions``, the conditions track-facts
+    reports, the same for every local task. The briefing's text is never part
+    of the data: :func:`briefing` gives it to the page.
+    """
+    facts = None
+    if race.has_card and race.task_dir is not None:
+        try:
+            facts = lb.track_facts(race.task_dir, data.results)
+        except lb.ResultsError:
+            facts = None
+    return {
+        "briefing": {
+            "show": race.briefing,
+            "words": facts["prompt_words"] if facts else None,
+        },
+        "track": {"files": facts["staged"]["files"], "lines": facts["staged"]["lines"]}
+        if facts
+        else None,
+        "conditions": lb.track_conditions(),
+    }
+
+
+#: An excerpt briefing shows the opening paragraph, cut at this many words.
+EXCERPT_WORDS = 60
+
+
+def briefing(race: Race) -> dict[str, str] | None:
+    """The race's briefing as its track card lets a page show it.
+
+    ``full``: ``lead`` is the text through its first paragraph of prose (any
+    heading before it included) and ``rest`` the remainder, word for word.
+    ``excerpt``: ``lead`` is that first paragraph alone, cut at
+    :data:`EXCERPT_WORDS` words, and ``rest`` is empty. ``none``, or a prompt
+    that is missing or not a public task file: None.
+    """
+    if race.briefing not in ("full", "excerpt") or race.task_dir is None:
+        return None
+    try:
+        path = lb.public_prompt_path(race.task_dir, race.prompt)
+        text = path.read_text(encoding="utf-8").strip()
+    except (lb.ResultsError, OSError, UnicodeDecodeError):
+        return None
+    if not text:
+        return None
+    paragraphs = re.split(r"\n[ \t]*\n", text)
+    first = next(
+        (
+            index
+            for index, paragraph in enumerate(paragraphs)
+            if not paragraph.lstrip().startswith(("#", "```"))
+        ),
+        0,
+    )
+    if race.briefing == "excerpt":
+        words = paragraphs[first].split()
+        cut = " ".join(words[:EXCERPT_WORDS])
+        return {
+            "show": "excerpt",
+            "lead": cut + (" …" if len(words) > EXCERPT_WORDS else ""),
+            "rest": "",
+        }
+    return {
+        "show": "full",
+        "lead": "\n\n".join(paragraphs[: first + 1]),
+        "rest": "\n\n".join(paragraphs[first + 1 :]),
+    }
+
+
 def race(data: SiteData, race: Race, ids: Mapping[tuple, str]) -> dict[str, Any]:
     runs = data.runs.get(race.key, [])
     firsts = sorted(data.firsts.get(race.key, []), key=identity)
@@ -529,13 +634,16 @@ def race(data: SiteData, race: Race, ids: Mapping[tuple, str]) -> dict[str, Any]
             "classification: each entry's first counted result",
         ),
         **{
-            key: summary[key] for key in ("id", "name", "title", "challenge", "version")
+            key: summary[key]
+            for key in ("id", "name", "shortName", "title", "challenge", "version")
         },
+        "pitch": race.pitch,
         **{key: summary[key] for key in ("calendar", "n", "k", "rate", "lo", "hi")},
         "difficulty": summary["difficulty"],
         "checkpoints": [label for _, label in _stations(race)] if checked else None,
         "moreChecks": summary["stages"]["moreChecks"] if summary["stages"] else None,
         "funnel": funnel,
+        **_track(data, race),
         "classification": {
             "starters": len(firsts),
             "finishers": [
@@ -767,9 +875,32 @@ def render(value: Any) -> str:
     return json.dumps(value, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
 
 
+@dataclass(frozen=True)
+class Site:
+    """The model and every data file's value, computed once per build, so the
+    pages read exactly the numbers the data files hold."""
+
+    data: SiteData
+    #: ``{path under the site root: value}`` for every data file.
+    files: dict[str, Any]
+
+
+def site(results: lb.Results, tasks_dir: Path) -> Site:
+    data = model(results, tasks_dir)
+    return Site(data, values(data))
+
+
 def build(results: lb.Results, tasks_dir: Path) -> dict[str, str]:
     """``{path under the site root: JSON text}`` for every data file."""
-    data = model(results, tasks_dir)
+    return render_files(site(results, tasks_dir))
+
+
+def render_files(built: Site) -> dict[str, str]:
+    return {name: render(value) for name, value in built.files.items()}
+
+
+def values(data: SiteData) -> dict[str, Any]:
+    """``{path under the site root: value}`` for every data file, in path order."""
     rows = _entry_rows(data)
     placed, partial, ids = rows
     files = {
@@ -782,4 +913,4 @@ def build(results: lb.Results, tasks_dir: Path) -> dict[str, str]:
         files[f"data/races/{race_.id}.json"] = race(data, race_, ids)
     for row in placed + partial:
         files[f"data/entries/{ids[row['key']]}.json"] = entry(data, row, ids)
-    return {name: render(value) for name, value in sorted(files.items())}
+    return dict(sorted(files.items()))

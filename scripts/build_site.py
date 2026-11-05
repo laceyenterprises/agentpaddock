@@ -48,6 +48,7 @@ import leaderboard as lb
 
 from paddock_site import data as site_data
 from paddock_site import layout, placeholder
+from paddock_site import races as race_pages
 from paddock_site import routes as site_routes
 from paddock_site import standings as standings_pages
 from paddock_site.layout import (  # re-exported for callers and tests
@@ -1058,6 +1059,7 @@ def _from_results(page: Any) -> site_routes.Builder:
 ROUTES = site_routes.registry(
     {
         "": _from_results(index_page),
+        "races/": race_pages.grid_page,
         "standings/": standings_pages.standings_page,
         "entries/": standings_pages.entries_page,
         "matrix.html": _from_results(matrix_page),
@@ -1079,9 +1081,10 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
         raise FileNotFoundError(
             f"{CARD_NAME} is missing; run python3 scripts/render_social_card.py"
         ) from exc
-    # The site data layer (PDW-03): data/*.json, from the same results and the
-    # local tasks beside them. The pages read their numbers from these files.
-    data_files = site_data.build(results, results_dir.parent / "tasks")
+    # The site data layer (PDW-03), computed once: the data/*.json files and
+    # the pages built from them read the same values.
+    site = site_data.site(results, results_dir.parent / "tasks")
+    data_files = site_data.render_files(site)
     inputs = site_routes.Build(
         results,
         {name: json.loads(text) for name, text in data_files.items()},
@@ -1092,12 +1095,13 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
         files[route.file] = (
             route.builder(inputs) if route.builder else placeholder.page(route, ROUTES)
         )
-    # One page per standings entry (PDW-07).
+    # One page per calendar race (PDW-06) and per standings entry (PDW-07).
+    files.update(race_pages.race_pages(site, ROUTES))
     files.update(standings_pages.entry_pages(inputs))
     files.update(
         {
-            "paddock.css": layout.stylesheet(STYLE + standings_pages.CSS),
-            SCRIPT_NAME: layout.SCRIPT,
+            "paddock.css": layout.stylesheet(STYLE + race_pages.CSS + standings_pages.CSS),
+            SCRIPT_NAME: layout.SCRIPT + race_pages.SCRIPT,
             standings_pages.SCRIPT_NAME: standings_pages.SCRIPT,
             "favicon.svg": FAVICON,
             CARD_NAME: card,
