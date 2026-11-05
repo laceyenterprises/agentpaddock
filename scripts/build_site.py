@@ -28,7 +28,9 @@ lands. ``design/web/README.md`` maps every route to its prototype and ticket.
 
 The pages' numbers come from the data files under ``data/``
 (``paddock_site/data.py``, PDW-03), built from the same ``results/`` and the
-``tasks/`` beside it.
+``tasks/`` beside it. The build makes them first and hands them to every page
+builder with the results; the Learn page (``paddock_site/learn.py``, PDW-05)
+reads ``data/drivers.json``.
 """
 
 from __future__ import annotations
@@ -47,7 +49,7 @@ from typing import Any, Mapping, Sequence
 import leaderboard as lb
 
 from paddock_site import data as site_data
-from paddock_site import community, contact, dictionary, kit, layout, pit_lane, placeholder
+from paddock_site import community, contact, dictionary, kit, layout, learn, pit_lane, placeholder
 from paddock_site import races as race_pages
 from paddock_site import rulebook
 from paddock_site import routes as site_routes
@@ -1054,6 +1056,12 @@ def _site_page(module):
     return lambda build: module.page(build.results, build.data, build.routes)
 
 
+def learn_page(build: site_routes.Build) -> str:
+    """Build the Learn page from the parsed site data."""
+    route = next(route for route in build.routes if route.path == "learn/")
+    return learn.page(route, build.routes, build.data["data/drivers.json"])
+
+
 #: Every page the site builds, in nav order. Today's board pages are built by
 #: the functions above; a page ticket adds its builder here (which also keeps
 #: its merge inside the pages workflow's ``scripts/build_site.py`` path filter).
@@ -1065,6 +1073,7 @@ def _from_results(page: Any) -> site_routes.Builder:
 ROUTES = site_routes.registry(
     {
         "": _from_results(index_page),
+        "learn/": learn_page,
         "races/": race_pages.grid_page,
         "standings/": standings_pages.standings_page,
         "entries/": standings_pages.entries_page,
@@ -1111,9 +1120,10 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
     files.update(standings_pages.entry_pages(inputs))
     files.update(
         {
-            "paddock.css": layout.stylesheet(STYLE + race_pages.CSS + standings_pages.CSS + kit.CSS),
+            "paddock.css": layout.stylesheet(STYLE + race_pages.CSS + standings_pages.CSS + kit.CSS + learn.CSS),
             SCRIPT_NAME: layout.SCRIPT + race_pages.SCRIPT + kit.SCRIPT,
             standings_pages.SCRIPT_NAME: standings_pages.SCRIPT,
+        learn.SCRIPT_FILE: learn.SCRIPT,
             "favicon.svg": FAVICON,
             CARD_NAME: card,
         }

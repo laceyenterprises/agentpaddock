@@ -101,6 +101,7 @@ def test_site_builds_deterministically_from_fixtures(tmp_path: Path):
             "paddock.css",
             "paddock.js",
             "standings.js",
+            "learn/learn.js",
             "favicon.svg",
             "social-card.png",
         }
@@ -470,7 +471,10 @@ def test_brand_assets_and_navigation_on_every_page():
         # A page with its own view switches (PDW-07) loads one shared script for them.
         own = f'<script src="{root}{standings_pages.SCRIPT_NAME}" defer></script>'
         assert page.count(own) == (1 if name == "standings/index.html" else 0), name
-        assert page.count("<script") == 3 + page.count(own) and "<style" not in page
+        assert page.count("<script") == 3 + page.count(own) + 2 * (name == "learn/index.html") and "<style" not in page
+        if name == "learn/index.html":
+            assert page.count('<script type="application/json" id="learn-data">') == 1
+            assert page.count('<script src="learn.js" defer></script>') == 1
         assert "<h1>" in page and page.count("<h1>") == 1
         assert {other for other, _ in build_site.PAGES} <= _local_links(name, page)
         # Every link marked current points at the page itself (a board page
@@ -2889,3 +2893,377 @@ def test_explainer_page_numbers_come_from_the_site_data(tmp_path):
     assert f"{races} races is a small sample." in files["rulebook/index.html"]
     assert f"All {races} races, grouped by challenge" in files["dictionary/index.html"]
     assert site_contact.CHALLENGE_SUBJECT == "Result challenge"
+# ---------------------------------------------------------------- the Learn page (PDW-05)
+#
+# The labs render from a drivers.json: the golden fixture above, or variants of
+# it built here. Every number on the page must come from that file or from
+# leaderboard.wilson.
+
+from paddock_site import learn  # noqa: E402
+
+DRIVERS_FIXTURE = SITE_GOLDEN / "drivers.json"
+
+
+def _drivers() -> dict:
+    return json.loads(DRIVERS_FIXTURE.read_text(encoding="utf-8"))
+
+
+def _rung(engine_map: str, k: int, n: int, cost: float | None) -> dict:
+    lo, hi = lb.wilson(k, n)
+    return {
+        "map": engine_map,
+        "k": k,
+        "n": n,
+        "rate": k / n,
+        "lo": lo,
+        "hi": hi,
+        "costPerRun": cost,
+    }
+
+
+def _car(car: str, k: int, n: int, place: int, cost: float | None = 0.01) -> dict:
+    lo, hi = lb.wilson(k, n)
+    return {
+        "id": f"{car}-x",
+        "car": car,
+        "configHash": "sha256:" + "0" * 64,
+        "k": k,
+        "n": n,
+        "rate": k / n,
+        "lo": lo,
+        "hi": hi,
+        "place": place,
+        "costPerPass": cost,
+    }
+
+
+def _embedded_view(page: str) -> dict:
+    raw = re.search(
+        r'<script type="application/json" id="learn-data">(.*?)</script>', page
+    )
+    return json.loads(raw[1])
+
+
+def _main_text(page: str) -> str:
+    main = _between(page, '<main class="wrap">', "</main>")
+    return " ".join(" ".join(Text(main).text).split())
+
+
+def test_learn_labs_render_from_the_drivers_fixture():
+    drivers = _drivers()
+    route = next(r for r in build_site.ROUTES if r.path == "learn/")
+    page = learn.page(route, build_site.ROUTES, drivers)
+    view = _embedded_view(page)
+    assert view == learn.view(drivers)
+
+    # The engine map: the fixture's one ladder, five levels always on the dial.
+    ladder = drivers["ladders"][0]
+    rungs = {rung["map"]: rung for rung in ladder["levels"]}
+    (shown,) = view["engineMap"]["ladders"]
+    assert list(shown["levels"]) == list(learn.LEVELS)
+    for level in learn.LEVELS:
+        tile = re.search(rf'<button[^>]*data-level="{level}"[^>]*>', page)[0]
+        if level in rungs:
+            assert 'aria-disabled="false"' in tile
+            words = shown["levels"][level]
+            rung = rungs[level]
+            assert words["runs"] == f"{rung['k']} of {rung['n']} runs passed"
+            assert words["range"] == (
+                f"{rung['lo'] * 100:.1f}% to {rung['hi'] * 100:.1f}%"
+            )
+        else:
+            assert 'aria-disabled="true"' in tile and "has not raced at" in tile
+            assert shown["levels"][level] is None
+    assert "Greyed out: medium, xhigh and max" in shown["caption"]
+    # Best is the highest lower bound: high (0/3 at low has a range from 0%).
+    assert shown["best"] == "high"
+    best = shown["levels"]["high"]
+    assert f'data-bind="em-pct" class="big">{best["pct"]}<' in page
+    assert best["pct"] == f"{rungs['high']['rate'] * 100:.0f}%"
+    assert (
+        '<button type="button" class="level" data-level="high" aria-pressed="true"'
+        in page
+    )
+
+    # Same driver, different car: both of the fixture's cars, bars from 80%.
+    (cars,) = view["cars"]["sets"]
+    assert [car["car"] for car in cars["cars"]] == ["alpha-cli", "beta-cli"]
+    assert cars["floor"] == 80 and "Bars start at 80%" in cars["caption"]
+    assert cars["cars"][0]["of"] == "2 of 2"
+    assert cars["cars"][0]["usd"] == "$0.004"
+    assert "coder-large at a high engine map, across all 2 races" in cars["sub"]
+
+    # The honest ranges start from the lab's top result, held at its rate.
+    ranges = view["ranges"]
+    assert ranges["title"] == "How sure is 100%?"
+    assert ranges["sizes"] == [9, 54, 162] and ranges["sizes"][ranges["start"]] == 54
+    assert ranges["k"] == 54
+
+    text = _main_text(page)
+    for words in (
+        "Does thinking harder help?",
+        "Same driver. Different car.",
+        "How sure is 100%?",
+    ):
+        assert words in text
+    assert not re.search(r"(?i)\b(faster|fastest|quicker)\b", page)
+
+
+def test_the_built_learn_page_embeds_the_view_of_its_own_drivers_json(tmp_path):
+    files = build_site.build(_site_tree(tmp_path))
+    drivers = json.loads(files["data/drivers.json"])
+    assert _embedded_view(files["learn/index.html"]) == learn.view(drivers)
+    assert files["learn/learn.js"] == learn.SCRIPT
+    assert learn.CSS in files["paddock.css"]
+    # The committed results build too, with real ladders and cars.
+    real = build_site.build(lb.DEFAULT_RESULTS)
+    view = _embedded_view(real["learn/index.html"])
+    assert view["engineMap"]["ladders"] and view["cars"]["sets"]
+
+
+def test_best_level_is_the_highest_lower_bound_not_the_highest_rate():
+    dial = {
+        "low": _rung("low", 18, 20, 0.01),  # 90%, a tight range
+        "high": _rung("high", 3, 3, 0.05),  # 100%, a wide one
+    }
+    assert dial["high"]["rate"] > dial["low"]["rate"]
+    assert dial["low"]["lo"] > dial["high"]["lo"]
+    assert learn.best_level(dial) == "low"
+    # A tie on the lower bound goes to the higher rate, then the cheaper run.
+    same = {"low": _rung("low", 5, 9, 0.02), "high": _rung("high", 5, 9, 0.01)}
+    assert learn.best_level(same) == "high"
+    unpriced = {"low": _rung("low", 5, 9, 0.02), "high": _rung("high", 5, 9, None)}
+    assert learn.best_level(unpriced) == "low"
+
+
+def test_engine_map_notes_are_written_from_the_numbers():
+    dial = {
+        "low": _rung("low", 2, 9, 0.01),
+        "medium": _rung("medium", 8, 9, 0.012),
+        "high": _rung("high", 9, 10, 0.05),
+    }
+    best = learn.best_level(dial)
+    assert best == "high"
+    low = learn.level_note("low", dial, best)
+    assert low.startswith("At low, 22% of runs pass, for $0.010 a run.")
+    # Ranges that do not overlap: clearly behind; the best costs 5x as much.
+    assert dial["low"]["hi"] < dial["high"]["lo"]
+    assert "Clearly behind high." in low
+    assert "High costs 5.0 times as much per run." in low
+    medium = learn.level_note("medium", dial, best)
+    assert medium.startswith("Medium adds 67 points over low, for $0.002 more a run.")
+    # Overlapping ranges are a statistical tie, and the cost ratio is named.
+    assert dial["medium"]["hi"] >= dial["high"]["lo"]
+    assert "overlaps high's, so the two are a statistical tie." in medium
+    assert "High costs 4.2 times as much per run." in medium
+    high = learn.level_note("high", dial, best)
+    assert "within a few points of medium" in high
+    assert "This is its best level here" in high
+    assert "times as much" not in high
+    # Under double the cost, no ratio is written.
+    near = {"low": _rung("low", 8, 9, 0.010), "high": _rung("high", 9, 10, 0.019)}
+    assert "times as much" not in learn.level_note("low", near, learn.best_level(near))
+    # An unpriced level says so instead of inventing a cost.
+    bare = {"low": _rung("low", 4, 9, None), "high": _rung("high", 9, 10, None)}
+    note = learn.level_note("low", bare, "high")
+    assert "no price on record" in note and "times as much" not in note
+
+
+def test_the_level_on_screen_is_held_across_drivers():
+    drivers = _drivers()
+    full = [
+        _rung(level, k, 9, 0.01 * (i + 1))
+        for i, (level, k) in enumerate(zip(learn.LEVELS, (3, 5, 6, 8, 7)))
+    ]
+    drivers["ladders"] = [
+        {"driver": "acme/coder-large", "car": "alpha-cli", "levels": full},
+        {
+            "driver": "bolt/coder-small",
+            "car": "beta-cli",
+            "levels": [_rung("default", 4, 9, 0.01)]
+            + [_rung("low", 4, 9, 0.01), _rung("medium", 7, 9, 0.02)],
+        },
+        # One dial level is no ladder: it never gets a chip.
+        {"driver": "local/coder-tiny", "car": "alpha-cli", "levels": full[:1]},
+    ]
+    lab = learn.engine_map_lab(drivers)
+    first, second = lab["ladders"]
+    assert [ladder["name"] for ladder in lab["ladders"]] == [
+        "coder-large",
+        "coder-small",
+    ]
+    # Before any pick, each shows its best.
+    assert learn.shown_level(first, None) == first["best"] == "xhigh"
+    assert learn.shown_level(second, None) == second["best"] == "medium"
+    # A held level the next driver has stays on screen ...
+    for level in ("low", "medium"):
+        assert learn.shown_level(second, level) == level
+    # ... and one it lacks falls back to its best, with a note.
+    for level in ("high", "xhigh", "max"):
+        assert learn.shown_level(second, level) == "medium"
+        assert second["fell"][level] == (
+            f"It has not raced at {level} in this car, so this shows its best level, medium."
+        )
+        assert (
+            second["why"][level] == f"coder-small has not raced at {level} in beta-cli"
+        )
+    assert set(first["show"]) == {"", *learn.LEVELS}
+    assert all(first["show"][level] == level for level in learn.LEVELS)
+    assert "It also raced at the car's own default, off this dial." in second["caption"]
+    assert "Greyed out: high, xhigh and max" in second["caption"]
+    # The script only looks the held level up; it holds what was on screen.
+    assert "show[held || '']" in learn.SCRIPT
+    assert "held = held || shown();" in learn.SCRIPT
+
+
+def test_the_car_on_screen_is_held_across_drivers_and_falls_back_with_a_note():
+    drivers = _drivers()
+    drivers["sameDriverDifferentCar"] = [
+        {
+            "driver": "acme/coder-large",
+            "map": "high",
+            "cars": [_car("alpha-cli", 52, 54, 1), _car("beta-cli", 50, 54, 3)],
+        },
+        {
+            "driver": "bolt/coder-small",
+            "map": "default",
+            "cars": [_car("gamma-cli", 51, 54, 2), _car("alpha-cli", 40, 54, 9, None)],
+        },
+    ]
+    lab = learn.car_lab(drivers)
+    first, second = lab["sets"]
+    assert lab["start"] == 0 and first["driver"] == "acme/coder-large"
+    assert learn.shown_car(first, None) == first["best"] == 0
+    # Held alpha-cli: both drivers raced in it.
+    assert first["cars"][learn.shown_car(first, "alpha-cli")]["car"] == "alpha-cli"
+    assert second["cars"][learn.shown_car(second, "alpha-cli")]["car"] == "alpha-cli"
+    # Held beta-cli: the second driver never raced in it, so its best car shows.
+    assert learn.shown_car(second, "beta-cli") == second["best"] == 0
+    assert second["fell"]["beta-cli"] == (
+        "It has not raced in beta-cli, so this shows its best car."
+    )
+    assert "alpha-cli" not in second["fell"]
+    assert second["cars"][1]["usd"] == "no price"
+    assert "at the car's own default engine map, across all 54 races" in second["sub"]
+    assert "heldCar = heldCar || cars.sets[set].cars[carIndex()].car;" in learn.SCRIPT
+
+
+@pytest.mark.parametrize(
+    ("rates", "floor"),
+    [
+        ((0.963, 0.944, 0.889), 80),
+        ((0.963, 0.82), 80),
+        ((0.963, 0.81), 75),
+        ((0.9, 0.5), 45),
+        ((1.0, 0.01), 0),
+    ],
+)
+def test_the_car_bar_floor_drops_below_80_only_when_a_value_needs_it(rates, floor):
+    assert learn.bar_floor(rates) == floor
+    assert all(rate * 100 - floor >= 0 for rate in rates)
+    caption = learn.floor_caption(floor, "beta-cli")
+    assert caption.startswith(f"Bars start at {floor}%")
+    if 0 < floor < 80:
+        assert "lower than usual, so beta-cli still shows a bar" in caption
+
+
+def test_car_bars_start_at_the_floor_in_the_view():
+    drivers = _drivers()
+    drivers["sameDriverDifferentCar"] = [
+        {
+            "driver": "acme/coder-large",
+            "map": "high",
+            "cars": [_car("alpha-cli", 50, 54, 1), _car("beta-cli", 30, 54, 2)],
+        }
+    ]
+    (cars,) = learn.car_lab(drivers)["sets"]
+    assert cars["floor"] == 50
+    assert [car["w"] for car in cars["cars"]] == [
+        f"{(50 / 54 * 100 - 50) / 50 * 100:.0f}%",
+        f"{(30 / 54 * 100 - 50) / 50 * 100:.0f}%",
+    ]
+    assert cars["caption"].startswith("Bars start at 50%, lower than usual")
+
+
+def test_honest_range_numbers_equal_leaderboard_wilson():
+    table = learn.wilson_table()
+    assert [len(rows) for rows in table] == [n + 1 for n in learn.SIZES]
+    for rows, n in zip(table, learn.SIZES):
+        for k, bounds in enumerate(rows):
+            assert tuple(bounds) == lb.wilson(k, n)
+    view = learn.view(_drivers())
+    assert view["ranges"]["table"] == table
+    assert view["ranges"]["z"] == f"{lb.Z_95:.2f}" == "1.96"
+    for n in learn.SIZES:
+        for k in (0, n // 2, n - 1, n):
+            words = learn.range_view(k, n)
+            lo, hi = lb.wilson(k, n)
+            assert words["range"] == f"{lo * 100:.1f}% to {hi * 100:.1f}%"
+            assert words["centre"] == f"{(lo + hi) / 2:.3f}"
+            assert words["half"] == f"{(hi - lo) / 2:.3f}"
+            assert words["p"] == f"{k / n:.3f}"
+            # A perfect score's range: from its lower bound to 100%, never flat.
+            assert words["perfect"] == f"{lb.wilson(n, n)[0] * 100:.1f}%"
+            assert lb.wilson(n, n)[1] == 1.0 and lb.wilson(n, n)[0] < 1.0
+    # The page shows the starting state's numbers and the perfect score's range.
+    page = learn.body(_drivers(), "learn/index.html")
+    start = learn.range_view(54, 54)
+    assert f'data-bind="hr-range">{start["range"]}<' in page
+    assert f'data-bind="hr-perfect">{start["perfect"]}<' in page
+    assert "half-width = z × √(p(1 − p)/n + z²/4n²)" in page
+    # The script reads the table; it computes no interval of its own.
+    assert "ranges.table[size][passes]" in learn.SCRIPT
+    assert "Math.sqrt" not in learn.SCRIPT
+
+
+def test_the_honest_ranges_start_at_an_example_without_a_trusted_result():
+    drivers = _drivers()
+    drivers.update(
+        state="awaiting-trust-sign-off", ladders=[], sameDriverDifferentCar=[]
+    )
+    view = learn.view(drivers)
+    assert view["ranges"]["title"] == "How sure is a pass rate?"
+    assert view["ranges"]["k"] == round(learn.EXAMPLE_RATE * learn.START_SIZE)
+    page = learn.body(drivers, "learn/index.html")
+    assert page.count("No trusted results yet.") == 2
+    assert "data-ladder" not in page and "data-set" not in page
+
+
+def test_the_sector_stepper_and_flags_spell_out_dnf_at_first_use():
+    page = learn.body(_drivers(), "learn/index.html")
+    text = " ".join(" ".join(Text(page).text).split())
+    first = text.index("DNF")
+    assert text[first : first + len("DNF, short for did not finish")] == (
+        "DNF, short for did not finish"
+    )
+    assert '<abbr title="did not finish">DNF</abbr>' in page
+    assert "DNF, short for did not finish: it missed a check" in page
+    # Four sectors, each with a jump target at least 44 px across.
+    assert page.count('data-sector-panel="') == 4
+    assert re.findall(r'class="hit" cx="\d+" cy="\d+" r="(\d+)"', page) == ["22"] * 4
+    # After sector 4 a tap starts another lap.
+    assert "(sector + 1) % stepper.points.length" in learn.SCRIPT
+    view = learn.view(_drivers())["stepper"]
+    assert view["last"] == "Another lap" and len(view["points"]) == 4
+    # Six flags, every glyph from the published set.
+    flags = re.findall(r'class="flag" data-flag="\d"', page)
+    assert len(flags) == 6
+    glyph_uses = set(re.findall(r'<use href="#([^"]+)"', page))
+    assert glyph_uses <= PUBLISHED_GLYPHS
+    # No number in the sector or flag copy: numbers come from the data.
+    for _title, _glyph, body, notice in learn.SECTORS:
+        assert not re.search(r"\d", body + notice)
+    for _name, _glyph, counted, body in learn.FLAGS:
+        assert not re.search(r"\d", counted + body)
+
+
+def test_learn_driver_chips_keep_two_providers_of_one_model_apart():
+    names = learn.driver_names(["fireworks/kimi-k3", "moonshot/kimi-k3", "acme/coder"])
+    assert names == {
+        "fireworks/kimi-k3": "fireworks/kimi-k3",
+        "moonshot/kimi-k3": "moonshot/kimi-k3",
+        "acme/coder": "coder",
+    }
+    assert learn.embed({"a": "</script><b>&"}) == (
+        '{"a":"\\u003c/script\\u003e\\u003cb\\u003e\\u0026"}'
+    )
