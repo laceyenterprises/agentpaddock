@@ -42,7 +42,8 @@ class Route:
     ticket: str = ""
     #: One line saying what the page is for; the placeholder shows it.
     summary: str = ""
-    #: Footer group: ``"site"`` for the new pages, ``"board"`` for today's board.
+    #: Footer group: ``"site"`` for the new pages, ``"board"`` for today's board,
+    #: ``""`` for home, which the lockup links instead.
     footer: str = "site"
 
     @property
@@ -62,8 +63,8 @@ class Route:
 
 
 ROUTES: tuple[Route, ...] = (
-    # Home stays the current leaderboard until PDW-04 replaces it.
-    Route("", "Leaderboard", ticket="PDW-04", nav_label="Leaderboard", footer="board"),
+    # Home (PDW-04); every page links it through the lockup in its header and footer.
+    Route("", "Home", ticket="PDW-04", nav_label="Home", footer=""),
     Route(
         "learn/",
         "Learn",
@@ -174,6 +175,7 @@ ROUTES: tuple[Route, ...] = (
     ),
     # Today's board pages keep their names and stay reachable from the footer
     # until the page tickets above replace them.
+    Route("leaderboard.html", "Leaderboard", ticket="PDW-07", footer="board"),
     Route("matrix.html", "Harness × model", footer="board"),
     Route("tasks.html", "Tasks", footer="board"),
     Route("changelog.html", "Changelog", footer="board"),
