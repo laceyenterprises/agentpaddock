@@ -26,7 +26,7 @@ def body(route: Route) -> str:
         + "<p><strong>Being built.</strong> This page is on its way. "
         "Until it lands, today's numbers are on the leaderboard.</p></div>"
         '<p class="soon-actions">'
-        f'<a class="btn solid" href="{root}index.html">See the leaderboard</a>'
+        f'<a class="btn solid" href="{root}leaderboard.html">See the leaderboard</a>'
         f'<a class="btn ghost" href="{root}methodology.html">Read the methodology</a></p>'
     )
 

@@ -57,6 +57,15 @@ ANALYTICS_DISCLOSURE = (
     "visitors in the EEA, the UK, Switzerland and listed territories."
 )
 
+#: Car (harness) -> its livery token in design/tokens.css, for identity only.
+CAR_LIVERY = {
+    "claude-code": "car-cc",
+    "codex": "car-codex",
+    "opencode": "car-opencode",
+    "pi": "car-pi",
+    "antigravity": "car-agy",
+}
+
 #: The menu button's two states, drawn inline as plain strokes.
 MENU_STROKES = (
     '<svg class="icon-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
