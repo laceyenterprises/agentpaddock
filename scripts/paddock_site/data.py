@@ -533,7 +533,7 @@ def _track(data: SiteData, race: Race) -> dict[str, Any]:
     if race.has_card and race.task_dir is not None:
         try:
             facts = lb.track_facts(race.task_dir, data.results)
-        except lb.ResultsError:
+        except (lb.ResultsError, OSError, UnicodeDecodeError):
             facts = None
     return {
         "briefing": {
@@ -574,7 +574,7 @@ def briefing(race: Race) -> dict[str, str] | None:
         (
             index
             for index, paragraph in enumerate(paragraphs)
-            if not paragraph.lstrip().startswith(("#", "```"))
+            if paragraph.strip() and not paragraph.lstrip().startswith(("#", "```"))
         ),
         0,
     )

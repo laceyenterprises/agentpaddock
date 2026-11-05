@@ -155,13 +155,17 @@ each race's briefing prompt.
   prototype's renames (`scripts/paddock_site/names.py`).
 - **The briefing** follows the track card's `[briefing] show`: `full` shows
   the prompt word for word (its opening, then "Read it all"), `excerpt` its
-  first paragraph cut at 60 words, `none` nothing. A card without
+  first prose paragraph cut at 60 words, `none` nothing. Blank paragraphs
+  after headings do not count as prose. A card without
   `[briefing]`, or a task without a card, shows `full`, the documented
   default. The prompt text is never written to a data file.
 - **The track and the sealed circuit** come from `leaderboard.py
   track-facts`: staged file and line counts when the race has a card
   `track-facts` accepts, and its conditions (`leaderboard.track_conditions`)
   for every race. No file names are shown: `track-facts` reports counts only.
+  If the prompt is missing or unreadable, the site omits its briefing text
+  and leaves the track counts and briefing word count unknown; the sealed
+  circuit still appears.
 - One script, `paddock.js`, carries the menu and these pages' controls; each
   part runs only when its markup is on the page.
 

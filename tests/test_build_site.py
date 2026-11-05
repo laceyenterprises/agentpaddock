@@ -2485,6 +2485,49 @@ def test_race_page_shows_the_briefing_as_the_track_card_allows(tmp_path):
     assert brief(f"{head}\n\n{lead}") in alpha and brief(rest) in alpha
 
 
+@pytest.mark.parametrize("show", ["excerpt", "full"])
+@pytest.mark.parametrize("separator", ["\n\n\n\n", "\n \n\t\n\n"])
+def test_briefing_skips_blank_paragraphs_after_heading(tmp_path, show, separator):
+    results = _site_tree(tmp_path)
+    task = results.parent / "tasks" / "hard-review-alpha"
+    heading, lead, rest = PROMPTS["hard-review-alpha"].strip().split("\n\n")
+    (task / "prompt.md").write_text(heading + separator + lead + "\n\n" + rest)
+    card = task / "track.toml"
+    card.write_text(card.read_text() + f'\n[briefing]\nshow = "{show}"\n')
+
+    files = build_site.build(results)
+    page = files["races/hard-review-alpha/index.html"]
+    assert '<div class="rc-brief-text"></div>' not in page
+    if show == "excerpt":
+        assert f'<div class="rc-brief-text">{html.escape(lead)}</div>' in page
+        assert "Read it all" not in page
+        assert rest not in page
+    else:
+        opening, disclosure = page.split("<details", 1)
+        assert html.escape(lead) in opening
+        assert html.escape(rest) in disclosure
+
+
+@pytest.mark.parametrize("prompt_bytes", [None, b"\xff"])
+def test_site_build_tolerates_unreadable_track_prompt(tmp_path, prompt_bytes):
+    results = _site_tree(tmp_path)
+    prompt = results.parent / "tasks" / "hard-review-alpha" / "prompt.md"
+    if prompt_bytes is None:
+        prompt.unlink()
+    else:
+        prompt.write_bytes(prompt_bytes)
+
+    files = build_site.build(results)
+    race = json.loads(files["data/races/hard-review-alpha.json"])
+    assert race["track"] is None
+    assert race["briefing"] == {"show": "full", "words": None}
+    page = files["races/hard-review-alpha/index.html"]
+    assert "On the track ·" not in page
+    assert '<div class="rc-brief-text">' not in page
+    for chip in site_races.sealed_circuit(lb.track_conditions()):
+        assert f"<li>{html.escape(chip)}</li>" in page
+
+
 def test_no_page_names_a_checkpoint_the_track_card_hides(tmp_path):
     results, files = _race_site(tmp_path)
     for name, text in _text_files(files):
@@ -2570,6 +2613,11 @@ def test_card_stage_bars_mark_the_weakest_in_red():
     assert "2:05 lap" in card and "$0.042 a run" in card
     race["stages"] = None
     assert "Stages not recorded yet." in site_races.race_card(race, "x/index.html")
+    race.update(rate=None, k=0, n=0)
+    uncounted = site_races.race_card(race, "x/index.html")
+    assert 'data-rate=""' in uncounted
+    assert '<span class="rc-rate">n/a</span>' in uncounted
+    assert "0 of 0 runs" in uncounted
 
 
 @pytest.mark.parametrize(

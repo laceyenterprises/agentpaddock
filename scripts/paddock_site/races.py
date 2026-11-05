@@ -221,11 +221,12 @@ def _stages(race: Mapping[str, Any]) -> str:
 
 def race_card(race: Mapping[str, Any], href: str) -> str:
     rate = race["rate"]
+    rate_attr = f"{rate:.6f}" if rate is not None else ""
     red = rate is not None and rate < RED_UNDER
     lap = lap_text(race["medianLapSeconds"])
     return (
         f'<a class="rc-card" href="{esc(href)}" data-challenge="{esc(race["challenge"])}" '
-        f'data-rate="{rate:.6f}" data-name="{esc(race["shortName"].lower())}">'
+        f'data-rate="{rate_attr}" data-name="{esc(race["shortName"].lower())}">'
         '<div class="rc-card-head">'
         + roundel(race["challenge"], size="lg")
         + '<div class="rc-card-name">'
