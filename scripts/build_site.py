@@ -25,6 +25,10 @@ the design tokens. The pages themselves are registered in
 ``paddock_site/routes.py`` and built by the functions :data:`ROUTES` names
 below; a route without a builder shows a placeholder until its PDW page ticket
 lands. ``design/web/README.md`` maps every route to its prototype and ticket.
+
+The pages' numbers come from the data files under ``data/``
+(``paddock_site/data.py``, PDW-03), built from the same ``results/`` and the
+``tasks/`` beside it.
 """
 
 from __future__ import annotations
@@ -41,6 +45,7 @@ from typing import Any, Mapping, Sequence
 
 import leaderboard as lb
 
+from paddock_site import data as site_data
 from paddock_site import layout, placeholder
 from paddock_site import routes as site_routes
 from paddock_site.layout import (  # re-exported for callers and tests
@@ -1080,6 +1085,9 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
     )
     for board in lb.boards(results.records):
         files[board_filename(board)] = board_page(board)
+    # The site data layer (PDW-03): data/*.json, from the same results and the
+    # local tasks beside them.
+    files.update(site_data.build(results, results_dir.parent / "tasks"))
     return files
 
 

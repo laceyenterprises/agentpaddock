@@ -1,0 +1,76 @@
+{
+  "schema": "paddock-site-entry/v1",
+  "generatedAt": "2026-01-06",
+  "state": "live",
+  "basis": {
+    "counts": "the entry's first counted result on each race it ran",
+    "trust": [
+      "reproduced",
+      "paddock-run"
+    ],
+    "documents": [
+      "2026-01-05-bench"
+    ],
+    "races": "local tasks at the version their task.toml names",
+    "calendar": "races with at least 10 counted runs",
+    "calendarRaces": 2
+  },
+  "id": "beta-cli-acme-coder-large-high-bcc71e3b",
+  "identity": {
+    "driver": "acme/coder-large",
+    "car": "beta-cli",
+    "map": "high",
+    "configHash": "sha256:bcc71e3b8ecd599f67c91fcd0003b560832a9308b499a1efb947c4598bb00805"
+  },
+  "trust": "paddock-run",
+  "totals": {
+    "k": 2,
+    "n": 2,
+    "rate": 1.0
+  },
+  "range": {
+    "lo": 0.3423802239546494,
+    "hi": 1.0
+  },
+  "place": 1,
+  "tie": true,
+  "fullCalendar": true,
+  "fuel": {
+    "costPerPass": 0.0038,
+    "costSource": "published-rate",
+    "tokensPerPass": 5100.0
+  },
+  "medianLapSeconds": 65.0,
+  "challenges": {
+    "docs": {
+      "k": 1,
+      "n": 1
+    },
+    "hard-review": {
+      "k": 1,
+      "n": 1
+    }
+  },
+  "races": [
+    {
+      "race": "docs-beta",
+      "name": "Beta",
+      "challenge": "docs",
+      "version": 1,
+      "calendar": true,
+      "passed": true,
+      "lapSeconds": 50.0,
+      "costUsd": 0.0038
+    },
+    {
+      "race": "hard-review-alpha",
+      "name": "Alpha circuit",
+      "challenge": "hard-review",
+      "version": 2,
+      "calendar": true,
+      "passed": true,
+      "lapSeconds": 80.0,
+      "costUsd": 0.0038
+    }
+  ]
+}

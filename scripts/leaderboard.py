@@ -41,7 +41,7 @@ import zlib
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 from urllib.parse import urlsplit
 
 MODULE_ROOT = Path(__file__).resolve().parents[1]
@@ -683,6 +683,24 @@ def _validate_record(
 
 ENTRY_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 TRUST_LEVELS = ("self-reported", "re-graded", "reproduced", "paddock-run")
+#: The levels the main standings, race and entry pages count (CONTRIBUTING.md
+#: "Trust levels"); the community board shows every level.
+TRUSTED_LEVELS = ("reproduced", "paddock-run")
+#: The ``runner`` every harness descriptor of the paddock's own bench names
+#: (``scripts/import_eval_bench.py`` writes it).
+PADDOCK_BENCH_RUNNER = "agent-os-fleet"
+#: Engine maps (reasoning levels) in ladder order; ``default`` is the provider's.
+ENGINE_MAPS = (
+    "default",
+    "minimal",
+    "none",
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max",
+    "ultra",
+)
 # Frozen legacy descriptors: these predate briefing and radio provenance. Never
 # extend this exception for a new configuration or rewrite an old descriptor.
 LEGACY_CONFIG_HASHES = frozenset(
@@ -850,20 +868,7 @@ def validate_entry(raw: Any, *, root: Path = MODULE_ROOT) -> list[str]:
             driver["provider_id"]
         ):
             errors.append("entry.driver: provider_id must look like provider/model")
-        if not _choice(
-            driver["engine_map"],
-            (
-                "default",
-                "minimal",
-                "none",
-                "low",
-                "medium",
-                "high",
-                "xhigh",
-                "max",
-                "ultra",
-            ),
-        ):
+        if not _choice(driver["engine_map"], ENGINE_MAPS):
             errors.append(
                 "entry.driver: engine_map must be a reasoning level or default"
             )
@@ -1018,6 +1023,46 @@ def validate_trust(raw: Any, documents: Mapping[str, Any]) -> list[str]:
     return errors
 
 
+def paddock_bench(document: Mapping[str, Any]) -> bool:
+    """True for a document the paddock's own bench produced.
+
+    Read from provenance, not the filename: no ``source.fork``, no record
+    pinned to an external track, and every harness descriptor names the
+    paddock bench runner. A submitter can write those fields, so maintainers
+    check them when reviewing a results pull request, and ``meta/trust.json``
+    overrides the default for any document it names.
+    """
+    configs = document["harness_configs"]
+    return (
+        "fork" not in document["source"]
+        and bool(configs)
+        and all(
+            isinstance(descriptor, dict)
+            and descriptor.get("runner") == PADDOCK_BENCH_RUNNER
+            for descriptor in configs.values()
+        )
+        and not any("track" in record for record in document["records"])
+    )
+
+
+def document_trust(
+    name: str, document: Mapping[str, Any], trust: Mapping[str, Any]
+) -> tuple[str, str]:
+    """``(level, origin)`` for one results document.
+
+    ``meta/trust.json`` decides when it names the document (origin
+    ``trust.json``). Otherwise the paddock's own bench is ``paddock-run``
+    (origin ``paddock-bench``) and every other document, fork and community
+    submissions included, is ``self-reported`` (origin ``default``).
+    """
+    named = (trust.get("documents") or {}).get(name)
+    if isinstance(named, dict) and named.get("level") in TRUST_LEVELS:
+        return named["level"], "trust.json"
+    if paddock_bench(document):
+        return "paddock-run", "paddock-bench"
+    return "self-reported", "default"
+
+
 def _load_gym() -> None:
     if "gym" not in sys.modules:
         package_dir = MODULE_ROOT / "lib" / "python" / "gym"
@@ -1126,6 +1171,114 @@ def validate_track(
     return errors, warnings
 
 
+#: CONTRIBUTING.md difficulty bands: a pass rate at or above the first edge is
+#: 1, ..., below the last edge is 5. Fewer counted runs than the minimum: null.
+DIFFICULTY_EDGES = (0.9, 0.75, 0.6, 0.4)
+DIFFICULTY_MIN_RUNS = 10
+#: Docs fact checks name the facts a document must hold; never disclose them.
+FACT_CHECK_PREFIX = "fact:"
+
+
+def difficulty(passed: int, n: int) -> int | None:
+    """The 1-to-5 difficulty band for ``passed`` of ``n`` counted runs."""
+    if n < DIFFICULTY_MIN_RUNS:
+        return None
+    return 1 + sum(passed / n < edge for edge in DIFFICULTY_EDGES)
+
+
+def disclosure(checkpoint: Mapping[str, Any]) -> str:
+    """How a track-card checkpoint may be shown: ``label``, ``count`` or ``hidden``.
+
+    A docs fact check is at most ``count`` whatever the card says: its name
+    can reveal a required fact.
+    """
+    if checkpoint["disclose"] == "label" and str(checkpoint["check"]).startswith(
+        FACT_CHECK_PREFIX
+    ):
+        return "count"
+    return checkpoint["disclose"]
+
+
+def retirement(
+    record: Mapping[str, Any], checkpoints: Sequence[Mapping[str, Any]]
+) -> int | None:
+    """Card index of the first failed required checkpoint, or None.
+
+    None also when the record carries no ``checks``; tell the two apart with
+    ``"checks" in record``.
+    """
+    checks = {check["name"]: check for check in record.get("checks", [])}
+    for index, checkpoint in enumerate(checkpoints):
+        check = checks.get(checkpoint["check"])
+        if check and check["required"] and not check["ok"]:
+            return index
+    return None
+
+
+def checkpoint_summary(
+    checkpoints: Sequence[Mapping[str, Any]],
+    records: Iterable[Mapping[str, Any]],
+    *,
+    names_from: Iterable[Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Disclosed checkpoint clear rates, the "N more checks" count and retirements.
+
+    ``records`` are the counted runs of one race. Only ``label`` checkpoints
+    are named; ``count`` checkpoints and recorded checks the card does not list
+    add to ``more_checks``; ``hidden`` ones are omitted. Retirements key a
+    disclosed checkpoint by its 1-based card position and pool the rest under
+    ``undisclosed``; a run without ``checks`` counts as unrecorded. Unlisted
+    check names come from ``names_from`` when given (``track_facts`` passes
+    every record of the task version), else from ``records``.
+    """
+    rows = list(records)
+    shown = []
+    more = 0
+    for index, checkpoint in enumerate(checkpoints):
+        level = disclosure(checkpoint)
+        if level == "hidden":
+            continue
+        if level == "count":
+            more += 1
+            continue
+        recorded = [
+            check["ok"]
+            for row in rows
+            for check in row.get("checks", [])
+            if check["name"] == checkpoint["check"]
+        ]
+        shown.append(
+            {
+                "position": index + 1,
+                "label": checkpoint["label"],
+                "recorded": len(recorded),
+                "clear_rate": sum(recorded) / len(recorded) if recorded else None,
+            }
+        )
+    listed = {checkpoint["check"] for checkpoint in checkpoints}
+    unlisted = {
+        check["name"]
+        for row in (rows if names_from is None else names_from)
+        for check in row.get("checks", [])
+    } - listed
+    retirements: Counter[str] = Counter()
+    unrecorded = 0
+    for row in rows:
+        if not row.get("checks"):
+            unrecorded += 1
+            continue
+        index = retirement(row, checkpoints)
+        if index is not None:
+            disclosed = disclosure(checkpoints[index]) == "label"
+            retirements[str(index + 1) if disclosed else "undisclosed"] += 1
+    return {
+        "checkpoints": shown,
+        "more_checks": more + len(unlisted),
+        "retirements": dict(retirements),
+        "retirement_unrecorded": unrecorded,
+    }
+
+
 def track_facts(task_dir: Path, results: Results | None = None) -> dict[str, Any]:
     """Public projection for a local task. Only trusted staging code is executed.
 
@@ -1181,50 +1334,7 @@ def track_facts(task_dir: Path, results: Results | None = None) -> dict[str, Any
     rows = _task_records(task, results.records)
     graded = [row for row in rows if included(row)]
     passed = sum(row["verdict"] == PASSED for row in graded)
-    checkpoints = []
-    hidden_count = 0
-    for index, checkpoint in enumerate(card["checkpoints"]):
-        if checkpoint["disclose"] == "hidden":
-            continue
-        if checkpoint["disclose"] == "count":
-            hidden_count += 1
-            continue
-        check_rows = [
-            check
-            for row in graded
-            for check in row.get("checks", [])
-            if check["name"] == checkpoint["check"]
-        ]
-        clear = sum(check["ok"] for check in check_rows)
-        checkpoints.append(
-            {
-                "position": index + 1,
-                "label": checkpoint["label"],
-                "recorded": len(check_rows),
-                "clear_rate": clear / len(check_rows) if check_rows else None,
-            }
-        )
-    listed = {checkpoint["check"] for checkpoint in card["checkpoints"]}
-    unlisted = {
-        check["name"] for row in rows for check in row.get("checks", [])
-    } - listed
-    retirements: Counter[str] = Counter()
-    retirement_unrecorded = 0
-    for row in graded:
-        checks = {check["name"]: check for check in row.get("checks", [])}
-        if not checks:
-            retirement_unrecorded += 1
-            continue
-        for index, checkpoint in enumerate(card["checkpoints"]):
-            check = checks.get(checkpoint["check"])
-            if check and check["required"] and not check["ok"]:
-                key = (
-                    str(index + 1)
-                    if checkpoint["disclose"] == "label"
-                    else "undisclosed"
-                )
-                retirements[key] += 1
-                break
+    stats = checkpoint_summary(card["checkpoints"], graded, names_from=rows)
     totals = {key: sum(row["tokens"][key] or 0 for row in graded) for key in TOKEN_KEYS}
     measured = bool(graded) and all(
         all(row["tokens"][key] is not None for key in TOKEN_KEYS) for row in graded
@@ -1289,17 +1399,12 @@ def track_facts(task_dir: Path, results: Results | None = None) -> dict[str, Any
             "runs": len(graded),
             "passed": passed,
             "avg_pass_rate": passed / len(graded) if graded else None,
-            "difficulty": (
-                1 + sum(passed / len(graded) < edge for edge in (0.9, 0.75, 0.6, 0.4))
-                if len(graded) >= 10
-                else None
-            ),
-            "difficulty_reason": "not enough runs" if len(graded) < 10 else None,
+            "difficulty": difficulty(passed, len(graded)),
+            "difficulty_reason": "not enough runs"
+            if len(graded) < DIFFICULTY_MIN_RUNS
+            else None,
             "wilson": list(wilson(passed, len(graded))) if graded else None,
-            "checkpoints": checkpoints,
-            "more_checks": hidden_count + len(unlisted),
-            "retirements": dict(retirements),
-            "retirement_unrecorded": retirement_unrecorded,
+            **stats,
             "fuel": fuel,
         },
         "warnings": warnings,
@@ -1500,6 +1605,35 @@ def _tokens_total(record: Mapping[str, Any]) -> int | None:
     return sum(counts) if all(_is_count(count) for count in counts) else None
 
 
+def _all_priced(costs: Iterable[Mapping[str, Any]]) -> bool:
+    return all(
+        cost["source"] in PRICED_SOURCES and _is_number(cost["usd"]) for cost in costs
+    )
+
+
+def _priced_source(costs: Iterable[Mapping[str, Any]]) -> str:
+    """The weaker price source among priced ``costs``."""
+    return (
+        RECONCILED if {cost["source"] for cost in costs} == {RECONCILED} else PUBLISHED
+    )
+
+
+def cost_per_run(records: list[Mapping[str, Any]]) -> dict[str, Any]:
+    """Mean cost of one counted run, priced only when every counted run is."""
+    costs = [record["cost"] for record in records if included(record)]
+    if costs and _all_priced(costs):
+        return {
+            "usd": round(sum(cost["usd"] for cost in costs) / len(costs), 6),
+            "source": _priced_source(costs),
+            "reason": None,
+        }
+    return {
+        "usd": None,
+        "source": UNKNOWN,
+        "reason": "no_runs" if not costs else "not_every_attempt_priced",
+    }
+
+
 def summarize(records: list[Mapping[str, Any]]) -> dict[str, Any]:
     """Pass rate, Wilson interval, mean score, tokens and cost per pass for ``records``."""
     graded = [record for record in records if included(record)]
@@ -1513,14 +1647,10 @@ def summarize(records: list[Mapping[str, Any]]) -> dict[str, Any]:
         sum(token_totals) / passed if passed and n and measured == n else None  # type: ignore[arg-type]
     )
     costs = [record["cost"] for record in graded]
-    priced = all(
-        cost["source"] in PRICED_SOURCES and _is_number(cost["usd"]) for cost in costs
-    )
-    if passed and n and priced:
-        sources = {cost["source"] for cost in costs}
+    if passed and n and _all_priced(costs):
         cost_per_pass = {
             "usd": round(sum(cost["usd"] for cost in costs) / passed, 6),
-            "source": RECONCILED if sources == {RECONCILED} else PUBLISHED,
+            "source": _priced_source(costs),
             "reason": None,
         }
     else:
@@ -1546,6 +1676,77 @@ def summarize(records: list[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
+def standing_key(row: Mapping[str, Any]) -> tuple:
+    """Board order for a :func:`summarize` row carrying its ``key``: pass rate,
+    then the Wilson lower bound, then n, best first; unscored rows last."""
+    return (
+        -row["rate"] if row["rate"] is not None else 1.0,
+        -row["ci"][0],
+        -row["n"],
+        row["key"],
+    )
+
+
+def places(rows: Sequence[Mapping[str, Any]]) -> list[tuple[int | None, bool]]:
+    """``(place, tie)`` for each of ``rows``, already in :func:`standing_key` order.
+
+    Competition ranking on the pass rate: rows with an equal ``passed / n``
+    share the place of the first of them and are a tie; the next rate takes the
+    place after all of them. An unscored row has no place.
+    """
+    scored = [row for row in rows if row["n"]]
+    if any(
+        a["passed"] * b["n"] < b["passed"] * a["n"] for a, b in zip(scored, scored[1:])
+    ) or any(row["n"] for row in rows[len(scored) :]):
+        raise ValueError("places() needs rows in standing_key order")
+    out: list[tuple[int | None, bool]] = []
+    for row in rows:
+        if not row["n"]:
+            out.append((None, False))
+            continue
+
+        def same(other: Mapping[str, Any]) -> bool:
+            return bool(other["n"]) and (
+                other["passed"] * row["n"] == row["passed"] * other["n"]
+            )
+
+        first = next(i for i, other in enumerate(rows) if same(other))
+        out.append((first + 1, sum(same(other) for other in rows) > 1))
+    return out
+
+
+def first_results(
+    documents: Mapping[str, Mapping[str, Any]],
+) -> list[Mapping[str, Any]]:
+    """Each identity's first counted result on each race.
+
+    An identity is the triple model, engine map and harness configuration; a
+    race is one task at one task version. Documents are taken in name order,
+    which is date order (``<date>-<id>.json``); within a document the lowest
+    ``attempt`` comes first (a null attempt after numbered ones), then record
+    order. Excluded and exhibition records never count, so a later attempt
+    stands in only when no earlier one was graded.
+    """
+    first: dict[tuple, tuple[tuple, Mapping[str, Any]]] = {}
+    for position, name in enumerate(sorted(documents)):
+        for index, record in enumerate(documents[name]["records"]):
+            if not included(record):
+                continue
+            key = (
+                record["model"]["provider_id"],
+                record["model"]["reasoning"] or "default",
+                record["harness"]["config_hash"],
+                record["suite"],
+                record["task"],
+                record["task_version"],
+            )
+            attempt = record["attempt"]
+            order = (position, attempt is None, attempt or 0, index)
+            if key not in first or order < first[key][0]:
+                first[key] = (order, record)
+    return [record for _, record in sorted(first.values(), key=lambda item: item[0])]
+
+
 def boards(records: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Per-suite boards. Results compare only within one task version, so a suite's
     records at different task versions form separate boards."""
@@ -1563,14 +1764,7 @@ def boards(records: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
         for key, row_records in rows.items():
             summary = summarize(row_records)
             board_rows.append({"key": key, **summary})
-        board_rows.sort(
-            key=lambda row: (
-                -row["rate"] if row["rate"] is not None else 1.0,
-                -row["ci"][0],
-                -row["n"],
-                row["key"],
-            )
-        )
+        board_rows.sort(key=standing_key)
         out.append(
             {
                 "suite": suite,

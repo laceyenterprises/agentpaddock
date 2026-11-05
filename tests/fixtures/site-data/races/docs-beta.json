@@ -1,0 +1,67 @@
+{
+  "schema": "paddock-site-race/v1",
+  "generatedAt": "2026-01-06",
+  "state": "live",
+  "basis": {
+    "counts": "funnel: every counted run recording checks; classification: each entry's first counted result",
+    "trust": [
+      "reproduced",
+      "paddock-run"
+    ],
+    "documents": [
+      "2026-01-05-bench"
+    ],
+    "races": "local tasks at the version their task.toml names",
+    "calendar": "races with at least 10 counted runs",
+    "calendarRaces": 2
+  },
+  "id": "docs-beta",
+  "name": "Beta",
+  "title": "Synthetic docs race",
+  "challenge": "docs",
+  "version": 1,
+  "calendar": true,
+  "n": 12,
+  "k": 7,
+  "rate": 0.5833333333333334,
+  "lo": 0.31951131084242423,
+  "hi": 0.8067396875653928,
+  "difficulty": 4,
+  "checkpoints": null,
+  "moreChecks": null,
+  "funnel": null,
+  "classification": {
+    "starters": 4,
+    "finishers": [
+      {
+        "entry": "beta-cli-bolt-coder-small-default-bcc71e3b",
+        "driver": "bolt/coder-small",
+        "car": "beta-cli",
+        "map": "default",
+        "configHash": "sha256:bcc71e3b8ecd599f67c91fcd0003b560832a9308b499a1efb947c4598bb00805",
+        "lapSeconds": 41.0,
+        "costUsd": 0.0054
+      },
+      {
+        "entry": "beta-cli-acme-coder-large-high-bcc71e3b",
+        "driver": "acme/coder-large",
+        "car": "beta-cli",
+        "map": "high",
+        "configHash": "sha256:bcc71e3b8ecd599f67c91fcd0003b560832a9308b499a1efb947c4598bb00805",
+        "lapSeconds": 50.0,
+        "costUsd": 0.0038
+      },
+      {
+        "entry": "alpha-cli-acme-coder-large-high-b92cb57c",
+        "driver": "acme/coder-large",
+        "car": "alpha-cli",
+        "map": "high",
+        "configHash": "sha256:b92cb57c0dd7eb5b9c3656c03379356f773ed490c260a6d7a48be79af95316f5",
+        "lapSeconds": 60.0,
+        "costUsd": 0.0038
+      }
+    ],
+    "retired": 1,
+    "retirements": null
+  }
+}

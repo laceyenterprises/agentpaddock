@@ -1,0 +1,119 @@
+{
+  "schema": "paddock-site-race/v1",
+  "generatedAt": "2026-01-06",
+  "state": "live",
+  "basis": {
+    "counts": "funnel: every counted run recording checks; classification: each entry's first counted result",
+    "trust": [
+      "reproduced",
+      "paddock-run"
+    ],
+    "documents": [
+      "2026-01-05-bench"
+    ],
+    "races": "local tasks at the version their task.toml names",
+    "calendar": "races with at least 10 counted runs",
+    "calendarRaces": 2
+  },
+  "id": "hard-review-alpha",
+  "name": "Alpha circuit",
+  "title": "Synthetic review race",
+  "challenge": "hard-review",
+  "version": 2,
+  "calendar": true,
+  "n": 14,
+  "k": 7,
+  "rate": 0.5,
+  "lo": 0.2679920230881164,
+  "hi": 0.7320079769118836,
+  "difficulty": 4,
+  "checkpoints": [
+    "Read the code",
+    "Right verdict"
+  ],
+  "moreChecks": 3,
+  "funnel": {
+    "runs": 13,
+    "all": [
+      13,
+      11,
+      8,
+      6
+    ],
+    "byCar": {
+      "alpha-cli": [
+        8,
+        7,
+        5,
+        3
+      ],
+      "beta-cli": [
+        5,
+        4,
+        3,
+        3
+      ]
+    },
+    "byDriver": {
+      "acme/coder-large": [
+        8,
+        7,
+        5,
+        3
+      ],
+      "bolt/coder-small": [
+        3,
+        2,
+        2,
+        2
+      ],
+      "local/coder-tiny": [
+        2,
+        2,
+        1,
+        1
+      ]
+    }
+  },
+  "classification": {
+    "starters": 5,
+    "finishers": [
+      {
+        "entry": "beta-cli-acme-coder-large-high-bcc71e3b",
+        "driver": "acme/coder-large",
+        "car": "beta-cli",
+        "map": "high",
+        "configHash": "sha256:bcc71e3b8ecd599f67c91fcd0003b560832a9308b499a1efb947c4598bb00805",
+        "lapSeconds": 80.0,
+        "costUsd": 0.0038
+      },
+      {
+        "entry": "alpha-cli-acme-coder-large-high-b92cb57c",
+        "driver": "acme/coder-large",
+        "car": "alpha-cli",
+        "map": "high",
+        "configHash": "sha256:b92cb57c0dd7eb5b9c3656c03379356f773ed490c260a6d7a48be79af95316f5",
+        "lapSeconds": 100.0,
+        "costUsd": 0.0038
+      }
+    ],
+    "retired": 3,
+    "retirements": {
+      "checkpoints": [
+        {
+          "checkpoint": 1,
+          "label": "Read the code",
+          "runs": 1
+        },
+        {
+          "checkpoint": 2,
+          "label": "Right verdict",
+          "runs": 0
+        }
+      ],
+      "undisclosed": 2,
+      "unclassified": 0,
+      "unrecorded": 0
+    }
+  }
+}

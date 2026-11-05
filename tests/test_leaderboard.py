@@ -1078,9 +1078,7 @@ def test_entry_livery_uses_supplied_root(tmp_path):
         json.dumps({"color": {"car-fixture": "#123456"}})
     )
     entry = _community_entry()
-    entry["tires"] = json.loads(
-        (lb.MODULE_ROOT / "locks/codex.lock.json").read_text()
-    )
+    entry["tires"] = json.loads((lb.MODULE_ROOT / "locks/codex.lock.json").read_text())
     entry["livery"]["colour"] = "car-fixture"
     assert lb.validate_entry(entry, root=tmp_path) == []
     entry["livery"]["colour"] = "car-codex"
@@ -1441,15 +1439,11 @@ def test_track_cli_preserves_first_infographic_mapping(
         )
     assert lb.main(["--results", str(results), "validate-track"]) == 1
     errors = capsys.readouterr().err.splitlines()
-    assert [
-        error for error in errors if "conflicting infographic ids" in error
-    ] == [
+    assert [error for error in errors if "conflicting infographic ids" in error] == [
         "b-conflict: challenge has conflicting infographic ids",
         "d-conflict: challenge has conflicting infographic ids",
     ]
-    assert [
-        error for error in errors if "must reuse its infographic id" in error
-    ] == [
+    assert [error for error in errors if "must reuse its infographic id" in error] == [
         "b-conflict: track: existing challenge must reuse its infographic id",
         "d-conflict: track: existing challenge must reuse its infographic id",
     ]
@@ -1687,3 +1681,179 @@ def test_track_difficulty_minimum_uses_only_counted_runs(community_track):
     assert lb.track_facts(community_track, loaded)["live"]["difficulty"] is None
     loaded.records[0]["excludedBecause"] = None
     assert lb.track_facts(community_track, loaded)["live"]["difficulty"] == 1
+
+
+# ---------------------------------------------------------------- PDW-03 helpers
+
+
+def _bench_document(**source):
+    descriptor = {"harness": "alpha-cli", "runner": lb.PADDOCK_BENCH_RUNNER}
+    key = lb.config_hash(descriptor)
+    return {
+        "source": {"kind": "import", **source},
+        "harness_configs": {key: descriptor},
+        "records": [{"task": "t"}],
+    }
+
+
+def test_paddock_bench_is_read_from_provenance_not_the_filename():
+    assert lb.paddock_bench(_bench_document())
+    assert not lb.paddock_bench(_bench_document(fork=_fork_pin()))
+    other = _bench_document()
+    for descriptor in other["harness_configs"].values():
+        descriptor["runner"] = "somewhere-else"
+    assert not lb.paddock_bench(other)
+    pinned = _bench_document()
+    pinned["records"].append({"track": {}})
+    assert not lb.paddock_bench(pinned)
+    assert not lb.paddock_bench({**_bench_document(), "harness_configs": {}})
+    # The committed eval-bench export is the paddock's own bench.
+    loaded = lb.load_results()
+    bench = loaded.documents["2026-10-29-eval-bench.json.gz"]
+    assert lb.paddock_bench(bench)
+    assert lb.document_trust("anything.json", bench, {}) == (
+        "paddock-run",
+        "paddock-bench",
+    )
+
+
+def test_document_trust_defaults_and_trust_json_overrides():
+    bench, fork = _bench_document(), _bench_document(fork=_fork_pin())
+    assert lb.document_trust("b.json", bench, {}) == ("paddock-run", "paddock-bench")
+    assert lb.document_trust("f.json", fork, {}) == ("self-reported", "default")
+    signed = {
+        "level": "reproduced",
+        "evidence": ["https://example.com/evidence"],
+        "sign_off": "maintainer",
+    }
+    trust = {
+        "schema": "paddock-trust/v1",
+        "documents": {
+            "b.json": {"level": "self-reported", "evidence": [], "sign_off": None},
+            "f.json": signed,
+        },
+    }
+    assert lb.document_trust("b.json", bench, trust) == ("self-reported", "trust.json")
+    assert lb.document_trust("f.json", fork, trust) == ("reproduced", "trust.json")
+    assert lb.TRUSTED_LEVELS == ("reproduced", "paddock-run")
+
+
+def _first_record(run_id, attempt, verdict="passed", **changes):
+    record = copy.deepcopy(lb.load_results(FIXTURE).records[0])
+    record.update(run_id=run_id, attempt=attempt, verdict=verdict, **changes)
+    return record
+
+
+def test_first_results_take_the_earliest_document_then_the_lowest_attempt():
+    documents = {
+        "2026-01-05-later.json": {
+            "records": [_first_record("later-1", 1, "passed")],
+        },
+        "2026-01-04-earlier.json": {
+            "records": [
+                _first_record("earlier-3", 3, "passed"),
+                _first_record("earlier-null", None, "passed"),
+                _first_record(
+                    "earlier-infra", 1, "error", excludedBecause="infra:error"
+                ),
+                _first_record("earlier-2", 2, "failed"),
+                _first_record("other-task", 9, "passed", task="coding-beta"),
+            ],
+        },
+    }
+    firsts = lb.first_results(documents)
+    assert [r["run_id"] for r in firsts] == ["earlier-2", "other-task"]
+    # A change of engine map is a different identity.
+    documents["2026-01-05-later.json"]["records"][0]["model"]["reasoning"] = "high"
+    assert {r["run_id"] for r in lb.first_results(documents)} == {
+        "earlier-2",
+        "other-task",
+        "later-1",
+    }
+
+
+def test_standing_key_is_the_board_order_and_places_share_ties():
+    records = lb.load_results(FIXTURE).records
+    for board in lb.boards(records):
+        assert board["rows"] == sorted(board["rows"], key=lb.standing_key)
+    rows = [
+        {"key": (str(i),), "passed": k, "n": n, "rate": k / n if n else None}
+        for i, (k, n) in enumerate([(2, 2), (4, 4), (3, 4), (6, 8), (1, 4), (0, 0)])
+    ]
+    for row in rows:
+        row["ci"] = lb.wilson(row["passed"], row["n"])
+    rows.sort(key=lb.standing_key)
+    assert [(r["passed"], r["n"]) for r in rows] == [
+        (4, 4),
+        (2, 2),
+        (6, 8),
+        (3, 4),
+        (1, 4),
+        (0, 0),
+    ]
+    assert lb.places(rows) == [
+        (1, True),
+        (1, True),
+        (3, True),
+        (3, True),
+        (5, False),
+        (None, False),
+    ]
+    with pytest.raises(ValueError):
+        lb.places(list(reversed(rows[:5])))
+
+
+def test_cost_per_run_needs_every_counted_run_priced():
+    records = copy.deepcopy(lb.load_results(FIXTURE).records[:3])
+    assert lb.cost_per_run(records) == {
+        "usd": 0.48,
+        "source": "published-rate",
+        "reason": None,
+    }
+    records[2]["cost"] = {"usd": None, "source": lb.UNKNOWN, "reason": "no_price"}
+    assert lb.cost_per_run(records)["usd"] is None
+    assert lb.cost_per_run([])["reason"] == "no_runs"
+
+
+def test_difficulty_bands_match_track_facts_edges():
+    assert lb.difficulty(9, 9) is None
+    assert [lb.difficulty(k, 10) for k in (10, 9, 8, 7, 6, 4, 3, 0)] == [
+        1,
+        1,
+        2,
+        3,
+        3,
+        4,
+        5,
+        5,
+    ]
+
+
+def test_docs_fact_checks_are_never_disclosed_by_name():
+    fact = {
+        "check": "fact:FACT_SENTINEL",
+        "label": "FACT_SENTINEL",
+        "disclose": "label",
+    }
+    assert lb.disclosure(fact) == "count"
+    assert lb.disclosure({**fact, "disclose": "hidden"}) == "hidden"
+    assert (
+        lb.disclosure({"check": "quality", "label": "Q", "disclose": "label"})
+        == "label"
+    )
+    checkpoints = [
+        {"check": "quality", "label": "Quality", "disclose": "label"},
+        fact,
+    ]
+    record = {
+        "checks": [
+            {"name": "quality", "ok": True, "required": True},
+            {"name": "fact:FACT_SENTINEL", "ok": False, "required": True},
+        ]
+    }
+    assert lb.retirement(record, checkpoints) == 1
+    assert lb.retirement({}, checkpoints) is None
+    summary = lb.checkpoint_summary(checkpoints, [record])
+    assert "FACT_SENTINEL" not in json.dumps(summary)
+    assert summary["more_checks"] == 1
+    assert summary["retirements"] == {"undisclosed": 1}

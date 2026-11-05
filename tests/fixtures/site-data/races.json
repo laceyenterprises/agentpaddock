@@ -1,0 +1,91 @@
+{
+  "schema": "paddock-site-races/v1",
+  "generatedAt": "2026-01-06",
+  "state": "live",
+  "basis": {
+    "counts": "every counted run on each race",
+    "trust": [
+      "reproduced",
+      "paddock-run"
+    ],
+    "documents": [
+      "2026-01-05-bench"
+    ],
+    "races": "local tasks at the version their task.toml names",
+    "calendar": "races with at least 10 counted runs",
+    "calendarRaces": 2
+  },
+  "races": [
+    {
+      "id": "docs-beta",
+      "name": "Beta",
+      "title": "Synthetic docs race",
+      "challenge": "docs",
+      "version": 1,
+      "calendar": true,
+      "n": 12,
+      "k": 7,
+      "rate": 0.5833333333333334,
+      "lo": 0.31951131084242423,
+      "hi": 0.8067396875653928,
+      "entries": 4,
+      "medianLapSeconds": 46.0,
+      "medianCostUsd": 0.0051,
+      "pricedRuns": 12,
+      "difficulty": 4,
+      "stages": null
+    },
+    {
+      "id": "fix-gamma",
+      "name": "Gamma",
+      "title": "Synthetic fix race",
+      "challenge": "fix",
+      "version": 1,
+      "calendar": false,
+      "n": 3,
+      "k": 2,
+      "rate": 0.6666666666666666,
+      "lo": 0.2076595988078242,
+      "hi": 0.9385080559790691,
+      "entries": 3,
+      "medianLapSeconds": 20.5,
+      "medianCostUsd": 0.0038,
+      "pricedRuns": 3,
+      "difficulty": null,
+      "stages": null
+    },
+    {
+      "id": "hard-review-alpha",
+      "name": "Alpha circuit",
+      "title": "Synthetic review race",
+      "challenge": "hard-review",
+      "version": 2,
+      "calendar": true,
+      "n": 14,
+      "k": 7,
+      "rate": 0.5,
+      "lo": 0.2679920230881164,
+      "hi": 0.7320079769118836,
+      "entries": 5,
+      "medianLapSeconds": 195.0,
+      "medianCostUsd": 0.0051,
+      "pricedRuns": 12,
+      "difficulty": 4,
+      "stages": {
+        "checkpoints": [
+          {
+            "label": "Read the code",
+            "recorded": 13,
+            "clearRate": 0.8461538461538461
+          },
+          {
+            "label": "Right verdict",
+            "recorded": 13,
+            "clearRate": 0.9230769230769231
+          }
+        ],
+        "moreChecks": 3
+      }
+    }
+  ]
+}

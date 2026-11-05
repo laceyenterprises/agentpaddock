@@ -1,0 +1,86 @@
+{
+  "schema": "paddock-site-entry/v1",
+  "generatedAt": "2026-01-06",
+  "state": "live",
+  "basis": {
+    "counts": "the entry's first counted result on each race it ran",
+    "trust": [
+      "reproduced",
+      "paddock-run"
+    ],
+    "documents": [
+      "2026-01-05-bench"
+    ],
+    "races": "local tasks at the version their task.toml names",
+    "calendar": "races with at least 10 counted runs",
+    "calendarRaces": 2
+  },
+  "id": "beta-cli-bolt-coder-small-default-bcc71e3b",
+  "identity": {
+    "driver": "bolt/coder-small",
+    "car": "beta-cli",
+    "map": "default",
+    "configHash": "sha256:bcc71e3b8ecd599f67c91fcd0003b560832a9308b499a1efb947c4598bb00805"
+  },
+  "trust": "paddock-run",
+  "totals": {
+    "k": 1,
+    "n": 2,
+    "rate": 0.5
+  },
+  "range": {
+    "lo": 0.09453120463920084,
+    "hi": 0.9054687953607992
+  },
+  "place": 3,
+  "tie": false,
+  "fullCalendar": true,
+  "fuel": {
+    "costPerPass": 0.0108,
+    "costSource": "provider-invoice-reconciled",
+    "tokensPerPass": 10200.0
+  },
+  "medianLapSeconds": 120.5,
+  "challenges": {
+    "docs": {
+      "k": 1,
+      "n": 1
+    },
+    "hard-review": {
+      "k": 0,
+      "n": 1
+    }
+  },
+  "races": [
+    {
+      "race": "docs-beta",
+      "name": "Beta",
+      "challenge": "docs",
+      "version": 1,
+      "calendar": true,
+      "passed": true,
+      "lapSeconds": 41.0,
+      "costUsd": 0.0054
+    },
+    {
+      "race": "fix-gamma",
+      "name": "Gamma",
+      "challenge": "fix",
+      "version": 1,
+      "calendar": false,
+      "passed": false,
+      "lapSeconds": 21.0,
+      "costUsd": 0.0054
+    },
+    {
+      "race": "hard-review-alpha",
+      "name": "Alpha circuit",
+      "challenge": "hard-review",
+      "version": 2,
+      "calendar": true,
+      "passed": false,
+      "lapSeconds": 200.0,
+      "costUsd": 0.0054
+    }
+  ]
+}

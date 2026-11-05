@@ -7,6 +7,8 @@ page shares:
 - ``layout``: the head, header, nav, menu panel and footer, and the stylesheet.
 - ``glyphs``: the inlined glyph sprite, ``<use>`` helpers and the race-type roundel.
 - ``placeholder``: the short page a route shows until its page ticket lands.
+- ``data``: the site data layer (PDW-03), ``data/*.json`` computed from
+  ``results/`` through ``scripts/leaderboard.py``, trust filter included.
 
 It is named ``paddock_site`` rather than ``site``: ``site`` is a standard
 library module (imported at interpreter start, so a ``site`` package here
