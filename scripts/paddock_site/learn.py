@@ -636,7 +636,7 @@ def stepper_html(stepper: Mapping[str, Any]) -> str:
         f'<p class="track-hint" id="track-hint">{esc(stepper["hint"])}</p></div>'
     )
     panels = "".join(
-        f'<div class="sector" data-sector-panel="{i}">'
+        f'<div class="sector" data-sector-panel="{i}"{"" if i == 0 else " hidden"}>'
         f'<div class="sector-head">{glyphs.icon(glyph, "sector-glyph")}'
         f'<div><span class="lab-eyebrow">Sector {i + 1} of 4</span>'
         f"<h3>{esc(title)}</h3></div></div>"
@@ -877,7 +877,7 @@ def flags_html() -> str:
         for i, (name, glyph, _counted, _body) in enumerate(FLAGS)
     )
     panels = "".join(
-        f'<div class="flag-says" data-flag-panel="{i}">'
+        f'<div class="flag-says" data-flag-panel="{i}"{"" if i == 0 else " hidden"}>'
         f"<b>{esc(name)} · {esc(counted)}</b><p>{esc(body)}</p></div>"
         for i, (name, _glyph, counted, body) in enumerate(FLAGS)
     )
@@ -1108,6 +1108,7 @@ SCRIPT = r"""(function () {
   var cars = view.cars;
   if (cars.sets.length) {
     var set = cars.start;
+    var renderedSet = set;
     var heldCar = null;
     var carIndex = function () {
       var current = cars.sets[set];
@@ -1126,29 +1127,37 @@ SCRIPT = r"""(function () {
       var car = current.cars[index];
       press('[data-set]', function (el) { return Number(el.getAttribute('data-set')) === set; });
       var row = byId('car-cars');
-      row.textContent = '';
       var bars = byId('car-bars');
-      bars.textContent = '';
-      current.cars.forEach(function (item, i) {
-        var button = element('button', 'car');
-        button.type = 'button';
-        button.setAttribute('aria-pressed', i === index ? 'true' : 'false');
-        var livery = element('span', 'livery');
-        livery.style.background = item.livery;
-        button.appendChild(livery);
-        button.appendChild(document.createTextNode(item.car));
-        button.addEventListener('click', function () { heldCar = item.car; showCars(); });
-        row.appendChild(button);
-        var bar = element('div', 'car-bar' + (i === index ? ' on' : ''));
-        bar.appendChild(element('span', 'car-bar-name', item.car));
-        var track = element('span', 'car-bar-track');
-        var fill = element('span');
-        fill.style.width = item.w;
-        fill.style.background = i === index ? item.livery : 'var(--viz-other)';
-        track.appendChild(fill);
-        bar.appendChild(track);
-        bar.appendChild(element('span', 'car-bar-pct', item.pct));
-        bars.appendChild(bar);
+      // Keep the focused car button when only the selection changes.
+      if (renderedSet !== set) {
+        row.textContent = '';
+        bars.textContent = '';
+        current.cars.forEach(function (item, i) {
+          var button = element('button', 'car');
+          button.type = 'button';
+          button.setAttribute('data-car', String(i));
+          var livery = element('span', 'livery');
+          livery.style.background = item.livery;
+          button.appendChild(livery);
+          button.appendChild(document.createTextNode(item.car));
+          row.appendChild(button);
+          var bar = element('div', 'car-bar');
+          bar.appendChild(element('span', 'car-bar-name', item.car));
+          var track = element('span', 'car-bar-track');
+          var fill = element('span');
+          fill.style.width = item.w;
+          track.appendChild(fill);
+          bar.appendChild(track);
+          bar.appendChild(element('span', 'car-bar-pct', item.pct));
+          bars.appendChild(bar);
+        });
+        renderedSet = set;
+      }
+      press('[data-car]', function (el) { return Number(el.getAttribute('data-car')) === index; });
+      all('.car-bar', bars).forEach(function (bar, i) {
+        bar.classList.toggle('on', i === index);
+        bar.querySelector('.car-bar-track > span').style.background =
+          i === index ? current.cars[i].livery : 'var(--viz-other)';
       });
       cue(row.parentNode);
       var fell = heldCar && current.fell[heldCar];
@@ -1168,11 +1177,12 @@ SCRIPT = r"""(function () {
         reveal(chip);
       });
     });
-    all('[data-car]').forEach(function (button) {
-      button.addEventListener('click', function () {
-        heldCar = cars.sets[set].cars[Number(button.getAttribute('data-car'))].car;
-        showCars();
-      });
+    byId('car-cars').addEventListener('click', function (event) {
+      var button = event.target.closest && event.target.closest('[data-car]');
+      if (!button) return;
+      heldCar = cars.sets[set].cars[Number(button.getAttribute('data-car'))].car;
+      showCars();
+      reveal(button);
     });
   }
 

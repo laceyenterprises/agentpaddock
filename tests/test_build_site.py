@@ -3240,6 +3240,11 @@ def test_the_sector_stepper_and_flags_spell_out_dnf_at_first_use():
     assert "DNF, short for did not finish: it missed a check" in page
     # Four sectors, each with a jump target at least 44 px across.
     assert page.count('data-sector-panel="') == 4
+    for panel, count in (("sector", 4), ("flag", 6)):
+        panels = re.findall(rf'<div[^>]*data-{panel}-panel="\d+"[^>]*>', page)
+        assert len(panels) == count
+        # First paint matches the initial script state, before JS loads.
+        assert [" hidden" in tag for tag in panels] == [False] + [True] * (count - 1)
     assert re.findall(r'class="hit" cx="\d+" cy="\d+" r="(\d+)"', page) == ["22"] * 4
     # After sector 4 a tap starts another lap.
     assert "(sector + 1) % stepper.points.length" in learn.SCRIPT
