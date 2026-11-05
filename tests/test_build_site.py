@@ -667,6 +667,9 @@ PRODUCT_NAME_ALLOWLIST = re.compile(
     r'|"paddock-site-[a-z]+/v\d+"'  # site data schema ids (PDW-03)
     r'|"paddock-(?:run|bench)"'  # the trust level and its origin, as JSON values
     r"|>Independent and open source: about the paddock<"  # the results note (PDW-07)
+    r"|</svg>Paddock run</span>"  # the trust badge's label (PDW-09)
+    r"|(?s:<pre\b[^>]*><code>.*?</code></pre>)"  # commands quoted verbatim (PDW-09)
+    r"|<code>[^<]*</code>"  # inline code: paths and commands
 )
 
 
@@ -2642,3 +2645,211 @@ def test_short_names_spell_out_acronyms(task_id, suite, card, name):
 def test_every_local_task_has_a_short_name():
     for path in (Path(__file__).resolve().parents[1] / "tasks").glob("*/task.toml"):
         assert path.parent.name in site_names.SHORT_NAMES, path.parent.name
+# ---------------------------------------------------------------- explainer pages (PDW-09)
+
+from paddock_site import community as site_community  # noqa: E402
+from paddock_site import contact as site_contact  # noqa: E402
+from paddock_site import dictionary as site_dictionary  # noqa: E402
+from paddock_site import pit_lane as site_pit_lane  # noqa: E402
+from paddock_site import rulebook as site_rulebook  # noqa: E402
+
+REPO = Path(__file__).resolve().parents[1]
+CODE_BOX = re.compile(
+    r'<div class="code"><pre[^>]*><code>(.*?)</code></pre>', re.DOTALL
+)
+
+
+def _main(page: str) -> str:
+    return _between(page, '<main class="wrap">', "</main>")
+
+
+def _indented_in(code: str, source: str) -> bool:
+    """``code`` appears in ``source`` line for line, at one common indent."""
+    lines = code.split("\n")
+    source_lines = source.splitlines()
+    for start, line in enumerate(source_lines):
+        indent = line[: len(line) - len(line.lstrip())]
+        if line != indent + lines[0]:
+            continue
+        window = source_lines[start : start + len(lines)]
+        if window == [(indent + x) if x else x.rstrip() for x in lines] or window == [
+            indent + x for x in lines
+        ]:
+            return True
+    return False
+
+
+def test_pit_lane_commands_equal_the_readme_and_contributing_text():
+    page = build_site.build(FIXTURE)["race-it-yourself/index.html"]
+    boxes = [html.unescape(code) for code in CODE_BOX.findall(page)]
+    readme = (REPO / "README.md").read_text(encoding="utf-8")
+    contributing = (REPO / "CONTRIBUTING.md").read_text(encoding="utf-8")
+    runners = (REPO / "design" / "guide" / "race-it-yourself.md").read_text("utf-8")
+    # Clone and install, the standalone config, the run, from-run, validate.
+    assert len(boxes) == 5
+    install, config, run, from_run, validate = boxes
+    assert install.startswith(
+        "git clone https://github.com/laceyenterprises/agentpaddock"
+    )
+    assert _indented_in(install, readme.split("## Quick start", 1)[1])
+    # The README's runner section lives in the guide the README links to.
+    assert "design/guide/race-it-yourself.md#runners-pdk-01" in readme
+    assert config.startswith('runner = "standalone"') and "[standalone]" in config
+    assert _indented_in(config, runners)
+    bundle = contributing.split("## Submit results: a run bundle", 1)[1].split(
+        "\n## ", 1
+    )[0]
+    assert "python3 -m gym.cli run" in run and _indented_in(run, bundle)
+    assert "scripts/leaderboard.py from-run" in from_run and _indented_in(
+        from_run, bundle
+    )
+    assert "leaderboard.py validate" in validate and _indented_in(validate, bundle)
+    # Six steps, one copy button per code box, and the fallback in the script.
+    main = _main(page)
+    assert main.count('<li class="step"') == 6
+    assert main.count('class="copy"') == len(boxes)
+    script = build_site.build(FIXTURE)["paddock.js"]
+    assert "Select and copy" in script and "execCommand('copy')" in script
+    # A tap on the card advances, except inside a code box.
+    assert "closest('.code, a, button, summary')" in script
+
+
+def test_pit_lane_refuses_a_missing_source_block(tmp_path):
+    (tmp_path / "README.md").write_text("# Title\n\n## Quick start\n\nNo code.\n")
+    with pytest.raises(site_pit_lane.SourceError):
+        site_pit_lane.command(site_pit_lane.COMMANDS["install"], tmp_path)
+    text = "## A\n\n1. Step:\n\n   ```bash\n   one \\\n     two\n   ```\n\n## B\n\n```\nthree\n```\n"
+    assert site_pit_lane.fenced_blocks(text, "## A") == ["one \\\n  two"]
+
+
+def test_every_dictionary_term_has_a_sprite_symbol_and_the_index_is_covered():
+    index = json.loads(
+        (REPO / "design" / "glyphs" / "index.json").read_text(encoding="utf-8")
+    )
+    terms = site_dictionary.terms(54)
+    assert [t.glyph for t in terms] == [
+        item["id"]
+        for item in index
+        if item["group"] not in site_dictionary.SKIPPED_GROUPS
+    ]
+    assert {t.glyph for t in terms} <= PUBLISHED_GLYPHS
+    page = build_site.build(FIXTURE)["dictionary/index.html"]
+    main = _main(page)
+    for term in terms:
+        card = _between(main, f'id="term-{term.glyph}">', "</li>")
+        assert f'<use href="#{term.glyph}"/>' in card, term.glyph
+        assert f"<h3>{html.escape(term.term)}</h3>" in card, term.glyph
+    # The contact glyph is a term of its own, and it leads to the contact page.
+    pit_board = _between(main, 'id="term-pit-board">', "</li>")
+    assert 'href="../contact/index.html"' in pit_board
+    assert "Where you meet it: Contact and about" in pit_board
+    # Search and group chips ride on the script; the content reads without it.
+    assert 'type="search"' in main and 'data-chips="group"' in main
+    assert "Race calendar" in main
+
+
+def test_dictionary_calendar_count_comes_from_the_site_data():
+    assert "All 7 races" in site_dictionary.terms(7)[15].meaning
+    assert not re.search(r"\d", site_dictionary.terms(0)[15].meaning)
+
+
+def test_every_rule_restates_a_source_section_that_exists():
+    rules = site_rulebook.rules(54)
+    assert len(rules) == 16
+    assert {r.glyph for r in rules} <= PUBLISHED_GLYPHS
+    methodology = build_site.build(FIXTURE)["methodology.html"]
+    for rule in rules:
+        source = rule.source
+        if source.document == site_rulebook.METHODOLOGY:
+            assert f"<h3>{source.section}</h3>" in methodology, rule.title
+            continue
+        text = (REPO / source.document).read_text(encoding="utf-8")
+        headings = {
+            line.lstrip("#").strip()
+            for line in text.splitlines()
+            if line.startswith("#")
+        }
+        assert source.section in headings, (rule.title, source)
+    main = _main(build_site.build(FIXTURE)["rulebook/index.html"])
+    assert main.count('<details class="rule">') == 16
+    assert main.count('<p class="from">Restates <a href=') == 16
+    assert "contributing-md" not in main
+    assert "CONTRIBUTING.md#submit-results-a-run-bundle" in main
+    assert 'href="../methodology.html"' in main
+
+
+def test_contact_page_has_the_pit_board_the_mailto_and_the_challenge_subject():
+    page = build_site.build(FIXTURE)["contact/index.html"]
+    main = _main(page)
+    hero = _between(main, '<div class="page-hero explain-hero">', "</div>")
+    assert '<use href="#pit-board"/>' in hero
+    assert '<use href="#team-radio"/>' not in main
+    assert 'href="mailto:hello@agentpaddock.ai"' in main
+    assert 'href="mailto:hello@agentpaddock.ai?subject=Result%20challenge"' in main
+    assert 'href="https://github.com/laceyenterprises/agentpaddock/issues"' in main
+    assert "Lacey Enterprises runs it." in main
+    for title in (
+        "Ask about the program",
+        "Challenge a result",
+        "Suggest a race or an entry",
+        "Race it yourself",
+    ):
+        assert f"<h3>{title}</h3>" in main, title
+    assert 'id="about"' in main
+    # The footer's two lines are on this page too, and it links Contact and about.
+    footer = _between(page, '<footer class="footer">', "</footer>")
+    assert layout.FOOTER_DISCLAIMER in footer and layout.FOOTER_INDEPENDENCE in footer
+    assert ">Contact and about</a>" in footer
+
+
+def test_community_shows_examples_until_real_records_exist(tmp_path):
+    results = _site_tree(tmp_path)
+    files = build_site.build(results)
+    main = _main(files["community/index.html"])
+    # The fork document is self-reported: a real card with its badge, no empty state.
+    assert "gamma-cli · bolt/coder-small" in main
+    assert "The board is empty for now" not in main
+    assert '<span class="badge badge-self badge-sm">' in main
+    community = json.loads(files["data/community.json"])
+    real = [e for e in community["entries"] if e["trust"] != "paddock-run"]
+    assert main.count('class="tile result"') == len(real) + 1  # board + fork tab
+    for entry in real:
+        assert f"<b>{entry['k']} of {entry['n']}</b>" in main
+    # Without a community record: the honest empty state and examples only.
+    data = {
+        "data/community.json": {
+            **community,
+            "documents": [
+                d for d in community["documents"] if d["trust"] == "paddock-run"
+            ],
+            "entries": [e for e in community["entries"] if e["trust"] == "paddock-run"],
+        }
+    }
+    route = next(r for r in build_site.ROUTES if r.path == "community/")
+    empty = site_community.body(route, data)
+    assert "The board is empty for now" in empty
+    assert 'class="tile result"' not in empty
+    assert empty.count('<span class="tag-example">EXAMPLE</span>') == 3
+    assert 'href="../race-it-yourself/index.html"' in empty
+    # Tabs and the trust ladder with every badge.
+    for key in ("entries", "tracks", "forks"):
+        assert f'role="tabpanel" id="tab-{key}"' in empty
+    ladder = _between(empty, '<ol class="ladder">', "</ol>")
+    assert [label for label, _c, _m in site_community.kit.TRUST.values()] == [
+        "Self-reported",
+        "Re-graded",
+        "Reproduced",
+        "Paddock run",
+    ]
+    for label, _css, _meaning in site_community.kit.TRUST.values():
+        assert f"</svg>{label}</span>" in ladder
+
+
+def test_explainer_page_numbers_come_from_the_site_data(tmp_path):
+    files = build_site.build(_site_tree(tmp_path))
+    races = json.loads(files["data/races.json"])["basis"]["calendarRaces"]
+    assert races > 0
+    assert f"a fixed calendar of {races} tasks" in files["contact/index.html"]
+    assert f"{races} races is a small sample." in files["rulebook/index.html"]
+    assert f"All {races} races, grouped by challenge" in files["dictionary/index.html"]
+    assert site_contact.CHALLENGE_SUBJECT == "Result challenge"

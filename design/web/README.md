@@ -71,6 +71,9 @@ which holds the bar's items and the panel-only ones, each with its glyph. A
 route whose ticket has not landed shows a short placeholder that points at
 today's leaderboard; the ticket replaces it by registering its builder in
 `scripts/build_site.py`.
+A builder takes the loaded results and the parsed site data (`data/*.json`,
+keyed by output path, PDW-03), so a page reads its numbers from the same files
+the build writes.
 
 | Route | Output file | Nav | Glyph | Built by today | Ticket |
 |---|---|---|---|---|---|
@@ -80,13 +83,18 @@ today's leaderboard; the ticket replaces it by registering its builder in
 | `/standings/` | `standings/index.html` | bar | `timing-tower` | the timing tower | PDW-07 |
 | `/garage/` | `garage/index.html` | bar | `setup-sheet` | placeholder | PDW-08 |
 | `/pit-wall/` | `pit-wall/index.html` | bar | `pit-wall` | placeholder | PDW-08 |
-| `/community/` | `community/index.html` | panel | `entry` | placeholder | PDW-09 |
+| `/community/` | `community/index.html` | panel | `entry` | `paddock_site/community.py` | PDW-09 |
 | `/drivers/` | `drivers/index.html` | panel | `driver` | placeholder | PDW-08 |
 | `/entries/` | `entries/index.html` | panel | `podium` | every entry's season, listed | PDW-07 |
 | `/rulebook/` | `rulebook/index.html` | panel | `rulebook` | placeholder | PDW-09 |
 | `/dictionary/` | `dictionary/index.html` | panel | `briefing` | placeholder | PDW-09 |
 | `/race-it-yourself/` | `race-it-yourself/index.html` | panel | `pit-lane` | placeholder | PDW-09 |
 | `/contact/` | `contact/index.html` | panel | `pit-board` | placeholder | PDW-09 |
+| `/entries/` | `entries/index.html` | panel | `podium` | placeholder | PDW-07 |
+| `/rulebook/` | `rulebook/index.html` | panel | `rulebook` | `paddock_site/rulebook.py` | PDW-09 |
+| `/dictionary/` | `dictionary/index.html` | panel | `briefing` | `paddock_site/dictionary.py` | PDW-09 |
+| `/race-it-yourself/` | `race-it-yourself/index.html` | panel | `pit-lane` | `paddock_site/pit_lane.py` | PDW-09 |
+| `/contact/` | `contact/index.html` | panel | `pit-board` | `paddock_site/contact.py` | PDW-09 |
 | `/matrix.html` | `matrix.html` | footer | none | today's harness × model matrix | kept until a PDW page replaces it |
 | `/tasks.html` | `tasks.html` | footer | none | today's task list | kept until a PDW page replaces it |
 | `/changelog.html` | `changelog.html` | footer | none | today's grading changelog | kept until a PDW page replaces it |
@@ -106,6 +114,28 @@ this prototype, not the published set, so they appear only inside a roundel.
 
 These design files are reference source: the build never reads them, ships
 them or loads their runtime.
+
+## The explainer pages (PDW-09)
+
+Community, Race it yourself, Rulebook, Dictionary and Contact share
+`scripts/paddock_site/kit.py`: the hero, the filter chips, the trust badge, and
+the one stylesheet block and script block they add. Each reads in full without
+JavaScript; the script adds the tabs, the filters, the step pager and the copy
+buttons.
+
+- **Race it yourself** reads every command at build time from the fenced block
+  it restates (`pit_lane.COMMANDS`): the README's quick start, the README's
+  runner section (`design/guide/race-it-yourself.md`) and the run-bundle
+  section of CONTRIBUTING.md. A moved block fails the build.
+- **Rulebook** cites the heading each rule restates; the tests check that every
+  cited heading exists.
+- **Dictionary** is generated from `design/glyphs/index.json`, one card per
+  glyph outside the `engine` group, with the prototype's visitor wording.
+- **Community** lists every entry in `data/community.json` below the paddock-run
+  level. Until one exists it shows the empty state and EXAMPLE cards only.
+- **Contact** uses the `pit-board` glyph, the `hello@agentpaddock.ai` mailto
+  (the challenge link pre-fills the subject "Result challenge") and the public
+  repository's issues.
 
 ## Site data (PDW-03)
 
