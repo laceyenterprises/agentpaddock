@@ -43,7 +43,7 @@ def slugs(provider_ids: Sequence[str]) -> dict[str, str]:
 
 def model(site: views.SiteData) -> list[dict[str, Any]]:
     """Featured drivers, best first, each with its placed entries in standings order."""
-    names = views.driver_names(entry["driver"] for entry in site.placed + site.partial)
+    names = site.driver_names
     placed: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
     for entry in site.placed:  # standings order: a driver's first entry is its best
         placed[entry["driver"]].append(entry)
@@ -138,6 +138,8 @@ def fuel_note(driver: Mapping[str, Any]) -> str:
     )
     if cheapest is best:
         return text + " That is also its best entry."
+    if best["costPerPass"] is None:
+        return text + " Its best entry has no pricing data to compare."
     return text + f" Its best entry costs {_fuel(best['costPerPass'])}."
 
 

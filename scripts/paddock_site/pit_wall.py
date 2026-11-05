@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 from . import glyphs, layout, views
+from .drivers import slugs
 from .routes import Route
 from .views import esc
 
@@ -41,7 +42,8 @@ def model(site: views.SiteData) -> dict[str, Any]:
         }
         for challenge, races in site.challenges()
     ]
-    names = views.driver_names(entry["driver"] for entry in site.placed + site.partial)
+    names = site.driver_names
+    page_slugs = slugs(list(dict.fromkeys(entry["driver"] for entry in site.placed)))
     rows = []
     for entry in site.placed:
         cells = []
@@ -53,7 +55,7 @@ def model(site: views.SiteData) -> dict[str, Any]:
                 "id": entry["id"],
                 "driver": entry["driver"],
                 "driverName": names[entry["driver"]],
-                "driverPage": f"drivers/{views.driver_slug(entry['driver'])}/index.html",
+                "driverPage": f"drivers/{page_slugs[entry['driver']]}/index.html",
                 "car": entry["car"],
                 "carName": views.car_name(entry["car"]),
                 "map": entry["map"],
@@ -309,18 +311,21 @@ SCRIPT = """(function () {
   var rows = Array.prototype.slice.call(body.rows);
   var heads = Array.prototype.slice.call(wall.querySelectorAll('thead th[aria-sort]'));
   var mode = wall.querySelector('[data-pitwall-mode]');
+  var sortedColumn = null, sortDirection = null;
   tools.hidden = false;
   function cell(row, column) { return row.querySelectorAll('td')[column]; }
   function value(row, column, dir) {
     var td = cell(row, column);
     if (td.hasAttribute('data-usd')) {
       var usd = td.getAttribute('data-usd');
-      return usd === '' ? Infinity : Number(usd);
+      return usd === '' ? (dir === 'asc' ? Infinity : -Infinity) : Number(usd);
     }
     if (!td.hasAttribute('data-k')) return dir === 'asc' ? Infinity : -Infinity;
     return Number(td.getAttribute('data-k')) / Number(td.getAttribute('data-n'));
   }
   function sort(column, dir) {
+    sortedColumn = column;
+    sortDirection = dir;
     rows.sort(function (a, b) {
       var x = value(a, column, dir), y = value(b, column, dir);
       if (x !== y) return dir === 'asc' ? x - y : y - x;
@@ -333,7 +338,10 @@ SCRIPT = """(function () {
   }
   heads.forEach(function (th, i) {
     var button = th.querySelector('button');
-    button.addEventListener('click', function () { sort(i, button.getAttribute('data-dir')); });
+    button.addEventListener('click', function () {
+      var dir = i === sortedColumn ? (sortDirection === 'asc' ? 'desc' : 'asc') : button.getAttribute('data-dir');
+      sort(i, dir);
+    });
   });
   Array.prototype.forEach.call(tools.querySelectorAll('[data-car]'), function (chip) {
     chip.addEventListener('click', function () {

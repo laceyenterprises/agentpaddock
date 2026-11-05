@@ -86,6 +86,14 @@ class SiteData:
         return list(self.standings["partial"])
 
     @property
+    def driver_names(self) -> dict[str, str]:
+        """Consistent labels across trusted and community entries."""
+        return driver_names(
+            entry["driver"]
+            for entry in self.placed + self.partial + list(self.community["entries"])
+        )
+
+    @property
     def calendar(self) -> list[Mapping[str, Any]]:
         return [race for race in self.races["races"] if race["calendar"]]
 

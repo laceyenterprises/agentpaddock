@@ -16,8 +16,9 @@ and one of six engine maps (provider default, low, medium, high, xhigh, max).
 - **Open but unraced**: "Nobody has raced this yet", linking to
   ``/race-it-yourself/``.
 
-The page renders the best placed entry; its script swaps the selection from a
-JSON block of the same numbers, so there is one template for every state.
+The page renders the best entry at a supported map; its script swaps the
+selection from a JSON block of the same numbers, so there is one template for
+every state.
 """
 
 from __future__ import annotations
@@ -114,7 +115,7 @@ def model(site: views.SiteData) -> dict[str, Any]:
             unverified.setdefault(combo, entry["trust"])
     raced = set(entries) | set(unverified)
     ids = [combo.split("|") for combo in sorted(raced)]
-    names = views.driver_names(driver for driver, _, _ in ids)
+    names = site.driver_names
     featured = list(dict.fromkeys(entry["driver"] for entry in site.placed))
     others = sorted(
         {driver for driver, _, _ in ids} - set(featured), key=lambda d: names[d].lower()
@@ -176,9 +177,10 @@ def model(site: views.SiteData) -> dict[str, Any]:
 def start(
     site: views.SiteData, drivers: Sequence[Mapping[str, Any]], cars: Sequence[str]
 ) -> list[str] | None:
-    """The selection the page opens on: the best entry on the board."""
+    """The best entry at a supported map, then an open community level."""
     for entry in site.placed + site.partial:
-        return [entry["driver"], entry["car"], entry["map"]]
+        if entry["map"] in LEVELS:
+            return [entry["driver"], entry["car"], entry["map"]]
     for driver in drivers:
         open_levels = [level for level, why in driver["levels"].items() if not why]
         if cars and open_levels:

@@ -3296,6 +3296,16 @@ def committed_pages():
     return _data_pages(lb.DEFAULT_RESULTS)
 
 
+@pytest.fixture
+def data_page_site():
+    return site_views.SiteData.parse(
+        {
+            "data/" + path.relative_to(SITE_GOLDEN).as_posix(): path.read_text("utf-8")
+            for path in SITE_GOLDEN.rglob("*.json")
+        }
+    )
+
+
 def _data_page_names(files) -> list[str]:
     return [
         name
@@ -3395,6 +3405,150 @@ def test_garage_offers_every_committed_driver_and_its_levels(committed_pages):
         assert raced["placed"] and raced["pct"] == site_views.pct(entry["rate"])
 
 
+@pytest.mark.parametrize("source", ["entries", "partial", "community", "none"])
+def test_garage_start_skips_unsupported_maps(data_page_site, source):
+    site = data_page_site
+    candidate = deepcopy(site.placed[-1])
+    for entry in site.placed + site.partial + site.community["entries"]:
+        entry["map"] = "ultra"
+    if source != "none":
+        candidate["map"] = "high"
+        if source == "community":
+            candidate["trust"] = "self-reported"
+            site.community["entries"].append(candidate)
+        else:
+            site.standings[source].append(candidate)
+    view = site_garage.model(site)
+    page = site_garage.body(site, "garage/index.html")
+    if source == "none":
+        assert view["start"] is None
+        assert "data-garage" not in page
+    else:
+        assert view["start"] == [candidate["driver"], candidate["car"], "high"]
+        assert 'data-map="high" aria-pressed="true"' in page
+        assert 'data-slot="map">high<' in page
+
+
+def test_driver_labels_include_community_name_collisions(data_page_site):
+    site = data_page_site
+    community = deepcopy(site.community["entries"][0])
+    community.update(driver="other/coder-large", trust="self-reported")
+    site.community["entries"].append(community)
+    name = "Coder Large · Acme"
+    garage = {d["id"]: d["name"] for d in site_garage.model(site)["drivers"]}
+    assert garage["other/coder-large"] == "Coder Large · Other"
+    assert garage["acme/coder-large"] == name
+    assert site_drivers.model(site)[0]["name"] == name
+    assert site_pit_wall.model(site)["rows"][0]["driverName"] == name
+
+
+def test_pit_wall_links_resolve_when_driver_slugs_collide(data_page_site):
+    site = data_page_site
+    replacements = {
+        "acme/coder-large": "vendor/model_v1",
+        "bolt/coder-small": "vendor/model-v1",
+    }
+    for entry in site.placed + site.partial + site.community["entries"]:
+        entry["driver"] = replacements.get(entry["driver"], entry["driver"])
+    route = next(r for r in build_site.ROUTES if r.file == site_drivers.INDEX)
+    pages = site_drivers.pages(site, route, build_site.ROUTES)
+    rows = site_pit_wall.model(site)["rows"]
+    links = {row["driverPage"] for row in rows}
+    assert len(links) == 2
+    assert "drivers/vendor-model-v1/index.html" not in links
+    assert links <= pages.keys()
+    assert links <= _local_links(
+        "pit-wall/index.html", site_pit_wall.body(site, "pit-wall/index.html")
+    )
+    assert links == {d["page"] for d in site_garage.model(site)["drivers"] if d["page"]}
+
+
+@pytest.mark.parametrize(
+    ("best_cost", "other_cost", "phrase"),
+    [
+        (None, None, "there is no fuel bill to compare."),
+        (0.01, 0.02, "That is also its best entry."),
+        (None, 0.02, "Its best entry has no pricing data to compare."),
+        (0.03, 0.02, "Its best entry costs $0.030 a pass."),
+    ],
+)
+def test_driver_fuel_note_handles_missing_prices(best_cost, other_cost, phrase):
+    best = {"car": "codex", "map": "high", "costPerPass": best_cost}
+    other = {"car": "pi", "map": "low", "costPerPass": other_cost}
+    priced = [e for e in (best, other) if e["costPerPass"] is not None]
+    driver = {
+        "name": "Example",
+        "best": best,
+        "cheapest": min(priced, key=lambda e: e["costPerPass"]) if priced else None,
+    }
+    assert site_drivers.fuel_note(driver).endswith(phrase)
+
+
+def test_pit_wall_sort_toggles_direction_and_keeps_missing_values_last():
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node is needed to exercise the pit wall script")
+    harness = r"""
+const assert = require('node:assert/strict');
+function element(attrs = {}) {
+  return {
+    attrs, listeners: {},
+    getAttribute(key) { return this.attrs[key]; },
+    hasAttribute(key) { return key in this.attrs; },
+    setAttribute(key, value) { this.attrs[key] = value; },
+    addEventListener(event, fn) { this.listeners[event] = fn; }
+  };
+}
+const heads = ['desc', 'asc'].map(dir => {
+  const th = element({'aria-sort': 'none'});
+  th.button = element({'data-dir': dir});
+  th.querySelector = () => th.button;
+  return th;
+});
+const rows = [[1, 0.02], [3, 0.01], [null, null], [3, 0.01]].map((values, i) => {
+  const row = element({'data-i': String(i)});
+  const cells = [
+    element(values[0] === null ? {} : {'data-k': values[0], 'data-n': 4}),
+    element({'data-usd': values[1] === null ? '' : String(values[1])})
+  ];
+  row.querySelectorAll = () => cells;
+  return row;
+});
+const body = {rows: rows.slice(), appendChild(row) {
+  this.rows.splice(this.rows.indexOf(row), 1); this.rows.push(row);
+}};
+const tools = {querySelectorAll: () => []};
+const mode = element();
+const wall = {
+  querySelector: selector => ({
+    '[data-pitwall-tools]': tools, 'tbody': body, '[data-pitwall-mode]': mode
+  })[selector],
+  querySelectorAll: () => heads
+};
+global.document = {querySelector: () => wall};
+eval(process.argv[1]);
+function click(column, order, direction) {
+  heads[column].button.listeners.click();
+  assert.deepEqual(body.rows.map(row => Number(row.getAttribute('data-i'))), order);
+  assert.equal(heads[column].getAttribute('aria-sort'), direction);
+  assert.equal(heads[1 - column].getAttribute('aria-sort'), 'none');
+}
+click(0, [1, 3, 0, 2], 'descending');
+click(0, [0, 1, 3, 2], 'ascending');
+click(0, [1, 3, 0, 2], 'descending');
+click(1, [1, 3, 0, 2], 'ascending');
+click(1, [0, 1, 3, 2], 'descending');
+click(0, [1, 3, 0, 2], 'descending');
+"""
+    subprocess.run(
+        [node, "-e", harness, site_pit_wall.SCRIPT],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+
 @pytest.mark.parametrize(
     ("k", "n", "tone"),
     [
@@ -3475,7 +3629,7 @@ def _check_driver_pages(files, site) -> None:
     assert {f"drivers/{slugs[d]}/index.html" for d in featured} <= _local_links(
         site_drivers.INDEX, index
     )
-    names = site_views.driver_names(e["driver"] for e in site.placed + site.partial)
+    names = site.driver_names
     for driver in featured:
         name = site_drivers.page_file(slugs[driver])
         page = files[name]

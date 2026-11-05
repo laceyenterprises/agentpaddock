@@ -269,16 +269,23 @@ lists them in `DATA_PAGES`, and each builder gets the parsed data files
 and the registry, and returns every file it writes. They read no results
 document directly.
 
+Driver display names use the same set of trusted and community driver IDs on
+all three pages; names shared by several hosts gain a host suffix. Links to
+featured driver pages use the same collision-disambiguated slugs everywhere.
+
 - **Garage** (`garage.py`): a level is open for a driver when a counted run of
   that driver at that level exists in any car and any document, trusted or not;
   every other level is greyed out with the reason. A raced combination shows its
   standings result. One raced only in untrusted documents points at the
   community board. An open but unraced combination shows "Nobody has raced this
   yet" and links to `/race-it-yourself/`. The selection lives in the address so
-  a build can be shared.
+  a build can be shared. It opens on the best standings entry at one of the six
+  supported maps, falling back to an open driver level when none qualifies.
 - **Pit wall** (`pit_wall.py`): every placed entry by challenge, shaded with the
   `--viz-seq` ramp of `design/tokens.css`. The page script adds the car filter,
-  the percent-or-count switch and column sort.
+  the percent-or-count switch and column sort. Clicking the active column again
+  reverses its order; a newly selected column starts best-first (fuel starts
+  cheapest-first). Missing values stay last in either direction.
 - **Drivers** (`drivers.py`): a driver with at least one placed entry, so a
   complete calendar, gets `/drivers/<driver-id>/`: best entry, car-by-car bars,
   wins and slips by challenge, and cheapest against best on fuel.
