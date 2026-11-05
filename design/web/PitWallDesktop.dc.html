@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent Paddock: pit wall at desktop width</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Saira:ital,wght@1,500;1,800&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,700;1,800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#007BFF}a:hover{color:#0057B3}
+</style>
+</helmet>
+<div style="width: 100%; background: #FFFFFF; font-family: Inter, -apple-system, Helvetica, Arial, sans-serif; color: #111111;">
+<dc-import name="PitWall" hint-size="100%,1300px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

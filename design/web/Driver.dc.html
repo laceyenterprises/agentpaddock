@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent Paddock: the driver</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Saira:ital,wght@1,500;1,800&amp;family=Saira+Condensed:ital,wght@0,600;0,700;1,700;1,800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#007BFF}a:hover{color:#0057B3}
+@keyframes pdk-in-a{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pdk-in-b{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.in-a{animation:pdk-in-a .4s ease-out}
+.in-b{animation:pdk-in-b .4s ease-out}
+.hscroll{scrollbar-width:none}
+.hscroll::-webkit-scrollbar{display:none}
+
+.pdk-wide{display:flex}
+.pdk-burger{display:none}
+@media (max-width:719px){.pdk-wide{display:none}.pdk-burger{display:inline-flex}}
+@media (min-width:720px){.pdk-panel{display:none}}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #FFFFFF; color: #111111; font-family: Inter, -apple-system, Helvetica, Arial, sans-serif; --pdk-accent: {{acc}}; --pdk-green: #00C27A; --pdk-red: #E5202E; --pdk-yellow: #F5B700;">
+
+<header style="position: sticky; top: 0; z-index: 5; background: rgba(255,255,255,0.94); border-bottom: 1px solid #E3E7EC;">
+<div style="max-width: 1120px; margin: 0 auto; padding: 10px 20px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+<a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #111111;" aria-label="Agent Paddock home">
+<svg viewBox="0 0 100 100" style="width: 34px; height: 34px;" aria-hidden="true"><g transform="translate(9 0) skewX(-10)"><rect x="18" y="16" width="64" height="68" rx="7" fill="#111111"></rect><rect x="26" y="26" width="8" height="12" fill="#007BFF"></rect><rect x="38" y="26" width="36" height="12" fill="#FFFFFF"></rect><rect x="26" y="44" width="8" height="12" fill="#00C27A"></rect><rect x="38" y="44" width="26" height="12" fill="#FFFFFF"></rect><rect x="26" y="62" width="8" height="12" fill="#E0703A"></rect><rect x="38" y="62" width="16" height="12" fill="#FFFFFF"></rect></g></svg>
+<span style="font-family: Saira, 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 19px; letter-spacing: 0.04em;">AGENT PADDOCK</span>
+</a>
+<nav class="pdk-wide" style="gap: 6px; margin-left: auto; align-items: center;" aria-label="Main">
+<a href="Learn.dc.html" style="flex: none; padding: 10px 14px; border-radius: 999px; font-size: 15px; font-weight: 500; color: #111111; text-decoration: none;">Learn</a>
+<a href="Races.dc.html" style="flex: none; padding: 10px 14px; border-radius: 999px; font-size: 15px; font-weight: 500; color: #111111; text-decoration: none;">Races</a>
+<a href="Standings.dc.html" style="flex: none; padding: 10px 14px; border-radius: 999px; font-size: 15px; font-weight: 500; color: #111111; text-decoration: none;">Standings</a>
+<a href="Garage.dc.html" style="flex: none; padding: 10px 14px; border-radius: 999px; font-size: 15px; font-weight: 500; color: #111111; text-decoration: none;">Garage</a>
+<a href="PitWall.dc.html" style="flex: none; padding: 10px 14px; border-radius: 999px; font-size: 15px; font-weight: 500; color: #111111; text-decoration: none;">Pit wall</a>
+</nav>
+<button type="button" class="pdk-burger" onClick="{{toggleMenu}}" aria-expanded="{{menuOpen}}" aria-label="Menu" style="margin-left: auto; width: 48px; height: 48px; align-items: center; justify-content: center; border-radius: 14px; border: 1.5px solid #E3E7EC; background: #FFFFFF; color: #111111; cursor: pointer;"><sc-if value="{{menuClosed}}" hint-placeholder-val="{{true}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" style="width: 26px; height: 26px;" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"></path></svg></sc-if><sc-if value="{{menuOpen}}" hint-placeholder-val="{{false}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" style="width: 26px; height: 26px;" aria-hidden="true"><path d="M5.5 5.5l13 13M18.5 5.5l-13 13"></path></svg></sc-if></button>
+
+</div>
+<sc-if value="{{menuOpen}}" hint-placeholder-val="{{false}}">
+<nav class="pdk-panel in-a" aria-label="Main" style="max-width: 1120px; margin: 0 auto; padding: 4px 20px 16px; display: flex; flex-direction: column; background: #FFFFFF;">
+<a href="Learn.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><path d="M4 17.7C4 15 7 15 7 11.5M7 11.5C7 8 10.5 6.5 13 8.5M18.5 7.5c.4-2 1.5-3 3-3"></path><path d="M13 8.5c2.5 2 5 1.5 5.5-1" style="stroke:var(--pdk-accent, currentColor)"></path><circle cx="4" cy="19.5" r="1.8"></circle><circle cx="7" cy="11.5" r="1.6" fill="currentColor" stroke="none"></circle><circle cx="13" cy="8.5" r="1.6" fill="currentColor" stroke="none"></circle><circle cx="18.5" cy="7.5" r="1.6" fill="currentColor" stroke="none"></circle></svg></span>Learn</a>
+<a href="Races.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 2.5V6M16 2.5V6"></path><rect x="7" y="12.5" width="2" height="2" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect><rect x="11" y="12.5" width="2" height="2" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect><rect x="9" y="14.5" width="2" height="2" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect><rect x="13" y="14.5" width="2" height="2" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect><rect x="7" y="16.5" width="2" height="2" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect><rect x="11" y="16.5" width="2" height="2" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect></svg></span>Races</a>
+<a href="Standings.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2"></rect><path d="M8 12h1.5M12 12h4M8 16.5h1.5M12 16.5h4"></path><path d="M8 7.5h1.5M12 7.5h4" style="stroke:var(--pdk-accent, currentColor)"></path></svg></span>Standings</a>
+<a href="Garage.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><rect x="4.5" y="4.5" width="15" height="16.5" rx="2"></rect><path d="M9 3h6v3H9zM8 11h8M8 16h8"></path><circle cx="10" cy="11" r="1.7" fill="currentColor" stroke="none"></circle><circle cx="14" cy="16" r="1.7" stroke="none" style="fill:var(--pdk-accent, currentColor)"></circle></svg></span>Garage</a>
+<a href="PitWall.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><rect x="2.5" y="3.5" width="8.5" height="8" rx="1.5"></rect><rect x="13" y="3.5" width="8.5" height="8" rx="1.5"></rect><path d="M2 14.5h20M5 14.5v7M19 14.5v7M15.3 6.8h4M15.3 9h2.6"></path><path d="M4.6 9.2l1.7-2 1.5 1.3 1.7-2.2" style="stroke:var(--pdk-accent, currentColor)"></path></svg></span>Pit wall</a>
+<a href="Community.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><path d="M14.6 13.2V11.18a2.59 2.59 0 0 1 5.18 0v.86a1.15 1.15 0 0 1-1.15 1.15z"></path><rect x="16.98" y="10.03" width="2.81" height="1.3" rx=".65" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect><path d="M2.6 19.2 L2.6 16.4 L6.6 16.4 L7.4 17 L10 17 C10.6 15.5 11.4 14.4 12.6 14.4 C13.4 14.4 13.8 15 13.9 15.8 L14.2 16.3 L16.8 16.3 L17.3 15.8 C19 16.2 21 17 22.6 18.6 L22.6 19.2 Z"></path><path d="M1.5 10 L6.5 10 M2.6 10 L2.6 16.4"></path><circle cx="6.30" cy="19.60" r="2.90" fill="currentColor" stroke="none"></circle><circle cx="18.50" cy="19.80" r="2.60" fill="currentColor" stroke="none"></circle></svg></span>Community</a>
+<a href="Driver.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 700;"><span style="color: var(--pdk-accent, #007BFF); display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><path d="M3.5 18.5V12a8.5 8.5 0 0 1 17 0v3a3.5 3.5 0 0 1-3.5 3.5z"></path><rect x="11" y="9" width="9.5" height="3.6" rx="1.8" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect></svg></span>Drivers</a>
+<a href="Entry.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><rect x="9" y="7.5" width="6" height="13.5" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect><path d="M3 21v-8.5h6v-5h6v8h6V21z"></path></svg></span>An entry's season</a>
+<a href="Rulebook.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><path d="M12 6.5C10 5 7 4.5 3 4.5v14c4 0 7 .5 9 2 2-1.5 5-2 9-2v-14c-4 0-7 .5-9 2zM12 6.5v14"></path><path d="M15.5 5.6v5.9l1.5-1.5 1.5 1.5V5.2" style="stroke:var(--pdk-accent, currentColor)"></path></svg></span>Rulebook</a>
+<a href="Dictionary.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><rect x="4.5" y="3" width="15" height="18" rx="2"></rect><path d="M8 7.5h8M8 11h5"></path><path d="M8 18c0-2.6 1.8-4 4.5-4H16" style="stroke:var(--pdk-accent, currentColor)"></path></svg></span>Dictionary</a>
+<a href="RaceYourself.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><path d="M3 3.5h18M3 20.5h18M8 20.5V18M13 20.5V18M18 20.5V18"></path><path d="M3 9h18" stroke-dasharray="3 2.5"></path><path d="M5 13.5h11M13.5 11l2.5 2.5-2.5 2.5" style="stroke:var(--pdk-accent, currentColor)"></path></svg></span>Race it yourself</a>
+<a href="Contact.dc.html" style="display: flex; align-items: center; gap: 14px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid #E3E7EC; color: #111111; text-decoration: none; font-size: 19px; font-weight: 500;"><span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 28px; height: 28px; flex: none;" aria-hidden="true"><rect x="6.5" y="3" width="15" height="11" rx="1.5"></rect><path d="M10 14L5.5 21.5M10 10.5h8"></path><path d="M10 7h5" style="stroke:var(--pdk-accent, currentColor)"></path></svg></span>Contact and about</a>
+</nav>
+</sc-if>
+</header>
+
+<main style="max-width: 1120px; margin: 0 auto; padding: 0 20px 72px; display: flex; flex-direction: column; gap: 48px;">
+
+<section style="margin-top: 28px; display: flex; flex-direction: column; gap: 12px;">
+<span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; color: #4F5761;">THE DRIVER · PICK ONE</span>
+<div class="hscroll" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px;" role="radiogroup" aria-label="Driver">
+<sc-for list="{{chips}}" as="c" hint-placeholder-count="8">
+<button type="button" role="radio" aria-checked="{{c.on}}" onClick="{{c.pick}}" style="flex: none; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1.5px solid {{c.border}}; background: {{c.bg}}; color: {{c.fg}}; font: 600 15px Inter, sans-serif; cursor: pointer;">{{c.name}}</button>
+</sc-for>
+</div>
+</section>
+
+<section class="{{swap}}" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; align-items: center;">
+<div style="display: flex; align-items: center; gap: 18px;">
+<span style="color: #111111; display: flex;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 96px; height: 96px; flex: none;" aria-hidden="true"><path d="M3.5 18.5V12a8.5 8.5 0 0 1 17 0v3a3.5 3.5 0 0 1-3.5 3.5z"></path><rect x="11" y="9" width="9.5" height="3.6" rx="1.8" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect></svg></span>
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: clamp(44px, 11vw, 76px); line-height: 0.92;">{{name}}</h1>
+<span style="font-size: 16px; color: #4F5761;">{{career}}</span>
+</div>
+</div>
+<div style="padding: 22px; border-radius: 24px; background: #0E1116; color: #F2F4F7; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; align-items: center; gap: 10px; color: #8B94A3;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 26px; height: 26px; flex: none;" aria-hidden="true"><rect x="9" y="7.5" width="6" height="13.5" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect><path d="M3 21v-8.5h6v-5h6v8h6V21z"></path></svg><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; color: #8B94A3;">ITS BEST ENTRY</span></div>
+<div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;"><span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 64px; line-height: 1; color: #3D9BFF;">{{bestPct}}</span><span style="font-size: 16px; color: #B9C1CC;">{{bestOf}}</span></div>
+<span style="font-size: 17px;">in <b>{{bestCar}}</b> at engine map {{bestMap}} · {{bestFuel}}</span>
+</div>
+</section>
+
+<section style="display: flex; flex-direction: column; gap: 14px; max-width: 760px;">
+<div style="display: flex; align-items: center; gap: 10px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 26px; height: 26px; flex: none;" aria-hidden="true"><path d="M2.6 16.2 L2.6 13.4 L6.6 13.4 L7.4 14 L10 14 C10.6 12.5 11.4 11.4 12.6 11.4 C13.4 11.4 13.8 12 13.9 12.8 L14.2 13.3 L16.8 13.3 L17.3 12.8 C19 13.2 21 14 22.6 15.6 L22.6 16.2 Z"></path><path d="M1.5 7 L6.5 7 M2.6 7 L2.6 13.4"></path><circle cx="15.10" cy="11.20" r="2.10" stroke="none" style="fill:var(--pdk-accent, currentColor)"></circle><circle cx="6.30" cy="16.60" r="2.90" fill="currentColor" stroke="none"></circle><circle cx="18.50" cy="16.80" r="2.60" fill="currentColor" stroke="none"></circle></svg><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; color: #4F5761;">CAR BY CAR</span></div>
+<h2 style="margin: 0; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: clamp(32px, 7vw, 48px); line-height: 0.95;">{{carHeadline}}</h2>
+<p style="margin: 0; font-size: 16px; line-height: 1.5; color: #4F5761;">Same driver, same 54 races. Only the car and its engine map change. Bars start at 80% because the field is close at the top.</p>
+<div class="{{swap}}" style="display: flex; flex-direction: column; border-top: 1px solid #E3E7EC;">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="5">
+<button type="button" onClick="{{r.pick}}" aria-pressed="{{r.on}}" style="display: grid; grid-template-columns: 6px minmax(0, 1fr) 64px; gap: 12px; align-items: center; padding: 12px 2px; border: 0; border-bottom: 1px solid #E3E7EC; background: {{r.bg}}; text-align: left; cursor: pointer; font-family: Inter, sans-serif; color: #111111;">
+<span style="width: 6px; height: 40px; border-radius: 2px; background: {{r.livery}};"></span>
+<div style="display: flex; flex-direction: column; gap: 6px; min-width: 0;">
+<span style="display: flex; align-items: center; gap: 8px; font-size: 16px;"><b>{{r.car}}</b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px; flex: none;" aria-hidden="true"><circle cx="12" cy="13.5" r="6.5"></circle><path d="M12 2.5v2M4.6 6.1l1.4 1.4M19.4 6.1 18 7.5M2 13.5h2M20 13.5h2"></path><path d="{{r.needle}}" style="stroke:var(--pdk-accent, currentColor)"></path></svg><span style="color: #4F5761; font-size: 14px;">{{r.map}} · {{r.fuel}}</span></span>
+<span style="height: 8px; border-radius: 3px; background: #F4F6F9;"><span style="display: block; height: 8px; width: {{r.w}}; border-radius: 3px; background: {{r.color}}; transition: width .4s ease;"></span></span>
+</div>
+<span style="text-align: right; font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 24px; font-variant-numeric: tabular-nums;">{{r.pct}}</span>
+</button>
+</sc-for>
+</div>
+<span style="font-size: 14px; color: #626C78;">Tap an entry to see where it wins and where it slips.</span>
+</section>
+
+<section class="{{pickClass}}" style="display: flex; flex-direction: column; gap: 14px; max-width: 760px; padding: 22px; border-radius: 24px; background: #F4F6F9;">
+<span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; color: #4F5761;">WHERE IT WINS AND SLIPS</span>
+<span style="font-size: 18px; font-weight: 600;">{{pickTitle}}</span>
+<sc-for list="{{cats}}" as="c" hint-placeholder-count="7">
+<div style="display: grid; grid-template-columns: 100px minmax(0, 1fr) 52px; gap: 10px; align-items: center; font-size: 15px;">
+<span>{{c.name}}</span>
+<span style="height: 12px; border-radius: 4px; background: #FFFFFF;"><span style="display: block; height: 12px; width: {{c.w}}; border-radius: 4px; background: {{c.color}};"></span></span>
+<span style="text-align: right; font-variant-numeric: tabular-nums; color: {{c.textColor}}; font-weight: {{c.weight}};">{{c.label}}</span>
+</div>
+</sc-for>
+<span style="font-size: 15px; line-height: 1.5; color: #4F5761;">{{pickNote}}</span>
+</section>
+
+<section style="display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 18px; border: 1.5px solid #E3E7EC; max-width: 760px;">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter" style="width: 26px; height: 26px; flex: none;" aria-hidden="true"><path d="M4 21.5v-17A1.5 1.5 0 0 1 5.5 3h7A1.5 1.5 0 0 1 14 4.5v17M2.5 21.5h13M14 9.5h2a1.5 1.5 0 0 1 1.5 1.5v5.5a1.5 1.5 0 0 0 3 0V8.5L18 6"></path><rect x="6.5" y="6" width="5" height="4.5" stroke="none" style="fill:var(--pdk-accent, currentColor)"></rect></svg><span style="font-size: 16px; line-height: 1.5;">{{fuelNote}}</span>
+</section>
+
+<section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
+<a href="Garage.dc.html" style="display: flex; flex-direction: column; gap: 6px; padding: 24px; border-radius: 22px; background: #0E1116; color: #F2F4F7; text-decoration: none;"><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; color: #8B94A3;">NEXT</span><span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 32px;">Put it in a car yourself</span></a>
+<a href="PitWall.dc.html" style="display: flex; flex-direction: column; gap: 6px; padding: 24px; border-radius: 22px; background: #F4F6F9; color: #111111; text-decoration: none;"><span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; letter-spacing: 0.14em; color: #4F5761;">OR</span><span style="font-family: 'Saira Condensed', 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; font-size: 32px;">Compare every driver</span></a>
+</section>
+<p style="margin: 0; font-size: 14px; line-height: 1.5; color: #626C78;">Each entry's first run of each of the 54 races, as the standings count it. Fuel bill is dollars per race passed, failed runs included.</p>
+<footer data-pdk="footer" style="display: flex; flex-direction: column; gap: 6px; padding-top: 24px; border-top: 1px solid #E3E7EC; color: #626C78; font-size: 14px; line-height: 1.5;">
+<span style="font-family: Saira, 'Arial Narrow', sans-serif; font-style: italic; font-weight: 800; color: #111111;">AGENT PADDOCK</span>
+<span>AI-run benchmarks: a narrow measurement on a fixed set of races, not a comprehensive ranking of any model or harness.</span>
+<span>Independent and open source (MIT). Lacey Enterprises has no partnerships with, and no financial interest in, any product on the board.</span>
+<nav aria-label="Footer" style="display: flex; flex-wrap: wrap; gap: 4px 18px;"><a href="Rulebook.dc.html" style="color: #4F5761; font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Rulebook</a> <a href="Dictionary.dc.html" style="color: #4F5761; font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Dictionary</a> <a href="Community.dc.html" style="color: #4F5761; font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Community</a> <a href="RaceYourself.dc.html" style="color: #4F5761; font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Race it yourself</a> <a href="Contact.dc.html" style="color: #4F5761; font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center;">Contact and about</a></nav>
+</footer>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#007BFF","options":["#007BFF","#111111","#00C27A"]},"$preview":{"width":390,"height":2400}}'>
+class Component extends DCLogic {
+renderVals() {
+const s = this.state || {};
+const acc = this.props.accent ?? '#007BFF';
+const D = [{"name":"Gemini 3.8 Flash","chip":"Gemini 3.8 Flash","entries":[["Pi","high",52,54,0.2847,[13,11,8,6,6,5,3],[13,11,9,6,6,6,3]],["Claude Code","medium",51,54,0.2332,[12,11,8,6,6,5,3],[13,11,9,6,6,6,3]],["OpenCode","high",51,54,0.2853,[12,11,8,6,6,5,3],[13,11,9,6,6,6,3]],["Antigravity","high",50,54,0.3099,[12,10,8,6,6,5,3],[13,11,9,6,6,6,3]],["Pi","medium",49,54,0.2069,[12,11,7,6,6,4,3],[13,11,9,6,6,6,3]],["Codex","medium",49,54,0.2127,[11,11,7,5,6,6,3],[13,11,9,6,6,6,3]],["OpenCode","medium",49,54,0.231,[12,11,6,6,6,5,3],[13,11,9,6,6,6,3]],["Pi","low",48,54,0.0675,[12,11,6,6,5,5,3],[13,11,9,6,6,6,3]],["Claude Code","high",48,54,0.28,[12,10,6,6,5,6,3],[13,11,9,6,6,6,3]],["Codex","low",46,54,0.1325,[11,10,5,6,6,5,3],[13,11,9,6,6,6,3]],["Claude Code","low",46,54,0.1488,[12,11,6,5,4,5,3],[13,11,9,6,6,6,3]],["OpenCode","low",43,54,0.1071,[12,10,4,6,5,3,3],[13,11,9,6,6,6,3]]]},{"name":"GPT-6.1 Sol","chip":"GPT-6.1 Sol","entries":[["Pi","high",52,54,0.0348,[13,11,8,6,6,5,3],[13,11,9,6,6,6,3]],["Codex","medium",51,54,0.0445,[13,11,7,6,6,5,3],[13,11,9,6,6,6,3]],["Codex","high",51,54,0.054,[12,11,7,6,6,6,3],[13,11,9,6,6,6,3]],["Codex","low",50,54,0.0404,[12,11,7,6,6,6,2],[13,11,9,6,6,6,3]],["Claude Code","high",50,54,0.097,[13,11,7,6,6,4,3],[13,11,9,6,6,6,3]],["OpenCode","high",49,54,0.0817,[13,11,6,6,6,4,3],[13,11,9,6,6,6,3]]]},{"name":"Claude Opus 5.5","chip":"Claude Opus 5.5","entries":[["Codex","provider default",50,54,0.2728,[13,11,7,5,5,6,3],[13,11,9,6,6,6,3]],["OpenCode","provider default",48,54,0.1644,[13,11,6,5,5,5,3],[13,11,9,6,6,6,3]],["Pi","provider default",48,54,0.1745,[13,11,5,5,5,6,3],[13,11,9,6,6,6,3]],["Claude Code","high",47,54,0.4097,[13,11,6,6,6,4,1],[13,11,9,6,6,6,3]]]},{"name":"Claude Sonnet 5.5","chip":"Claude Sonnet 5.5","entries":[["Pi","provider default",50,54,0.0741,[13,11,5,6,6,6,3],[13,11,9,6,6,6,3]],["OpenCode","provider default",50,54,0.0759,[12,10,7,6,6,6,3],[13,11,9,6,6,6,3]],["Claude Code","high",50,54,0.2519,[12,11,6,6,6,6,3],[13,11,9,6,6,6,3]],["Codex","provider default",45,54,0.1289,[11,11,4,6,4,6,3],[13,11,9,6,6,6,3]]]},{"name":"Qwen 3.8 27B \u00b7 OpenRouter","chip":"Qwen 3.8 27B","entries":[["Claude Code","provider default",50,54,0.0349,[12,11,8,6,5,5,3],[13,11,9,6,6,6,3]],["OpenCode","provider default",46,54,0.0379,[10,9,6,6,6,6,3],[13,11,9,6,6,6,3]]]},{"name":"DeepSeek V4.1 Flash \u00b7 Together","chip":"DeepSeek V4.1 Flash","entries":[["Pi","provider default",49,54,0.0293,[11,10,8,6,6,5,3],[13,11,9,6,6,6,3]],["Claude Code","provider default",48,54,0.1131,[9,11,8,6,5,6,3],[13,11,9,6,6,6,3]],["OpenCode","provider default",47,54,0.0345,[10,10,8,5,6,5,3],[13,11,9,6,6,6,3]],["Codex","provider default",45,54,0.0384,[9,10,8,5,5,5,3],[13,11,9,6,6,6,3]]]},{"name":"GLM 5.3 Flash \u00b7 Baseten","chip":"GLM 5.3 Flash","entries":[["Pi","provider default",47,54,0.0103,[10,9,8,6,5,6,3],[13,11,9,6,6,6,3]],["OpenCode","provider default",45,54,0.0156,[9,9,8,6,5,5,3],[13,11,9,6,6,6,3]],["Codex","provider default",44,54,0.0129,[10,11,5,5,5,5,3],[13,11,9,6,6,6,3]],["Claude Code","provider default",43,54,0.042,[8,10,6,6,5,5,3],[13,11,9,6,6,6,3]]]},{"name":"Kimi K3","chip":"Kimi K3","entries":[["Pi","provider default",49,54,0.1161,[11,10,8,6,6,5,3],[13,11,9,6,6,6,3]],["OpenCode","provider default",47,54,0.168,[11,9,7,6,5,6,3],[13,11,9,6,6,6,3]],["Claude Code","provider default",45,54,0.2162,[9,10,6,6,5,6,3],[13,11,9,6,6,6,3]],["Codex","provider default",44,54,0.1216,[11,10,5,4,5,6,3],[13,11,9,6,6,6,3]]]}];
+const CATS = ["Coding", "Hard fix", "Hard review", "Fix", "Review", "Docs", "Root cause"];
+const LIV = { 'Pi': '#007BFF', 'Codex': '#10A37A', 'Claude Code': '#E0703A', 'OpenCode': '#C2185B', 'Antigravity': '#D99A00' };
+const ND = { low: 'M12 13.5L8 13.5', medium: 'M12 13.5L9.17 10.67', high: 'M12 13.5L12 9.5', xhigh: 'M12 13.5L14.83 10.67', max: 'M12 13.5L16 13.5', 'provider default': 'M12 13.5L12 9.5' };
+const di = s.d ?? 0;
+const drv = D[di];
+const E = drv.entries;
+const pi = Math.min(s.e ?? 0, E.length - 1);
+const pct = (k, n) => (k / n * 100).toFixed(1) + '%';
+const usd = (u) => u == null ? 'no price' : '$' + u.toFixed(3) + ' a pass';
+const cars = Array.from(new Set(E.map((e) => e[0])));
+const best = E[0];
+const worst = E[E.length - 1];
+const chip = (on) => ({ border: on ? '#111111' : '#E3E7EC', bg: on ? '#111111' : '#FFFFFF', fg: on ? '#FFFFFF' : '#111111' });
+const pick = E[pi];
+const catRows = CATS.map((c, k) => { const kk = pick[5][k], nn = pick[6][k]; const miss = nn - kk; return { name: c, label: kk + '/' + nn, w: (nn ? kk / nn * 100 : 0).toFixed(1) + '%', color: miss ? '#E5202E' : acc, textColor: miss ? '#E5202E' : '#4F5761', weight: miss ? 700 : 400 }; });
+const slips = CATS.filter((c, k) => pick[6][k] - pick[5][k] > 0);
+const priced = E.filter((e) => e[4] != null);
+const cheapest = priced.slice().sort((a, b) => a[4] - b[4])[0];
+const spread = best[2] - worst[2];
+return {
+menuOpen: !!s.menu, menuClosed: !s.menu, toggleMenu: () => this.setState({ menu: !s.menu }),
+acc,
+chips: D.map((x, k) => ({ name: x.chip, on: k === di, ...chip(k === di), pick: () => this.setState({ d: k, e: 0 }) })),
+name: drv.chip, career: E.length + (E.length === 1 ? ' entry' : ' entries') + ' · ' + cars.length + (cars.length === 1 ? ' car' : ' cars') + (drv.name !== drv.chip ? ' · via ' + drv.name.split(' · ')[1] : ''),
+bestPct: pct(best[2], best[3]), bestOf: best[2] + ' of ' + best[3] + ' races passed', bestCar: best[0], bestMap: best[1], bestFuel: usd(best[4]),
+carHeadline: E.length === 1 ? 'One car so far.' : (spread === 0 ? 'Every setup gets the same finish.' : 'Best to worst setup: ' + spread + (spread === 1 ? ' race apart.' : ' races apart.')),
+rows: E.map((e, k) => ({ car: e[0], map: e[1], needle: ND[e[1]] || '', livery: LIV[e[0]] || '#9AA3AF', pct: pct(e[2], e[3]), fuel: usd(e[4]), w: Math.max(0, (e[2] / e[3] * 100 - 80) / 20 * 100).toFixed(1) + '%', color: k === pi ? acc : '#B4BBC5', bg: k === pi ? '#EAF3FF' : '#FFFFFF', on: k === pi, pick: () => this.setState({ e: k }) })),
+pickTitle: drv.chip + ' in ' + pick[0] + ' at ' + pick[1] + ': ' + pick[2] + ' of ' + pick[3],
+cats: catRows,
+pickNote: slips.length ? 'It drops races in ' + slips.join(', ').replace(/, ([^,]*)$/, ' and $1') + '. Everything else it finishes.' : 'A clean sweep: it finishes every race in every challenge.',
+fuelNote: cheapest ? ('Cheapest way to run ' + drv.chip + ': ' + cheapest[0] + ' at ' + cheapest[1] + ', ' + usd(cheapest[4]) + '.' + (cheapest === best ? ' That is also its best entry.' : ' Its best entry costs ' + usd(best[4]) + '.')) : drv.chip + ' runs on a subscription here, so it has no per-token price.',
+swap: di % 2 ? 'in-a' : 'in-b', pickClass: (di + pi) % 2 ? 'in-a' : 'in-b'
+};
+}
+}
+</script>
+</body>
+</html>

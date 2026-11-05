@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import posixpath
 import re
 import shutil
 import struct
@@ -18,6 +19,7 @@ import build_site
 import leaderboard as lb
 import pytest
 import render_social_card
+from paddock_site import layout
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "leaderboard"
 # The repository name the site must never link: it was never created.
@@ -92,7 +94,7 @@ def test_site_builds_deterministically_from_fixtures(tmp_path: Path):
     assert build_site.build(moved) == first
     assert set(first) == (
         {name for name, _ in build_site.PAGES}
-        | {"paddock.css", "favicon.svg", "social-card.png"}
+        | {"paddock.css", "paddock.js", "favicon.svg", "social-card.png"}
         | {
             build_site.board_filename(b)
             for b in lb.boards(lb.load_results(FIXTURE).records)
@@ -303,11 +305,26 @@ def test_cli_refuses_invalid_results(tmp_path: Path, capsys):
     assert not (tmp_path / "site").exists()
 
 
+def _resolve(name: str, link: str) -> str:
+    """The output file a relative ``link`` on page ``name`` points at."""
+    path = urlsplit(link).path
+    if not path:
+        return name
+    return posixpath.normpath(posixpath.join(posixpath.dirname(name), path))
+
+
+def _local_links(name: str, page: str) -> set[str]:
+    return {
+        _resolve(name, attrs["href"])
+        for tag, attrs in Elements(page).items
+        if tag == "a" and "href" in attrs and not urlsplit(attrs["href"]).scheme
+    }
+
+
 @pytest.mark.parametrize("name", [name for name, _ in build_site.PAGES])
 def test_every_page_links_to_every_other(name: str):
     page = build_site.build(FIXTURE)[name]
-    for other, _ in build_site.PAGES:
-        assert f'href="{other}"' in page
+    assert {other for other, _ in build_site.PAGES} <= _local_links(name, page)
 
 
 @pytest.mark.parametrize("values", [(0, 0), (1, 1000)])
@@ -374,8 +391,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     out = tmp_path / "site"
     assert build_site.GTM_CONTAINER_ID == "GTM-P52SNL3D"
     assert build_site.main(["--results", str(FIXTURE), "--out", str(out)]) == 0
-    pages = sorted(out.glob("*.html"))
-    assert {page.name for page in pages} == {
+    pages = sorted(out.rglob("*.html"))
+    assert {page.relative_to(out).as_posix() for page in pages} == {
         name for name in build_site.build(FIXTURE) if name.endswith(".html")
     }
     for path in pages:
@@ -412,7 +429,7 @@ def test_every_local_link_and_anchor_resolves():
             link = urlsplit(attrs["href"])
             if link.scheme:
                 continue
-            target = link.path or name
+            target = _resolve(name, attrs["href"])
             assert target in files, (name, target)
             if link.fragment:
                 assert any(a.get("id") == link.fragment for _, a in elements[target]), (
@@ -432,16 +449,25 @@ def test_brand_assets_and_navigation_on_every_page():
         for color in ("#007BFF", "#00C27A", "#E0703A"):
             assert color in page
         assert 'fill="var(--ink)"' in page and page.count('fill="var(--paper)"') == 3
-        assert '<link rel="icon" href="favicon.svg" type="image/svg+xml">' in page
-        assert '<link rel="stylesheet" href="paddock.css">' in page
+        root = layout.up(name)
+        assert (
+            f'<link rel="icon" href="{root}favicon.svg" type="image/svg+xml">' in page
+        )
+        assert f'<link rel="stylesheet" href="{root}paddock.css">' in page
+        assert f'<script src="{root}paddock.js" defer></script>' in page
         assert 'aria-label="Agent Paddock home"' in page and "PADDOCK" in page
         assert page.count("fonts.googleapis.com/css2?") == 1 and "display=swap" in page
-        assert page.count("<script") == 2 and "<style" not in page
+        assert page.count("<script") == 3 and "<style" not in page
         assert "<h1>" in page and page.count("<h1>") == 1
-        for other, _ in build_site.PAGES:
-            assert f'href="{other}"' in page
-        current = [a["href"] for t, a in elements if t == "a" and "aria-current" in a]
-        assert current == ["index.html" if name.startswith("board-") else name]
+        assert {other for other, _ in build_site.PAGES} <= _local_links(name, page)
+        # Every link marked current points at the page itself (a board page
+        # belongs to the leaderboard), and the page is marked somewhere.
+        current = {
+            _resolve(name, a["href"])
+            for t, a in elements
+            if t == "a" and a.get("aria-current") == "page"
+        }
+        assert current == {"index.html" if name.startswith("board-") else name}
         assert f"{build_site.REPO_URL}/blob/main/LICENSE" in page
         assert "© 2026 Lacey Enterprises LLC" in page
     favicon = files["favicon.svg"]
@@ -621,6 +647,8 @@ PRODUCT_NAME_ALLOWLIST = re.compile(
     r'|>AGENT</span><span class="wordmark-name">PADDOCK<'  # the stacked lockup
     r"|\bpaddock (?:run|show|baseline|lock)\b"  # the command
     r"|\bpaddock\.css\b"  # the stylesheet path
+    r"|\bpaddock\.js\b"  # the menu script path
+    r'|<meta name="paddock-site" content="pdw-1">'  # the activation marker
     r"|agentpaddock"  # the domain, repository and distribution
     r"|\bPADDOCK_[A-Z0-9_]+"  # environment variables
 )
@@ -692,12 +720,14 @@ def test_header_and_footer_render_the_one_stacked_lockup(monkeypatch):
     for name, page in build_site.build(FIXTURE).items():
         if not name.endswith(".html"):
             continue
+        # A nested page's lockup links home through its relative prefix.
+        lockup = layout.brand(layout.up(name))
         header = page.split('<header class="nav">', 1)[1].split("</header>", 1)[0]
         footer = page.split('<footer class="footer">', 1)[1].split("</footer>", 1)[0]
         assert header.count(lockup) == 1 and footer.count(lockup) == 1, name
         assert page.count("wordmark-agent") == 2, name
-    # Both renderings come from brand(): replacing it replaces both.
-    monkeypatch.setattr(build_site, "brand", lambda: "<i>synthetic lockup</i>")
+    # Both renderings come from layout.brand(): replacing it replaces both.
+    monkeypatch.setattr(layout, "brand", lambda root="": "<i>synthetic lockup</i>")
     page = build_site.build(FIXTURE)["index.html"]
     assert (
         page.count("<i>synthetic lockup</i>") == 2
@@ -706,7 +736,7 @@ def test_header_and_footer_render_the_one_stacked_lockup(monkeypatch):
 
 
 def test_lockup_styles_follow_the_brand_spec():
-    style = build_site.STYLE
+    style = layout.CSS
     rules = _css_rules(style)
     phone = _css_rules(
         style.split("@media (max-width: 640px) {", 1)[1].split("\n}\n", 1)[0]
@@ -750,13 +780,13 @@ def test_lockup_styles_follow_the_brand_spec():
     # AGENT is 0.6 x PADDOCK at every size, within a pixel.
     for agent, name in ((13, 21), (17, 28), (12, 19)):
         assert abs(agent - name * 0.6) < 1
-    # Both lines inherit the brand text colour (ink on light, white on the dark footer).
+    # Both lines inherit the brand text colour (ink in the header and the light footer).
     for selector, body in rules.items():
         if "wordmark" in selector:
             assert "color" not in body, selector
             assert not re.search(r"--(muted|tower-mute|ink-2)", body), selector
     declares(rules, ".brand", "color: var(--ink);")
-    declares(rules, ".footer .brand", "color: var(--tower-fg);")
+    declares(rules, ".footer .brand", "color: var(--ink);")
     page = build_site.build(FIXTURE)["index.html"]
     assert "family=Saira:ital,wght@1,500;1,800&amp;" in page
     assert page.count("fonts.googleapis.com/css2?") == 1
@@ -776,6 +806,7 @@ def _meta(page: str) -> list[tuple[str, str]]:
 def test_every_page_carries_the_social_card_meta():
     files = build_site.build(FIXTURE)
     pages = [name for name in files if name.endswith(".html")]
+    route_urls = {route.file: route.url for route in build_site.ROUTES}
     urls = set()
     for name in pages:
         page = files[name]
@@ -783,9 +814,10 @@ def test_every_page_carries_the_social_card_meta():
         tags = dict(meta)
         assert len(tags) == len(meta), name
         title = html.unescape(re.search(r"<title>(.*?)</title>", page)[1])
-        url = "https://agentpaddock.ai/" + ("" if name == "index.html" else name)
+        url = route_urls.get(name, "https://agentpaddock.ai/" + name)
         alt = build_site.CARD_ALT
         assert tags == {
+            "paddock-site": "pdw-1",
             "og:type": "website",
             "og:site_name": "Agent Paddock",
             "og:title": title,
@@ -822,8 +854,16 @@ def test_social_card_png_is_written_at_card_size_and_deterministically(tmp_path)
     assert data == build_site.CARD_PNG.read_bytes()
     assert data[:8] == b"\x89PNG\r\n\x1a\n" and data[12:16] == b"IHDR"
     assert struct.unpack(">II", data[16:24]) == (1200, 630)
-    first = sorted(path.name for path in outs[0].iterdir())
-    assert first == sorted(path.name for path in outs[1].iterdir())
+    first = sorted(
+        path.relative_to(outs[0]).as_posix()
+        for path in outs[0].rglob("*")
+        if path.is_file()
+    )
+    assert first == sorted(
+        path.relative_to(outs[1]).as_posix()
+        for path in outs[1].rglob("*")
+        if path.is_file()
+    )
     for name in first:
         assert (outs[0] / name).read_bytes() == (outs[1] / name).read_bytes(), name
 
@@ -1019,3 +1059,287 @@ def test_card_template_holds_the_stacked_lockup_and_no_data(monkeypatch):
     assert "agentpaddock.ai" in text
     # Decoration, not data: the tower positions are the only digits on the card.
     assert re.findall(r"\d", text) == ["1", "2", "3", "4", "5"]
+
+
+# ---------- PDW-02: the shared layout and the page registry ----------
+
+from paddock_site import glyphs as site_glyphs  # noqa: E402
+from paddock_site import routes as site_routes  # noqa: E402
+
+WEB_DESIGN = Path(__file__).resolve().parents[1] / "design" / "web"
+PUBLISHED_GLYPHS = set(site_glyphs.published_ids())
+
+
+def _html_pages(files):
+    return {name: page for name, page in files.items() if name.endswith(".html")}
+
+
+def _between(page: str, start: str, end: str) -> str:
+    assert page.count(start) == 1, start
+    return page.split(start, 1)[1].split(end, 1)[0]
+
+
+@pytest.mark.parametrize(
+    ("active", "header_marks"),
+    [
+        ("index.html", 0),
+        ("learn/index.html", 2),
+        ("contact/index.html", 1),
+        ("methodology.html", 0),
+    ],
+)
+@pytest.mark.parametrize(
+    "filename", ["board-example.html", "boards/example/index.html"]
+)
+def test_document_uses_output_path_for_links_and_active_route_for_marks(
+    active, header_marks, filename
+):
+    page = build_site.document("Example", active, "<h1>Example</h1>", filename=filename)
+    root = "../" * filename.count("/")
+    for asset in ("paddock.css", "paddock.js", "favicon.svg"):
+        assert f'"{root}{asset}"' in page
+    assert f'property="og:url" content="{build_site.SITE_URL}{filename}"' in page
+    header = _between(page, '<header class="nav">', "</header>")
+    footer = _between(page, '<footer class="footer">', "</footer>")
+    assert {r.file for r in build_site.ROUTES} <= _local_links(filename, footer)
+    for section, count in ((header, header_marks), (footer, 1)):
+        assert f'class="brand" href="{root}index.html"' in section
+        marked = re.findall(r'<a href="([^"]+)" aria-current="page"', section)
+        assert marked == [root + active] * count
+
+
+def test_sprite_reads_and_parses_each_path_once_and_returns_independent_lists(
+    tmp_path, monkeypatch
+):
+    paths = [tmp_path / "first.svg", tmp_path / "second.svg"]
+    for path, glyph_id in zip(paths, ("first", "second")):
+        path.write_text(
+            f'<svg><symbol id="{glyph_id}"></symbol></svg>', encoding="utf-8"
+        )
+    reads = []
+    read_text = Path.read_text
+
+    def counted_read(path, *args, **kwargs):
+        reads.append(path)
+        return read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", counted_read)
+    for path, glyph_id in zip(paths, ("first", "second")):
+        first = site_glyphs.sprite(path=path)
+        symbols = site_glyphs.published_symbols(path)
+        symbols.clear()
+        assert site_glyphs.sprite(path=path) == first
+        assert site_glyphs.published_ids(path) == [glyph_id]
+        assert reads.count(path) == 1
+
+
+def test_every_registered_route_builds_into_the_output(tmp_path):
+    out = tmp_path / "site"
+    assert build_site.main(["--results", str(FIXTURE), "--out", str(out)]) == 0
+    assert (
+        build_site.main(["--results", str(FIXTURE), "--out", str(out), "--check"]) == 0
+    )
+    for route in build_site.ROUTES:
+        path = out / route.file
+        assert path.is_file(), route.path
+        page = path.read_text(encoding="utf-8")
+        # Today's board pages keep the titles their builders give them.
+        if route.builder is None:
+            assert f"<title>{html.escape(route.title)} · Agent Paddock</title>" in page
+    # The registry names each route once, by path and by output file.
+    assert len({r.path for r in build_site.ROUTES}) == len(build_site.ROUTES)
+    assert len({r.file for r in build_site.ROUTES}) == len(build_site.ROUTES)
+
+
+def test_every_page_carries_the_site_marker_once_in_its_head():
+    for name, page in _html_pages(build_site.build(FIXTURE)).items():
+        head = page.split("<head>", 1)[1].split("</head>", 1)[0]
+        assert head.count('<meta name="paddock-site" content="pdw-1">') == 1, name
+        assert page.count('name="paddock-site"') == 1, name
+
+
+def test_every_page_has_the_nav_the_menu_panel_and_the_footer():
+    routes = build_site.ROUTES
+    bar = site_routes.nav_routes(routes, site_routes.BAR)
+    menu = site_routes.nav_routes(routes, site_routes.BAR, site_routes.PANEL)
+    assert [r.label for r in bar] == [
+        "Learn",
+        "Races",
+        "Standings",
+        "Garage",
+        "Pit wall",
+    ]
+    assert [r.label for r in menu] == [
+        "Learn",
+        "Races",
+        "Standings",
+        "Garage",
+        "Pit wall",
+        "Community",
+        "Drivers",
+        "An entry's season",
+        "Rulebook",
+        "Dictionary",
+        "Race it yourself",
+        "Contact and about",
+    ]
+    for name, page in _html_pages(build_site.build(FIXTURE)).items():
+        header = _between(page, '<header class="nav">', "</header>")
+        wide = _between(header, '<nav class="nav-wide" aria-label="Main">', "</nav>")
+        panel = _between(
+            header,
+            '<nav class="nav-panel" id="site-menu" aria-label="Menu" hidden>',
+            "</nav>",
+        )
+        footer = _between(page, '<footer class="footer">', "</footer>")
+        assert _local_links(name, wide) == {r.file for r in bar}, name
+        assert _local_links(name, panel) == {r.file for r in menu}, name
+        # The panel draws one glyph per item.
+        assert panel.count("<use href=") == len(menu), name
+        # The menu button controls the panel and starts closed; it draws both strokes.
+        button = _between(
+            header, '<button type="button" class="nav-burger"', "</button>"
+        )
+        assert (
+            'aria-expanded="false"' in button and 'aria-controls="site-menu"' in button
+        )
+        assert layout.MENU_STROKES in button and layout.CLOSE_STROKES in button
+        # Without JavaScript the footer still reaches every page.
+        assert {r.file for r in routes} <= _local_links(name, footer), name
+        assert (
+            layout.FOOTER_DISCLAIMER in footer and layout.FOOTER_INDEPENDENCE in footer
+        )
+        # The current page is marked in the bar and the panel when it is in them.
+        for route in menu:
+            mark = f'href="{layout.href(route.file, name)}" aria-current="page"'
+            expected = 1 if route.file == name else 0
+            assert panel.count(mark) == expected, (name, route.path)
+            if route in bar:
+                assert wide.count(mark) == expected, (name, route.path)
+
+
+def test_every_nav_glyph_is_a_published_symbol():
+    for route in site_routes.nav_routes(
+        build_site.ROUTES, site_routes.BAR, site_routes.PANEL
+    ):
+        assert route.nav_glyph in PUBLISHED_GLYPHS, route.path
+    expected = {
+        "learn/": "track-map",
+        "races/": "race-calendar",
+        "standings/": "timing-tower",
+        "garage/": "setup-sheet",
+        "pit-wall/": "pit-wall",
+        "community/": "entry",
+        "drivers/": "driver",
+        "entries/": "podium",
+        "rulebook/": "rulebook",
+        "dictionary/": "briefing",
+        "race-it-yourself/": "pit-lane",
+        "contact/": "pit-board",
+    }
+    assert {r.path: r.nav_glyph for r in build_site.ROUTES if r.nav_glyph} == expected
+
+
+def test_every_page_inlines_the_sprite_exactly_once_and_uses_only_its_symbols():
+    published = site_glyphs.published_symbols()
+    for name, page in _html_pages(build_site.build(FIXTURE)).items():
+        assert page.count('<svg class="symbols"') == 1, name
+        sprite = _between(page, '<svg class="symbols"', "</svg>")
+        assert all(page.count(symbol) == 1 for symbol in published), name
+        ids = re.findall(r'<symbol id="([^"]+)"', page)
+        assert len(ids) == len(set(ids)), name
+        uses = set(re.findall(r'<use href="#([^"]+)"', page))
+        assert uses <= set(ids), (name, uses - set(ids))
+        assert "<symbol" not in page.replace(sprite, ""), name
+
+
+def test_the_stylesheet_carries_the_design_tokens_once_and_pages_none():
+    files = build_site.build(FIXTURE)
+    css = files["paddock.css"]
+    tokens = (Path(__file__).resolve().parents[1] / "design" / "tokens.css").read_text(
+        encoding="utf-8"
+    )
+    assert css.startswith(tokens) and css.count(tokens) == 1
+    # One definition of each token: the page styles carry no copy of their own.
+    assert css.count("--paper: #FFFFFF;") == 1
+    for name, page in _html_pages(files).items():
+        assert page.count("paddock.css") == 1, name
+        assert "--paper:" not in page, name
+
+
+def test_registry_rejects_a_builder_for_an_unregistered_route():
+    with pytest.raises(KeyError, match="unregistered"):
+        site_routes.registry({"nowhere/": lambda results: ""})
+    replaced = site_routes.registry({"learn/": lambda results: "built"})
+    learn = next(r for r in replaced if r.path == "learn/")
+    assert learn.builder(None) == "built" and learn.file == "learn/index.html"
+    assert all(r.builder is None for r in replaced if r.path != "learn/")
+
+
+def test_placeholders_carry_no_numbers_and_link_home():
+    files = build_site.build(FIXTURE)
+    for route in build_site.ROUTES:
+        if route.builder is not None:
+            continue
+        page = files[route.file]
+        main = _between(page, '<main class="wrap">', "</main>")
+        text = " ".join(" ".join(Text(main).text).split())
+        assert not re.search(r"\d", text), (route.path, text)
+        assert "index.html" in _local_links(route.file, main), route.path
+        assert f"<h1>{html.escape(route.title)}</h1>" in main
+
+
+@pytest.mark.parametrize(
+    ("race_type", "mark", "red"),
+    [
+        ("coding", "coding-worker", False),
+        ("fix", "diff", False),
+        ("hard-fix", "ci-failed", True),
+        ("review", "review", False),
+        ("hard-review", "red-team", True),
+        ("docs", "documents", False),
+        ("rca", "search", False),
+    ],
+)
+def test_race_type_roundel(race_type, mark, red):
+    roundel = site_glyphs.roundel(race_type)
+    assert '<use href="#roundel"/>' in roundel and f'<use href="#{mark}"/>' in roundel
+    assert ("roundel-red" in roundel) is red
+    label = site_glyphs.RACE_TYPES[race_type][0]
+    assert f'role="img" aria-label="{label}"' in roundel
+    assert 'aria-hidden="true"' in site_glyphs.roundel(race_type, labelled=False)
+    sprite = layout.sprite()
+    symbol = re.search(rf'<symbol id="{mark}"[^>]*>(.*?)</symbol>', sprite)
+    assert symbol, mark
+    assert ("--pdk-red" in symbol[1]) is red
+    # The frame is the published roundel glyph; the marks are not published ones.
+    assert "roundel" in PUBLISHED_GLYPHS and mark not in PUBLISHED_GLYPHS
+
+
+def test_menu_script_toggles_the_panel_and_ships_once():
+    files = build_site.build(FIXTURE)
+    script = files["paddock.js"]
+    for needle in ("aria-expanded", "site-menu", "Escape", "(min-width: 720px)"):
+        assert needle in script
+    css = files["paddock.css"]
+    assert "@media (min-width: 720px)" in layout.CSS
+    assert ".nav-burger[hidden], .nav-panel[hidden] { display: none; }" in css
+
+
+def test_design_reference_is_committed_and_never_shipped():
+    readme = (WEB_DESIGN / "README.md").read_text(encoding="utf-8")
+    prototypes = sorted(path.name for path in WEB_DESIGN.glob("*.dc.html"))
+    assert prototypes and "Main.dc.html" in prototypes
+    for prototype in prototypes:
+        assert f"`{prototype.removesuffix('.dc.html')}" in readme, prototype
+    assert (WEB_DESIGN / "data" / "live.example.json").is_file()
+    route_map = readme.split("## Route map in the site generator", 1)[1]
+    for route in build_site.ROUTES:
+        assert f"| `/{route.path}` | `{route.file}` |" in route_map, route.path
+        if route.nav_glyph:
+            assert f"`{route.nav_glyph}`" in route_map, route.path
+    for name, content in build_site.build(FIXTURE).items():
+        assert not name.endswith(".dc.html"), name
+        if isinstance(content, str):
+            assert ".dc.html" not in content and "support.js" not in content, name
+            assert "DCLogic" not in content, name

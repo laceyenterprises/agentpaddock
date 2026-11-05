@@ -1,0 +1,56 @@
+{
+ "schema": "paddock-live/v1",
+ "updated": "04:44Z",
+ "updatedIso": "2026-11-03T04:44:58Z",
+ "racing": 0,
+ "ticks": [
+  {
+   "who": "Qwen 3.8 27B in Pi",
+   "what": "Hard fix: Wrong recommendation retry charge v3",
+   "kind": "dnf",
+   "flagName": "DNF \u00b7 DID NOT FINISH",
+   "flag": "#E5202E",
+   "when": "finished"
+  },
+  {
+   "who": "Qwen 3.8 27B in Pi",
+   "what": "Hard fix: Wrong recommendation retry charge",
+   "kind": "passed",
+   "flagName": "CHECKERED",
+   "flag": "#111111",
+   "when": "finished"
+  },
+  {
+   "who": "Qwen 3.8 27B in Pi",
+   "what": "Hard fix: Two findings v2",
+   "kind": "passed",
+   "flagName": "CHECKERED",
+   "flag": "#111111",
+   "when": "finished"
+  },
+  {
+   "who": "Qwen 3.8 27B in Pi",
+   "what": "Hard fix: Two findings",
+   "kind": "passed",
+   "flagName": "CHECKERED",
+   "flag": "#111111",
+   "when": "finished"
+  },
+  {
+   "who": "Qwen 3.8 27B in Pi",
+   "what": "Hard fix: Wrong recommendation config reload",
+   "kind": "dnf",
+   "flagName": "DNF \u00b7 DID NOT FINISH",
+   "flag": "#E5202E",
+   "when": "finished"
+  },
+  {
+   "who": "Qwen 3.8 27B in Pi",
+   "what": "Hard fix: Regression test quiet hours",
+   "kind": "passed",
+   "flagName": "CHECKERED",
+   "flag": "#111111",
+   "when": "finished"
+  }
+ ]
+}
