@@ -18,8 +18,20 @@ from typing import Any, Callable, Mapping
 #: The public site; canonical and share URLs are absolute on it.
 SITE_URL = "https://agentpaddock.ai/"
 
-#: A page builder takes the loaded results and returns the whole page.
-Builder = Callable[[Any], str]
+
+@dataclass(frozen=True)
+class Build:
+    """What a page builder reads: the loaded results, the site data files
+    (``data.py``) parsed by their path under the site root
+    (``"data/standings.json"``), and the route registry for the layout."""
+
+    results: Any
+    data: Mapping[str, Any]
+    routes: tuple["Route", ...]
+
+
+#: A page builder takes the build's inputs and returns the whole page.
+Builder = Callable[[Build], str]
 
 #: Nav placements: in the bar at 720 px and wider and in the menu panel, or in
 #: the menu panel only. Every other route is reached from the footer.
