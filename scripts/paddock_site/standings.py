@@ -205,6 +205,17 @@ def top_by_pass(entries: Sequence[Mapping[str, Any]], top: int = TOP) -> int:
     return sum(1 for row in entries if row["place"] is not None and row["place"] <= cut)
 
 
+def top_by_fuel(entries: Sequence[Mapping[str, Any]], top: int = TOP) -> int:
+    """Keep equal fuel bills at the cut whole; unpriced rows have no tie."""
+    priced = sorted(
+        row["costPerPass"] for row in entries if row["costPerPass"] is not None
+    )
+    if len(priced) < top:
+        return min(len(entries), top)
+    cut = priced[top - 1]
+    return sum(cost <= cut for cost in priced)
+
+
 # ---------------------------------------------------------------- shared parts
 
 
@@ -454,9 +465,10 @@ def board(root: str, standings: Mapping[str, Any], races: Mapping[str, Any]) -> 
         )
     fuel = fuel_ranks(entries)
     pass_top = top_by_pass(entries)
+    fuel_top = top_by_fuel(entries)
     clash = ambiguous(entries + standings["partial"])
     rows = "".join(
-        _row(i, row, fuel[i], (i < pass_top, fuel[i][0] < TOP), clash, root)
+        _row(i, row, fuel[i], (i < pass_top, fuel[i][0] < fuel_top), clash, root)
         for i, row in enumerate(entries)
     )
     more = len(entries) > min(pass_top, TOP)
@@ -524,13 +536,14 @@ def standings_body(
 
 def _chips(entry_id: str, standings: Mapping[str, Any], root: str) -> str:
     chips = []
+    clash = ambiguous(standings["entries"])
     for row in standings["entries"]:
         current = ' aria-current="page"' if row["id"] == entry_id else ""
         chips.append(
             f'<a href="{root}entries/{esc(row["id"])}/index.html"{current}>'
             f'<span class="st-livery" style="--c:{livery(row["car"])}" aria-hidden="true">'
             f"</span>{esc(row['driver'])} in {esc(car_name(row['car']))} · "
-            f"{esc(row['map'])}</a>"
+            f"{esc(row['map'])}{setup_note(row, clash)}</a>"
         )
     if not chips:
         return ""
@@ -583,7 +596,14 @@ def _hero(entry: Mapping[str, Any]) -> str:
     fuel = entry["fuel"]["costPerPass"]
     weak = weakest(entry["challenges"])
     if weak is None or weak[1] == weak[2]:
-        weak_tile = _tile("whisker", "Weakest challenge", "None", "a clean sweep", True)
+        note = (
+            "no calendar races run"
+            if weak is None
+            else "all races run passed"
+            if entry["place"] is None
+            else "a clean sweep"
+        )
+        weak_tile = _tile("whisker", "Weakest challenge", "None", note, True)
     else:
         weak_tile = _tile(
             "whisker",
@@ -677,12 +697,19 @@ def season(entry: Mapping[str, Any], races: Mapping[str, Any]) -> str:
         if (race["id"], race["version"]) in mine
         and not mine[(race["id"], race["version"])]["passed"]
     ]
+    missing = len(calendar) - len(mine)
     if fails:
         title = f"It dropped {plural(len(fails), 'race')}"
         line = ", ".join(fails) + ". Tap any flag for its lap and fuel."
+    elif missing:
+        title = (
+            f"Passed all {plural(len(mine), 'race')} run"
+            if mine
+            else "No calendar races run"
+        )
+        line = "Tap any flag for its lap and fuel."
     else:
         title, line = "A clean sweep", "Tap any flag for its lap and fuel."
-    missing = len(calendar) - len(mine)
     off = sum(1 for race in entry["races"] if not race["calendar"])
     notes = []
     if missing:
@@ -817,6 +844,8 @@ def entry_file(entry_id: str) -> str:
 def entry_pages(build: Build) -> dict[str, str]:
     """One page per standings entry, placed and partial."""
     standings = _load(build.data, "standings.json")
+    if standings["state"] == AWAITING:
+        return {}
     races = _load(build.data, "races.json")
     pages = {}
     for row in standings["entries"] + standings["partial"]:

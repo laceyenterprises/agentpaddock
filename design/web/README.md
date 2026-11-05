@@ -144,12 +144,15 @@ data files and never from the prototypes.
   the honest-ranges switch with its explainer, and the rows on a 75-100% scale
   whose header shares the rows' grid. A range below 75% is held to the left
   end. Rows are `<details>`, so they open without JavaScript. The board shows
-  the top 16, keeping a tie at the cut whole, until "Show all" is pressed.
+  the top 16 in either ranking, keeping a tie at the cut whole, until "Show
+  all" is pressed. Unpriced entries have no fuel rank and do not form a tie.
 - An entry page follows `Entry.dc.html`: the placed entries as chips, the hero
   with its honest range on a 50-100% scale, four tiles, and the season grid,
   one cell per calendar race grouped by challenge (checkered, DNF, or a dashed
   cell for a race a partial entry has not run). A tapped flag shows its lap
-  and fuel.
+  and fuel. Chips with the same driver, car and map show their setup hashes.
+  A clean sweep means every calendar race was run and passed; partial entries
+  describe only the races they ran.
 - `/entries/` lists the placed entries in standings order and the partial ones
   behind a disclosure.
 - Drivers show as their provider id (`openai/gpt-6.1-sol`): the results carry

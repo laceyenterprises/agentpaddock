@@ -1967,6 +1967,65 @@ def test_top_rows_keep_a_tie_at_the_cut_whole():
     assert standings_pages.top_by_pass(rows, top=10) == 6
 
 
+@pytest.mark.parametrize(
+    ("costs", "top", "expected"),
+    [
+        ([0.2, None, 0.1, 0.2, None], 2, 3),
+        ([0.2, None, 0.1, 0.2, None], 4, 4),
+        ([None, None, None], 2, 2),
+        ([0.1], 16, 1),
+        ([], 16, 0),
+    ],
+)
+def test_top_fuel_rows_keep_priced_ties_whole(costs, top, expected):
+    entries = [{"costPerPass": cost} for cost in costs]
+    assert standings_pages.top_by_fuel(entries, top=top) == expected
+
+
+def test_board_keeps_fuel_tie_at_sixteen_visible(tmp_path):
+    files = _site_files(_site_tree(tmp_path))
+    standings = _site_json(files, "standings.json")
+    template = standings["entries"][0]
+    costs = list(range(1, 16)) + [16, 16, 18, None]
+    standings["entries"] = [
+        {
+            **template,
+            "id": f"entry-{i}",
+            "place": i + 1,
+            "tie": False,
+            "costPerPass": cost,
+        }
+        for i, cost in enumerate(reversed(costs))
+    ]
+    markup = standings_pages.board("../", standings, _site_json(files, "races.json"))
+    rows = _rows(markup)
+    assert len(rows) == 19
+    for (_, row), entry in zip(rows, standings["entries"]):
+        expected = entry["costPerPass"] is not None and entry["costPerPass"] <= 16
+        assert f'data-top-fuel="{int(expected)}"' in row
+    assert sum('data-top-fuel="1"' in row for _, row in rows) == 17
+    assert sum('data-top-pass="1"' in row for _, row in rows) == 16
+    assert markup.count('<span class="st-by-fuel">=16</span>') == 2
+
+
+def test_entry_chips_disambiguate_duplicate_setups(tmp_path):
+    files = _site_files(_site_tree(tmp_path))
+    standings = _site_json(files, "standings.json")
+    first = standings["entries"][0]
+    first["configHash"] = "sha256:" + "a" * 64
+    second = {**first, "id": "other-setup", "configHash": "sha256:" + "b" * 64}
+    unique = {**first, "id": "unique", "driver": "other/driver"}
+    standings["entries"] = [first, second, unique]
+    chips = standings_pages._chips(first["id"], standings, "../../")
+    links = re.findall(r"<a\b.*?</a>", chips)
+    assert len(links) == 3
+    assert 'aria-current="page"' in links[0]
+    assert 'aria-current="page"' not in links[1]
+    assert "setup <code>aaaaaaaa</code>" in links[0]
+    assert "setup <code>bbbbbbbb</code>" in links[1]
+    assert "setup" not in links[2]
+
+
 def test_every_standings_row_links_to_a_built_entry_page(tmp_path):
     files = build_site.build(_site_tree(tmp_path))
     standings = json.loads(files["data/standings.json"])
@@ -2087,6 +2146,48 @@ def test_standings_and_entries_await_trust_sign_off(tmp_path):
         assert 'class="st-item"' not in page and "en-list-row" not in page, name
         assert "gamma-cli" not in page, name
     assert not [name for name in files if re.match(r"entries/[^/]+/index\.html", name)]
+
+
+@pytest.mark.parametrize("bucket", ["entries", "partial"])
+def test_entry_pages_ignore_rows_awaiting_trust_sign_off(bucket):
+    # No race or entry files: the awaiting state must be checked before loading them.
+    standings = {
+        "state": standings_pages.AWAITING,
+        "entries": [],
+        "partial": [],
+    }
+    standings[bucket] = [{"id": "untrusted-entry"}]
+    build = site_routes.Build(
+        results=None, data={"data/standings.json": standings}, routes=()
+    )
+    assert standings_pages.entry_pages(build) == {}
+
+
+@pytest.mark.parametrize("ran", [0, 1, 2])
+def test_clean_sweep_requires_a_complete_calendar(tmp_path, ran):
+    files = _site_files(_site_tree(tmp_path))
+    standings = _site_json(files, "standings.json")
+    row = standings["entries"][0]
+    entry = _site_json(files, f"entries/{row['id']}.json")
+    entry["races"] = [race for race in entry["races"] if race["calendar"]][:ran]
+    for race in entry["races"]:
+        race["passed"] = True
+    entry["place"] = row["place"] if ran == 2 else None
+    entry["challenges"] = {"docs": {"k": ran, "n": ran}}
+    entry["totals"].update(k=ran, n=ran, rate=1.0 if ran else 0.0)
+    page = standings_pages.entry_body(
+        entry, standings, _site_json(files, "races.json"), "../../"
+    )
+    if ran == 2:
+        assert 'data-default-title="A clean sweep"' in page
+        assert "a clean sweep" in page
+    else:
+        assert "clean sweep" not in page.lower()
+        title = "Passed all 1 race run" if ran else "No calendar races run"
+        assert f'data-default-title="{title}"' in page
+        assert "so it is not placed" in page
+        note = "all races run passed" if ran else "no calendar races run"
+        assert note in page
 
 
 def test_standings_and_entry_pages_name_no_hidden_check(tmp_path):
