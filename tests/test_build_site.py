@@ -2419,6 +2419,16 @@ def test_race_page_funnel_comes_from_the_data(tmp_path):
         assert view["stats"][-1] == f"{data[-1]} of {data[0]} finish"
 
 
+def test_classification_secondary_lap_reads_like_the_race_card():
+    row = {"lapSeconds": None, "costUsd": 0.25, "driver": "d", "car": "c", "map": "default"}
+    html_row = site_races._finisher(1, row)
+    # Sorting by fuel shows the lap as the secondary value: "lap n/a", never "n/a lap".
+    assert 'data-lap-second="lap n/a"' in html_row
+    timed = site_races._finisher(1, dict(row, lapSeconds=95))
+    assert f'data-lap-second="{site_races.lap_text(95)} lap"' in timed
+    assert 'data-usd-second="' in timed
+
+
 def test_race_page_classification_comes_from_the_data(tmp_path):
     _, files = _race_site(tmp_path)
     race = json.loads(files["data/races/hard-review-alpha.json"])

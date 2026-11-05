@@ -531,7 +531,9 @@ def _finisher(position: int, row: Mapping[str, Any]) -> str:
     return (
         f'<li class="rc-finisher" data-lap="{"" if row["lapSeconds"] is None else row["lapSeconds"]}" '
         f'data-usd="{"" if row["costUsd"] is None else row["costUsd"]}" '
-        f'data-lap-text="{esc(lap_shown)}" data-usd-text="{esc(usd_shown)}">'
+        f'data-lap-text="{esc(lap_shown)}" data-usd-text="{esc(usd_shown)}" '
+        f'data-lap-second="{esc(f"{lap} lap" if lap else "lap n/a")}" '
+        f'data-usd-second="{esc(usd_shown)}">'
         f'<span class="rc-pos{" is-podium" if position <= 3 else ""}">P{position}</span>'
         f'<span class="rc-livery" style="background:{livery(row["car"])}" aria-hidden="true"></span>'
         '<span class="rc-who">'
@@ -1233,7 +1235,7 @@ SCRIPT = """(function () {
         row.querySelector('.rc-pos').classList.toggle('is-podium', i < 3);
         var other = by === 'lap' ? 'usd' : 'lap';
         row.querySelector('.rc-main').textContent = row.getAttribute('data-' + by + '-text');
-        row.querySelector('.rc-second').textContent = row.getAttribute('data-' + other + '-text') + (other === 'lap' ? ' lap' : '');
+        row.querySelector('.rc-second').textContent = row.getAttribute('data-' + other + '-second');
       });
       if (toggle) {
         toggle.textContent = open ? 'Show the top ' + firstRows : 'Show all ' + rows.length + ' finishers';
