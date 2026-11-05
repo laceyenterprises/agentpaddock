@@ -1084,6 +1084,15 @@ def _from_results(page: Any) -> site_routes.Builder:
     return lambda build: page(build.results)
 
 
+def _from_data_page(path: str, page: Any) -> site_routes.Builder:
+    """Adapt a data-page bundle to the registry's single-page interface."""
+    def render(build: site_routes.Build) -> str:
+        route = next(route for route in build.routes if route.path == path)
+        return page(views.SiteData(build.data), route, build.routes)[route.file]
+
+    return render
+
+
 ROUTES = site_routes.registry(
     {
         "": _from_results(index_page),
@@ -1100,7 +1109,7 @@ ROUTES = site_routes.registry(
         "dictionary/": _site_page(dictionary),
         "race-it-yourself/": _site_page(pit_lane),
         "contact/": _site_page(contact),
-        **DATA_PAGES,
+        **{path: _from_data_page(path, page) for path, page in DATA_PAGES.items()},
     }
 )
 #: ``(output file, title)`` for every registered page.
@@ -1129,7 +1138,7 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
     files: dict[str, str | bytes] = {}
     for route in ROUTES:
         if route.path in DATA_PAGES:
-            files.update(route.builder(parsed_data, route, ROUTES))
+            files.update(DATA_PAGES[route.path](parsed_data, route, ROUTES))
         else:
             files[route.file] = (
                 route.builder(inputs) if route.builder else placeholder.page(route, ROUTES)

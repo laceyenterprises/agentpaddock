@@ -1183,6 +1183,18 @@ def test_every_registered_route_builds_into_the_output(tmp_path):
     assert len({r.file for r in build_site.ROUTES}) == len(build_site.ROUTES)
 
 
+def test_data_page_builders_follow_the_registry_interface():
+    files = build_site.build(FIXTURE)
+    inputs = site_routes.Build(
+        None,
+        {name: json.loads(text) for name, text in files.items() if name.startswith("data/")},
+        build_site.ROUTES,
+    )
+    for route in build_site.ROUTES:
+        if route.path in build_site.DATA_PAGES:
+            assert route.builder(inputs) == files[route.file]
+
+
 def test_every_page_carries_the_site_marker_once_in_its_head():
     for name, page in _html_pages(build_site.build(FIXTURE)).items():
         head = page.split("<head>", 1)[1].split("</head>", 1)[0]

@@ -267,7 +267,8 @@ The garage, the pit wall and the drivers are data pages: `scripts/build_site.py`
 lists them in `DATA_PAGES`, and each builder gets the parsed data files
 (`paddock_site/views.py`, which also turns ids into display names), the route
 and the registry, and returns every file it writes. They read no results
-document directly.
+document directly. The registry adapts each data-page builder to its single-page
+interface; the site build also retains auxiliary files returned by the bundle.
 
 Driver display names use the same set of trusted and community driver IDs on
 all three pages; names shared by several hosts gain a host suffix. Links to
