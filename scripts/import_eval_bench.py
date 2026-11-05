@@ -44,7 +44,8 @@ EVAL_BENCH_PRICE_TABLE = "2026-10-25"
 EVAL_BENCH_PRICE_TABLES: dict[str, str] = {
     "REPORT-eval-bench-2026-10-29.raw.json.gz": "2026-10-25",
 }
-RUNNER = "agent-os-fleet"
+#: The paddock bench runner; its documents are trusted by default (CONTRIBUTING.md).
+RUNNER = leaderboard.PADDOCK_BENCH_RUNNER
 PROXY_PREFIX = "litellm-local-openai/"
 
 #: Fleet worker class -> (harness CLI, how it reaches the model).

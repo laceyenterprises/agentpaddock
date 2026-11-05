@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import html
+import json
+import os
 import posixpath
 import re
 import shutil
@@ -19,6 +21,7 @@ import build_site
 import leaderboard as lb
 import pytest
 import render_social_card
+from paddock_site import data as site_data
 from paddock_site import layout
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "leaderboard"
@@ -99,6 +102,7 @@ def test_site_builds_deterministically_from_fixtures(tmp_path: Path):
             build_site.board_filename(b)
             for b in lb.boards(lb.load_results(FIXTURE).records)
         }
+        | set(site_data.build(lb.load_results(FIXTURE), FIXTURE.parent / "tasks"))
     )
 
 
@@ -651,6 +655,8 @@ PRODUCT_NAME_ALLOWLIST = re.compile(
     r'|<meta name="paddock-site" content="pdw-1">'  # the activation marker
     r"|agentpaddock"  # the domain, repository and distribution
     r"|\bPADDOCK_[A-Z0-9_]+"  # environment variables
+    r'|"paddock-site-[a-z]+/v\d+"'  # site data schema ids (PDW-03)
+    r'|"paddock-(?:run|bench)"'  # the trust level and its origin, as JSON values
 )
 
 
@@ -1343,3 +1349,482 @@ def test_design_reference_is_committed_and_never_shipped():
         if isinstance(content, str):
             assert ".dc.html" not in content and "support.js" not in content, name
             assert "DCLogic" not in content, name
+
+
+# ---------------------------------------------------------------- site data (PDW-03)
+#
+# A small synthetic results tree: a paddock bench document (trusted by default),
+# a fork document (self-reported by default) and four local tasks. The golden
+# files under tests/fixtures/site-data/ are its whole data output; regenerate
+# them after an intended change with PADDOCK_WRITE_SITE_GOLDEN=1.
+
+SITE_GOLDEN = Path(__file__).resolve().parent / "fixtures" / "site-data"
+SENTINELS = (
+    "COUNT_CHECK_SENTINEL",
+    "COUNT_LABEL_SENTINEL",
+    "HIDDEN_CHECK_SENTINEL",
+    "HIDDEN_LABEL_SENTINEL",
+    "FACT_SENTINEL",
+    "FACT_LABEL_SENTINEL",
+    "UNLISTED_SENTINEL",
+)
+BENCH = "2026-01-05-bench.json"
+FORK = "2026-01-06-fork.json"
+REVIEW_CARD = """name = "Alpha circuit"
+pitch = "Review a proposed change."
+challenge = "hard-review"
+infographic = "hard-review"
+
+[[checkpoints]]
+check = "read_files"
+label = "Read the code"
+disclose = "label"
+
+[[checkpoints]]
+check = "COUNT_CHECK_SENTINEL"
+label = "COUNT_LABEL_SENTINEL"
+disclose = "count"
+
+[[checkpoints]]
+check = "fact:FACT_SENTINEL"
+label = "FACT_LABEL_SENTINEL"
+disclose = "label"
+
+[[checkpoints]]
+check = "verdict_right"
+label = "Right verdict"
+disclose = "label"
+
+[[checkpoints]]
+check = "HIDDEN_CHECK_SENTINEL"
+label = "HIDDEN_LABEL_SENTINEL"
+disclose = "hidden"
+"""
+
+
+def _checks(**failed: bool) -> list[dict]:
+    names = {
+        "read": "read_files",
+        "count": "COUNT_CHECK_SENTINEL",
+        "fact": "fact:FACT_SENTINEL",
+        "verdict": "verdict_right",
+        "hidden": "HIDDEN_CHECK_SENTINEL",
+    }
+    checks = [
+        {"name": name, "ok": not failed.get(short, False), "required": True}
+        for short, name in names.items()
+    ]
+    return checks + [{"name": "UNLISTED_SENTINEL", "ok": False, "required": False}]
+
+
+def _site_tree(tmp_path: Path, trust: dict | None = None) -> Path:
+    """Write the synthetic tree; returns its results directory."""
+    results = tmp_path / "results"
+    shutil.copytree(FIXTURE, results)
+    (results / "2026-01-03-fixture-run.json").unlink()
+    raw = json.loads((results / "prices" / "2026-01-02.json").read_text())
+    table = lb.PriceTable(raw["date"], raw["models"], raw["note"])
+    runner = lb.PADDOCK_BENCH_RUNNER
+    configs = {
+        name: {"harness": name, "runner": runner}
+        for name in ("alpha-cli", "beta-cli", "gamma-cli")
+    }
+    hashes = {name: lb.config_hash(descriptor) for name, descriptor in configs.items()}
+    identities = {
+        "A": ("alpha-cli", "acme/coder-large", "high"),
+        "C": ("alpha-cli", "acme/coder-large", "low"),
+        "D": ("beta-cli", "acme/coder-large", "high"),
+        "B": ("beta-cli", "bolt/coder-small", None),
+        "F": ("alpha-cli", "local/coder-tiny", None),
+        "E": ("gamma-cli", "bolt/coder-small", "max"),
+    }
+    counter = iter(range(1, 1000))
+
+    def record(who, task, suite, version, verdict, attempt, wall, checks=None, **extra):
+        harness, provider, reasoning = identities[who]
+        tokens = {"input": 1000, "cache": 4000, "output": 100 * attempt}
+        row = {
+            "run_id": f"synthetic-{next(counter):03d}",
+            "suite": suite,
+            "task": task,
+            "task_version": version,
+            "attempt": attempt,
+            "harness": {
+                "name": harness,
+                "version": None,
+                "config_hash": hashes[harness],
+            },
+            "model": {"provider_id": provider, "reasoning": reasoning},
+            "verdict": verdict,
+            "score": None,
+            "tokens": tokens,
+            "wall_seconds": wall,
+            "paddock_commit": None,
+            "excludedBecause": None,
+            "cost": lb.price_cost(tokens, provider, table),
+        }
+        if checks is not None:
+            row["checks"] = checks
+        row.update(extra)
+        return row
+
+    review = ("hard-review-alpha", "hard-review", 2)
+    docs = ("docs-beta", "docs", 1)
+    bench = [
+        record("A", *review, "passed", 1, 100.0, _checks()),
+        record("A", *review, "passed", 2, 120.0, _checks()),
+        record("A", *review, "failed", 3, 90.0, _checks(read=True)),
+        record("A", *review, "error", 4, None, excludedBecause="infra:error"),
+        record("D", *review, "passed", 1, 80.0, _checks()),
+        record("D", *review, "failed", 2, 85.0, _checks(verdict=True)),
+        record("D", *review, "passed", 3, 70.0),
+        record("B", *review, "failed", 1, 200.0, _checks(read=True)),
+        record("B", *review, "passed", 2, 210.0, _checks()),
+        record("B", *review, "passed", 3, 190.0, _checks()),
+        record("C", *review, "failed", 1, 300.0, _checks(hidden=True)),
+        record("C", *review, "failed", 2, 310.0, _checks(count=True)),
+        record("C", *review, "failed", 3, 320.0, _checks()),
+        record("F", *review, "failed", 1, 400.0, _checks(fact=True)),
+        record("F", *review, "passed", 2, 410.0, _checks()),
+        record("A", *docs, "passed", 1, 60.0),
+        record("A", *docs, "passed", 2, 61.0),
+        record("A", *docs, "failed", 3, 62.0),
+        record("D", *docs, "passed", 1, 50.0),
+        record("D", *docs, "failed", 2, 51.0),
+        record("D", *docs, "passed", 3, 52.0),
+        # Out of attempt order on purpose: the first result is attempt 1.
+        record("B", *docs, "failed", 2, 40.0),
+        record("B", *docs, "passed", 1, 41.0),
+        record("B", *docs, "failed", 3, 42.0),
+        record("C", *docs, "failed", 1, 30.0),
+        record("C", *docs, "passed", 2, 31.0),
+        record("C", *docs, "passed", 3, 32.0),
+        record("A", "fix-gamma", "fix", 1, "passed", 1, 20.0),
+        record("B", "fix-gamma", "fix", 1, "failed", 1, 21.0),
+        record("C", "fix-gamma", "fix", 1, "passed", 1, None),
+        # A superseded task version and a task that is not local: never races.
+        record("A", "coding-old", "coding", 1, "passed", 1, 10.0),
+        record("A", "coding-elsewhere", "coding", 1, "passed", 1, 10.0),
+    ]
+    fork = [
+        record("E", *review, "passed", 1, 10.0, _checks()),
+        record("E", *docs, "passed", 1, 10.0),
+    ]
+
+    def document(name, records, **source):
+        date, doc_id = name[:10], name[11:].removesuffix(".json")
+        used = {row["harness"]["name"] for row in records}
+        lb.write_document(
+            results / name,
+            {
+                "schema": lb.SCHEMA,
+                "id": doc_id,
+                "date": date,
+                "source": {
+                    "description": "Synthetic site-data fixture.",
+                    "evidence": "tests/test_build_site.py",
+                    **source,
+                },
+                "price_table": "2026-01-02",
+                "harness_configs": {
+                    hashes[name]: configs[name] for name in sorted(used)
+                },
+                "records": records,
+            },
+        )
+
+    document(BENCH, bench, kind="import")
+    document(
+        FORK,
+        fork,
+        kind="import",
+        fork={
+            "repository": "https://example.com/community/paddock",
+            "commit": "a" * 40,
+        },
+    )
+    if trust is not None:
+        (results / "meta" / "trust.json").write_text(
+            json.dumps({"schema": "paddock-trust/v1", "documents": trust})
+        )
+    tasks = tmp_path / "tasks"
+    for task_id, suite, version, title, card in (
+        ("hard-review-alpha", "hard-review", 2, "Synthetic review race", REVIEW_CARD),
+        ("docs-beta", "docs", 1, "Synthetic docs race", None),
+        ("fix-gamma", "fix", 1, "Synthetic fix race", None),
+        ("coding-old", "coding", 2, "Synthetic bumped race", None),
+    ):
+        (tasks / task_id).mkdir(parents=True)
+        (tasks / task_id / "task.toml").write_text(
+            f'id = "{task_id}"\ntask_version = {version}\n'
+            f'title = "{title}"\nsuite = "{suite}"\n'
+        )
+        if card:
+            (tasks / task_id / "track.toml").write_text(card)
+    return results
+
+
+def _site_files(results: Path) -> dict[str, str]:
+    return site_data.build(lb.load_results(results), results.parent / "tasks")
+
+
+def _site_json(files: dict[str, str], name: str):
+    return json.loads(files[f"data/{name}"])
+
+
+def test_site_data_matches_the_golden_file_per_schema(tmp_path, monkeypatch):
+    files = _site_files(_site_tree(tmp_path))
+    if os.environ.get("PADDOCK_WRITE_SITE_GOLDEN") == "1":
+        shutil.rmtree(SITE_GOLDEN, ignore_errors=True)
+        for name, text in files.items():
+            path = SITE_GOLDEN / name.removeprefix("data/")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+    golden = {
+        "data/" + path.relative_to(SITE_GOLDEN).as_posix(): path.read_text("utf-8")
+        for path in sorted(SITE_GOLDEN.rglob("*.json"))
+    }
+    assert files == golden
+    schemas = {
+        _site_json(files, name.removeprefix("data/"))["schema"] for name in files
+    }
+    assert schemas == set(site_data.SCHEMAS.values())
+    for name, text in files.items():
+        value = json.loads(text)
+        assert {"schema", "generatedAt", "basis"} <= set(value), name
+        assert value["generatedAt"] == "2026-01-06", name
+    # The same tree elsewhere builds the same bytes.
+    assert _site_files(_site_tree(tmp_path / "again")) == files
+
+
+def test_site_data_counts_only_trusted_documents(tmp_path):
+    files = _site_files(_site_tree(tmp_path))
+    community = _site_json(files, "community.json")
+    by_document = {row["document"] + ".json": row for row in community["documents"]}
+    assert by_document[BENCH]["trust"] == "paddock-run"
+    assert by_document[BENCH]["trustOrigin"] == "paddock-bench"
+    assert by_document[FORK]["trust"] == "self-reported"
+    assert by_document[FORK]["counted"] is False
+    listed = {(row["car"], row["trust"]) for row in community["entries"]}
+    assert ("gamma-cli", "self-reported") in listed
+    assert ("alpha-cli", "paddock-run") in listed
+    for name, text in files.items():
+        if name != "data/community.json":
+            assert "gamma-cli" not in text, name
+            assert FORK.removesuffix(".json") not in text, name
+    standings = _site_json(files, "standings.json")
+    assert standings["state"] == "live"
+    assert standings["basis"]["documents"] == [BENCH.removesuffix(".json")]
+    # A maintainer sign-off elevates the fork; it then counts in standings.
+    signed = {
+        "level": "reproduced",
+        "evidence": ["https://example.com/evidence"],
+        "sign_off": "maintainer",
+    }
+    elevated = _site_files(_site_tree(tmp_path / "signed", {FORK: signed}))
+    rows = _site_json(elevated, "standings.json")["entries"]
+    fork_rows = [row for row in rows if row["car"] == "gamma-cli"]
+    assert [row["trust"] for row in fork_rows] == ["reproduced"]
+    assert fork_rows[0]["place"] == 1
+
+
+@pytest.mark.parametrize("copy_record", [dict, deepcopy], ids=["shallow", "deep"])
+def test_site_data_resolves_trust_for_copied_first_results(
+    tmp_path, monkeypatch, copy_record
+):
+    signed = {
+        "level": "reproduced",
+        "evidence": ["https://example.com/evidence"],
+        "sign_off": "maintainer",
+    }
+    results = _site_tree(tmp_path, {FORK: signed})
+    expected = _site_files(results)
+    first_results = lb.first_results
+    monkeypatch.setattr(
+        lb,
+        "first_results",
+        lambda documents: [copy_record(record) for record in first_results(documents)],
+    )
+    assert _site_files(results) == expected
+
+
+def test_an_empty_trusted_set_awaits_sign_off_and_never_falls_back(tmp_path):
+    demoted = {BENCH: {"level": "self-reported", "evidence": [], "sign_off": None}}
+    files = _site_files(_site_tree(tmp_path, demoted))
+    standings = _site_json(files, "standings.json")
+    assert standings["state"] == "awaiting-trust-sign-off"
+    assert standings["entries"] == [] and standings["partial"] == []
+    assert _site_json(files, "races.json")["races"] == []
+    drivers = _site_json(files, "drivers.json")
+    assert drivers["ladders"] == [] and drivers["sameDriverDifferentCar"] == []
+    assert not [
+        name for name in files if name.startswith(("data/races/", "data/entries/"))
+    ]
+    for name in ("standings.json", "races.json", "drivers.json"):
+        assert _site_json(files, name)["state"] == "awaiting-trust-sign-off"
+    community = _site_json(files, "community.json")
+    assert community["state"] == "live"
+    assert {row["trust"] for row in community["documents"]} == {"self-reported"}
+    assert community["entries"]
+    # The committed fixture's single run document is not the bench: awaiting too.
+    fixture = site_data.build(lb.load_results(FIXTURE), FIXTURE.parent / "tasks")
+    assert json.loads(fixture["data/standings.json"])["state"] == (
+        "awaiting-trust-sign-off"
+    )
+
+
+def test_site_data_discloses_checkpoints_only_as_the_track_card_says(tmp_path):
+    results = _site_tree(tmp_path)
+    files = _site_files(results)
+    for name, text in files.items():
+        for sentinel in SENTINELS:
+            assert sentinel not in text, (name, sentinel)
+        assert "fact:" not in text, name
+    race = _site_json(files, "races/hard-review-alpha.json")
+    assert race["checkpoints"] == ["Read the code", "Right verdict"]
+    # Count checkpoint, docs fact (forced to count) and the unlisted check.
+    assert race["moreChecks"] == 3
+    # 13 counted runs record checks (one does not; the infra row never counts).
+    assert race["funnel"]["all"] == [13, 11, 8, 6]
+    assert race["funnel"]["byCar"]["beta-cli"][0] == 5
+    assert race["classification"]["retirements"] == {
+        "checkpoints": [
+            {"checkpoint": 1, "label": "Read the code", "runs": 1},
+            {"checkpoint": 2, "label": "Right verdict", "runs": 0},
+        ],
+        "undisclosed": 2,
+        "unclassified": 0,
+        "unrecorded": 0,
+    }
+    assert [row["lapSeconds"] for row in race["classification"]["finishers"]] == [
+        80.0,
+        100.0,
+    ]
+    stages = next(
+        row
+        for row in _site_json(files, "races.json")["races"]
+        if row["id"] == "hard-review-alpha"
+    )["stages"]
+    assert [row["label"] for row in stages["checkpoints"]] == [
+        "Read the code",
+        "Right verdict",
+    ]
+    assert stages["moreChecks"] == 3
+    # A race whose runs record no checks has no checkpoints at all.
+    docs = _site_json(files, "races/docs-beta.json")
+    assert docs["checkpoints"] is None and docs["funnel"] is None
+    assert docs["classification"]["retirements"] is None
+    # Turning the hidden checkpoint into a counted one adds one to the count
+    # and names nothing new.
+    card = results.parent / "tasks" / "hard-review-alpha" / "track.toml"
+    card.write_text(
+        card.read_text().replace('disclose = "hidden"', 'disclose = "count"')
+    )
+    recount = _site_json(_site_files(results), "races/hard-review-alpha.json")
+    assert recount["moreChecks"] == 4
+    assert recount["checkpoints"] == race["checkpoints"]
+
+
+def test_site_data_ranges_places_and_ties_equal_leaderboard(tmp_path):
+    results = _site_tree(tmp_path)
+    files = _site_files(results)
+    loaded = lb.load_results(results)
+    calendar = {("hard-review", "hard-review-alpha", 2), ("docs", "docs-beta", 1)}
+    assert [
+        (row["challenge"], row["id"], row["version"])
+        for row in json.loads(files["data/races.json"])["races"]
+        if row["calendar"]
+    ] == sorted(calendar, key=lambda key: key[1])
+    grouped: dict = {}
+    for record in lb.first_results({BENCH: loaded.documents[BENCH]}):
+        if (record["suite"], record["task"], record["task_version"]) in calendar:
+            grouped.setdefault(site_data.identity(record), []).append(record)
+    expected = [
+        {"key": key, **lb.summarize(records)}
+        for key, records in grouped.items()
+        if len(records) == len(calendar)
+    ]
+    expected.sort(key=lb.standing_key)
+    standings = _site_json(files, "standings.json")["entries"]
+    assert [(row["car"], row["driver"], row["map"]) for row in standings] == [
+        (key[0], key[2], key[3]) for key in (row["key"] for row in expected)
+    ]
+    for row, want, (place, tie) in zip(standings, expected, lb.places(expected)):
+        assert (row["k"], row["n"], row["rate"]) == (
+            want["passed"],
+            want["n"],
+            want["rate"],
+        )
+        assert (
+            (row["lo"], row["hi"]) == want["ci"] == lb.wilson(want["passed"], want["n"])
+        )
+        assert (row["place"], row["tie"]) == (place, tie)
+        assert row["costPerPass"] == want["cost_per_pass"]["usd"]
+    assert [(row["place"], row["tie"]) for row in standings] == [
+        (1, True),
+        (1, True),
+        (3, False),
+        (4, False),
+    ]
+    partial = _site_json(files, "standings.json")["partial"]
+    assert [(row["driver"], row["place"]) for row in partial] == [
+        ("local/coder-tiny", None)
+    ]
+    assert partial[0]["costPerPass"] is None
+    # Races count every counted run; ladders match leaderboard on the same runs.
+    alpha = next(
+        row
+        for row in _site_json(files, "races.json")["races"]
+        if row["id"] == "hard-review-alpha"
+    )
+    review_runs = [
+        record
+        for record in loaded.documents[BENCH]["records"]
+        if record["task"] == "hard-review-alpha" and lb.included(record)
+    ]
+    summary = lb.summarize(review_runs)
+    assert (alpha["k"], alpha["n"]) == (summary["passed"], summary["n"]) == (7, 14)
+    assert alpha["difficulty"] == lb.difficulty(7, 14) == 4
+    ladder = _site_json(files, "drivers.json")["ladders"]
+    assert [(row["driver"], row["car"]) for row in ladder] == [
+        ("acme/coder-large", "alpha-cli")
+    ]
+    assert [level["map"] for level in ladder[0]["levels"]] == ["low", "high"]
+    high = [
+        r
+        for r in review_runs
+        if site_data.identity(r)[0] == "alpha-cli" and r["model"]["reasoning"] == "high"
+    ]
+    assert ladder[0]["levels"][1]["costPerRun"] == lb.cost_per_run(high)["usd"]
+    assert (ladder[0]["levels"][1]["lo"], ladder[0]["levels"][1]["hi"]) == lb.wilson(
+        2, 3
+    )
+    sets = _site_json(files, "drivers.json")["sameDriverDifferentCar"]
+    assert [
+        (row["driver"], row["map"], [c["car"] for c in row["cars"]]) for row in sets
+    ] == [("acme/coder-large", "high", ["alpha-cli", "beta-cli"])]
+
+
+def test_site_data_entry_lists_every_first_result(tmp_path):
+    files = _site_files(_site_tree(tmp_path))
+    standings = _site_json(files, "standings.json")
+    for row in standings["entries"] + standings["partial"]:
+        entry = _site_json(files, f"entries/{row['id']}.json")
+        assert entry["totals"] == {"k": row["k"], "n": row["n"], "rate": row["rate"]}
+        assert (entry["place"], entry["tie"]) == (row["place"], row["tie"])
+    alpha = next(row for row in standings["entries"] if row["car"] == "alpha-cli")
+    entry = _site_json(files, f"entries/{alpha['id']}.json")
+    assert [(r["race"], r["calendar"], r["passed"]) for r in entry["races"]] == [
+        ("docs-beta", True, True),
+        ("fix-gamma", False, True),
+        ("hard-review-alpha", True, True),
+    ]
+    assert entry["medianLapSeconds"] == 80.0
+    assert entry["fullCalendar"] is True
+
+
+def test_build_writes_site_data_beside_the_pages(tmp_path):
+    results = _site_tree(tmp_path)
+    files = build_site.build(results)
+    assert files["data/standings.json"] == _site_files(results)["data/standings.json"]
+    assert "data/races/hard-review-alpha.json" in files

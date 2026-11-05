@@ -106,3 +106,27 @@ this prototype, not the published set, so they appear only inside a roundel.
 
 These design files are reference source: the build never reads them, ships
 them or loads their runtime.
+
+## Site data (PDW-03)
+
+Every page reads its numbers from JSON that the build writes under `site/data/`
+(`scripts/paddock_site/data.py`). The prototypes' sample data is replaced by
+these files, never copied. Nothing under `site/` is committed.
+
+| File | Schema | Shapes it serves |
+|---|---|---|
+| `data/standings.json` | `paddock-site-standings/v1` | `Standings.dc.html`, home |
+| `data/races.json` | `paddock-site-races/v1` | `Races.dc.html` |
+| `data/races/<race-id>.json` | `paddock-site-race/v1` | `Race.dc.html` |
+| `data/entries/<entry-id>.json` | `paddock-site-entry/v1` | `Entry.dc.html` |
+| `data/drivers.json` | `paddock-site-drivers/v1` | `Driver.dc.html`, the `Learn.dc.html` ladders |
+| `data/community.json` | `paddock-site-community/v1` | `Community.dc.html` |
+
+Each file carries `schema`, `generatedAt` (the newest results document's date),
+`state` and `basis`. Standings, race, entry and driver files count only results
+documents at `reproduced` or `paddock-run` (CONTRIBUTING.md "Trust levels").
+When none qualifies, `state` is `awaiting-trust-sign-off`, the lists are empty,
+and the page says so. A race is a local task at its `task.toml` version. The
+calendar is the races with at least ten counted runs. Standings place the
+entries with a first result on every calendar race and list the rest as
+`partial`. Checkpoints appear only as the race's track card discloses them.

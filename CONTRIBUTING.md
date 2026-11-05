@@ -249,8 +249,16 @@ field can bypass this exclusion.
 
 `results/meta/trust.json` is maintainer-owned, like `fairness.json`. Its schema
 is `paddock-trust/v1`; `documents` maps exact results filenames (including
-`.gz` when used) to `{level, evidence, sign_off}`. Missing entries default to
-`self-reported`; an empty mapping makes no retrospective trust claims.
+`.gz` when used) to `{level, evidence, sign_off}`. A document the mapping does
+not name takes a default from its provenance. A document produced by the
+paddock's own bench is `paddock-run`: it has no `source.fork`, no record pinned
+to an external track, and every harness descriptor in it names the bench runner
+(`runner = "agent-os-fleet"`, as `scripts/import_eval_bench.py` writes). Every
+other document, fork and community submissions included, defaults to
+`self-reported`. Those provenance fields are a claim that maintainers check
+when reviewing the results pull request. Naming a document in the mapping
+overrides its default in either direction. An empty mapping makes no
+retrospective trust claims beyond the bench default.
 
 | Level | What the evidence establishes |
 |---|---|
@@ -266,8 +274,15 @@ sign-off. Submitters leave promotions to maintainers. `validate` cross-checks
 trust documents and entry references along with costs. The main standings count
 only `reproduced` and `paddock-run` results.
 The community board shows every trust level, each with its badge. Exhibition
-admission remains separate. These are the rules for the forthcoming board
-rendering; this contract change does not implement those pages.
+admission remains separate.
+
+The site data layer (`scripts/paddock_site/data.py`) applies these rules when
+it writes `data/*.json` for the pages. Standings, race, entry and driver files
+count only `reproduced` and `paddock-run` documents. With no trusted document,
+these files say `"state": "awaiting-trust-sign-off"` and list nothing, so those
+pages never fall back to untrusted results. `data/community.json` remains
+`"state": "live"` whenever results documents exist, listing every document
+and entry with its trust badge.
 
 ## Signed answers and submission API contract
 

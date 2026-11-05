@@ -1,0 +1,158 @@
+{
+  "schema": "paddock-site-standings/v1",
+  "generatedAt": "2026-01-06",
+  "state": "live",
+  "basis": {
+    "counts": "each entry's first counted result on each calendar race",
+    "trust": [
+      "reproduced",
+      "paddock-run"
+    ],
+    "documents": [
+      "2026-01-05-bench"
+    ],
+    "races": "local tasks at the version their task.toml names",
+    "calendar": "races with at least 10 counted runs",
+    "calendarRaces": 2
+  },
+  "entries": [
+    {
+      "id": "alpha-cli-acme-coder-large-high-b92cb57c",
+      "driver": "acme/coder-large",
+      "car": "alpha-cli",
+      "map": "high",
+      "configHash": "sha256:b92cb57c0dd7eb5b9c3656c03379356f773ed490c260a6d7a48be79af95316f5",
+      "k": 2,
+      "n": 2,
+      "rate": 1.0,
+      "lo": 0.3423802239546494,
+      "hi": 1.0,
+      "place": 1,
+      "tie": true,
+      "costPerPass": 0.0038,
+      "costSource": "published-rate",
+      "tokensPerPass": 5100.0,
+      "trust": "paddock-run",
+      "challenges": {
+        "docs": {
+          "k": 1,
+          "n": 1
+        },
+        "hard-review": {
+          "k": 1,
+          "n": 1
+        }
+      }
+    },
+    {
+      "id": "beta-cli-acme-coder-large-high-bcc71e3b",
+      "driver": "acme/coder-large",
+      "car": "beta-cli",
+      "map": "high",
+      "configHash": "sha256:bcc71e3b8ecd599f67c91fcd0003b560832a9308b499a1efb947c4598bb00805",
+      "k": 2,
+      "n": 2,
+      "rate": 1.0,
+      "lo": 0.3423802239546494,
+      "hi": 1.0,
+      "place": 1,
+      "tie": true,
+      "costPerPass": 0.0038,
+      "costSource": "published-rate",
+      "tokensPerPass": 5100.0,
+      "trust": "paddock-run",
+      "challenges": {
+        "docs": {
+          "k": 1,
+          "n": 1
+        },
+        "hard-review": {
+          "k": 1,
+          "n": 1
+        }
+      }
+    },
+    {
+      "id": "beta-cli-bolt-coder-small-default-bcc71e3b",
+      "driver": "bolt/coder-small",
+      "car": "beta-cli",
+      "map": "default",
+      "configHash": "sha256:bcc71e3b8ecd599f67c91fcd0003b560832a9308b499a1efb947c4598bb00805",
+      "k": 1,
+      "n": 2,
+      "rate": 0.5,
+      "lo": 0.09453120463920084,
+      "hi": 0.9054687953607992,
+      "place": 3,
+      "tie": false,
+      "costPerPass": 0.0108,
+      "costSource": "provider-invoice-reconciled",
+      "tokensPerPass": 10200.0,
+      "trust": "paddock-run",
+      "challenges": {
+        "docs": {
+          "k": 1,
+          "n": 1
+        },
+        "hard-review": {
+          "k": 0,
+          "n": 1
+        }
+      }
+    },
+    {
+      "id": "alpha-cli-acme-coder-large-low-b92cb57c",
+      "driver": "acme/coder-large",
+      "car": "alpha-cli",
+      "map": "low",
+      "configHash": "sha256:b92cb57c0dd7eb5b9c3656c03379356f773ed490c260a6d7a48be79af95316f5",
+      "k": 0,
+      "n": 2,
+      "rate": 0.0,
+      "lo": 0.0,
+      "hi": 0.6576197760453506,
+      "place": 4,
+      "tie": false,
+      "costPerPass": null,
+      "costSource": "unknown",
+      "tokensPerPass": null,
+      "trust": "paddock-run",
+      "challenges": {
+        "docs": {
+          "k": 0,
+          "n": 1
+        },
+        "hard-review": {
+          "k": 0,
+          "n": 1
+        }
+      }
+    }
+  ],
+  "partial": [
+    {
+      "id": "alpha-cli-local-coder-tiny-default-b92cb57c",
+      "driver": "local/coder-tiny",
+      "car": "alpha-cli",
+      "map": "default",
+      "configHash": "sha256:b92cb57c0dd7eb5b9c3656c03379356f773ed490c260a6d7a48be79af95316f5",
+      "k": 0,
+      "n": 1,
+      "rate": 0.0,
+      "lo": 0.0,
+      "hi": 0.7934506882081973,
+      "place": null,
+      "tie": false,
+      "costPerPass": null,
+      "costSource": "unknown",
+      "tokensPerPass": null,
+      "trust": "paddock-run",
+      "challenges": {
+        "hard-review": {
+          "k": 0,
+          "n": 1
+        }
+      }
+    }
+  ]
+}

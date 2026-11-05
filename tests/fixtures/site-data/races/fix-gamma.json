@@ -1,0 +1,58 @@
+{
+  "schema": "paddock-site-race/v1",
+  "generatedAt": "2026-01-06",
+  "state": "live",
+  "basis": {
+    "counts": "funnel: every counted run recording checks; classification: each entry's first counted result",
+    "trust": [
+      "reproduced",
+      "paddock-run"
+    ],
+    "documents": [
+      "2026-01-05-bench"
+    ],
+    "races": "local tasks at the version their task.toml names",
+    "calendar": "races with at least 10 counted runs",
+    "calendarRaces": 2
+  },
+  "id": "fix-gamma",
+  "name": "Gamma",
+  "title": "Synthetic fix race",
+  "challenge": "fix",
+  "version": 1,
+  "calendar": false,
+  "n": 3,
+  "k": 2,
+  "rate": 0.6666666666666666,
+  "lo": 0.2076595988078242,
+  "hi": 0.9385080559790691,
+  "difficulty": null,
+  "checkpoints": null,
+  "moreChecks": null,
+  "funnel": null,
+  "classification": {
+    "starters": 3,
+    "finishers": [
+      {
+        "entry": "alpha-cli-acme-coder-large-high-b92cb57c",
+        "driver": "acme/coder-large",
+        "car": "alpha-cli",
+        "map": "high",
+        "configHash": "sha256:b92cb57c0dd7eb5b9c3656c03379356f773ed490c260a6d7a48be79af95316f5",
+        "lapSeconds": 20.0,
+        "costUsd": 0.0038
+      },
+      {
+        "entry": "alpha-cli-acme-coder-large-low-b92cb57c",
+        "driver": "acme/coder-large",
+        "car": "alpha-cli",
+        "map": "low",
+        "configHash": "sha256:b92cb57c0dd7eb5b9c3656c03379356f773ed490c260a6d7a48be79af95316f5",
+        "lapSeconds": null,
+        "costUsd": 0.0038
+      }
+    ],
+    "retired": 1,
+    "retirements": null
+  }
+}
