@@ -77,12 +77,12 @@ today's leaderboard; the ticket replaces it by registering its builder in
 | `/` | `index.html` | lockup | none | today's leaderboard | PDW-04 |
 | `/learn/` | `learn/index.html` | bar | `track-map` | placeholder | PDW-05 |
 | `/races/` | `races/index.html` | bar | `race-calendar` | placeholder | PDW-06 |
-| `/standings/` | `standings/index.html` | bar | `timing-tower` | placeholder | PDW-07 |
+| `/standings/` | `standings/index.html` | bar | `timing-tower` | the timing tower | PDW-07 |
 | `/garage/` | `garage/index.html` | bar | `setup-sheet` | placeholder | PDW-08 |
 | `/pit-wall/` | `pit-wall/index.html` | bar | `pit-wall` | placeholder | PDW-08 |
 | `/community/` | `community/index.html` | panel | `entry` | placeholder | PDW-09 |
 | `/drivers/` | `drivers/index.html` | panel | `driver` | placeholder | PDW-08 |
-| `/entries/` | `entries/index.html` | panel | `podium` | placeholder | PDW-07 |
+| `/entries/` | `entries/index.html` | panel | `podium` | every entry's season, listed | PDW-07 |
 | `/rulebook/` | `rulebook/index.html` | panel | `rulebook` | placeholder | PDW-09 |
 | `/dictionary/` | `dictionary/index.html` | panel | `briefing` | placeholder | PDW-09 |
 | `/race-it-yourself/` | `race-it-yourself/index.html` | panel | `pit-lane` | placeholder | PDW-09 |
@@ -130,3 +130,34 @@ and the page says so. A race is a local task at its `task.toml` version. The
 calendar is the races with at least ten counted runs. Standings place the
 entries with a first result on every calendar race and list the rest as
 `partial`. Checkpoints appear only as the race's track card discloses them.
+
+## Standings and entry pages (PDW-07)
+
+`scripts/paddock_site/standings.py` builds `/standings/`, `/entries/` and one
+`/entries/<entry-id>/` page per entry in `data/standings.json`, placed or
+partial. Page builders take a `routes.Build` (the results, the parsed
+`data/*.json` and the route registry), so a page reads its numbers from the
+data files and never from the prototypes.
+
+- Standings follows `Standings.dc.html`: hero, then the "How to read these
+  results" note, the scope panel, the rank switch (avg pass rate or fuel bill),
+  the honest-ranges switch with its explainer, and the rows on a 75-100% scale
+  whose header shares the rows' grid. A range below 75% is held to the left
+  end. Rows are `<details>`, so they open without JavaScript. The board shows
+  the top 16 in either ranking, keeping a tie at the cut whole, until "Show
+  all" is pressed. Unpriced entries have no fuel rank and do not form a tie.
+- An entry page follows `Entry.dc.html`: the placed entries as chips, the hero
+  with its honest range on a 50-100% scale, four tiles, and the season grid,
+  one cell per calendar race grouped by challenge (checkered, DNF, or a dashed
+  cell for a race a partial entry has not run). A tapped flag shows its lap
+  and fuel. Chips with the same driver, car and map show their setup hashes.
+  A clean sweep means every calendar race was run and passed; partial entries
+  describe only the races they ran.
+- `/entries/` lists the placed entries in standings order and the partial ones
+  behind a disclosure.
+- Drivers show as their provider id (`openai/gpt-6.1-sol`): the results carry
+  no display names. Cars use the names in `design/vocabulary.md`.
+- `standings.js` only switches the view (ranking, ranges, all rows, the tapped
+  flag). Without it the board shows the pass ranking with ranges, every row.
+- With no trusted results both pages show the awaiting-trust state and no
+  entry page is built.

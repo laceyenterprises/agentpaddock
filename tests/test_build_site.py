@@ -97,7 +97,13 @@ def test_site_builds_deterministically_from_fixtures(tmp_path: Path):
     assert build_site.build(moved) == first
     assert set(first) == (
         {name for name, _ in build_site.PAGES}
-        | {"paddock.css", "paddock.js", "favicon.svg", "social-card.png"}
+        | {
+            "paddock.css",
+            "paddock.js",
+            "standings.js",
+            "favicon.svg",
+            "social-card.png",
+        }
         | {
             build_site.board_filename(b)
             for b in lb.boards(lb.load_results(FIXTURE).records)
@@ -461,7 +467,10 @@ def test_brand_assets_and_navigation_on_every_page():
         assert f'<script src="{root}paddock.js" defer></script>' in page
         assert 'aria-label="Agent Paddock home"' in page and "PADDOCK" in page
         assert page.count("fonts.googleapis.com/css2?") == 1 and "display=swap" in page
-        assert page.count("<script") == 3 and "<style" not in page
+        # A page with its own view switches (PDW-07) loads one shared script for them.
+        own = f'<script src="{root}{standings_pages.SCRIPT_NAME}" defer></script>'
+        assert page.count(own) == (1 if name == "standings/index.html" else 0), name
+        assert page.count("<script") == 3 + page.count(own) and "<style" not in page
         assert "<h1>" in page and page.count("<h1>") == 1
         assert {other for other, _ in build_site.PAGES} <= _local_links(name, page)
         # Every link marked current points at the page itself (a board page
@@ -657,6 +666,7 @@ PRODUCT_NAME_ALLOWLIST = re.compile(
     r"|\bPADDOCK_[A-Z0-9_]+"  # environment variables
     r'|"paddock-site-[a-z]+/v\d+"'  # site data schema ids (PDW-03)
     r'|"paddock-(?:run|bench)"'  # the trust level and its origin, as JSON values
+    r"|>Independent and open source: about the paddock<"  # the results note (PDW-07)
 )
 
 
@@ -690,6 +700,10 @@ def test_no_page_names_the_product_bare_paddock():
         assert not _stray_product_names(page), (name, _stray_product_names(page))
 
 
+#: Pages whose hero follows its prototype's eyebrow (PDW-07).
+PROTOTYPE_HEROES = {"standings/index.html", "entries/index.html"}
+
+
 def test_every_page_title_and_eyebrow_names_agent_paddock():
     files = build_site.build(FIXTURE)
     for name, page in files.items():
@@ -699,6 +713,10 @@ def test_every_page_title_and_eyebrow_names_agent_paddock():
         titles = re.findall(r"<title>(.*?)</title>", head)
         assert len(titles) == 1 and titles[0].endswith(" · Agent Paddock"), name
     for name, _ in build_site.PAGES:
+        if name in PROTOTYPE_HEROES:
+            # Pages rebuilt from a prototype carry its own eyebrow over the h1.
+            assert re.search(r'<p class="st-eyebrow">.*?</p><h1>', files[name]), name
+            continue
         assert '<span class="eyebrow">Agent Paddock</span><h1>' in files[name], name
     methodology = files["methodology.html"]
     assert "the eval bench that preceded Agent Paddock," in methodology
@@ -1828,3 +1846,364 @@ def test_build_writes_site_data_beside_the_pages(tmp_path):
     files = build_site.build(results)
     assert files["data/standings.json"] == _site_files(results)["data/standings.json"]
     assert "data/races/hard-review-alpha.json" in files
+
+
+# ---------------------------------------------------------------- standings and entries (PDW-07)
+
+from paddock_site import standings as standings_pages  # noqa: E402
+
+ROW = re.compile(
+    r'<li class="st-item" data-entry="([^"]+)".*?</details></li>', re.DOTALL
+)
+
+
+def _rows(page: str) -> list[tuple[str, str]]:
+    """``(entry id, row markup)`` for every standings row, in page order."""
+    return [(match[1], match[0]) for match in ROW.finditer(page)]
+
+
+def _expected_standings(results: Path) -> list[dict]:
+    """The placed rows as leaderboard.py orders them, computed here from scratch."""
+    loaded = lb.load_results(results)
+    calendar = {("hard-review", "hard-review-alpha", 2), ("docs", "docs-beta", 1)}
+    grouped: dict = {}
+    for record in lb.first_results({BENCH: loaded.documents[BENCH]}):
+        if (record["suite"], record["task"], record["task_version"]) in calendar:
+            grouped.setdefault(site_data.identity(record), []).append(record)
+    rows = [
+        {"key": key, **lb.summarize(records)}
+        for key, records in grouped.items()
+        if len(records) == len(calendar)
+    ]
+    rows.sort(key=lb.standing_key)
+    return rows
+
+
+def test_standings_carries_the_results_note_after_the_hero(tmp_path):
+    for files in (build_site.build(_site_tree(tmp_path)), build_site.build(FIXTURE)):
+        page = files["standings/index.html"]
+        main = _between(page, '<main class="wrap">', "</main>")
+        hero = main.index('<section class="st-hero">')
+        note = main.index('data-pdk="results-note"')
+        assert main.count('data-pdk="results-note"') == 1
+        assert hero < note
+        assert main.index("<h1>The timing tower.</h1>") < note
+        # Nothing but the hero comes before the note.
+        assert "<section" not in main[main.index("</section>", hero) + 10 : note - 30]
+        block = main[note : main.index("</section>", note)]
+        assert "How to read these results" in block
+        assert "the same automated checks grade every run" in block
+        assert "It is not a comprehensive ranking" in block
+        assert '<use href="#rulebook"/>' in block
+        links = _local_links("standings/index.html", block)
+        assert links == {"contact/index.html", "rulebook/index.html"}
+        assert ">Independent and open source: about the paddock<" in block
+        assert ">Read the method<" in block
+    live = build_site.build(_site_tree(tmp_path / "again"))["standings/index.html"]
+    assert "AI agents race a fixed calendar of 2 tasks" in live
+
+
+def test_standings_order_and_ties_equal_leaderboard(tmp_path):
+    results = _site_tree(tmp_path)
+    page = build_site.build(results)["standings/index.html"]
+    expected = _expected_standings(results)
+    ids = site_data.entry_ids(row["key"] for row in expected)
+    rows = _rows(page)
+    assert [entry for entry, _ in rows] == [ids[row["key"]] for row in expected]
+    labels = [
+        re.search(r'<span class="st-by-pass">([^<]+)</span>', markup)[1]
+        for _, markup in rows
+    ]
+    want = [f"={place}" if tie else str(place) for place, tie in lb.places(expected)]
+    assert labels == want == ["=1", "=1", "3", "4"]
+    for (_, markup), row in zip(rows, expected):
+        value = re.search(
+            r'<span class="st-value num"><span class="st-by-pass">([^<]+)<', markup
+        )
+        assert value[1] == f"{row['rate'] * 100:.1f}%"
+        assert (
+            f"honest range {row['ci'][0] * 100:.1f}% to {row['ci'][1] * 100:.1f}%"
+            in markup
+        )
+    # The photo finish names the tie leaderboard.py found.
+    assert "<b>Photo finish.</b> The top two share" in page
+    # The rows ranked by fuel bill: cheapest per race passed first, no price last.
+    standings = json.loads(build_site.build(results)["data/standings.json"])["entries"]
+    fuel = standings_pages.fuel_ranks(standings)
+    for (_, markup), (order, label) in zip(rows, fuel):
+        assert f'data-fuel-rank="{order}"' in markup
+        assert f'<span class="st-by-fuel">{label}</span>' in markup
+    by_fuel = sorted(range(len(standings)), key=lambda i: fuel[i][0])
+    priced = [
+        standings[i]["costPerPass"]
+        for i in by_fuel
+        if standings[i]["costPerPass"] is not None
+    ]
+    assert priced == sorted(priced)
+
+
+def test_fuel_ranks_tie_equal_bills_and_put_no_price_last():
+    entries = [
+        {"costPerPass": 0.2},
+        {"costPerPass": None},
+        {"costPerPass": 0.1},
+        {"costPerPass": 0.2},
+        {"costPerPass": None},
+    ]
+    assert standings_pages.fuel_ranks(entries) == [
+        (1, "=2"),
+        (3, "–"),
+        (0, "1"),
+        (2, "=2"),
+        (4, "–"),
+    ]
+
+
+def test_top_rows_keep_a_tie_at_the_cut_whole():
+    places = [1, 1, 3, 3, 3, 6]
+    rows = [{"place": place} for place in places]
+    assert standings_pages.top_by_pass(rows, top=3) == 5
+    assert standings_pages.top_by_pass(rows, top=2) == 2
+    assert standings_pages.top_by_pass(rows, top=10) == 6
+
+
+@pytest.mark.parametrize(
+    ("costs", "top", "expected"),
+    [
+        ([0.2, None, 0.1, 0.2, None], 2, 3),
+        ([0.2, None, 0.1, 0.2, None], 4, 4),
+        ([None, None, None], 2, 2),
+        ([0.1], 16, 1),
+        ([], 16, 0),
+    ],
+)
+def test_top_fuel_rows_keep_priced_ties_whole(costs, top, expected):
+    entries = [{"costPerPass": cost} for cost in costs]
+    assert standings_pages.top_by_fuel(entries, top=top) == expected
+
+
+def test_board_keeps_fuel_tie_at_sixteen_visible(tmp_path):
+    files = _site_files(_site_tree(tmp_path))
+    standings = _site_json(files, "standings.json")
+    template = standings["entries"][0]
+    costs = list(range(1, 16)) + [16, 16, 18, None]
+    standings["entries"] = [
+        {
+            **template,
+            "id": f"entry-{i}",
+            "place": i + 1,
+            "tie": False,
+            "costPerPass": cost,
+        }
+        for i, cost in enumerate(reversed(costs))
+    ]
+    markup = standings_pages.board("../", standings, _site_json(files, "races.json"))
+    rows = _rows(markup)
+    assert len(rows) == 19
+    for (_, row), entry in zip(rows, standings["entries"]):
+        expected = entry["costPerPass"] is not None and entry["costPerPass"] <= 16
+        assert f'data-top-fuel="{int(expected)}"' in row
+    assert sum('data-top-fuel="1"' in row for _, row in rows) == 17
+    assert sum('data-top-pass="1"' in row for _, row in rows) == 16
+    assert markup.count('<span class="st-by-fuel">=16</span>') == 2
+
+
+def test_entry_chips_disambiguate_duplicate_setups(tmp_path):
+    files = _site_files(_site_tree(tmp_path))
+    standings = _site_json(files, "standings.json")
+    first = standings["entries"][0]
+    first["configHash"] = "sha256:" + "a" * 64
+    second = {**first, "id": "other-setup", "configHash": "sha256:" + "b" * 64}
+    unique = {**first, "id": "unique", "driver": "other/driver"}
+    standings["entries"] = [first, second, unique]
+    chips = standings_pages._chips(first["id"], standings, "../../")
+    links = re.findall(r"<a\b.*?</a>", chips)
+    assert len(links) == 3
+    assert 'aria-current="page"' in links[0]
+    assert 'aria-current="page"' not in links[1]
+    assert "setup <code>aaaaaaaa</code>" in links[0]
+    assert "setup <code>bbbbbbbb</code>" in links[1]
+    assert "setup" not in links[2]
+
+
+def test_every_standings_row_links_to_a_built_entry_page(tmp_path):
+    files = build_site.build(_site_tree(tmp_path))
+    standings = json.loads(files["data/standings.json"])
+    rows = _rows(files["standings/index.html"])
+    assert rows
+    for entry, markup in rows:
+        links = _local_links("standings/index.html", markup)
+        target = f"entries/{entry}/index.html"
+        assert links == {target}, entry
+        assert target in files
+        assert "See its whole season, race by race" in markup
+    # One page per standings entry, placed or partial, and no others.
+    built = {name for name in files if re.fullmatch(r"entries/[^/]+/index\.html", name)}
+    assert built == {
+        f"entries/{row['id']}/index.html"
+        for row in standings["entries"] + standings["partial"]
+    }
+    # The landing page lists every one of them.
+    landing = _local_links("entries/index.html", files["entries/index.html"])
+    assert built <= landing
+    for name in built:
+        page = files[name]
+        # Entry pages mark the entries route in the nav and resolve every link.
+        assert 'href="../../entries/index.html" aria-current="page"' in page
+        for link in _local_links(name, page):
+            assert link in files, (name, link)
+
+
+def _left(style: str, prop: str) -> float:
+    return float(re.search(rf"{prop}:([0-9.]+)%", style)[1])
+
+
+def test_scale_positions_match_values(tmp_path):
+    files = build_site.build(_site_tree(tmp_path))
+    page = files["standings/index.html"]
+    standings = json.loads(files["data/standings.json"])["entries"]
+
+    def at(value: float, low: int, high: int) -> float:
+        return min(100.0, max(0.0, (value * 100 - low) / (high - low) * 100))
+
+    # The scale and the rows share one grid, so the ticks sit over the bars.
+    scale = _between(page, '<div class="st-scale st-grid', "</div>")
+    ticks = re.findall(r'style="left:([0-9.]+)%" data-value="(\d+)"', scale)
+    assert [int(value) for _, value in ticks] == [75, 80, 85, 90, 95, 100]
+    for left, value in ticks:
+        assert float(left) == pytest.approx(at(int(value) / 100, 75, 100), abs=0.05)
+    assert '<summary class="st-row st-grid">' in page
+    for (_, markup), row in zip(_rows(page), standings):
+        bar = re.search(
+            r'<span class="st-band" style="(left:[^"]+)"></span>'
+            r'<span class="st-dot" style="(left:[^"]+)"></span>',
+            markup,
+        )
+        band, dot = bar[1], bar[2]
+        assert _left(band, "left") == pytest.approx(at(row["lo"], 75, 100), abs=0.05)
+        assert _left(band, "width") == pytest.approx(
+            at(row["hi"], 75, 100) - at(row["lo"], 75, 100), abs=0.1
+        )
+        assert _left(dot, "left") == pytest.approx(at(row["rate"], 75, 100), abs=0.05)
+    # A value below the scale is held to its left end, never drawn outside.
+    assert standings_pages.scale_pos(0.5) == 0.0
+    assert standings_pages.scale_pos(1.0) == 100.0
+    # The entry hero draws its range on 50-100%.
+    for row in standings:
+        hero = files[f"entries/{row['id']}/index.html"]
+        bar = re.search(
+            r'<span class="en-range"[^>]*><span class="st-band" style="([^"]+)"></span>'
+            r'<span class="st-dot" style="([^"]+)"></span>',
+            hero,
+        )
+        assert _left(bar[1], "left") == pytest.approx(at(row["lo"], 50, 100), abs=0.05)
+        assert _left(bar[2], "left") == pytest.approx(
+            at(row["rate"], 50, 100), abs=0.05
+        )
+        assert "scale 50% to 100%" in hero
+
+
+def test_entry_grid_has_one_flag_per_calendar_race(tmp_path):
+    files = build_site.build(_site_tree(tmp_path))
+    standings = json.loads(files["data/standings.json"])
+    calendar = [
+        r for r in json.loads(files["data/races.json"])["races"] if r["calendar"]
+    ]
+    assert len(calendar) == 2
+    for row in standings["entries"] + standings["partial"]:
+        page = files[f"entries/{row['id']}/index.html"]
+        entry = json.loads(files[f"data/entries/{row['id']}.json"])
+        grid = _between(page, "data-en-season>", '<div class="en-pick"')
+        cells = re.findall(r'class="en-flag (pass|dnf|none)"', grid)
+        assert len(cells) == len(calendar), row["id"]
+        ran = {race["race"]: race for race in entry["races"] if race["calendar"]}
+        for race in calendar:
+            if race["id"] in ran:
+                result = "pass" if ran[race["id"]]["passed"] else "dnf"
+                assert f'class="en-flag {result}"' in grid
+                assert f'data-race="{race["id"]}"' in grid
+            else:
+                assert f'aria-label="{race["name"]}, not raced"' in grid
+        # Races off the calendar never get a flag.
+        for race in entry["races"]:
+            if not race["calendar"]:
+                assert f'data-race="{race["race"]}"' not in grid
+        assert f"{row['k']} of {row['n']} races passed" in page
+    # A tapped flag carries its lap and fuel.
+    alpha = next(r for r in standings["entries"] if r["car"] == "alpha-cli")
+    page = files[f"entries/{alpha['id']}/index.html"]
+    assert 'data-line="Checkered flag · lap 1:40 · fuel' in page
+    partial = standings["partial"][0]
+    assert "Not placed" in files[f"entries/{partial['id']}/index.html"]
+
+
+def test_standings_and_entries_await_trust_sign_off(tmp_path):
+    demoted = {BENCH: {"level": "self-reported", "evidence": [], "sign_off": None}}
+    files = build_site.build(_site_tree(tmp_path, demoted))
+    for name in ("standings/index.html", "entries/index.html"):
+        page = files[name]
+        assert 'data-state="awaiting-trust-sign-off"' in page, name
+        assert 'class="st-item"' not in page and "en-list-row" not in page, name
+        assert "gamma-cli" not in page, name
+    assert not [name for name in files if re.match(r"entries/[^/]+/index\.html", name)]
+
+
+@pytest.mark.parametrize("bucket", ["entries", "partial"])
+def test_entry_pages_ignore_rows_awaiting_trust_sign_off(bucket):
+    # No race or entry files: the awaiting state must be checked before loading them.
+    standings = {
+        "state": standings_pages.AWAITING,
+        "entries": [],
+        "partial": [],
+    }
+    standings[bucket] = [{"id": "untrusted-entry"}]
+    build = site_routes.Build(
+        results=None, data={"data/standings.json": standings}, routes=()
+    )
+    assert standings_pages.entry_pages(build) == {}
+
+
+@pytest.mark.parametrize("ran", [0, 1, 2])
+def test_clean_sweep_requires_a_complete_calendar(tmp_path, ran):
+    files = _site_files(_site_tree(tmp_path))
+    standings = _site_json(files, "standings.json")
+    row = standings["entries"][0]
+    entry = _site_json(files, f"entries/{row['id']}.json")
+    entry["races"] = [race for race in entry["races"] if race["calendar"]][:ran]
+    for race in entry["races"]:
+        race["passed"] = True
+    entry["place"] = row["place"] if ran == 2 else None
+    entry["challenges"] = {"docs": {"k": ran, "n": ran}}
+    entry["totals"].update(k=ran, n=ran, rate=1.0 if ran else 0.0)
+    page = standings_pages.entry_body(
+        entry, standings, _site_json(files, "races.json"), "../../"
+    )
+    if ran == 2:
+        assert 'data-default-title="A clean sweep"' in page
+        assert "a clean sweep" in page
+    else:
+        assert "clean sweep" not in page.lower()
+        title = "Passed all 1 race run" if ran else "No calendar races run"
+        assert f'data-default-title="{title}"' in page
+        assert "so it is not placed" in page
+        note = "all races run passed" if ran else "no calendar races run"
+        assert note in page
+
+
+def test_standings_and_entry_pages_name_no_hidden_check(tmp_path):
+    files = build_site.build(_site_tree(tmp_path))
+    pages = {
+        name: text
+        for name, text in files.items()
+        if name.startswith(("standings/", "entries/"))
+    }
+    assert len(pages) > 2
+    for name, text in pages.items():
+        for sentinel in SENTINELS:
+            assert sentinel not in text, (name, sentinel)
+        assert "fact:" not in text, name
+        assert "faster" not in text.lower(), name
+        # Only the published sprite and the race-type marks are drawn.
+        uses = set(re.findall(r'<use href="#([^"]+)"', text))
+        marks = {mark for _l, mark, _b in site_glyphs.RACE_TYPES.values()}
+        assert uses <= PUBLISHED_GLYPHS | marks | {"broadcast"}, (name, uses)

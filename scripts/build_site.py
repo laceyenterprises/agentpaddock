@@ -36,6 +36,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
+import json
 import re
 import struct
 import sys
@@ -48,6 +49,7 @@ import leaderboard as lb
 from paddock_site import data as site_data
 from paddock_site import layout, placeholder
 from paddock_site import routes as site_routes
+from paddock_site import standings as standings_pages
 from paddock_site.layout import (  # re-exported for callers and tests
     CARD_ALT as CARD_ALT,
     CARD_NAME,
@@ -1048,13 +1050,20 @@ def card_problem(png: bytes) -> str:
 #: Every page the site builds, in nav order. Today's board pages are built by
 #: the functions above; a page ticket adds its builder here (which also keeps
 #: its merge inside the pages workflow's ``scripts/build_site.py`` path filter).
+def _from_results(page: Any) -> site_routes.Builder:
+    """A builder for one of today's board pages, which read only the results."""
+    return lambda build: page(build.results)
+
+
 ROUTES = site_routes.registry(
     {
-        "": index_page,
-        "matrix.html": matrix_page,
-        "tasks.html": tasks_page,
-        "changelog.html": changelog_page,
-        "methodology.html": methodology_page,
+        "": _from_results(index_page),
+        "standings/": standings_pages.standings_page,
+        "entries/": standings_pages.entries_page,
+        "matrix.html": _from_results(matrix_page),
+        "tasks.html": _from_results(tasks_page),
+        "changelog.html": _from_results(changelog_page),
+        "methodology.html": _from_results(methodology_page),
     }
 )
 #: ``(output file, title)`` for every registered page.
@@ -1070,24 +1079,33 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
         raise FileNotFoundError(
             f"{CARD_NAME} is missing; run python3 scripts/render_social_card.py"
         ) from exc
+    # The site data layer (PDW-03): data/*.json, from the same results and the
+    # local tasks beside them. The pages read their numbers from these files.
+    data_files = site_data.build(results, results_dir.parent / "tasks")
+    inputs = site_routes.Build(
+        results,
+        {name: json.loads(text) for name, text in data_files.items()},
+        ROUTES,
+    )
     files: dict[str, str | bytes] = {}
     for route in ROUTES:
         files[route.file] = (
-            route.builder(results) if route.builder else placeholder.page(route, ROUTES)
+            route.builder(inputs) if route.builder else placeholder.page(route, ROUTES)
         )
+    # One page per standings entry (PDW-07).
+    files.update(standings_pages.entry_pages(inputs))
     files.update(
         {
-            "paddock.css": layout.stylesheet(STYLE),
+            "paddock.css": layout.stylesheet(STYLE + standings_pages.CSS),
             SCRIPT_NAME: layout.SCRIPT,
+            standings_pages.SCRIPT_NAME: standings_pages.SCRIPT,
             "favicon.svg": FAVICON,
             CARD_NAME: card,
         }
     )
     for board in lb.boards(results.records):
         files[board_filename(board)] = board_page(board)
-    # The site data layer (PDW-03): data/*.json, from the same results and the
-    # local tasks beside them.
-    files.update(site_data.build(results, results_dir.parent / "tasks"))
+    files.update(data_files)
     return files
 
 
