@@ -1100,6 +1100,14 @@ def _from_standings(builder: site_routes.Builder) -> Callable[[SiteInputs], str]
     ))
 
 
+def _site_page(module: Any) -> Callable[[SiteInputs], str]:
+    return lambda site: module.page(
+        site.results,
+        {name: json.loads(text) for name, text in site.data.items()},
+        ROUTES,
+    )
+
+
 ROUTES = site_routes.registry(
     {
     "": home_page,
@@ -1111,11 +1119,11 @@ ROUTES = site_routes.registry(
         "tasks.html": _from_results(tasks_page),
         "changelog.html": _from_results(changelog_page),
         "methodology.html": _from_results(methodology_page),
-    "community/": _from_standings(community.page),
-    "rulebook/": _from_standings(rulebook.page),
-    "dictionary/": _from_standings(dictionary.page),
-    "race-it-yourself/": _from_standings(pit_lane.page),
-    "contact/": _from_standings(contact.page),
+    "community/": _site_page(community),
+    "rulebook/": _site_page(rulebook),
+    "dictionary/": _site_page(dictionary),
+    "race-it-yourself/": _site_page(pit_lane),
+    "contact/": _site_page(contact),
     }
 )
 #: ``(output file, title)`` for every registered page.
