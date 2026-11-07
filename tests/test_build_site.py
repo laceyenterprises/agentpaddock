@@ -3051,6 +3051,8 @@ def test_home_fuel_card_compares_a_shared_finish(tmp_path):
     # Without two priced entries sharing a place, the card makes no comparison.
     alone = site_home.fuel_card({"entries": standings["entries"][1:]})
     assert "Same finish" not in alone and "The fuel bill." in alone
+    free = site_home.fuel_card({"entries": [dict(standings["entries"][0], costPerPass=0.0)]})
+    assert "best-placed priced entry" in free
 
 
 def test_home_without_trusted_results_says_so(tmp_path):

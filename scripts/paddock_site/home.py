@@ -573,7 +573,7 @@ def fuel_card(standings: Mapping[str, Any]) -> str:
             f"{entry_name(dear)}, tied on the finish, pays {usd(dear['costPerPass'])}."
         )
     else:
-        priced = [e for e in standings.get("entries", []) if e.get("costPerPass")]
+        priced = [e for e in standings.get("entries", []) if e.get("costPerPass") is not None]
         if priced:
             best = priced[0]
             title = "The fuel bill."
