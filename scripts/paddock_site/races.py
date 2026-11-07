@@ -528,10 +528,14 @@ def _finisher(position: int, row: Mapping[str, Any]) -> str:
     usd = usd_text(row["costUsd"])
     lap_shown = lap or "n/a"
     usd_shown = usd or "no price"
+    lap_second = "lap n/a" if row["lapSeconds"] is None else f"{lap} lap"
+    usd_second = usd_shown
     return (
         f'<li class="rc-finisher" data-lap="{"" if row["lapSeconds"] is None else row["lapSeconds"]}" '
         f'data-usd="{"" if row["costUsd"] is None else row["costUsd"]}" '
-        f'data-lap-text="{esc(lap_shown)}" data-usd-text="{esc(usd_shown)}">'
+        f'data-lap-text="{esc(lap_shown)}" data-usd-text="{esc(usd_shown)}" '
+        f'data-lap-second="{esc(lap_second)}" '
+        f'data-usd-second="{esc(usd_second)}">'
         f'<span class="rc-pos{" is-podium" if position <= 3 else ""}">P{position}</span>'
         f'<span class="rc-livery" style="background:{livery(row["car"])}" aria-hidden="true"></span>'
         '<span class="rc-who">'
@@ -539,7 +543,7 @@ def _finisher(position: int, row: Mapping[str, Any]) -> str:
         f'<span class="rc-map">{esc(map_text(row["map"]))}</span></span>'
         '<span class="rc-values">'
         f'<span class="rc-main">{esc(lap_shown)}</span>'
-        f'<span class="rc-second">{esc(usd_shown)}</span></span></li>'
+        f'<span class="rc-second">{esc(usd_second)}</span></span></li>'
     )
 
 
@@ -1233,7 +1237,7 @@ SCRIPT = """(function () {
         row.querySelector('.rc-pos').classList.toggle('is-podium', i < 3);
         var other = by === 'lap' ? 'usd' : 'lap';
         row.querySelector('.rc-main').textContent = row.getAttribute('data-' + by + '-text');
-        row.querySelector('.rc-second').textContent = row.getAttribute('data-' + other + '-text') + (other === 'lap' ? ' lap' : '');
+        row.querySelector('.rc-second').textContent = row.getAttribute('data-' + other + '-second');
       });
       if (toggle) {
         toggle.textContent = open ? 'Show the top ' + firstRows : 'Show all ' + rows.length + ' finishers';
