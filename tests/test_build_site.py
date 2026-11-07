@@ -480,11 +480,13 @@ def test_brand_assets_and_navigation_on_every_page():
         assert {other for other, _ in build_site.PAGES} <= _local_links(name, page)
         # Every link marked current points at the page itself (a board page
         # belongs to the leaderboard), and the page is marked somewhere.
-        current = {
-            _resolve(name, a["href"])
+        current_links = [
+            a
             for t, a in elements
-            if t == "a" and a.get("aria-current") == "page"
-        }
+            if t == "a" and "aria-current" in a
+        ]
+        assert all(a["aria-current"] == "page" for a in current_links), name
+        current = {_resolve(name, a["href"]) for a in current_links}
         assert current == {"index.html" if name.startswith("board-") else name}
         assert f"{build_site.REPO_URL}/blob/main/LICENSE" in page
         assert "© 2026 Lacey Enterprises LLC" in page
