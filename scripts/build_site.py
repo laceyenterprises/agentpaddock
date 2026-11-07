@@ -93,7 +93,6 @@ body::before {
   z-index: 10; background: var(--paper);
 }
 a { color: var(--blue-ink); text-underline-offset: 3px; }
-a:hover { color: var(--blue-ink); }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 4px; }
 h1, h2, h3 { text-wrap: balance; margin: 0; }
 p { margin: 0; }
