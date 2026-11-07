@@ -528,12 +528,14 @@ def _finisher(position: int, row: Mapping[str, Any]) -> str:
     usd = usd_text(row["costUsd"])
     lap_shown = lap or "n/a"
     usd_shown = usd or "no price"
+    lap_second = "lap n/a" if row["lapSeconds"] is None else f"{lap} lap"
+    usd_second = usd_shown
     return (
         f'<li class="rc-finisher" data-lap="{"" if row["lapSeconds"] is None else row["lapSeconds"]}" '
         f'data-usd="{"" if row["costUsd"] is None else row["costUsd"]}" '
         f'data-lap-text="{esc(lap_shown)}" data-usd-text="{esc(usd_shown)}" '
-        f'data-lap-second="{esc(f"{lap} lap" if lap else "lap n/a")}" '
-        f'data-usd-second="{esc(usd_shown)}">'
+        f'data-lap-second="{esc(lap_second)}" '
+        f'data-usd-second="{esc(usd_second)}">'
         f'<span class="rc-pos{" is-podium" if position <= 3 else ""}">P{position}</span>'
         f'<span class="rc-livery" style="background:{livery(row["car"])}" aria-hidden="true"></span>'
         '<span class="rc-who">'
@@ -541,7 +543,7 @@ def _finisher(position: int, row: Mapping[str, Any]) -> str:
         f'<span class="rc-map">{esc(map_text(row["map"]))}</span></span>'
         '<span class="rc-values">'
         f'<span class="rc-main">{esc(lap_shown)}</span>'
-        f'<span class="rc-second">{esc(usd_shown)}</span></span></li>'
+        f'<span class="rc-second">{esc(usd_second)}</span></span></li>'
     )
 
 

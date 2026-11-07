@@ -2368,6 +2368,8 @@ def test_race_pages_hold_the_site_invariants(tmp_path):
                 assert target in files, (name, target)
     script = files["paddock.js"]
     assert site_races.SCRIPT in script and script.startswith(layout.SCRIPT)
+    assert "getAttribute('data-' + other + '-second')" in script
+    assert "(other === 'lap' ? ' lap' : '')" not in script
     assert str(site_races.PLAYBACK_MS) in pages["races/hard-review-alpha/index.html"]
     assert site_races.PLAYBACK_MS == 1600
 
@@ -2419,14 +2421,30 @@ def test_race_page_funnel_comes_from_the_data(tmp_path):
         assert view["stats"][-1] == f"{data[-1]} of {data[0]} finish"
 
 
-def test_classification_secondary_lap_reads_like_the_race_card():
-    row = {"lapSeconds": None, "costUsd": 0.25, "driver": "d", "car": "c", "map": "default"}
+@pytest.mark.parametrize(
+    ("lap_seconds", "lap_label"),
+    [(None, "lap n/a"), (0, "0:00 lap"), (95, "1:35 lap")],
+)
+@pytest.mark.parametrize(
+    ("cost_usd", "fuel_label"),
+    [(None, "no price"), (0, "$0.000"), (0.25, "$0.250")],
+)
+def test_classification_secondary_lap_reads_like_the_race_card(
+    lap_seconds, lap_label, cost_usd, fuel_label
+):
+    row = {
+        "lapSeconds": lap_seconds,
+        "costUsd": cost_usd,
+        "driver": "d",
+        "car": "c",
+        "map": "default",
+    }
     html_row = site_races._finisher(1, row)
     # Sorting by fuel shows the lap as the secondary value: "lap n/a", never "n/a lap".
-    assert 'data-lap-second="lap n/a"' in html_row
-    timed = site_races._finisher(1, dict(row, lapSeconds=95))
-    assert f'data-lap-second="{site_races.lap_text(95)} lap"' in timed
-    assert 'data-usd-second="' in timed
+    attrs = Elements(html_row).items[0][1]
+    assert attrs["data-lap-second"] == lap_label
+    assert attrs["data-usd-second"] == attrs["data-usd-text"] == fuel_label
+    assert _texts(html_row, "rc-second") == [attrs["data-usd-second"]]
 
 
 def test_race_page_classification_comes_from_the_data(tmp_path):
