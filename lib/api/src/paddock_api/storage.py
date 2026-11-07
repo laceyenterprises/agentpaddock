@@ -72,12 +72,20 @@ class Storage:
     blobs: BundleBlobs
 
 
+def envelope_key(sha256: str) -> str:
+    """Object key of the canonical envelope: ``bundles/<sha256>/bundle.json``."""
+    return f"bundles/{sha256}/bundle.json"
+
+
 def object_keys(sha256: str, answer_paths: list[str]) -> dict[str, str]:
-    """Bundle-relative names to object keys: ``bundles/<sha256>/...``."""
-    prefix = f"bundles/{sha256}/"
-    keys = {"bundle.json": prefix + "bundle.json"}
-    keys.update({path: prefix + "answers/" + path for path in answer_paths})
-    return keys
+    """Answer paths to object keys: ``bundles/<sha256>/answers/<path>``.
+
+    Only answer paths appear here. The envelope key comes from
+    ``envelope_key``, so an answer file named ``bundle.json`` cannot take the
+    envelope's slot.
+    """
+    prefix = f"bundles/{sha256}/answers/"
+    return {path: prefix + path for path in answer_paths}
 
 
 # -- In-memory fakes ---------------------------------------------------------
@@ -121,7 +129,7 @@ class MemoryBundleBlobs:
         self, sha256: str, envelope: bytes, answers: dict[str, bytes]
     ) -> None:
         names = object_keys(sha256, list(answers))
-        self.objects[names["bundle.json"]] = envelope
+        self.objects[envelope_key(sha256)] = envelope
         for path, data in answers.items():
             self.objects[names[path]] = data
 
@@ -267,7 +275,7 @@ class S3BundleBlobs:
         names = object_keys(sha256, list(answers))
         for path, data in answers.items():
             self._put(names[path], data, "application/octet-stream")
-        self._put(names["bundle.json"], envelope, "application/json")
+        self._put(envelope_key(sha256), envelope, "application/json")
 
 
 def aws_storage(

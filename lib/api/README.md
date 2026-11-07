@@ -125,9 +125,10 @@ credentials. The project region is `us-east-2`.
 | Parameter | Value |
 |---|---|
 | `Region` | `us-east-2`. The function refuses to serve from any other region. |
-| `MaintainerAccounts` | Comma-separated GitHub logins of the maintainers. Give it at deploy time; never commit it. |
+| `MaintainerAccounts` | Comma-separated GitHub logins of the maintainers; spaces after commas are allowed. Give it at deploy time; never commit it. |
 | `BudgetAlertEmail` | Address that receives budget alerts. Give it at deploy time; never commit it. |
 | `CostTagValue` | `paddock-api` (default): value of the `paddock-cost-center` tag |
+| `EnableCostBudget` | `false` (default) on the first deploy; `true` on the redeploy in step 3, once the tag is active |
 | `DomainName` | `api.agentpaddock.ai`, or empty for the execute-api URL only |
 | `CertificateArn` | ACM (AWS Certificate Manager) certificate for `DomainName`, issued in `us-east-2` |
 | `ReservedConcurrency` | `5` (default): upper bound on concurrent invocations |
@@ -137,6 +138,8 @@ credentials. The project region is `us-east-2`.
 The budget is fixed at $10 per month in the template, by operator decision.
 It covers only costs tagged `paddock-cost-center=<CostTagValue>`, never the
 whole account. It emails at 80% of actual spend and at 100% of forecast spend.
+The stack creates it only when `EnableCostBudget=true` (step 3), because the
+tag filter cannot match anything until the tag key is active in Billing.
 
 ### 1. Certificate (custom domain only)
 
@@ -168,6 +171,14 @@ sam deploy --template-file .aws-sam/build/template.yaml \
     CertificateArn="$PADDOCK_API_CERT_ARN"
 ```
 
+This first deploy leaves `EnableCostBudget` at `false`, so no budget exists
+yet; step 3 adds it. API Gateway attaches the access-log group's resource
+policy itself while deploying, so the deploying credentials need the CloudWatch
+Logs delivery permissions it uses (`logs:CreateLogDelivery`,
+`logs:GetLogDelivery`, `logs:UpdateLogDelivery`, `logs:ListLogDeliveries`,
+`logs:PutResourcePolicy`, `logs:DescribeResourcePolicies`,
+`logs:DescribeLogGroups`).
+
 `.aws-sam/` is local build output. Do not commit it. The tables and the
 bucket have `DeletionPolicy: Retain`, and the tables have deletion protection,
 so deleting the stack keeps submitted bundles.
@@ -176,8 +187,25 @@ so deleting the stack keeps submitted bundles.
 
 The first deploy creates the `paddock-cost-center` tag. In the Billing console
 under **Cost allocation tags**, activate `paddock-cost-center`. It can take up
-to 24 hours to appear and to start filtering costs. The budget matches nothing
-until the tag is active.
+to 24 hours to appear and to start filtering costs.
+
+Once the tag shows as active, redeploy with the budget enabled:
+
+```bash
+sam deploy --template-file .aws-sam/build/template.yaml \
+  --stack-name paddock-submission-api --region us-east-2 \
+  --capabilities CAPABILITY_IAM --resolve-s3 \
+  --parameter-overrides \
+    Region=us-east-2 \
+    MaintainerAccounts="$PADDOCK_MAINTAINERS" \
+    BudgetAlertEmail="$PADDOCK_BUDGET_EMAIL" \
+    DomainName=api.agentpaddock.ai \
+    CertificateArn="$PADDOCK_API_CERT_ARN" \
+    EnableCostBudget=true
+```
+
+Keep `EnableCostBudget=true` on every later deploy, or the stack deletes the
+budget.
 
 ### 4. DNS record
 
@@ -202,7 +230,7 @@ The private key never leaves that machine.
 
 ```bash
 openssl genpkey -algorithm ed25519 -out paddock-signing.pem
-PUB=$(openssl pkey -in paddock-signing.pem -pubout -outform DER | tail -c 32 | base64)
+PUB=$(openssl pkey -in paddock-signing.pem -pubout -outform DER | tail -c 32 | base64 | tr -d '\n')
 curl -sS -X POST "$API/submission/keys" \
   -H "Authorization: Bearer $(gh auth token)" \
   -H "Content-Type: application/json" \
@@ -235,7 +263,7 @@ filled envelope and answers outside the repository, and never commit them.
 # manifest.json holds the filled manifest; sign its canonical bytes.
 python3 -c 'import json,sys; sys.path.insert(0,"scripts"); from leaderboard import canonical_json; sys.stdout.write(canonical_json(json.load(open(sys.argv[1]))))' \
   manifest.json > manifest.canonical
-SIG=$(openssl pkeyutl -sign -inkey paddock-signing.pem -rawin -in manifest.canonical | base64)
+SIG=$(openssl pkeyutl -sign -inkey paddock-signing.pem -rawin -in manifest.canonical | base64 | tr -d '\n')
 python3 -c 'import json,sys; print(json.dumps({"manifest": json.load(open(sys.argv[1])), "signature": sys.argv[2]}))' \
   manifest.json "$SIG" > bundle.json
 curl -sS -X POST "$API/submission/bundles" \

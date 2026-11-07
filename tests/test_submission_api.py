@@ -473,6 +473,19 @@ def test_submit_bundle_202_stores_canonical_envelope_and_answers(api):
     assert (record.github_account, record.status) == (ALICE, "pending")
 
 
+def test_answer_file_named_bundle_json_never_replaces_the_envelope(api):
+    key_id = register(api)
+    env = envelope(key_id, [run(path="bundle.json")])
+    response = post_bundle(api, env, files={"bundle.json": ANSWER_TEXT})
+    expect(response, 202)
+    digest = response.body["sha256"]
+    objects = api.storage.blobs.objects
+    assert objects[f"bundles/{digest}/bundle.json"] == canonical_json(env).encode(
+        "utf-8"
+    )
+    assert objects[f"bundles/{digest}/answers/bundle.json"] == ANSWER_TEXT
+
+
 def test_submit_bundle_digest_ignores_submitted_whitespace_and_key_order(api):
     key_id = register(api)
     env = envelope(key_id, [run()])
@@ -1118,6 +1131,14 @@ def test_s3_blobs_write_answers_then_envelope_with_checksums():
     assert {o["Bucket"] for o in client.objects.values()} == {"bucket"}
 
 
+def test_s3_blobs_keep_an_answer_named_bundle_json_apart_from_the_envelope():
+    client = FakeS3()
+    S3BundleBlobs(client, "bucket").put_bundle("c" * 64, b"{}", {"bundle.json": b"A"})
+    prefix = f"bundles/{'c' * 64}/"
+    assert client.objects[prefix + "answers/bundle.json"]["Body"] == b"A"
+    assert client.objects[prefix + "bundle.json"]["Body"] == b"{}"
+
+
 def test_full_flow_on_aws_store_classes():
     from paddock_api.storage import aws_storage
 
@@ -1186,7 +1207,15 @@ def test_template_tags_every_taggable_resource_with_the_cost_tag():
 
 
 def test_template_budget_is_ten_dollars_scoped_to_the_cost_tag():
-    budget = _template()["Resources"]["CostBudget"]["Properties"]["Budget"]
+    template = _template()
+    resource = template["Resources"]["CostBudget"]
+    assert resource["Condition"] == "CreateCostBudget"
+    assert template["Conditions"]["CreateCostBudget"] == {
+        "!Equals": [{"!Ref": "EnableCostBudget"}, "true"]
+    }
+    enable = template["Parameters"]["EnableCostBudget"]
+    assert (enable["Default"], enable["AllowedValues"]) == ("false", ["true", "false"])
+    budget = resource["Properties"]["Budget"]
     assert budget["BudgetLimit"] == {"Amount": 10, "Unit": "USD"}
     assert budget["TimeUnit"] == "MONTHLY"
     assert budget["CostFilters"] == {
@@ -1199,6 +1228,10 @@ def test_template_parameters_and_runtime():
     parameters = template["Parameters"]
     assert parameters["Region"]["Default"] == "us-east-2"
     assert parameters["MaintainerAccounts"].get("Default", "") == ""
+    allowed = re.compile(parameters["MaintainerAccounts"]["AllowedPattern"])
+    assert allowed.fullmatch("a-one, B-two") and allowed.fullmatch("a-one,B-two")
+    assert maintainers_from("a-one, B-two") == {"a-one", "B-two"}
+    assert not allowed.fullmatch("a-one;B-two")
     assert "Default" not in parameters["BudgetAlertEmail"]
     function = template["Resources"]["SubmissionFunction"]["Properties"]
     assert function["Runtime"] == "python3.12"

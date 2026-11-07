@@ -5,7 +5,9 @@
 # Every resource that accepts tags carries the cost-allocation tag
 # `paddock-cost-center` (value: CostTagValue), and CostBudget alarms on that
 # tag alone: a $10/month budget kept narrow to this API, never a project-wide
-# spend limit. Maintainer accounts and the alert address are deploy
+# spend limit. The budget is created only when EnableCostBudget is "true",
+# which the second deploy sets after the tag key is active in Billing
+# (README steps 2-3). Maintainer accounts and the alert address are deploy
 # parameters, never committed values.
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
@@ -22,12 +24,21 @@ Parameters:
   MaintainerAccounts:
     Type: String
     Default: ""
-    AllowedPattern: "^[A-Za-z0-9,-]*$"
-    Description: Comma-separated GitHub logins that may read every bundle.
+    AllowedPattern: "^[A-Za-z0-9, -]*$"
+    Description: >-
+      Comma-separated GitHub logins that may read every bundle. Spaces around
+      the commas are allowed and stripped.
   BudgetAlertEmail:
     Type: String
     AllowedPattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
     Description: Address that receives the cost budget alerts.
+  EnableCostBudget:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      Create CostBudget. Leave "false" on the first deploy; set "true" once
+      the paddock-cost-center tag key is active in Billing (README step 3).
   CostTagValue:
     Type: String
     Default: paddock-api
@@ -75,6 +86,7 @@ Conditions:
   HasDomain: !And
     - !Not [!Equals [!Ref DomainName, ""]]
     - !Not [!Equals [!Ref CertificateArn, ""]]
+  CreateCostBudget: !Equals [!Ref EnableCostBudget, "true"]
 
 Resources:
   BundleBucket:
@@ -177,6 +189,11 @@ Resources:
         - Key: paddock-cost-center
           Value: !Ref CostTagValue
 
+  # API Gateway delivers HTTP API access logs through CloudWatch Logs vended
+  # delivery and adds the log-group resource policy itself at deploy time,
+  # using the deploying principal's logs permissions (README step 2). No
+  # explicit AWS::Logs::ResourcePolicy here: those are capped per account and
+  # region and would duplicate the one API Gateway manages.
   AccessLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -311,10 +328,12 @@ Resources:
       DomainName: !Ref ApiDomain
       Stage: $default
 
-  # Scoped to the cost-allocation tag only. Activate the tag key in Billing
-  # (README step 1) or the filter matches nothing.
+  # Scoped to the cost-allocation tag only. Created on the second deploy, with
+  # EnableCostBudget=true, after the tag key is active in Billing (README
+  # step 3); before activation the filter would match nothing.
   CostBudget:
     Type: AWS::Budgets::Budget
+    Condition: CreateCostBudget
     Properties:
       Budget:
         BudgetName: !Sub "${AWS::StackName}-paddock-api"
