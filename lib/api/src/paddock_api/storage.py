@@ -220,7 +220,7 @@ class DynamoBundleIndex:
             evidence=tuple(
                 entry["S"] for entry in item.get("evidence", {"L": []})["L"]
             ),
-            error=item["error"]["S"] if "error" in item else None,
+            error=item.get("error", {}).get("S"),
         )
 
     def put_if_absent(self, record: BundleRecord) -> BundleRecord | None:

@@ -69,11 +69,21 @@ class GitHubUserResolver:
                 payload = json.loads(response.read(65536).decode("utf-8"))
         except urllib.error.HTTPError as exc:
             status = exc.code
-            remaining = (
-                exc.headers.get("x-ratelimit-remaining") if exc.headers else None
-            )
-            exc.close()
-            if status == 401 or (status == 403 and remaining != "0"):
+            headers = exc.headers or {}
+            limited = headers.get("x-ratelimit-remaining") == "0"
+            try:
+                if status == 403 and not limited:
+                    limited = headers.get("retry-after") is not None
+                    if not limited and exc.fp is not None:
+                        message = exc.read(4096).lower()
+                        limited = (
+                            b"secondary rate limit" in message or b"abuse detection" in message
+                        )
+            except OSError:
+                raise AuthUnavailable("github user api unreachable") from None
+            finally:
+                exc.close()
+            if status == 401 or (status == 403 and not limited):
                 return None
             raise AuthUnavailable(f"github user api status {status}") from None
         except (OSError, ValueError):

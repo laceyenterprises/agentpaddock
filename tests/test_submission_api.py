@@ -422,19 +422,21 @@ def test_github_resolver_sends_token_once_and_keeps_nothing():
 
 
 @pytest.mark.parametrize(
-    "status, remaining, outcome",
+    "status, headers, body, outcome",
     [
-        (401, None, None),
-        (403, "42", None),
-        (403, "0", "unavailable"),
-        (500, None, "unavailable"),
+        (401, {}, b"", None),
+        (403, {"x-ratelimit-remaining": "42"}, b"", None),
+        (403, {"x-ratelimit-remaining": "0"}, b"", "unavailable"),
+        (403, {"retry-after": "60"}, b"", "unavailable"),
+        (403, {}, b'{"message": "You have exceeded a secondary rate limit."}', "unavailable"),
+        (429, {}, b"", "unavailable"),
+        (500, {}, b"", "unavailable"),
     ],
 )
-def test_github_resolver_maps_errors(status, remaining, outcome):
+def test_github_resolver_maps_errors(status, headers, body, outcome):
     def opener(request, timeout):
-        headers = {"x-ratelimit-remaining": remaining} if remaining else {}
         raise urllib.error.HTTPError(
-            request.full_url, status, "x", headers, io.BytesIO(b"")
+            request.full_url, status, "x", headers, io.BytesIO(body)
         )
 
     resolver = GitHubUserResolver(opener=opener)
@@ -1095,6 +1097,8 @@ def test_dynamo_bundle_index_round_trip_and_conflict():
     index = DynamoBundleIndex(client, "bundles")
     pending = BundleRecord("a" * 64, "k", ALICE, "pending", "t")
     assert index.put_if_absent(pending) is None
+    assert index.get("a" * 64) == pending
+    client.tables["bundles"]["a" * 64]["error"] = {"NULL": True}
     assert index.get("a" * 64) == pending
     assert (
         index.put_if_absent(BundleRecord("a" * 64, "k", ALICE, "complete", "t2"))
