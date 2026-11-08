@@ -4875,11 +4875,33 @@ def test_charts_have_screen_reader_names(acceptance_sites):
                     ), (name, attrs)
 
 
-@pytest.mark.parametrize("fault", ("weight", "link", "fragment", "no-script"))
+@pytest.mark.parametrize(
+    "fault", ("weight-raw", "weight-gzip", "link", "fragment", "no-script")
+)
 def test_acceptance_assertions_reject_regressions(acceptance_sites, fault):
     files = dict(acceptance_sites[0])
-    if fault == "weight":
-        files["paddock.css"] += " " * (768 * 1024)
+    if fault in ("weight-raw", "weight-gzip"):
+        if fault == "weight-raw":
+            files["paddock.css"] += " " * (768 * 1024)
+        else:
+            # Deterministic mixed text exceeds the gzip budget without
+            # exceeding the raw budget.
+            files["paddock.css"] += hashlib.shake_256(b"cold-load").hexdigest(
+                128 * 1024
+            )
+        # Keep the other budget satisfied on every page, so either missing
+        # assertion makes its corresponding fault pass undetected.
+        for name, page in _html_pages(files).items():
+            blobs = [
+                files[r].encode("utf-8") if isinstance(files[r], str) else files[r]
+                for r in _page_resources(name, page)
+            ]
+            if fault == "weight-raw":
+                assert sum(len(gzip.compress(b, mtime=0)) for b in blobs) <= (
+                    128 * 1024
+                ), name
+            else:
+                assert sum(map(len, blobs)) <= 768 * 1024, name
         check = test_every_page_has_a_bounded_cold_load
     elif fault in ("link", "fragment"):
         target = "missing.html" if fault == "link" else "#missing-section"
