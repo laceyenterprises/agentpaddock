@@ -208,7 +208,7 @@ def _slips(driver: Mapping[str, Any]) -> str:
             for row in entry["byChallenge"]
         )
         panels.append(
-            f'<div class="dv-slips" id="slips-{index}" data-slips="{index}"' + ">"
+            f'<div class="dv-slips" id="slips-{index}" data-slips="{index}">'
             f'<span class="dv-slips-title">{esc(driver["name"])} in {esc(_entry_words(entry))}: '
             f"{entry['k']} of {entry['n']}</span>{rows}"
             f'<p class="dv-note">{slips_note(entry)}</p></div>'
