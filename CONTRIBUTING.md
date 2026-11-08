@@ -321,8 +321,10 @@ shape, without fetching a bundle, looking up keys or verifying signatures.
 
 The following relative API paths are a contract for a separately built
 endpoint. Authentication establishes the GitHub account for every operation;
-a submitter may upload and read only their own bundles. No server, key store,
-client or network implementation is included here.
+a submitter may upload and read only their own bundles. The server
+implementation, with its error codes and deploy runbook, is in
+[`lib/api/`](lib/api/README.md); it is not deployed, and no client is
+included.
 
 | Operation | Request | Success response | Errors |
 |---|---|---|---|

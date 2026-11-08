@@ -1,0 +1,382 @@
+# Agent Paddock submission API: one regional stack, not deployed by this
+# repository. Deploy steps are in lib/api/README.md; the contract is
+# CONTRIBUTING's "Signed answers and submission API contract".
+#
+# Every resource that accepts tags carries the cost-allocation tag
+# `paddock-cost-center` (value: CostTagValue), and CostBudget alarms on that
+# tag alone: a $10/month budget kept narrow to this API, never a project-wide
+# spend limit. The budget is created only when EnableCostBudget is "true",
+# which the second deploy sets after the tag key is active in Billing
+# (README steps 2-3). Maintainer accounts and the alert address are deploy
+# parameters, never committed values.
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Agent Paddock submission API (signed answers bundles)
+
+Parameters:
+  Region:
+    Type: String
+    Default: us-east-2
+    AllowedPattern: "^[a-z]{2}(-[a-z]+)+-[0-9]$"
+    Description: >-
+      The region this stack is deployed in (the project region). The function
+      refuses to serve from any other region.
+  MaintainerAccounts:
+    Type: String
+    Default: ""
+    AllowedPattern: "^[A-Za-z0-9, -]*$"
+    Description: >-
+      Comma-separated GitHub logins that may read every bundle. Spaces around
+      the commas are allowed and stripped.
+  BudgetAlertEmail:
+    Type: String
+    AllowedPattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    Description: Address that receives the cost budget alerts.
+  EnableCostBudget:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >-
+      Create CostBudget. Leave "false" on the first deploy; set "true" once
+      the paddock-cost-center tag key is active in Billing (README step 3).
+  CostTagValue:
+    Type: String
+    Default: paddock-api
+    AllowedPattern: "^[A-Za-z0-9_.:/=+@-]{1,128}$"
+    Description: Value of the paddock-cost-center cost-allocation tag.
+  DomainName:
+    Type: String
+    Default: ""
+    Description: Optional custom domain for the API; empty uses the execute-api URL.
+  CertificateArn:
+    Type: String
+    Default: ""
+    Description: ACM certificate for DomainName, issued in the stack's region.
+  ReservedConcurrency:
+    Type: Number
+    Default: 5
+    MinValue: 1
+    MaxValue: 50
+  ThrottleRate:
+    Type: Number
+    Default: 5
+    MinValue: 1
+    MaxValue: 100
+    Description: Steady-state requests per second across the API.
+  ThrottleBurst:
+    Type: Number
+    Default: 10
+    MinValue: 1
+    MaxValue: 200
+  MaxBodyBytes:
+    Type: Number
+    Default: 4194304
+    MinValue: 1024
+    MaxValue: 4194304
+    Description: >-
+      Largest accepted request body. Lambda accepts at most 6 MB of event and
+      HTTP APIs Base64-encode multipart bodies, so 4 MiB is the ceiling.
+  MaxFiles:
+    Type: Number
+    Default: 256
+    MinValue: 1
+    MaxValue: 1000
+
+Conditions:
+  HasDomain: !And
+    - !Not [!Equals [!Ref DomainName, ""]]
+    - !Not [!Equals [!Ref CertificateArn, ""]]
+  CreateCostBudget: !Equals [!Ref EnableCostBudget, "true"]
+
+Resources:
+  BundleBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-overwritten-versions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+      Tags:
+        - Key: paddock-cost-center
+          Value: !Ref CostTagValue
+
+  BundleBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BundleBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt BundleBucket.Arn
+              - !Sub "${BundleBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+  KeysTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: key_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: key_id
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      DeletionProtectionEnabled: true
+      Tags:
+        - Key: paddock-cost-center
+          Value: !Ref CostTagValue
+
+  BundlesTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: sha256
+          AttributeType: S
+      KeySchema:
+        - AttributeName: sha256
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      DeletionProtectionEnabled: true
+      Tags:
+        - Key: paddock-cost-center
+          Value: !Ref CostTagValue
+
+  FunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
+      Tags:
+        - Key: paddock-cost-center
+          Value: !Ref CostTagValue
+
+  # API Gateway delivers HTTP API access logs through CloudWatch Logs vended
+  # delivery and adds the log-group resource policy itself at deploy time,
+  # using the deploying principal's logs permissions (README step 2). No
+  # explicit AWS::Logs::ResourcePolicy here: those are capped per account and
+  # region and would duplicate the one API Gateway manages.
+  AccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
+      Tags:
+        - Key: paddock-cost-center
+          Value: !Ref CostTagValue
+
+  # Exactly what the function does: read and conditionally write one item per
+  # table, write bundle objects, write its own logs. No reads of bundle
+  # objects, no deletes, no wildcards.
+  SubmissionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: tables
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem]
+                Resource:
+                  - !GetAtt KeysTable.Arn
+                  - !GetAtt BundlesTable.Arn
+        - PolicyName: bundles
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [s3:PutObject]
+                Resource: !Sub "${BundleBucket.Arn}/bundles/*"
+        - PolicyName: logs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt FunctionLogGroup.Arn
+      Tags:
+        - Key: paddock-cost-center
+          Value: !Ref CostTagValue
+
+  SubmissionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: paddock_api.handler.lambda_handler
+      Runtime: python3.12
+      Architectures: [arm64]
+      MemorySize: 256
+      Timeout: 15
+      ReservedConcurrentExecutions: !Ref ReservedConcurrency
+      Role: !GetAtt SubmissionRole.Arn
+      LoggingConfig:
+        LogFormat: Text
+        LogGroup: !Ref FunctionLogGroup
+      Environment:
+        Variables:
+          KEYS_TABLE: !Ref KeysTable
+          BUNDLES_TABLE: !Ref BundlesTable
+          BUNDLE_BUCKET: !Ref BundleBucket
+          MAINTAINER_ACCOUNTS: !Ref MaintainerAccounts
+          MAX_BODY_BYTES: !Ref MaxBodyBytes
+          MAX_FILES: !Ref MaxFiles
+          EXPECTED_REGION: !Ref Region
+      Events:
+        RegisterKey:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SubmissionApi
+            Method: POST
+            Path: /submission/keys
+        SubmitBundle:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SubmissionApi
+            Method: POST
+            Path: /submission/bundles
+        ReadBundle:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SubmissionApi
+            Method: GET
+            Path: /submission/bundles/{sha256}
+      Tags:
+        paddock-cost-center: !Ref CostTagValue
+
+  # Regional HTTP API with the $default stage. Routes outside the three
+  # operations never reach the function. Access logs carry no headers, so no
+  # token is ever written.
+  SubmissionApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      FailOnWarnings: true
+      DefaultRouteSettings:
+        ThrottlingRateLimit: !Ref ThrottleRate
+        ThrottlingBurstLimit: !Ref ThrottleBurst
+      AccessLogSettings:
+        DestinationArn: !GetAtt AccessLogGroup.Arn
+        Format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","requestTime":"$context.requestTime","routeKey":"$context.routeKey","status":"$context.status","responseLength":"$context.responseLength","integrationError":"$context.integrationErrorMessage"}'
+      Tags:
+        paddock-cost-center: !Ref CostTagValue
+
+  ApiDomain:
+    Type: AWS::ApiGatewayV2::DomainName
+    Condition: HasDomain
+    Properties:
+      DomainName: !Ref DomainName
+      DomainNameConfigurations:
+        - CertificateArn: !Ref CertificateArn
+          EndpointType: REGIONAL
+          SecurityPolicy: TLS_1_2
+      Tags:
+        paddock-cost-center: !Ref CostTagValue
+
+  ApiMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Condition: HasDomain
+    DependsOn: SubmissionApiApiGatewayDefaultStage
+    Properties:
+      ApiId: !Ref SubmissionApi
+      DomainName: !Ref ApiDomain
+      Stage: $default
+
+  # Scoped to the cost-allocation tag only. Created on the second deploy, with
+  # EnableCostBudget=true, after the tag key is active in Billing (README
+  # step 3); before activation the filter would match nothing.
+  CostBudget:
+    Type: AWS::Budgets::Budget
+    Condition: CreateCostBudget
+    Properties:
+      Budget:
+        BudgetName: !Sub "${AWS::StackName}-paddock-api"
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: 10
+          Unit: USD
+        CostFilters:
+          TagKeyValue:
+            - !Join ["", ["user:paddock-cost-center$", !Ref CostTagValue]]
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetAlertEmail
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetAlertEmail
+      ResourceTags:
+        - Key: paddock-cost-center
+          Value: !Ref CostTagValue
+
+Outputs:
+  ApiEndpoint:
+    Description: Default execute-api URL (smoke tests before DNS exists).
+    Value: !Sub "https://${SubmissionApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}"
+  ApiDomainTarget:
+    Condition: HasDomain
+    Description: CNAME target for DomainName.
+    Value: !GetAtt ApiDomain.RegionalDomainName
+  BundleBucketName:
+    Value: !Ref BundleBucket
+  KeysTableName:
+    Value: !Ref KeysTable
+  BundlesTableName:
+    Value: !Ref BundlesTable
