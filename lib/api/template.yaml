@@ -26,7 +26,7 @@ Parameters:
     Default: ""
     AllowedPattern: "^[A-Za-z0-9, -]*$"
     Description: >-
-      Comma-separated GitHub logins that may read every bundle. Spaces around
+      Comma-separated GitHub logins that may read every bundle and sign live updates. Spaces around
       the commas are allowed and stripped.
   BudgetAlertEmail:
     Type: String
@@ -203,8 +203,8 @@ Resources:
           Value: !Ref CostTagValue
 
   # Exactly what the function does: read and conditionally write one item per
-  # table, write bundle objects, write its own logs. No reads of bundle
-  # objects, no deletes, no wildcards.
+  # table, write bundle objects, read/write the public ticker, write its logs.
+  # No reads of bundle objects or deletes.
   SubmissionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -235,6 +235,15 @@ Resources:
               - Effect: Allow
                 Action: [s3:PutObject]
                 Resource: !Sub "${BundleBucket.Arn}/bundles/*"
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub "${BundleBucket.Arn}/live.json"
+              - Effect: Allow
+                Action: [s3:ListBucket]
+                Resource: !GetAtt BundleBucket.Arn
+                Condition:
+                  StringEquals:
+                    s3:prefix: live.json
         - PolicyName: logs
           PolicyDocument:
             Version: "2012-10-17"
@@ -270,6 +279,24 @@ Resources:
           MAX_FILES: !Ref MaxFiles
           EXPECTED_REGION: !Ref Region
       Events:
+        ReadLive:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SubmissionApi
+            Method: GET
+            Path: /live
+        UpdateLive:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SubmissionApi
+            Method: PUT
+            Path: /live
+        LivePreflight:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SubmissionApi
+            Method: OPTIONS
+            Path: /live
         RegisterKey:
           Type: HttpApi
           Properties:

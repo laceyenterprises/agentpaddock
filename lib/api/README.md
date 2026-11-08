@@ -9,7 +9,8 @@ CI job talks to AWS. A maintainer deploys it by following the runbook below.
 
 | Path | What it is |
 |---|---|
-| `src/paddock_api/app.py` | The three operations, their checks and error codes |
+| `src/paddock_api/app.py` | Submission and live operations, their checks and error codes |
+| `src/paddock_api/live.py` | Strict public `paddock-live/v1` ticker document validation |
 | `src/paddock_api/auth.py` | GitHub-token authentication, resolved per request |
 | `src/paddock_api/ed25519.py` | Ed25519 verification (RFC 8032), standard library only |
 | `src/paddock_api/canonical.py` | `canonical_json` (identical to `scripts/leaderboard.py`) and a strict JSON reader |
@@ -19,22 +20,70 @@ CI job talks to AWS. A maintainer deploys it by following the runbook below.
 | `template.yaml` | AWS SAM (Serverless Application Model) / CloudFormation stack |
 | `requirements.txt` | Runtime dependencies (only `boto3`, which the Lambda runtime provides) |
 
-The tests are `tests/test_submission_api.py`. They use fakes only: no network,
-no AWS and no credentials.
+Submission tests are in `tests/test_submission_api.py`; live endpoint tests
+are in the home page's existing fast file, `tests/test_build_site.py`, using
+the same synthetic API fakes from `tests/api_test_support.py` and the `api`
+fixture from `tests/conftest.py`. Neither API test group uses network, AWS or
+credentials.
 
 ```bash
 python3 -m pytest -q -p no:cacheprovider tests/test_submission_api.py
+python3 -m pytest -q -p no:cacheprovider tests/test_build_site.py
 ```
 
 ## How it behaves
 
-**Authentication.** Every operation requires `Authorization: Bearer <GitHub
+**Authentication.** Submission operations and `PUT /live` require `Authorization: Bearer <GitHub
 token>`. The function sends the token once to `GET https://api.github.com/user`
 to learn the account login, then drops it. The token is never cached, stored,
 logged or echoed back. Any token GitHub accepts for that call works, including
 a fine-grained token with no permissions. GitHub logins compare
 case-insensitively. A submitter reads only their own bundles. The logins in
 the `MaintainerAccounts` deploy parameter may read every bundle.
+They may also publish signed live updates using their own registered keys.
+
+**Live ticker.** `GET /live` is public with a 60-second cache, and returns
+`404 live_unavailable` until a maintainer publishes a document. `PUT /live`
+accepts exactly `{document, key_id, signature}`; the Ed25519 signature covers
+the canonical document bytes. The key must belong to the authenticated account,
+whose current deploy configuration must grant the maintainer role. Accepted
+writes replace the single S3 key `live.json`, separate from private bundles;
+reads return only the validated public document. The last accepted write wins.
+S3 bucket versioning retains overwritten versions under its existing lifecycle.
+The bucket uses SSE-S3 (`AES256`), so reads need no KMS decrypt grant.
+Missing-object `AccessDenied` is checked with `ListObjectsV2`, restricted by IAM
+to the `live.json` prefix, with at most one result. This confirms absence even
+when the prefix condition prevents S3's implicit missing-key check. An existing
+object that cannot be read, or a denied list request, remains a service error;
+access denial alone never means missing. Normal successful reads use one
+`GetObject` and no list call.
+See CONTRIBUTING's contract for every document field and the content rules.
+Malformed envelopes/documents return `400 malformed_live`, non-maintainers
+`403 maintainer_required`, and signature failures `422 invalid_live_signature`;
+authentication, ownership and unknown-key errors use the existing codes.
+Only successful reads are cached; writes and errors use `no-store`.
+Invalid stored JSON or schema returns `503 invalid_stored_live`; the function
+logs only the object's SHA-256 digest, and a valid signed update repairs it.
+The v1 signature deliberately relies on the strict, disjoint live and submission
+schemas for purpose separation, as specified in CONTRIBUTING. Schema changes
+that introduce overlap require a new signing context before deployment.
+`/live` responses include a fixed Cross-Origin Resource Sharing (CORS) origin
+of `https://agentpaddock.ai`, and `OPTIONS /live` handles browser preflight.
+The submission routes have no CORS headers.
+
+**Public traffic and cost.** The existing API Gateway default throttling applies
+to `/live` too: 5 requests/second with a burst of 10, and Lambda reserved
+concurrency is 5. These are overload controls, not a monthly spending cap.
+There is no CDN or server-side response cache in this stack; the 60-second
+header permits browser caching. The home page bypasses that cache when polling
+every 60 seconds while visible, so expect about one request per minute per
+visible page (100 pages: about 1.7 requests per second or 144,000 reads/day).
+Each uncached successful read invokes Lambda and S3 once; absent documents can
+add one S3 list call.
+Sustained traffic at the default throttle could approach 432,000 requests/day.
+Monitor request volume and throttles, and adjust the existing deploy parameters
+to the intended audience. Complete the budget activation in runbook step 3;
+budget alerts do not stop traffic or spending.
 
 **Keys.** A key id is `ed25519-` plus the first 32 hex characters of the
 SHA-256 of the raw 32-byte public key. Registering an already registered key
@@ -125,7 +174,7 @@ credentials. The project region is `us-east-2`.
 | Parameter | Value |
 |---|---|
 | `Region` | `us-east-2`. The function refuses to serve from any other region. |
-| `MaintainerAccounts` | Comma-separated GitHub logins of the maintainers; spaces after commas are allowed. Give it at deploy time; never commit it. |
+| `MaintainerAccounts` | Comma-separated GitHub logins that may read all bundles and sign live updates; spaces after commas are allowed. Give it at deploy time; never commit it. |
 | `BudgetAlertEmail` | Address that receives budget alerts. Give it at deploy time; never commit it. |
 | `CostTagValue` | `paddock-api` (default): value of the `paddock-cost-center` tag |
 | `EnableCostBudget` | `false` (default) on the first deploy; `true` on the redeploy in step 3, once the tag is active |
@@ -279,5 +328,6 @@ maintainer, and `403` for any other account.
 
 ### Not in this stack
 
-There is no Lambda@Edge, no multi-region resource, no CORS (the API is for
-command-line clients) and no write path for statuses after `pending`.
+There is no Lambda@Edge, no multi-region resource and no write path for
+bundle statuses after `pending`. Live publication and browser CORS are confined
+to `/live`; the function can read only `live.json` from S3, never bundle objects.

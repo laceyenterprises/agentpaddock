@@ -59,6 +59,12 @@ class BundleIndex(Protocol):
 
 
 class BundleBlobs(Protocol):
+    def get_live(self) -> bytes | None:
+        """Read the public ticker, or None before its first publication."""
+
+    def put_live(self, document: bytes) -> None:
+        """Replace the single canonical public ticker document."""
+
     def put_bundle(
         self, sha256: str, envelope: bytes, answers: dict[str, bytes]
     ) -> None:
@@ -124,6 +130,12 @@ class MemoryBundleIndex:
 @dataclass
 class MemoryBundleBlobs:
     objects: dict[str, bytes] = field(default_factory=dict)
+
+    def get_live(self) -> bytes | None:
+        return self.objects.get("live.json")
+
+    def put_live(self, document: bytes) -> None:
+        self.objects["live.json"] = document
 
     def put_bundle(
         self, sha256: str, envelope: bytes, answers: dict[str, bytes]
@@ -268,6 +280,36 @@ class S3BundleBlobs:
             ContentType=content_type,
             ChecksumSHA256=checksum,
         )
+
+    def get_live(self) -> bytes | None:
+        try:
+            response = self._client.get_object(Bucket=self._bucket, Key="live.json")
+        except Exception as exc:
+            error = getattr(exc, "response", {}).get("Error", {}).get("Code")
+            if error == "NoSuchKey":
+                return None
+            if error == "AccessDenied":
+                # A prefix-conditioned ListBucket grant does not provide an
+                # unconditioned missing-key check for GetObject. Prove absence
+                # with an explicitly prefixed list; preserve real read denials.
+                listing = self._client.list_objects_v2(
+                    Bucket=self._bucket, Prefix="live.json", MaxKeys=1
+                )
+                # General-purpose S3 buckets sort keys lexicographically, so
+                # the exact key precedes every longer key with this prefix.
+                if not any(
+                    item["Key"] == "live.json" for item in listing.get("Contents", [])
+                ):
+                    return None
+            raise
+        stream = response["Body"]
+        try:
+            return stream.read()
+        finally:
+            stream.close()
+
+    def put_live(self, document: bytes) -> None:
+        self._put("live.json", document, "application/json")
 
     def put_bundle(
         self, sha256: str, envelope: bytes, answers: dict[str, bytes]

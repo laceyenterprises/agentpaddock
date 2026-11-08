@@ -332,6 +332,56 @@ included.
 | `POST /submission/bundles` | Multipart `bundle` (JSON envelope) and `answers` (files at manifest paths) | `202 {"sha256":"<bundle digest>","key_id":"<id>","status":"pending"}` | `400` malformed manifest, duplicate ids, unsafe paths or missing/extra files; `401` unauthenticated; `403` key not owned by account; `404` unknown key; `422` invalid signature, answer digest mismatch or incompatible results/fork/verifier pin; `409` duplicate bundle (returns existing digest and status) |
 | `GET /submission/bundles/{sha256}` | Bundle digest in path; no body | `200 {"sha256":"<digest>","key_id":"<id>","status":"pending\|re-grading\|complete\|rejected","verdict_agreement":null,"evidence":[]}` | `400` malformed digest; `401` unauthenticated; `403` not owned by account; `404` unknown bundle |
 
+The public ticker uses `paddock-live/v1`, matching
+[`live.example.json`](design/web/data/live.example.json). Its exact fields are:
+
+| Field | Contract |
+|---|---|
+| `schema` | Exactly `"paddock-live/v1"`. |
+| `updated` | UTC (Coordinated Universal Time) display time, `HH:MMZ`, matching `updatedIso`. |
+| `updatedIso` | Valid UTC timestamp, `YYYY-MM-DDTHH:MM:SSZ`, with whole seconds. |
+| `racing` | Nonnegative integer count of active races; booleans are rejected. |
+| `ticks` | Array of at most 12 ticks, in display order; may be empty. |
+| Each tick | Exactly `who`, `what`, `kind`, `flagName`, `flag`, `when`. Every value is a nonempty printable string of at most 256 characters. `kind` is `racing`, `passed`, `dnf` or `rerun`; `flag` is a six-digit hexadecimal colour prefixed by `#`. |
+
+Extra fields at every level, duplicate JSON keys, floats and non-finite numbers
+are rejected. Use only public driver and race labels, flag labels and display
+times: never include answers, grading reasons, hidden checks, private data or
+task-answer hints in these strings. Schema validation bounds the fields; the
+signing maintainer is responsible for their public content.
+
+| Operation | Request | Success response | Errors |
+|---|---|---|---|
+| `GET /live` | Public; no authentication | `200` with the document only; `Cache-Control: public, max-age=60` | `404 live_unavailable` before the first publication; `503 invalid_stored_live` if the stored document is invalid |
+| `PUT /live` | GitHub Bearer token and JSON `{"document":{...},"key_id":"<registered id>","signature":"<Base64>"}` | `200` with the stored document; `Cache-Control: no-store` | `400 malformed_live`; `401 unauthenticated`; `403 key_not_owned` or `maintainer_required`; `404 unknown_key`; `422 invalid_live_signature` |
+| `OPTIONS /live` | Public browser preflight | `200`; allows `GET, PUT, OPTIONS` and `authorization, content-type` headers | Transport limits apply as for other operations |
+
+Sign `canonical_json(document)` as UTF-8 bytes with Ed25519, using the same
+encoding and standard padded Base64 signature rules as the submission manifest.
+The v1 protocol intentionally separates signing purposes through strict,
+disjoint schemas, without a context prefix: live documents require exactly the
+fields above, while submission manifests require exactly `key_id` and `runs`.
+Both schemas are checked before signature verification. Any future change
+that makes these schemas overlap must introduce a versioned signing context
+before accepting the overlapping shape.
+The envelope has exactly `document`, `key_id` and `signature`; unsigned documents
+are rejected. The authenticated account must own that registered key and be in
+the current `MaintainerAccounts` configuration. Registration alone grants no
+maintainer role. Each accepted write replaces `live.json` in the existing
+private storage bucket; the public read returns no key id or signature.
+The last accepted write wins; timestamps describe the feed and do not impose
+write ordering. No document is fabricated before the first signed update.
+If a stored document fails strict JSON or schema validation, reads return the
+fixed `503 invalid_stored_live` error without caching; logs identify only its
+SHA-256 digest. A maintainer can replace it with a valid signed update.
+
+Cross-Origin Resource Sharing (CORS) for `/live` allows only
+`https://agentpaddock.ai`; responses always name that fixed origin, including
+errors, and never reflect a supplied origin. Browsers on other origins cannot
+read the response. CORS does not restrict public command-line reads.
+Errors and writes are not cached. Submission routes keep their existing
+authentication and no-store policy.
+
 A completed status carries `verdict_agreement` as a boolean and public-safe
 `evidence` references. Pending or re-grading statuses use null agreement;
 rejected status adds a safe `error` code without answer text or grading
