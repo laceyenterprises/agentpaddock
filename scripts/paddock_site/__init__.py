@@ -12,6 +12,9 @@ page shares:
 - ``races``: the races grid and one page per calendar race (PDW-06), read
   from the site data.
 - ``names``: the races' short names, plain words with acronyms spelled out.
+- ``home``: the home page (PDW-04), its styles and its script.
+- ``site_config``: build-time settings such as the live ticker's feed URL.
+
 - ``learn``: the Learn page (PDW-05), its labs and ``learn/learn.js``.
 
 - ``views``: the parsed data files and display labels the data pages share.
