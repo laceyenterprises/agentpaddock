@@ -1148,7 +1148,7 @@ def build(results_dir: Path = lb.DEFAULT_RESULTS) -> dict[str, str | bytes]:
             ),
             SCRIPT_NAME: layout.SCRIPT + race_pages.SCRIPT + kit.SCRIPT + DATA_SCRIPT,
             standings_pages.SCRIPT_NAME: standings_pages.SCRIPT,
-        learn.SCRIPT_FILE: learn.SCRIPT,
+            learn.SCRIPT_FILE: learn.SCRIPT,
             "favicon.svg": FAVICON,
             CARD_NAME: card,
         }
