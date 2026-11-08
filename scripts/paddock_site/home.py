@@ -27,7 +27,7 @@ import math
 from itertools import zip_longest
 from typing import Any, Mapping, Sequence
 
-from . import glyphs, layout
+from . import glyphs, layout, site_config
 from .routes import Route
 
 TITLE = "The open leaderboard for coding agents"
@@ -597,7 +597,7 @@ def call_to_action() -> str:
         f"{CAR_ILLUSTRATION}"
         '<h2 class="home-h2">Put a driver in a car. See how it does.</h2>'
         '<p class="home-cta-actions">'
-        '<a class="home-btn solid" href="garage/index.html">Build an entry</a>'
+        '<a class="home-btn solid" href="race-it-yourself/index.html">Build an entry</a>'
         '<a class="home-btn ghost" href="learn/index.html">How a race works</a></p>'
         "</section>"
     )
@@ -623,7 +623,7 @@ def body(
     return (
         '<div class="home" data-home>'
         + hero(go_line(standings, calendar))
-        + ticker(config["live_feed_url"], sample_ticks(standings, entries))
+        + ticker(config.get("live_feed_url", site_config.DEFAULT_LIVE_FEED_URL), sample_ticks(standings, entries))
         + photo_finish(standings)
         + results_note(calendar)
         + learn(standings)

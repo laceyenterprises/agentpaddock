@@ -690,7 +690,6 @@ PRODUCT_NAME_ALLOWLIST = re.compile(
     r"|(?s:<pre\b[^>]*><code>.*?</code></pre>)"  # commands quoted verbatim (PDW-09)
     r"|<code>[^<]*</code>"  # inline code: paths and commands
     r"|Learn the paddock in 60 seconds\."
-    r"|>Independent and open source: about the paddock<"
 )
 
 
