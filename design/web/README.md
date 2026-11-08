@@ -103,9 +103,9 @@ the build writes.
 | Route | Output file | Nav | Glyph | Built by today | Ticket |
 |---|---|---|---|---|---|
 | `/` | `index.html` | lockup | none | home (`paddock_site/home.py`) | PDW-04 |
+| `/learn/` | `learn/index.html` | bar | `track-map` | the Learn page (`learn.py`, `learn/learn.js`) | PDW-05 |
 | `/races/` | `races/index.html` | bar | `race-calendar` | the races grid | PDW-06 |
 | `/standings/` | `standings/index.html` | bar | `timing-tower` | the timing tower | PDW-07 |
-| `/learn/` | `learn/index.html` | bar | `track-map` | the Learn page (`learn.py`, `learn/learn.js`) | PDW-05 |
 | `/garage/` | `garage/index.html` | bar | `setup-sheet` | the garage (`garage.py`) | PDW-08 |
 | `/pit-wall/` | `pit-wall/index.html` | bar | `pit-wall` | the pit wall (`pit_wall.py`) | PDW-08 |
 | `/community/` | `community/index.html` | panel | `entry` | `paddock_site/community.py` | PDW-09 |
