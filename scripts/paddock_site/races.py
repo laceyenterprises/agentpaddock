@@ -1143,7 +1143,8 @@ SCRIPT = """(function () {
     var step = last;
     var selected = view.worst || last;
     var timer = null;
-    var motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    var motion = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
     function motionChanged() {
       if (motion.matches) { stop(); step = last; selected = last; show(); }
     }

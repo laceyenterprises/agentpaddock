@@ -855,7 +855,8 @@ def _script() -> str:
   var root = document.querySelector('[data-home]');
   if (!root) return;
   var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
-  var motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var motion = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
   var reduce = motion.matches;
   function motionChanged() {
     reduce = motion.matches;
@@ -875,7 +876,7 @@ def _script() -> str:
     var buttons = root.querySelectorAll('[data-pick="' + group + '"]');
     var panels = root.querySelectorAll('[data-panel="' + group + '"]');
     each(panels, function (panel, i) {
-      panel.hidden = buttons[i].getAttribute('aria-pressed') !== 'true';
+      panel.hidden = !buttons[i] || buttons[i].getAttribute('aria-pressed') !== 'true';
     });
     each(buttons, function (button, i) {
       button.addEventListener('click', function () {

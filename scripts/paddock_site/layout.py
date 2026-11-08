@@ -121,7 +121,8 @@ SCRIPT = """(function () {
       button.focus();
     }
   });
-  var wide = window.matchMedia('(min-width: 720px)');
+  var wide = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(min-width: 720px)') : { matches: false };
   var close = function (event) { if (event.matches) set(false); };
   if (wide.addEventListener) wide.addEventListener('change', close);
   else if (wide.addListener) wide.addListener(close);

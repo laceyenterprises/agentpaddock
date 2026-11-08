@@ -4881,6 +4881,98 @@ def test_acceptance_assertions_reject_regressions(acceptance_sites, fault):
         check((files,))
 
 
+@pytest.mark.parametrize(
+    "scenario", ("native", "missing-match-media", "unpaired-panel")
+)
+def test_browser_panel_startup_and_motion_changes(acceptance_sites, tmp_path, scenario):
+    executable = os.environ.get("PADDOCK_BROWSER_EXECUTABLE")
+    if not executable:
+        pytest.skip("Local Chromium pass requires PADDOCK_BROWSER_EXECUTABLE")
+    browser_api = pytest.importorskip("playwright.sync_api")
+    files = dict(acceptance_sites[0])
+    if scenario == "unpaired-panel":
+        files["index.html"] = files["index.html"].replace(
+            '<a class="home-more"',
+            '<p data-panel="cast">Unpaired panel</p><a class="home-more"',
+            1,
+        )
+    for name, content in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content.encode() if isinstance(content, str) else content)
+    with browser_api.sync_playwright() as api:
+        browser = api.chromium.launch(executable_path=executable)
+        try:
+            context = browser.new_context(reduced_motion="no-preference")
+            context.route("https://**", lambda route: route.abort())
+            if scenario == "missing-match-media":
+                context.add_init_script("window.matchMedia = undefined;")
+            page = context.new_page()
+            page.set_default_timeout(5000)
+            page.set_default_navigation_timeout(5000)
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+
+            page.goto((tmp_path / "learn/index.html").as_uri())
+            for marker in ("data-sector-panel", "data-flag-panel"):
+                assert page.locator(f"[{marker}]:visible").count() == 1
+                assert page.locator(f'[{marker}="0"]').is_visible()
+            assert page.locator("[data-sector-panel]").count() == 4
+            assert page.locator("[data-flag-panel]").count() == len(learn.FLAGS)
+            page.locator('[data-flag="1"]').click()
+            assert page.locator('[data-flag-panel="1"]').is_visible()
+            assert page.locator("[data-flag-panel]:visible").count() == 1
+
+            page.goto((tmp_path / "index.html").as_uri())
+            assert not errors, errors
+            assert page.locator('[data-panel="cast"]:visible').count() == 1
+            start = page.locator("[data-start]")
+            start.click()
+            assert start.inner_text() == "Hold…"
+            if scenario == "native":
+                # Changing the preference during the countdown completes it.
+                page.emulate_media(reduced_motion="reduce")
+                page.wait_for_function(
+                    "document.querySelector('[data-start]').textContent === 'Run it again'",
+                    timeout=1000,
+                )
+                assert page.locator("[data-go]").is_visible()
+                assert (
+                    page.locator("[data-art]").get_attribute("aria-label")
+                    == "Start lights: all out"
+                )
+                start.click()
+                assert start.inner_text() == "Run it again"
+                page.emulate_media(reduced_motion="no-preference")
+                start.click()
+                assert start.inner_text() == "Hold…"
+            assert not errors, errors
+
+            race = next(
+                name for name in _html_pages(files) if "data-funnel=" in files[name]
+            )
+            page.goto((tmp_path / race).as_uri())
+            assert not errors, errors
+            assert page.locator("[data-lap-controls]").is_visible()
+            play = page.locator("[data-lap-play]")
+            play.click()
+            assert play.inner_text() == "Racing…"
+            if scenario == "native":
+                page.emulate_media(reduced_motion="reduce")
+                page.wait_for_function(
+                    "document.querySelector('[data-lap-play]').textContent === 'Play the race'",
+                    timeout=1000,
+                )
+                assert (
+                    page.locator(".rc-station-card").last.get_attribute("aria-pressed")
+                    == "true"
+                )
+            assert not errors, errors
+            context.close()
+        finally:
+            browser.close()
+
+
 def test_browser_widths_keyboard_and_no_script_reading(acceptance_sites, tmp_path):
     """Optional local browser pass; fast CI needs only the stdlib checks above.
 
