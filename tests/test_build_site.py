@@ -4688,21 +4688,30 @@ def _page_resources(name, page):
     return resources
 
 
+_COLD_LOAD_RAW_BUDGET = 768 * 1024
+_COLD_LOAD_GZIP_BUDGET = 128 * 1024
+
+
+def _page_cold_load_sizes(files, name, page):
+    blobs = [
+        files[r].encode("utf-8") if isinstance(files[r], str) else files[r]
+        for r in _page_resources(name, page)
+    ]
+    return (
+        sum(map(len, blobs)),
+        sum(len(gzip.compress(b, mtime=0)) for b in blobs),
+    )
+
+
 def test_every_page_has_a_bounded_cold_load(acceptance_sites):
     # Raw UTF-8 plus CSS/scripts/images: 768 KiB. Individually gzip-compressed
     # resources: 128 KiB. Fonts and the analytics service are third-party and
     # outside this reproducible first-party budget; the share card is not loaded.
     for files in acceptance_sites:
         for name, page in _html_pages(files).items():
-            resources = _page_resources(name, page)
-            blobs = [
-                files[r].encode("utf-8") if isinstance(files[r], str) else files[r]
-                for r in resources
-            ]
-            assert sum(map(len, blobs)) <= 768 * 1024, name
-            assert sum(len(gzip.compress(b, mtime=0)) for b in blobs) <= 128 * 1024, (
-                name
-            )
+            raw_size, gzip_size = _page_cold_load_sizes(files, name, page)
+            assert raw_size <= _COLD_LOAD_RAW_BUDGET, name
+            assert gzip_size <= _COLD_LOAD_GZIP_BUDGET, name
 
 
 def test_all_page_links_resources_and_fragments_resolve(acceptance_sites):
@@ -4875,11 +4884,32 @@ def test_charts_have_screen_reader_names(acceptance_sites):
                     ), (name, attrs)
 
 
-@pytest.mark.parametrize("fault", ("weight", "link", "fragment", "no-script"))
+@pytest.mark.parametrize(
+    "fault", ("weight-raw", "weight-gzip", "link", "fragment", "no-script")
+)
 def test_acceptance_assertions_reject_regressions(acceptance_sites, fault):
     files = dict(acceptance_sites[0])
-    if fault == "weight":
-        files["paddock.css"] += " " * (768 * 1024)
+    if fault in ("weight-raw", "weight-gzip"):
+        if fault == "weight-raw":
+            files["paddock.css"] += " " * _COLD_LOAD_RAW_BUDGET
+        else:
+            # Deterministic mixed text exceeds the gzip budget without
+            # exceeding the raw budget.
+            files["paddock.css"] += hashlib.shake_256(b"cold-load").hexdigest(
+                _COLD_LOAD_GZIP_BUDGET
+            )
+        # Keep the other budget satisfied on every page, so either missing
+        # assertion makes its corresponding fault pass undetected.
+        exceeds_target_budget = False
+        for name, page in _html_pages(files).items():
+            raw_size, gzip_size = _page_cold_load_sizes(files, name, page)
+            if fault == "weight-raw":
+                assert gzip_size <= _COLD_LOAD_GZIP_BUDGET, name
+                exceeds_target_budget |= raw_size > _COLD_LOAD_RAW_BUDGET
+            else:
+                assert raw_size <= _COLD_LOAD_RAW_BUDGET, name
+                exceeds_target_budget |= gzip_size > _COLD_LOAD_GZIP_BUDGET
+        assert exceeds_target_budget, fault
         check = test_every_page_has_a_bounded_cold_load
     elif fault in ("link", "fragment"):
         target = "missing.html" if fault == "link" else "#missing-section"
