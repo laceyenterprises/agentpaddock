@@ -52,6 +52,31 @@ part of the design contract:
 - Naming **Lacey Enterprises** in the independence statement is operator-approved. Personal names, emails and
   accounts stay off the site.
 
+## Accessibility and page weight
+
+Every generated page has a keyboard skip link and visible focus. Learn renders
+all sector and flag explanations before JavaScript selects a panel. Reduced
+motion disables transitions, the start-light sequence, ticker rotation and lap
+playback; the controls still show the completed state.
+
+The cold-load budget per page is **768 KiB uncompressed and 128 KiB gzip**,
+counting its HTML and each directly loaded first-party stylesheet, script and
+image once. Embedded data and the glyph sprite count inside the HTML. Fonts
+and analytics come from external services and are outside this reproducible
+budget; the social share card is metadata, not a page-load resource.
+
+`tests/test_build_site.py` checks those limits on synthetic and committed results,
+local links and fragments, reading without JavaScript, chart names, text contrast
+and both footer lines. It also proves that broken links, missing fragments,
+overweight resources and hidden main content fail the assertions.
+
+The same test file includes a local Chromium pass at 390, 768 and 1440 px,
+with JavaScript both enabled and disabled. Install Playwright separately and set
+`PADDOCK_BROWSER_EXECUTABLE` to a local Chromium executable when running it.
+It blocks external requests, checks page overflow and control names, and exercises
+the skip link, menu and reduced-motion start lights with the keyboard. It skips
+when no executable is supplied; the existing fast job needs no browser install.
+
 
 ## Route map in the site generator (PDW-02)
 

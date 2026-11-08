@@ -1143,6 +1143,13 @@ SCRIPT = """(function () {
     var step = last;
     var selected = view.worst || last;
     var timer = null;
+    var motion = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+    function motionChanged() {
+      if (motion.matches) { stop(); step = last; selected = last; show(); }
+    }
+    if (motion.addEventListener) motion.addEventListener('change', motionChanged);
+    else if (motion.addListener) motion.addListener(motionChanged);
     function show() {
       stations.forEach(function (station, k) {
         var top = station.querySelector('.rc-ribbon-top');
@@ -1201,6 +1208,7 @@ SCRIPT = """(function () {
     });
     play.addEventListener('click', function () {
       stop();
+      if (motion.matches) { step = last; selected = last; show(); return; }
       step = 0; selected = 0;
       timer = setInterval(function () {
         step += 1; selected = step;

@@ -208,9 +208,7 @@ def _slips(driver: Mapping[str, Any]) -> str:
             for row in entry["byChallenge"]
         )
         panels.append(
-            f'<div class="dv-slips" id="slips-{index}" data-slips="{index}"'
-            + ("" if index == 0 else " hidden")
-            + ">"
+            f'<div class="dv-slips" id="slips-{index}" data-slips="{index}"' + ">"
             f'<span class="dv-slips-title">{esc(driver["name"])} in {esc(_entry_words(entry))}: '
             f"{entry['k']} of {entry['n']}</span>{rows}"
             f'<p class="dv-note">{slips_note(entry)}</p></div>'
@@ -335,7 +333,7 @@ CSS = """
 /* ---------- drivers (PDW-08) ---------- */
 .dv { display: grid; grid-template-columns: minmax(0, 1fr); gap: 48px; padding-top: 28px; }
 .dv > * { min-width: 0; }
-.dv-pick { display: grid; gap: 12px; }
+.dv-pick { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .dv-pick .hscroll-track .chip { flex: none; }
 .dv-head { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 24px; align-items: center; }
 .dv-name { display: flex; align-items: center; gap: 18px; min-width: 0; }
@@ -377,7 +375,16 @@ CSS = """
 .dv-cat.slip .dv-cat-bar span { background: var(--red); }
 .dv-cat.slip .dv-cat-num { color: var(--red-ink); font-weight: 700; }
 .dv-fuel { display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 18px; border: 1.5px solid var(--rule); }
-.dv-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 14px; }
+.dv-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+@media (min-width: 720px) {
+  .dv-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dv-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+@media (min-width: 1100px) {
+  .dv-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dv-card:last-child:nth-child(odd) { grid-column: auto; }
+  .dv-card:last-child:nth-child(3n + 1) { grid-column: 1 / -1; }
+}
 .dv-card { display: grid; gap: 4px; padding: 20px; border-radius: 20px; background: var(--soft); color: var(--ink); text-decoration: none; min-height: 44px; }
 .dv-card:hover { color: var(--ink); background: var(--blue-soft); }
 .dv-card b { font-size: 18px; }
@@ -391,6 +398,7 @@ SCRIPT = """(function () {
   if (!page) return;
   var rows = page.querySelectorAll('[data-entry]');
   var panels = page.querySelectorAll('[data-slips]');
+  Array.prototype.forEach.call(panels, function (panel, i) { panel.hidden = i !== 0; });
   Array.prototype.forEach.call(rows, function (row) {
     row.addEventListener('click', function () {
       var pick = row.getAttribute('data-entry');

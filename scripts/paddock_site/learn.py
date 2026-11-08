@@ -600,7 +600,7 @@ def _eyebrow(text: str, glyph: str = "") -> str:
 
 def _scroll_row(label: str, hint: str, buttons: str, row_id: str) -> str:
     return (
-        f'<div class="chip-scroll" data-more="false">'
+        f'<div class="chip-scroll" data-more="true">'
         f'<div class="chip-row" id="{row_id}" role="group" aria-label="{esc(label)}">{buttons}</div>'
         f'<p class="scroll-hint" aria-hidden="true">{esc(hint)}</p></div>'
     )
@@ -617,7 +617,7 @@ def stepper_html(stepper: Mapping[str, Any]) -> str:
     marks = "".join(
         f'<g class="sector-mark{" on" if i == 0 else ""}" data-sector="{i}" role="button" tabindex="0" '
         f'aria-label="Sector {i + 1}: {esc(SECTORS[i][0])}">'
-        f'<circle class="hit" cx="{x}" cy="{y}" r="22"/>'
+        f'<circle class="hit" cx="{x}" cy="{y}" r="26"/>'
         f'<circle class="dot" cx="{x}" cy="{y}" r="13"/>'
         f'<text x="{x}" y="{y + 5}">{i + 1}</text></g>'
         for i, (x, y) in enumerate(SECTOR_POINTS)
@@ -625,7 +625,7 @@ def stepper_html(stepper: Mapping[str, Any]) -> str:
     x, y = SECTOR_POINTS[0]
     track = (
         '<div class="track" id="track">'
-        '<svg viewBox="0 0 346 150" role="img" aria-labelledby="track-label">'
+        '<svg viewBox="0 0 346 150" role="group" aria-labelledby="track-label">'
         '<title id="track-label">A lap in four sectors</title>'
         f'<path class="track-bed" d="{TRACK_PATH}"/>'
         f'<path class="track-done" id="track-done" d="{TRACK_PATH}" pathLength="100" '
@@ -636,7 +636,7 @@ def stepper_html(stepper: Mapping[str, Any]) -> str:
         f'<p class="track-hint" id="track-hint">{esc(stepper["hint"])}</p></div>'
     )
     panels = "".join(
-        f'<div class="sector" data-sector-panel="{i}"{"" if i == 0 else " hidden"}>'
+        f'<div class="sector" data-sector-panel="{i}">'
         f'<div class="sector-head">{glyphs.icon(glyph, "sector-glyph")}'
         f'<div><span class="lab-eyebrow">Sector {i + 1} of 4</span>'
         f"<h3>{esc(title)}</h3></div></div>"
@@ -877,7 +877,7 @@ def flags_html() -> str:
         for i, (name, glyph, _counted, _body) in enumerate(FLAGS)
     )
     panels = "".join(
-        f'<div class="flag-says" data-flag-panel="{i}"{"" if i == 0 else " hidden"}>'
+        f'<div class="flag-says" data-flag-panel="{i}">'
         f"<b>{esc(name)} · {esc(counted)}</b><p>{esc(body)}</p></div>"
         for i, (name, _glyph, counted, body) in enumerate(FLAGS)
     )
