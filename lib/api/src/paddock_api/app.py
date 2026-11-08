@@ -1,4 +1,4 @@
-"""The three submission operations of CONTRIBUTING's API contract.
+"""Submission operations and the signed public live ticker.
 
 ``POST /submission/keys``, ``POST /submission/bundles`` and
 ``GET /submission/bundles/{sha256}``, with exactly the contract's success and
@@ -26,7 +26,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import ed25519, multipart
+from . import ed25519, live, multipart
 from .auth import AccountResolver, AuthUnavailable, bearer_token
 from .canonical import StrictJSONError, canonical_bytes, strict_loads
 from .storage import BundleRecord, KeyRecord, Storage
@@ -35,6 +35,13 @@ LOG = logging.getLogger("paddock_api")
 
 #: code -> (HTTP status, fixed public message)
 ERRORS: dict[str, tuple[int, str]] = {
+    "malformed_live": (400, "The live envelope or document is malformed."),
+    "maintainer_required": (403, "A registered maintainer signing key is required."),
+    "live_unavailable": (404, "No live document has been published."),
+    "invalid_live_signature": (
+        422,
+        "The signature does not verify against the live document.",
+    ),
     "invalid_json": (400, "The request body is not valid JSON."),
     "malformed_key": (
         400,
@@ -135,6 +142,7 @@ class Request:
 class Response:
     status: int
     body: dict[str, Any]
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 class ApiError(Exception):
@@ -301,7 +309,8 @@ class SubmissionApi:
             route, operation, argument = self._route(request)
             if len(request.body) > self.limits.max_body_bytes:
                 raise ApiError("payload_too_large")
-            account = self._authenticate(request)
+            if route not in {"GET /live", "OPTIONS /live"}:
+                account = self._authenticate(request)
             response = operation(account, request, argument)
         except ApiError as exc:
             response = exc.response()
@@ -323,10 +332,33 @@ class SubmissionApi:
                 sort_keys=True,
             )
         )
-        return response
+        return self.response_headers(request, response)
+
+    def response_headers(self, request: Request, response: Response) -> Response:
+        if request.path != "/live":
+            return response
+        headers = {
+            "access-control-allow-origin": "https://agentpaddock.ai",
+            "cache-control": "no-store",
+        }
+        if request.method.upper() == "GET" and response.status == 200:
+            headers["cache-control"] = "public, max-age=60"
+        if request.method.upper() == "OPTIONS":
+            headers["access-control-allow-methods"] = "GET, PUT, OPTIONS"
+            headers["access-control-allow-headers"] = "authorization, content-type"
+        return Response(response.status, response.body, headers)
 
     def _route(self, request: Request):
         path, method = request.path, request.method.upper()
+        if path == "/live":
+            operations = {
+                "GET": self.read_live,
+                "PUT": self.put_live,
+                "OPTIONS": self.live_options,
+            }
+            if method not in operations:
+                raise ApiError("method_not_allowed")
+            return f"{method} /live", operations[method], None
         if path == "/submission/keys":
             expected, route, operation, argument = (
                 "POST",
@@ -361,6 +393,55 @@ class SubmissionApi:
         if account is None:
             raise ApiError("unauthenticated")
         return account
+
+    # -- /live ------------------------------------------------------------------
+
+    def live_options(self, _account, _request, _argument) -> Response:
+        return Response(200, {})
+
+    def read_live(self, _account, _request, _argument) -> Response:
+        raw = self.storage.blobs.get_live()
+        if raw is None:
+            raise ApiError("live_unavailable")
+        document = strict_loads(raw)
+        live.validate_document(document)
+        return Response(200, document)
+
+    def put_live(self, account: str, request: Request, _argument) -> Response:
+        try:
+            envelope = strict_loads(request.body)
+            if not isinstance(envelope, dict) or set(envelope) != {
+                "document",
+                "key_id",
+                "signature",
+            }:
+                raise ValueError("envelope")
+            live.validate_document(envelope["document"])
+            if not _short_text(envelope["key_id"]):
+                raise ValueError("key id")
+        except (StrictJSONError, ValueError):
+            raise ApiError("malformed_live") from None
+        key = self.storage.keys.get(envelope["key_id"])
+        if key is None:
+            raise ApiError("unknown_key")
+        if not _same_account(key.github_account, account):
+            raise ApiError("key_not_owned")
+        if (
+            key.github_account.casefold() not in self.maintainers
+            or key.algorithm != ALGORITHM
+        ):
+            raise ApiError("maintainer_required")
+        public_key = _b64_exact(key.public_key, 32)
+        signature = _b64_exact(envelope["signature"], 64)
+        document_bytes = canonical_bytes(envelope["document"])
+        if (
+            public_key is None
+            or signature is None
+            or not ed25519.verify(public_key, document_bytes, signature)
+        ):
+            raise ApiError("invalid_live_signature")
+        self.storage.blobs.put_live(document_bytes)
+        return Response(200, envelope["document"])
 
     # -- POST /submission/keys ---------------------------------------------------
 

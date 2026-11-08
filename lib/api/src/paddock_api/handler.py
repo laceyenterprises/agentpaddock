@@ -92,7 +92,7 @@ def request_from_event(event: dict[str, Any], request_id: str = "") -> Request:
 def to_event_response(response: Response) -> dict[str, Any]:
     return {
         "statusCode": response.status,
-        "headers": dict(_HEADERS),
+        "headers": {**_HEADERS, **response.headers},
         "body": json.dumps(response.body, sort_keys=True, ensure_ascii=False),
         "isBase64Encoded": False,
     }
@@ -104,7 +104,16 @@ def handle_event(
     try:
         request = request_from_event(event, request_id)
     except ApiError as exc:
-        return to_event_response(exc.response())
+        request = Request(
+            method=str(
+                ((event.get("requestContext") or {}).get("http") or {}).get(
+                    "method", ""
+                )
+            ),
+            path=str(event.get("rawPath") or ""),
+            headers={},
+        )
+        return to_event_response(api.response_headers(request, exc.response()))
     return to_event_response(api.handle(request))
 
 

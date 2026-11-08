@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import io
 import json
 import os
 import posixpath
@@ -472,7 +473,11 @@ def test_brand_assets_and_navigation_on_every_page():
         # A page with its own view switches (PDW-07) loads one shared script for them.
         own = f'<script src="{root}{standings_pages.SCRIPT_NAME}" defer></script>'
         assert page.count(own) == (1 if name == "standings/index.html" else 0), name
-        assert page.count("<script") == 3 + page.count(own) + 2 * (name == "learn/index.html") and "<style" not in page
+        assert (
+            page.count("<script")
+            == 3 + page.count(own) + 2 * (name == "learn/index.html")
+            and "<style" not in page
+        )
         if name == "learn/index.html":
             assert page.count('<script type="application/json" id="learn-data">') == 1
             assert page.count('<script src="learn.js" defer></script>') == 1
@@ -480,11 +485,7 @@ def test_brand_assets_and_navigation_on_every_page():
         assert {other for other, _ in build_site.PAGES} <= _local_links(name, page)
         # Every link marked current points at the page itself (a board page
         # belongs to the leaderboard), and the page is marked somewhere.
-        current_links = [
-            a
-            for t, a in elements
-            if t == "a" and "aria-current" in a
-        ]
+        current_links = [a for t, a in elements if t == "a" and "aria-current" in a]
         assert all(a["aria-current"] == "page" for a in current_links), name
         current = {_resolve(name, a["href"]) for a in current_links}
         if name.startswith("board-"):
@@ -1210,7 +1211,11 @@ def test_data_page_builders_follow_the_registry_interface():
     files = build_site.build(FIXTURE)
     inputs = site_routes.Build(
         None,
-        {name: json.loads(text) for name, text in files.items() if name.startswith("data/")},
+        {
+            name: json.loads(text)
+            for name, text in files.items()
+            if name.startswith("data/")
+        },
         build_site.ROUTES,
     )
     for route in build_site.ROUTES:
@@ -2713,6 +2718,8 @@ def test_short_names_spell_out_acronyms(task_id, suite, card, name):
 def test_every_local_task_has_a_short_name():
     for path in (Path(__file__).resolve().parents[1] / "tasks").glob("*/task.toml"):
         assert path.parent.name in site_names.SHORT_NAMES, path.parent.name
+
+
 # ---------------------------------------------------------------- explainer pages (PDW-09)
 
 from paddock_site import community as site_community  # noqa: E402
@@ -2957,6 +2964,8 @@ def test_explainer_page_numbers_come_from_the_site_data(tmp_path):
     assert f"{races} races is a small sample." in files["rulebook/index.html"]
     assert f"All {races} races, grouped by challenge" in files["dictionary/index.html"]
     assert site_contact.CHALLENGE_SUBJECT == "Result challenge"
+
+
 # ---------------------------------------------------------------- home (PDW-04)
 
 from paddock_site import home as site_home  # noqa: E402
@@ -3078,7 +3087,9 @@ def test_home_fuel_card_compares_a_shared_finish(tmp_path):
     # Without two priced entries sharing a place, the card makes no comparison.
     alone = site_home.fuel_card({"entries": standings["entries"][1:]})
     assert "Same finish" not in alone and "The fuel bill." in alone
-    free = site_home.fuel_card({"entries": [dict(standings["entries"][0], costPerPass=0.0)]})
+    free = site_home.fuel_card(
+        {"entries": [dict(standings["entries"][0], costPerPass=0.0)]}
+    )
     assert "best-placed priced entry" in free
 
 
@@ -3369,6 +3380,7 @@ def test_every_footer_carries_both_optics_lines_verbatim_and_links_contact(tmp_p
             rf'<a href="{re.escape(contact)}"( aria-current="page")?>Contact and about</a>',
             footer,
         ), name
+
 
 # ---------------------------------------------------------------- the Learn page (PDW-05)
 #
@@ -3749,6 +3761,7 @@ def test_learn_driver_chips_keep_two_providers_of_one_model_apart():
     assert learn.embed({"a": "</script><b>&"}) == (
         '{"a":"\\u003c/script\\u003e\\u003cb\\u003e\\u0026"}'
     )
+
 
 # ---------------------------------------------------------------- garage, pit wall and drivers (PDW-08)
 #
@@ -4195,3 +4208,311 @@ def test_embedded_page_data_cannot_close_its_script():
     assert json.loads(
         _between(block, '<script type="application/json" id="x">', "</script>")
     ) == {"name": "</script><b>&"}
+
+
+# The live ticker is the dynamic data source for the home page. Keep its
+# endpoint contract in this existing fast test file; reuse synthetic API fakes.
+from test_submission_api import (  # noqa: E402
+    SEED_A,
+    SEED_B,
+    FakeS3,
+    Request,
+    S3BundleBlobs,
+    _template,
+    api as _api_fixture,
+    auth,
+    b64,
+    expect,
+    handle_event,
+    register,
+    sign,
+)
+from paddock_api.canonical import canonical_json  # noqa: E402
+
+api = _api_fixture
+
+# -- public live ticker -------------------------------------------------------------
+
+
+def live_document():
+    return {
+        "schema": "paddock-live/v1",
+        "updated": "04:44Z",
+        "updatedIso": "2026-11-03T04:44:58Z",
+        "racing": 1,
+        "ticks": [
+            {
+                "who": "Example driver",
+                "what": "Example race",
+                "kind": "racing",
+                "flagName": "GREEN · RACING",
+                "flag": "#00C27A",
+                "when": "now",
+            }
+        ],
+    }
+
+
+def live_envelope(key_id, document=None, seed=SEED_A):
+    document = live_document() if document is None else document
+    return {
+        "document": document,
+        "key_id": key_id,
+        "signature": b64(sign(seed, canonical_json(document).encode("utf-8"))),
+    }
+
+
+def put_live(api, envelope, token="tok-maint-0003"):
+    body = envelope if isinstance(envelope, bytes) else json.dumps(envelope).encode()
+    return api.handle(Request("PUT", "/live", auth(token), body))
+
+
+def test_live_signed_round_trip_replaces_one_object_and_public_read_skips_auth(api):
+    key = register(api, token="tok-maint-0003")
+    doc = live_document()
+    # Key ordering and transport whitespace do not affect signing.
+    envelope = live_envelope(key, doc)
+    expect(put_live(api, json.dumps(envelope, indent=2).encode()), 200)
+    doc["ticks"] = []
+    doc["racing"] = 0
+    expect(put_live(api, live_envelope(key, doc)), 200)
+    api.resolver.calls.clear()
+    response = api.handle(Request("GET", "/live", {"authorization": "bad"}))
+    assert response.body == doc
+    assert response.headers["cache-control"] == "public, max-age=60"
+    assert api.resolver.calls == []
+    assert api.storage.blobs.objects == {
+        "live.json": canonical_json(doc).encode("utf-8")
+    }
+    assert "signature" not in response.body and "key_id" not in response.body
+
+
+def test_live_missing_document_is_safe_and_not_cached(api):
+    response = api.handle(Request("GET", "/live", {}))
+    expect(response, 404, "live_unavailable")
+    assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "https://agentpaddock.ai",
+        "https://example.org",
+        "https://agentpaddock.ai.example.org",
+    ],
+)
+@pytest.mark.parametrize("method", ["GET", "PUT", "OPTIONS", "DELETE"])
+def test_live_cors_is_fixed_to_site_on_success_and_errors(api, origin, method):
+    result = handle_event(
+        api,
+        {
+            "rawPath": "/live",
+            "requestContext": {"http": {"method": method}},
+            "headers": {"origin": origin},
+        },
+    )
+    assert result["headers"]["access-control-allow-origin"] == "https://agentpaddock.ai"
+    if method == "OPTIONS":
+        assert result["statusCode"] == 200
+        assert result["headers"]["access-control-allow-methods"] == "GET, PUT, OPTIONS"
+        assert (
+            result["headers"]["access-control-allow-headers"]
+            == "authorization, content-type"
+        )
+
+
+def test_live_lambda_success_headers_and_malformed_transport(api):
+    key = register(api, token="tok-maint-0003")
+    expect(put_live(api, live_envelope(key)), 200)
+    event = {"rawPath": "/live", "requestContext": {"http": {"method": "GET"}}}
+    result = handle_event(api, event)
+    assert result["headers"]["cache-control"] == "public, max-age=60"
+    assert json.loads(result["body"]) == live_document()
+    result = handle_event(api, {**event, "isBase64Encoded": True, "body": "%%%"})
+    assert result["statusCode"] == 400
+    assert result["headers"]["cache-control"] == "no-store"
+    assert result["headers"]["access-control-allow-origin"] == "https://agentpaddock.ai"
+
+
+def test_live_requires_token_owned_key_and_current_maintainer_role(api):
+    maint_key = register(api, token="tok-maint-0003")
+    user_key = register(api, seed=SEED_B)
+    envelope = live_envelope(maint_key)
+    expect(
+        api.handle(Request("PUT", "/live", {}, json.dumps(envelope).encode())),
+        401,
+        "unauthenticated",
+    )
+    expect(put_live(api, envelope, "tok-alice-0001"), 403, "key_not_owned")
+    expect(
+        put_live(api, live_envelope(user_key, seed=SEED_B), "tok-alice-0001"),
+        403,
+        "maintainer_required",
+    )
+    expect(put_live(api, live_envelope("unknown")), 404, "unknown_key")
+    api.maintainers = frozenset()
+    expect(put_live(api, envelope), 403, "maintainer_required")
+    assert not api.storage.blobs.objects
+
+
+@pytest.mark.parametrize("signature", [None, "", "bad", b64(bytes(64))])
+def test_live_invalid_signatures_leave_previous_document_untouched(api, signature):
+    key = register(api, token="tok-maint-0003")
+    expect(put_live(api, live_envelope(key)), 200)
+    previous = dict(api.storage.blobs.objects)
+    envelope = live_envelope(key)
+    envelope["signature"] = signature
+    expect(put_live(api, envelope), 422, "invalid_live_signature")
+    assert api.storage.blobs.objects == previous
+
+
+def test_live_signature_binds_every_document_field_and_key(api):
+    key = register(api, token="tok-maint-0003")
+    envelope = live_envelope(key)
+    envelope["document"]["racing"] = 2
+    expect(put_live(api, envelope), 422, "invalid_live_signature")
+    expect(
+        put_live(api, live_envelope(key, seed=SEED_B)), 422, "invalid_live_signature"
+    )
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("schema", "paddock-live/v2"),
+        ("schema", None),
+        ("updated", "04:45Z"),
+        ("updatedIso", "2026-02-30T04:44:58Z"),
+        ("updatedIso", "2026-11-03T04:44:58+00:00"),
+        ("updatedIso", 123),
+        ("racing", -1),
+        ("racing", True),
+        ("racing", 1.5),
+        ("racing", "1"),
+        ("ticks", {}),
+        ("ticks", [live_document()["ticks"][0]] * 13),
+        ("extra", "refused"),
+    ],
+)
+def test_live_rejects_invalid_top_level_fields(api, field, value):
+    key = register(api, token="tok-maint-0003")
+    doc = live_document()
+    doc[field] = value
+    expect(put_live(api, live_envelope(key, doc)), 400, "malformed_live")
+    assert not api.storage.blobs.objects
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("who", ""),
+        ("who", "x" * 257),
+        ("what", "line\nbreak"),
+        ("when", None),
+        ("kind", "unknown"),
+        ("kind", []),
+        ("flag", "red"),
+        ("flag", "#12345g"),
+        ("extra", "refused"),
+    ],
+)
+def test_live_rejects_invalid_tick_fields(api, field, value):
+    key = register(api, token="tok-maint-0003")
+    doc = live_document()
+    doc["ticks"][0][field] = value
+    expect(put_live(api, live_envelope(key, doc)), 400, "malformed_live")
+
+
+@pytest.mark.parametrize("field", sorted(live_document()))
+def test_live_requires_every_document_field(api, field):
+    key = register(api, token="tok-maint-0003")
+    doc = live_document()
+    del doc[field]
+    expect(put_live(api, live_envelope(key, doc)), 400, "malformed_live")
+
+
+@pytest.mark.parametrize("field", sorted(live_document()["ticks"][0]))
+def test_live_requires_every_tick_field(api, field):
+    key = register(api, token="tok-maint-0003")
+    doc = live_document()
+    del doc["ticks"][0][field]
+    expect(put_live(api, live_envelope(key, doc)), 400, "malformed_live")
+
+
+@pytest.mark.parametrize("kind", ["racing", "passed", "dnf", "rerun"])
+def test_live_accepts_all_kinds_and_twelve_ticks(api, kind):
+    key = register(api, token="tok-maint-0003")
+    doc = live_document()
+    doc["ticks"][0]["kind"] = kind
+    doc["ticks"] *= 12
+    expect(put_live(api, live_envelope(key, doc)), 200)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        b"{}",
+        b"[]",
+        b'{"key_id":"a","key_id":"b"}',
+        b"NaN",
+    ],
+)
+def test_live_rejects_malformed_json_and_unsigned_documents(api, body):
+    expect(put_live(api, body), 400, "malformed_live")
+    expect(put_live(api, live_document()), 400, "malformed_live")
+
+
+def test_live_rejects_extra_envelope_fields_or_missing_signature(api):
+    key = register(api, token="tok-maint-0003")
+    envelope = live_envelope(key)
+    expect(put_live(api, {**envelope, "extra": "refused"}), 400, "malformed_live")
+    del envelope["signature"]
+    expect(put_live(api, envelope), 400, "malformed_live")
+
+
+def test_live_s3_uses_only_live_object_and_closes_reader():
+    class Missing(Exception):
+        response = {"Error": {"Code": "NoSuchKey"}}
+
+    class LiveS3(FakeS3):
+        def get_object(self, **kwargs):
+            assert kwargs == {"Bucket": "bucket", "Key": "live.json"}
+            if "live.json" not in self.objects:
+                raise Missing()
+            self.stream = io.BytesIO(self.objects["live.json"]["Body"])
+            return {"Body": self.stream}
+
+    client = LiveS3()
+    blobs = S3BundleBlobs(client, "bucket")
+    assert blobs.get_live() is None
+    blobs.put_live(b'{"example":1}')
+    blobs.put_live(b'{"example":2}')
+    assert list(client.objects) == ["live.json"]
+    assert blobs.get_live() == b'{"example":2}'
+    assert client.stream.closed
+    Missing.response = {"Error": {"Code": "AccessDenied"}}
+    client.objects.clear()
+    with pytest.raises(Missing):
+        blobs.get_live()
+
+
+def test_live_template_routes_and_narrow_storage_permissions():
+    resources = _template()["Resources"]
+    events = resources["SubmissionFunction"]["Properties"]["Events"]
+    assert {
+        (event["Properties"]["Method"], event["Properties"]["Path"])
+        for event in events.values()
+    } >= {
+        ("GET", "/live"),
+        ("PUT", "/live"),
+        ("OPTIONS", "/live"),
+    }
+    policies = resources["SubmissionRole"]["Properties"]["Policies"]
+    reads = [
+        statement
+        for policy in policies
+        for statement in policy["PolicyDocument"]["Statement"]
+        if "s3:GetObject" in statement["Action"]
+    ]
+    assert len(reads) == 1
+    assert reads[0]["Resource"] == {"!Sub": "${BundleBucket.Arn}/live.json"}

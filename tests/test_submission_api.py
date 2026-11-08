@@ -428,7 +428,12 @@ def test_github_resolver_sends_token_once_and_keeps_nothing():
         (403, {"x-ratelimit-remaining": "42"}, b"", None),
         (403, {"x-ratelimit-remaining": "0"}, b"", "unavailable"),
         (403, {"retry-after": "60"}, b"", "unavailable"),
-        (403, {}, b'{"message": "You have exceeded a secondary rate limit."}', "unavailable"),
+        (
+            403,
+            {},
+            b'{"message": "You have exceeded a secondary rate limit."}',
+            "unavailable",
+        ),
         (429, {}, b"", "unavailable"),
         (500, {}, b"", "unavailable"),
     ],
@@ -1259,6 +1264,7 @@ def test_template_iam_is_least_privilege():
         "dynamodb:GetItem",
         "dynamodb:PutItem",
         "s3:PutObject",
+        "s3:GetObject",
         "logs:CreateLogStream",
         "logs:PutLogEvents",
     }
