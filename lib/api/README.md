@@ -22,7 +22,8 @@ CI job talks to AWS. A maintainer deploys it by following the runbook below.
 
 Submission tests are in `tests/test_submission_api.py`; live endpoint tests
 are in the home page's existing fast file, `tests/test_build_site.py`, using
-the same synthetic API fakes. Neither API test group uses network, AWS or
+the same synthetic API fakes from `tests/api_test_support.py` and the `api`
+fixture from `tests/conftest.py`. Neither API test group uses network, AWS or
 credentials.
 
 ```bash
@@ -49,14 +50,40 @@ whose current deploy configuration must grant the maintainer role. Accepted
 writes replace the single S3 key `live.json`, separate from private bundles;
 reads return only the validated public document. The last accepted write wins.
 S3 bucket versioning retains overwritten versions under its existing lifecycle.
+The bucket uses SSE-S3 (`AES256`), so reads need no KMS decrypt grant.
+Missing-object `AccessDenied` is checked with `ListObjectsV2`, restricted by IAM
+to the `live.json` prefix, with at most one result. This confirms absence even
+when the prefix condition prevents S3's implicit missing-key check. An existing
+object that cannot be read, or a denied list request, remains a service error;
+access denial alone never means missing. Normal successful reads use one
+`GetObject` and no list call.
 See CONTRIBUTING's contract for every document field and the content rules.
 Malformed envelopes/documents return `400 malformed_live`, non-maintainers
 `403 maintainer_required`, and signature failures `422 invalid_live_signature`;
 authentication, ownership and unknown-key errors use the existing codes.
 Only successful reads are cached; writes and errors use `no-store`.
+Invalid stored JSON or schema returns `503 invalid_stored_live`; the function
+logs only the object's SHA-256 digest, and a valid signed update repairs it.
+The v1 signature deliberately relies on the strict, disjoint live and submission
+schemas for purpose separation, as specified in CONTRIBUTING. Schema changes
+that introduce overlap require a new signing context before deployment.
 `/live` responses include a fixed Cross-Origin Resource Sharing (CORS) origin
 of `https://agentpaddock.ai`, and `OPTIONS /live` handles browser preflight.
 The submission routes have no CORS headers.
+
+**Public traffic and cost.** The existing API Gateway default throttling applies
+to `/live` too: 5 requests/second with a burst of 10, and Lambda reserved
+concurrency is 5. These are overload controls, not a monthly spending cap.
+There is no CDN or server-side response cache in this stack; the 60-second
+header permits browser caching. The home page bypasses that cache when polling
+every 60 seconds while visible, so expect about one request per minute per
+visible page (100 pages: about 1.7 requests per second or 144,000 reads/day).
+Each uncached successful read invokes Lambda and S3 once; absent documents can
+add one S3 list call.
+Sustained traffic at the default throttle could approach 432,000 requests/day.
+Monitor request volume and throttles, and adjust the existing deploy parameters
+to the intended audience. Complete the budget activation in runbook step 3;
+budget alerts do not stop traffic or spending.
 
 **Keys.** A key id is `ed25519-` plus the first 32 hex characters of the
 SHA-256 of the raw 32-byte public key. Registering an already registered key

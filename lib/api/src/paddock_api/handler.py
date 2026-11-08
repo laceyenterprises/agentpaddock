@@ -92,7 +92,11 @@ def request_from_event(event: dict[str, Any], request_id: str = "") -> Request:
 def to_event_response(response: Response) -> dict[str, Any]:
     return {
         "statusCode": response.status,
-        "headers": {**_HEADERS, **response.headers},
+        "headers": {
+            key.lower(): value
+            for headers in (_HEADERS, response.headers)
+            for key, value in headers.items()
+        },
         "body": json.dumps(response.body, sort_keys=True, ensure_ascii=False),
         "isBase64Encoded": False,
     }

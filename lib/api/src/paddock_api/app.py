@@ -38,6 +38,7 @@ ERRORS: dict[str, tuple[int, str]] = {
     "malformed_live": (400, "The live envelope or document is malformed."),
     "maintainer_required": (403, "A registered maintainer signing key is required."),
     "live_unavailable": (404, "No live document has been published."),
+    "invalid_stored_live": (503, "The stored live document is unavailable."),
     "invalid_live_signature": (
         422,
         "The signature does not verify against the live document.",
@@ -403,8 +404,19 @@ class SubmissionApi:
         raw = self.storage.blobs.get_live()
         if raw is None:
             raise ApiError("live_unavailable")
-        document = strict_loads(raw)
-        live.validate_document(document)
+        try:
+            document = strict_loads(raw)
+            live.validate_document(document)
+        except (StrictJSONError, ValueError):
+            LOG.error(
+                json.dumps(
+                    {
+                        "event": "invalid_stored_live",
+                        "sha256": hashlib.sha256(raw).hexdigest(),
+                    }
+                )
+            )
+            raise ApiError("invalid_stored_live") from None
         return Response(200, document)
 
     def put_live(self, account: str, request: Request, _argument) -> Response:

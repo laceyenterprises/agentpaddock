@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import html
 import io
+import logging
 import json
 import os
 import posixpath
@@ -473,11 +475,7 @@ def test_brand_assets_and_navigation_on_every_page():
         # A page with its own view switches (PDW-07) loads one shared script for them.
         own = f'<script src="{root}{standings_pages.SCRIPT_NAME}" defer></script>'
         assert page.count(own) == (1 if name == "standings/index.html" else 0), name
-        assert (
-            page.count("<script")
-            == 3 + page.count(own) + 2 * (name == "learn/index.html")
-            and "<style" not in page
-        )
+        assert page.count("<script") == 3 + page.count(own) + 2 * (name == "learn/index.html") and "<style" not in page
         if name == "learn/index.html":
             assert page.count('<script type="application/json" id="learn-data">') == 1
             assert page.count('<script src="learn.js" defer></script>') == 1
@@ -485,7 +483,11 @@ def test_brand_assets_and_navigation_on_every_page():
         assert {other for other, _ in build_site.PAGES} <= _local_links(name, page)
         # Every link marked current points at the page itself (a board page
         # belongs to the leaderboard), and the page is marked somewhere.
-        current_links = [a for t, a in elements if t == "a" and "aria-current" in a]
+        current_links = [
+            a
+            for t, a in elements
+            if t == "a" and "aria-current" in a
+        ]
         assert all(a["aria-current"] == "page" for a in current_links), name
         current = {_resolve(name, a["href"]) for a in current_links}
         if name.startswith("board-"):
@@ -1211,11 +1213,7 @@ def test_data_page_builders_follow_the_registry_interface():
     files = build_site.build(FIXTURE)
     inputs = site_routes.Build(
         None,
-        {
-            name: json.loads(text)
-            for name, text in files.items()
-            if name.startswith("data/")
-        },
+        {name: json.loads(text) for name, text in files.items() if name.startswith("data/")},
         build_site.ROUTES,
     )
     for route in build_site.ROUTES:
@@ -2718,8 +2716,6 @@ def test_short_names_spell_out_acronyms(task_id, suite, card, name):
 def test_every_local_task_has_a_short_name():
     for path in (Path(__file__).resolve().parents[1] / "tasks").glob("*/task.toml"):
         assert path.parent.name in site_names.SHORT_NAMES, path.parent.name
-
-
 # ---------------------------------------------------------------- explainer pages (PDW-09)
 
 from paddock_site import community as site_community  # noqa: E402
@@ -2964,8 +2960,6 @@ def test_explainer_page_numbers_come_from_the_site_data(tmp_path):
     assert f"{races} races is a small sample." in files["rulebook/index.html"]
     assert f"All {races} races, grouped by challenge" in files["dictionary/index.html"]
     assert site_contact.CHALLENGE_SUBJECT == "Result challenge"
-
-
 # ---------------------------------------------------------------- home (PDW-04)
 
 from paddock_site import home as site_home  # noqa: E402
@@ -3087,9 +3081,7 @@ def test_home_fuel_card_compares_a_shared_finish(tmp_path):
     # Without two priced entries sharing a place, the card makes no comparison.
     alone = site_home.fuel_card({"entries": standings["entries"][1:]})
     assert "Same finish" not in alone and "The fuel bill." in alone
-    free = site_home.fuel_card(
-        {"entries": [dict(standings["entries"][0], costPerPass=0.0)]}
-    )
+    free = site_home.fuel_card({"entries": [dict(standings["entries"][0], costPerPass=0.0)]})
     assert "best-placed priced entry" in free
 
 
@@ -3380,7 +3372,6 @@ def test_every_footer_carries_both_optics_lines_verbatim_and_links_contact(tmp_p
             rf'<a href="{re.escape(contact)}"( aria-current="page")?>Contact and about</a>',
             footer,
         ), name
-
 
 # ---------------------------------------------------------------- the Learn page (PDW-05)
 #
@@ -3761,7 +3752,6 @@ def test_learn_driver_chips_keep_two_providers_of_one_model_apart():
     assert learn.embed({"a": "</script><b>&"}) == (
         '{"a":"\\u003c/script\\u003e\\u003cb\\u003e\\u0026"}'
     )
-
 
 # ---------------------------------------------------------------- garage, pit wall and drivers (PDW-08)
 #
@@ -4211,25 +4201,22 @@ def test_embedded_page_data_cannot_close_its_script():
 
 
 # The live ticker is the dynamic data source for the home page. Keep its
-# endpoint contract in this existing fast test file; reuse synthetic API fakes.
-from test_submission_api import (  # noqa: E402
+# endpoint contract here; synthetic API helpers are shared through a support module.
+from api_test_support import (  # noqa: E402
     SEED_A,
     SEED_B,
     FakeS3,
-    Request,
-    S3BundleBlobs,
     _template,
-    api as _api_fixture,
     auth,
     b64,
     expect,
-    handle_event,
     register,
     sign,
 )
+from paddock_api.app import Request  # noqa: E402
 from paddock_api.canonical import canonical_json  # noqa: E402
-
-api = _api_fixture
+from paddock_api.handler import handle_event  # noqa: E402
+from paddock_api.storage import S3BundleBlobs  # noqa: E402
 
 # -- public live ticker -------------------------------------------------------------
 
@@ -4291,6 +4278,53 @@ def test_live_missing_document_is_safe_and_not_cached(api):
     response = api.handle(Request("GET", "/live", {}))
     expect(response, 404, "live_unavailable")
     assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b'{"private":"stored-content-marker","private":2}',
+        b'{"private":"stored-content-marker"}',
+        b"\xff",
+    ],
+)
+def test_live_invalid_stored_document_has_defined_error_and_logs_only_digest(
+    api, caplog, raw
+):
+    api.storage.blobs.objects["live.json"] = raw
+    with caplog.at_level(logging.INFO, logger="paddock_api"):
+        result = handle_event(
+            api, {"rawPath": "/live", "requestContext": {"http": {"method": "GET"}}}
+        )
+    assert result["statusCode"] == 503
+    assert json.loads(result["body"])["error"] == "invalid_stored_live"
+    assert result["headers"]["cache-control"] == "no-store"
+    assert result["headers"]["access-control-allow-origin"] == "https://agentpaddock.ai"
+    assert hashlib.sha256(raw).hexdigest() in caplog.text
+    assert "stored-content-marker" not in caplog.text + result["body"]
+    assert "unhandled" not in caplog.text
+
+
+def test_live_header_merge_is_case_insensitive(api, monkeypatch):
+    from paddock_api import handler
+
+    key = register(api, token="tok-maint-0003")
+    expect(put_live(api, live_envelope(key)), 200)
+    monkeypatch.setattr(handler, "_HEADERS", {"Cache-Control": "no-store"})
+    result = handle_event(
+        api, {"rawPath": "/live", "requestContext": {"http": {"method": "GET"}}}
+    )
+    assert [
+        (name, value)
+        for name, value in result["headers"].items()
+        if name.lower() == "cache-control"
+    ] == [("cache-control", "public, max-age=60")]
+    # The inverse casing must also respect the operation-specific override.
+    monkeypatch.setattr(handler, "_HEADERS", {"cache-control": "no-store"})
+    response = handler.to_event_response(
+        handler.Response(200, {}, {"Cache-Control": "public, max-age=60"})
+    )
+    assert response["headers"] == {"cache-control": "public, max-age=60"}
 
 
 @pytest.mark.parametrize(
@@ -4374,6 +4408,25 @@ def test_live_signature_binds_every_document_field_and_key(api):
     expect(
         put_live(api, live_envelope(key, seed=SEED_B)), 422, "invalid_live_signature"
     )
+
+
+def test_live_and_submission_signed_schemas_are_disjoint(api):
+    key = register(api, token="tok-maint-0003")
+    manifest = {"key_id": key, "runs": []}
+    # A valid signature does not bypass strict schema validation in either route.
+    expect(put_live(api, live_envelope(key, manifest)), 400, "malformed_live")
+    from paddock_api.app import ApiError, _parse_envelope
+
+    with pytest.raises(ApiError) as error:
+        _parse_envelope(
+            json.dumps(
+                {
+                    "manifest": live_document(),
+                    "signature": live_envelope(key)["signature"],
+                }
+            ).encode()
+        )
+    assert error.value.code == "malformed_manifest"
 
 
 @pytest.mark.parametrize(
@@ -4490,15 +4543,70 @@ def test_live_s3_uses_only_live_object_and_closes_reader():
     assert list(client.objects) == ["live.json"]
     assert blobs.get_live() == b'{"example":2}'
     assert client.stream.closed
-    Missing.response = {"Error": {"Code": "AccessDenied"}}
+    Missing.response = {"Error": {"Code": "SlowDown"}}
     client.objects.clear()
     with pytest.raises(Missing):
         blobs.get_live()
 
 
+def test_live_s3_checks_absence_with_scoped_list_and_preserves_denials(api):
+    from dataclasses import replace
+
+    class Denied(Exception):
+        response = {"Error": {"Code": "AccessDenied"}}
+
+    class LiveS3(FakeS3):
+        list_allowed = True
+
+        def get_object(self, **kwargs):
+            assert kwargs == {"Bucket": "bucket", "Key": "live.json"}
+            raise Denied()
+
+        def list_objects_v2(self, **kwargs):
+            assert kwargs == {
+                "Bucket": "bucket",
+                "Prefix": "live.json",
+                "MaxKeys": 1,
+            }
+            if not self.list_allowed:
+                raise Denied()
+            keys = sorted(key for key in self.objects if key.startswith("live.json"))
+            return {"Contents": [{"Key": key} for key in keys[:1]]}
+
+    client = LiveS3()
+    api.storage = replace(api.storage, blobs=S3BundleBlobs(client, "bucket"))
+    # Missing GetObject under a prefix-only ListBucket grant can be AccessDenied.
+    # A longer prefixed key is not the document itself.
+    client.objects["live.json.backup"] = {}
+    expect(api.handle(Request("GET", "/live", {})), 404, "live_unavailable")
+    client.list_allowed = False
+    with pytest.raises(Denied):
+        api.storage.blobs.get_live()
+    client.list_allowed = True
+    client.objects["live.json"] = {}
+    with pytest.raises(Denied):
+        api.storage.blobs.get_live()
+
+
 def test_live_template_routes_and_narrow_storage_permissions():
-    resources = _template()["Resources"]
-    events = resources["SubmissionFunction"]["Properties"]["Events"]
+    template = _template()
+    resources = template["Resources"]
+    function = resources["SubmissionFunction"]["Properties"]
+    assert function["ReservedConcurrentExecutions"] == {
+        "!Ref": "ReservedConcurrency"
+    }
+    assert template["Parameters"]["ReservedConcurrency"]["Default"] == 5
+    assert resources["SubmissionApi"]["Properties"]["DefaultRouteSettings"] == {
+        "ThrottlingRateLimit": {"!Ref": "ThrottleRate"},
+        "ThrottlingBurstLimit": {"!Ref": "ThrottleBurst"},
+    }
+    assert template["Parameters"]["ThrottleRate"]["Default"] == 5
+    assert template["Parameters"]["ThrottleBurst"]["Default"] == 10
+    encryption = resources["BundleBucket"]["Properties"]["BucketEncryption"]
+    assert encryption["ServerSideEncryptionConfiguration"][0][
+        "ServerSideEncryptionByDefault"
+    ] == {"SSEAlgorithm": "AES256"}
+    events = function["Events"]
     assert {
         (event["Properties"]["Method"], event["Properties"]["Path"])
         for event in events.values()
@@ -4516,3 +4624,17 @@ def test_live_template_routes_and_narrow_storage_permissions():
     ]
     assert len(reads) == 1
     assert reads[0]["Resource"] == {"!Sub": "${BundleBucket.Arn}/live.json"}
+    lists = [
+        statement
+        for policy in policies
+        for statement in policy["PolicyDocument"]["Statement"]
+        if "s3:ListBucket" in statement["Action"]
+    ]
+    assert lists == [
+        {
+            "Effect": "Allow",
+            "Action": ["s3:ListBucket"],
+            "Resource": {"!GetAtt": "BundleBucket.Arn"},
+            "Condition": {"StringEquals": {"s3:prefix": "live.json"}},
+        }
+    ]

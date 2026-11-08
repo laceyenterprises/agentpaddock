@@ -110,6 +110,13 @@ def agent_os_host_services(tmp_path_factory):
 
 
 @pytest.fixture
+def api():
+    from api_test_support import make_api
+
+    return make_api()
+
+
+@pytest.fixture
 def protocol_backend(monkeypatch):
     """Only synthetic test bytes use this seam; it proves no OS containment."""
     import gym.hidden_tests as runner

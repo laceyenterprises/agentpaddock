@@ -288,6 +288,19 @@ class S3BundleBlobs:
             error = getattr(exc, "response", {}).get("Error", {}).get("Code")
             if error == "NoSuchKey":
                 return None
+            if error == "AccessDenied":
+                # A prefix-conditioned ListBucket grant does not provide an
+                # unconditioned missing-key check for GetObject. Prove absence
+                # with an explicitly prefixed list; preserve real read denials.
+                listing = self._client.list_objects_v2(
+                    Bucket=self._bucket, Prefix="live.json", MaxKeys=1
+                )
+                # General-purpose S3 buckets sort keys lexicographically, so
+                # the exact key precedes every longer key with this prefix.
+                if not any(
+                    item["Key"] == "live.json" for item in listing.get("Contents", [])
+                ):
+                    return None
             raise
         stream = response["Body"]
         try:

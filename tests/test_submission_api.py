@@ -25,7 +25,7 @@ sys.path.insert(0, str(API_DIR / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from paddock_api import ed25519  # noqa: E402
-from paddock_api.app import ERRORS, Limits, Request, SubmissionApi  # noqa: E402
+from paddock_api.app import Request, SubmissionApi  # noqa: E402
 from paddock_api.auth import AuthUnavailable, GitHubUserResolver, bearer_token  # noqa: E402
 from paddock_api.canonical import canonical_json  # noqa: E402
 from paddock_api.handler import handle_event, maintainers_from  # noqa: E402
@@ -35,104 +35,32 @@ from paddock_api.storage import (  # noqa: E402
     DynamoKeyStore,
     KeyRecord,
     S3BundleBlobs,
-    memory_storage,
 )
 
 import leaderboard  # noqa: E402
 
-# Synthetic tokens: shaped like nothing GitHub issues, so no scan mistakes them.
-ALICE, BOB, MAINTAINER = "alice-example", "bob-example", "maint-example"
-TOKENS = {
-    "tok-alice-0001": ALICE,
-    "tok-bob-0002": BOB,
-    "tok-maint-0003": MAINTAINER,
-}
-DOWN = "tok-github-down"
-ANSWER_TEXT = b'{"verdict": "SECRET-ANSWER-MARKER-7f3a"}\n'
-COMMIT = "0123456789abcdef0123456789abcdef01234567"
-
+from api_test_support import (  # noqa: E402
+    ALICE,
+    ANSWER_TEXT,
+    BOB,
+    COMMIT,
+    DOWN,
+    SEED_A,
+    SEED_B,
+    TOKENS,
+    FakeResolver,
+    FakeS3,
+    _template,
+    auth,
+    b64,
+    expect,
+    post_key,
+    public_key,
+    register,
+    sign,
+)
 
 # -- helpers -------------------------------------------------------------------
-
-
-def _expand(seed: bytes) -> tuple[int, bytes]:
-    h = hashlib.sha512(seed).digest()
-    scalar = int.from_bytes(h[:32], "little")
-    scalar &= (1 << 254) - 8
-    scalar |= 1 << 254
-    return scalar, h[32:]
-
-
-def public_key(seed: bytes) -> bytes:
-    scalar, _ = _expand(seed)
-    return ed25519.compress(ed25519._mul(scalar, ed25519.BASE))
-
-
-def sign(seed: bytes, message: bytes) -> bytes:
-    """RFC 8032 signing, test-only: the Lambda never signs."""
-    scalar, prefix = _expand(seed)
-    pub = public_key(seed)
-    r = int.from_bytes(hashlib.sha512(prefix + message).digest(), "little") % ed25519.L
-    r_bytes = ed25519.compress(ed25519._mul(r, ed25519.BASE))
-    h = (
-        int.from_bytes(hashlib.sha512(r_bytes + pub + message).digest(), "little")
-        % ed25519.L
-    )
-    return r_bytes + ((r + h * scalar) % ed25519.L).to_bytes(32, "little")
-
-
-SEED_A = hashlib.sha256(b"paddock synthetic seed a").digest()
-SEED_B = hashlib.sha256(b"paddock synthetic seed b").digest()
-
-
-def b64(data: bytes) -> str:
-    return base64.b64encode(data).decode("ascii")
-
-
-class FakeResolver:
-    def __init__(self) -> None:
-        self.calls: list[str] = []
-
-    def resolve(self, token: str) -> str | None:
-        self.calls.append(token)
-        if token == DOWN:
-            raise AuthUnavailable("down")
-        return TOKENS.get(token)
-
-
-@pytest.fixture
-def api() -> SubmissionApi:
-    return SubmissionApi(
-        storage=memory_storage(),
-        resolver=FakeResolver(),
-        maintainers=frozenset({"Maint-Example"}),
-        limits=Limits(max_body_bytes=64 * 1024, max_files=8),
-        now=lambda: "2026-11-04T00:00:00Z",
-    )
-
-
-def auth(token: str = "tok-alice-0001") -> dict[str, str]:
-    return {"authorization": f"Bearer {token}"}
-
-
-def post_key(api, body, token="tok-alice-0001"):
-    raw = body if isinstance(body, bytes) else json.dumps(body).encode()
-    return api.handle(
-        Request(
-            "POST",
-            "/submission/keys",
-            {**auth(token), "content-type": "application/json"},
-            raw,
-        )
-    )
-
-
-def register(api, seed=SEED_A, token="tok-alice-0001") -> str:
-    response = post_key(
-        api, {"algorithm": "Ed25519", "public_key": b64(public_key(seed))}, token
-    )
-    assert response.status == 201, response.body
-    return response.body["key_id"]
 
 
 def run(run_id="run-001", path="answers/run-001.json", data=ANSWER_TEXT, **overrides):
@@ -189,14 +117,6 @@ def post_bundle(api, env, files=None, token="tok-alice-0001", extra=()):
 
 def get_bundle(api, digest, token="tok-alice-0001"):
     return api.handle(Request("GET", f"/submission/bundles/{digest}", auth(token)))
-
-
-def expect(response, status, code=None):
-    assert response.status == status, response.body
-    if code is not None:
-        assert response.body["error"] == code
-        assert ERRORS[code][0] == status
-        assert response.body["message"] == ERRORS[code][1]
 
 
 # -- Ed25519 and canonical JSON ---------------------------------------------------
@@ -428,12 +348,7 @@ def test_github_resolver_sends_token_once_and_keeps_nothing():
         (403, {"x-ratelimit-remaining": "42"}, b"", None),
         (403, {"x-ratelimit-remaining": "0"}, b"", "unavailable"),
         (403, {"retry-after": "60"}, b"", "unavailable"),
-        (
-            403,
-            {},
-            b'{"message": "You have exceeded a secondary rate limit."}',
-            "unavailable",
-        ),
+        (403, {}, b'{"message": "You have exceeded a secondary rate limit."}', "unavailable"),
         (429, {}, b"", "unavailable"),
         (500, {}, b"", "unavailable"),
     ],
@@ -1073,16 +988,6 @@ class FakeDynamo:
         table[Item[name]["S"]] = Item
 
 
-class FakeS3:
-    def __init__(self) -> None:
-        self.objects: dict[str, dict] = {}
-
-    def put_object(self, **kwargs):
-        digest = base64.b64encode(hashlib.sha256(kwargs["Body"]).digest()).decode()
-        assert kwargs["ChecksumSHA256"] == digest
-        self.objects[kwargs["Key"]] = kwargs
-
-
 def test_dynamo_key_store_round_trip_and_conditional_conflict():
     client = FakeDynamo()
     store = DynamoKeyStore(client, "keys")
@@ -1172,25 +1077,6 @@ UNTAGGABLE = {
 }
 
 
-def _template():
-    yaml = pytest.importorskip("yaml")
-
-    class Loader(yaml.SafeLoader):
-        pass
-
-    def any_tag(loader, suffix, node):
-        if isinstance(node, yaml.ScalarNode):
-            value = loader.construct_scalar(node)
-        elif isinstance(node, yaml.SequenceNode):
-            value = loader.construct_sequence(node, deep=True)
-        else:
-            value = loader.construct_mapping(node, deep=True)
-        return {f"!{suffix}": value}
-
-    Loader.add_multi_constructor("!", any_tag)
-    return yaml.load((API_DIR / "template.yaml").read_text(), Loader=Loader)
-
-
 COST_TAG = "paddock-cost-center"
 COST_VALUE = {"!Ref": "CostTagValue"}
 
@@ -1265,6 +1151,7 @@ def test_template_iam_is_least_privilege():
         "dynamodb:PutItem",
         "s3:PutObject",
         "s3:GetObject",
+        "s3:ListBucket",
         "logs:CreateLogStream",
         "logs:PutLogEvents",
     }

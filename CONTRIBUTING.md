@@ -352,12 +352,18 @@ signing maintainer is responsible for their public content.
 
 | Operation | Request | Success response | Errors |
 |---|---|---|---|
-| `GET /live` | Public; no authentication | `200` with the document only; `Cache-Control: public, max-age=60` | `404 live_unavailable` before the first publication |
+| `GET /live` | Public; no authentication | `200` with the document only; `Cache-Control: public, max-age=60` | `404 live_unavailable` before the first publication; `503 invalid_stored_live` if the stored document is invalid |
 | `PUT /live` | GitHub Bearer token and JSON `{"document":{...},"key_id":"<registered id>","signature":"<Base64>"}` | `200` with the stored document; `Cache-Control: no-store` | `400 malformed_live`; `401 unauthenticated`; `403 key_not_owned` or `maintainer_required`; `404 unknown_key`; `422 invalid_live_signature` |
 | `OPTIONS /live` | Public browser preflight | `200`; allows `GET, PUT, OPTIONS` and `authorization, content-type` headers | Transport limits apply as for other operations |
 
 Sign `canonical_json(document)` as UTF-8 bytes with Ed25519, using the same
 encoding and standard padded Base64 signature rules as the submission manifest.
+The v1 protocol intentionally separates signing purposes through strict,
+disjoint schemas, without a context prefix: live documents require exactly the
+fields above, while submission manifests require exactly `key_id` and `runs`.
+Both schemas are checked before signature verification. Any future change
+that makes these schemas overlap must introduce a versioned signing context
+before accepting the overlapping shape.
 The envelope has exactly `document`, `key_id` and `signature`; unsigned documents
 are rejected. The authenticated account must own that registered key and be in
 the current `MaintainerAccounts` configuration. Registration alone grants no
@@ -365,6 +371,9 @@ maintainer role. Each accepted write replaces `live.json` in the existing
 private storage bucket; the public read returns no key id or signature.
 The last accepted write wins; timestamps describe the feed and do not impose
 write ordering. No document is fabricated before the first signed update.
+If a stored document fails strict JSON or schema validation, reads return the
+fixed `503 invalid_stored_live` error without caching; logs identify only its
+SHA-256 digest. A maintainer can replace it with a valid signed update.
 
 Cross-Origin Resource Sharing (CORS) for `/live` allows only
 `https://agentpaddock.ai`; responses always name that fixed origin, including

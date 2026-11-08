@@ -238,6 +238,12 @@ Resources:
               - Effect: Allow
                 Action: [s3:GetObject, s3:PutObject]
                 Resource: !Sub "${BundleBucket.Arn}/live.json"
+              - Effect: Allow
+                Action: [s3:ListBucket]
+                Resource: !GetAtt BundleBucket.Arn
+                Condition:
+                  StringEquals:
+                    s3:prefix: live.json
         - PolicyName: logs
           PolicyDocument:
             Version: "2012-10-17"
