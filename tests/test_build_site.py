@@ -1192,6 +1192,19 @@ def test_sprite_reads_and_parses_each_path_once_and_returns_independent_lists(
         assert reads.count(path) == 1
 
 
+def test_documented_navigation_order_matches_registry():
+    readme = (Path(__file__).resolve().parents[1] / "design/web/README.md").read_text(
+        encoding="utf-8"
+    )
+    documented = []
+    for line in readme.splitlines():
+        cells = [cell.strip().strip("`") for cell in line.split("|")]
+        if len(cells) == 8 and cells[3].lower() == "bar":
+            documented.append(cells[1])
+    expected = ["/" + route.path for route in site_routes.nav_routes(build_site.ROUTES, site_routes.BAR)]
+    assert documented == expected
+
+
 def test_every_registered_route_builds_into_the_output(tmp_path):
     out = tmp_path / "site"
     assert build_site.main(["--results", str(FIXTURE), "--out", str(out)]) == 0
