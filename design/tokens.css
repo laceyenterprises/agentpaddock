@@ -82,7 +82,7 @@
     --car-cc: #F08A55; --car-codex: #2BC495; --car-opencode: #E8558E; --car-pi: #3D9BFF; --car-agy: #FFC83D;
     --viz-seq-1: #16263D; --viz-seq-2: #1C3A66; --viz-seq-3: #21508F; --viz-seq-4: #2A6BC0;
     --viz-seq-5: #3B88E6; --viz-seq-6: #71AEF5; --viz-seq-7: #B5D7FB;
-    --viz-seq-ink-light: #DCE6F2; --viz-seq-ink-dark: #06111F;
+    --viz-seq-ink-light: #F2F4F7; --viz-seq-ink-dark: #06111F;
     --viz-other: #56606D; --viz-interval: #8B95A3; --viz-fuel: #B9C1CC; --viz-empty: #0D1218;
   }
 }
@@ -96,6 +96,6 @@
   --car-cc: #F08A55; --car-codex: #2BC495; --car-opencode: #E8558E; --car-pi: #3D9BFF; --car-agy: #FFC83D;
   --viz-seq-1: #16263D; --viz-seq-2: #1C3A66; --viz-seq-3: #21508F; --viz-seq-4: #2A6BC0;
   --viz-seq-5: #3B88E6; --viz-seq-6: #71AEF5; --viz-seq-7: #B5D7FB;
-  --viz-seq-ink-light: #DCE6F2; --viz-seq-ink-dark: #06111F;
+  --viz-seq-ink-light: #F2F4F7; --viz-seq-ink-dark: #06111F;
   --viz-other: #56606D; --viz-interval: #8B95A3; --viz-fuel: #B9C1CC; --viz-empty: #0D1218;
 }

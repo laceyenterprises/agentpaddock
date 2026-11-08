@@ -473,7 +473,7 @@ def learn(standings: Mapping[str, Any]) -> str:
         for i, (term, glyph, _body) in enumerate(terms)
     )
     panels = "".join(
-        f'<div class="home-detail-panel" data-panel="cast"{"" if i == 0 else " hidden"}>'
+        '<div class="home-detail-panel" data-panel="cast">'
         f'<b class="home-detail-term">{esc(term)}</b><p>{esc(body)}</p></div>'
         for i, (term, _glyph, body) in enumerate(terms)
     )
@@ -519,7 +519,7 @@ def challenges(races: Mapping[str, Any]) -> str:
             title = label
             tail = " No race of this challenge is on the calendar yet."
         panels.append(
-            f'<div class="home-detail-panel" data-panel="challenge"{"" if on else " hidden"}>'
+            '<div class="home-detail-panel" data-panel="challenge">'
             f'<b class="challenge-title">{esc(title)}</b>'
             f"<p>{esc(label)}: {esc(CHALLENGE_COPY[race_type])}{esc(tail)}</p></div>"
         )
@@ -573,7 +573,9 @@ def fuel_card(standings: Mapping[str, Any]) -> str:
             f"{entry_name(dear)}, tied on the finish, pays {usd(dear['costPerPass'])}."
         )
     else:
-        priced = [e for e in standings.get("entries", []) if e.get("costPerPass") is not None]
+        priced = [
+            e for e in standings.get("entries", []) if e.get("costPerPass") is not None
+        ]
         if priced:
             best = priced[0]
             title = "The fuel bill."
@@ -623,7 +625,10 @@ def body(
     return (
         '<div class="home" data-home>'
         + hero(go_line(standings, calendar))
-        + ticker(config.get("live_feed_url", site_config.DEFAULT_LIVE_FEED_URL), sample_ticks(standings, entries))
+        + ticker(
+            config.get("live_feed_url", site_config.DEFAULT_LIVE_FEED_URL),
+            sample_ticks(standings, entries),
+        )
         + photo_finish(standings)
         + results_note(calendar)
         + learn(standings)
@@ -850,7 +855,14 @@ def _script() -> str:
   var root = document.querySelector('[data-home]');
   if (!root) return;
   var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
-  var reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  var reduce = motion.matches;
+  function motionChanged() {
+    reduce = motion.matches;
+    if (reduce && counting) finishLights();
+  }
+  if (motion.addEventListener) motion.addEventListener('change', motionChanged);
+  else if (motion.addListener) motion.addListener(motionChanged);
   function enter(node) {
     if (reduce) return;
     node.classList.remove('in');
@@ -862,6 +874,9 @@ def _script() -> str:
   function picker(group, onPick) {
     var buttons = root.querySelectorAll('[data-pick="' + group + '"]');
     var panels = root.querySelectorAll('[data-panel="' + group + '"]');
+    each(panels, function (panel, i) {
+      panel.hidden = buttons[i].getAttribute('aria-pressed') !== 'true';
+    });
     each(buttons, function (button, i) {
       button.addEventListener('click', function () {
         each(buttons, function (b, j) { b.setAttribute('aria-pressed', i === j ? 'true' : 'false'); });
@@ -905,9 +920,19 @@ def _script() -> str:
       each(lamps, function (lamp, i) { lamp.classList.toggle('on', i < n); });
       art.setAttribute('aria-label', 'Start lights: ' + n + ' of 5 lit');
     };
+    function finishLights() {
+      clearInterval(timer);
+      counting = false;
+      light(0);
+      art.setAttribute('aria-label', 'Start lights: all out');
+      go.hidden = false;
+      line.textContent = lights.getAttribute('data-go-line');
+      start.textContent = 'Run it again';
+    }
     start.hidden = false;
     start.addEventListener('click', function () {
       if (counting) return;
+      if (reduce) { finishLights(); return; }
       counting = true;
       go.hidden = true;
       line.textContent = 'Hold it\\u2026';
@@ -918,13 +943,7 @@ def _script() -> str:
       timer = setInterval(function () {
         lit += 1;
         if (lit <= 5) { light(lit); return; }
-        clearInterval(timer);
-        counting = false;
-        light(0);
-        art.setAttribute('aria-label', 'Start lights: all out');
-        go.hidden = false;
-        line.textContent = lights.getAttribute('data-go-line');
-        start.textContent = 'Run it again';
+        finishLights();
       }, 650);
     });
   }
@@ -987,7 +1006,7 @@ def _script() -> str:
     ticks = samples; at = 0; show(ticks[0]);
   };
   setInterval(function () {
-    if (document.hidden || ticks.length < 2) return;
+    if (reduce || document.hidden || ticks.length < 2) return;
     at = (at + 1) % ticks.length;
     show(ticks[at]);
   }, 3200);

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import html
 import io
@@ -475,7 +476,11 @@ def test_brand_assets_and_navigation_on_every_page():
         # A page with its own view switches (PDW-07) loads one shared script for them.
         own = f'<script src="{root}{standings_pages.SCRIPT_NAME}" defer></script>'
         assert page.count(own) == (1 if name == "standings/index.html" else 0), name
-        assert page.count("<script") == 3 + page.count(own) + 2 * (name == "learn/index.html") and "<style" not in page
+        assert (
+            page.count("<script")
+            == 3 + page.count(own) + 2 * (name == "learn/index.html")
+            and "<style" not in page
+        )
         if name == "learn/index.html":
             assert page.count('<script type="application/json" id="learn-data">') == 1
             assert page.count('<script src="learn.js" defer></script>') == 1
@@ -483,11 +488,7 @@ def test_brand_assets_and_navigation_on_every_page():
         assert {other for other, _ in build_site.PAGES} <= _local_links(name, page)
         # Every link marked current points at the page itself (a board page
         # belongs to the leaderboard), and the page is marked somewhere.
-        current_links = [
-            a
-            for t, a in elements
-            if t == "a" and "aria-current" in a
-        ]
+        current_links = [a for t, a in elements if t == "a" and "aria-current" in a]
         assert all(a["aria-current"] == "page" for a in current_links), name
         current = {_resolve(name, a["href"]) for a in current_links}
         if name.startswith("board-"):
@@ -1213,7 +1214,11 @@ def test_data_page_builders_follow_the_registry_interface():
     files = build_site.build(FIXTURE)
     inputs = site_routes.Build(
         None,
-        {name: json.loads(text) for name, text in files.items() if name.startswith("data/")},
+        {
+            name: json.loads(text)
+            for name, text in files.items()
+            if name.startswith("data/")
+        },
         build_site.ROUTES,
     )
     for route in build_site.ROUTES:
@@ -2716,6 +2721,8 @@ def test_short_names_spell_out_acronyms(task_id, suite, card, name):
 def test_every_local_task_has_a_short_name():
     for path in (Path(__file__).resolve().parents[1] / "tasks").glob("*/task.toml"):
         assert path.parent.name in site_names.SHORT_NAMES, path.parent.name
+
+
 # ---------------------------------------------------------------- explainer pages (PDW-09)
 
 from paddock_site import community as site_community  # noqa: E402
@@ -2960,6 +2967,8 @@ def test_explainer_page_numbers_come_from_the_site_data(tmp_path):
     assert f"{races} races is a small sample." in files["rulebook/index.html"]
     assert f"All {races} races, grouped by challenge" in files["dictionary/index.html"]
     assert site_contact.CHALLENGE_SUBJECT == "Result challenge"
+
+
 # ---------------------------------------------------------------- home (PDW-04)
 
 from paddock_site import home as site_home  # noqa: E402
@@ -3081,7 +3090,9 @@ def test_home_fuel_card_compares_a_shared_finish(tmp_path):
     # Without two priced entries sharing a place, the card makes no comparison.
     alone = site_home.fuel_card({"entries": standings["entries"][1:]})
     assert "Same finish" not in alone and "The fuel bill." in alone
-    free = site_home.fuel_card({"entries": [dict(standings["entries"][0], costPerPass=0.0)]})
+    free = site_home.fuel_card(
+        {"entries": [dict(standings["entries"][0], costPerPass=0.0)]}
+    )
     assert "best-placed priced entry" in free
 
 
@@ -3372,6 +3383,7 @@ def test_every_footer_carries_both_optics_lines_verbatim_and_links_contact(tmp_p
             rf'<a href="{re.escape(contact)}"( aria-current="page")?>Contact and about</a>',
             footer,
         ), name
+
 
 # ---------------------------------------------------------------- the Learn page (PDW-05)
 #
@@ -3723,9 +3735,10 @@ def test_the_sector_stepper_and_flags_spell_out_dnf_at_first_use():
     for panel, count in (("sector", 4), ("flag", 6)):
         panels = re.findall(rf'<div[^>]*data-{panel}-panel="\d+"[^>]*>', page)
         assert len(panels) == count
-        # First paint matches the initial script state, before JS loads.
-        assert [" hidden" in tag for tag in panels] == [False] + [True] * (count - 1)
-    assert re.findall(r'class="hit" cx="\d+" cy="\d+" r="(\d+)"', page) == ["22"] * 4
+        # Every explanation reads without JavaScript; the script selects a panel.
+        assert all(" hidden" not in tag for tag in panels)
+    # Allow for the SVG scaling down inside the padded mobile track card.
+    assert re.findall(r'class="hit" cx="\d+" cy="\d+" r="(\d+)"', page) == ["26"] * 4
     # After sector 4 a tap starts another lap.
     assert "(sector + 1) % stepper.points.length" in learn.SCRIPT
     view = learn.view(_drivers())["stepper"]
@@ -3752,6 +3765,7 @@ def test_learn_driver_chips_keep_two_providers_of_one_model_apart():
     assert learn.embed({"a": "</script><b>&"}) == (
         '{"a":"\\u003c/script\\u003e\\u003cb\\u003e\\u0026"}'
     )
+
 
 # ---------------------------------------------------------------- garage, pit wall and drivers (PDW-08)
 #
@@ -4638,3 +4652,336 @@ def test_live_template_routes_and_narrow_storage_permissions():
             "Condition": {"StringEquals": {"s3:prefix": "live.json"}},
         }
     ]
+
+
+# PDW-10: cheap whole-site assertions run in the existing fast test file.
+@pytest.fixture(scope="module")
+def acceptance_sites(tmp_path_factory, committed_pages):
+    return (
+        build_site.build(_site_tree(tmp_path_factory.mktemp("site-acceptance"))),
+        committed_pages[0],
+    )
+
+
+def _page_resources(name, page):
+    """First-party resources loaded by this document, once per cold visit."""
+    resources = {name}
+    for tag, attrs in Elements(page).items:
+        value = attrs.get("src")
+        if tag == "link" and attrs.get("rel") in {"stylesheet", "icon"}:
+            value = attrs.get("href")
+        if value and not urlsplit(value).scheme:
+            resources.add(_resolve(name, value))
+    return resources
+
+
+def test_every_page_has_a_bounded_cold_load(acceptance_sites):
+    # Raw UTF-8 plus CSS/scripts/images: 768 KiB. Individually gzip-compressed
+    # resources: 128 KiB. Fonts and the analytics service are third-party and
+    # outside this reproducible first-party budget; the share card is not loaded.
+    for files in acceptance_sites:
+        for name, page in _html_pages(files).items():
+            resources = _page_resources(name, page)
+            blobs = [
+                files[r].encode("utf-8") if isinstance(files[r], str) else files[r]
+                for r in resources
+            ]
+            assert sum(map(len, blobs)) <= 768 * 1024, name
+            assert sum(len(gzip.compress(b, mtime=0)) for b in blobs) <= 128 * 1024, (
+                name
+            )
+
+
+def test_all_page_links_resources_and_fragments_resolve(acceptance_sites):
+    for files in acceptance_sites:
+        pages = _html_pages(files)
+        elements = {name: Elements(page).items for name, page in pages.items()}
+        ids = {
+            name: {attrs["id"] for _, attrs in items if "id" in attrs}
+            for name, items in elements.items()
+        }
+        for name, items in elements.items():
+            for _, attrs in items:
+                for attr in ("href", "src"):
+                    value = attrs.get(attr)
+                    if not value or urlsplit(value).scheme:
+                        continue
+                    link = urlsplit(value)
+                    assert not link.netloc, (name, value)
+                    target = _resolve(name, value)
+                    assert target in files, (name, value)
+                    if link.fragment:
+                        assert link.fragment in ids[target], (name, value)
+            footer = _between(pages[name], '<footer class="footer">', "</footer>")
+            for line in _readme_footer_lines():
+                assert footer.count(line) == 1, name
+            assert "contact/index.html" in _local_links(name, footer), name
+
+
+class ReadingHTML(HTMLParser):
+    """Read text and controls as a client with scripting disabled would."""
+
+    def __init__(self, page):
+        super().__init__()
+        self.stack = []
+        self.main_text = []
+        self.feed(page)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag not in {
+            "area",
+            "base",
+            "br",
+            "col",
+            "embed",
+            "hr",
+            "img",
+            "input",
+            "link",
+            "meta",
+            "param",
+            "source",
+            "track",
+            "wbr",
+            "use",
+            "path",
+        }:
+            self.stack.append((tag, attrs))
+
+    def handle_endtag(self, tag):
+        for i in range(len(self.stack) - 1, -1, -1):
+            if self.stack[i][0] == tag:
+                del self.stack[i:]
+                break
+
+    def handle_data(self, text):
+        if any(
+            tag in {"script", "style"} or "hidden" in attrs for tag, attrs in self.stack
+        ):
+            return
+        if any(tag == "main" for tag, _ in self.stack):
+            self.main_text.append(text)
+
+
+def test_every_page_is_readable_without_javascript(acceptance_sites):
+    for files in acceptance_sites:
+        for name, page in _html_pages(files).items():
+            reader = ReadingHTML(page)
+            assert len(" ".join(reader.main_text).split()) >= 15, name
+            assert re.search(r"<h1\b", page), name
+            assert 'href="#main-content">Skip to content</a>' in page, name
+            assert 'id="main-content" tabindex="-1"' in page, name
+        learn_page = ReadingHTML(files["learn/index.html"])
+        words = " ".join(" ".join(learn_page.main_text).split())
+        for title, _, _, _ in learn.SECTORS:
+            assert title in words
+        for _, _, _, explanation in learn.FLAGS:
+            assert explanation in words
+        # These pages progressively collapse/filter server-rendered content.
+        for name, markers in (
+            ("index.html", ('data-panel="cast"', 'data-panel="challenge"')),
+            ("learn/index.html", ("sector-panel", "flag-panel")),
+            ("races/index.html", ("rc-card",)),
+            ("standings/index.html", ("st-row",)),
+        ):
+            for marker in markers:
+                tags = re.findall(rf"<[^>]*{marker}[^>]*>", files[name])
+                assert tags, (name, marker)
+                assert all(" hidden" not in tag for tag in tags), (name, marker)
+        for name in _data_page_names(files):
+            if name.startswith("drivers/"):
+                for tag in re.findall(r"<[^>]*data-slips=[^>]*>", files[name]):
+                    assert " hidden" not in tag, name
+
+
+def test_shared_accessibility_and_motion_rules():
+    css = layout.stylesheet(build_site.STYLE)
+    assert ":focus-visible { outline: 3px solid var(--blue-ink)" in css
+    assert "button, summary, select { min-height: 44px; min-width: 44px; }" in css
+    assert "animation: none !important; transition: none !important;" in css
+    assert (
+        "if (motion.matches) { step = last; selected = last; show(); return; }"
+        in site_races.SCRIPT
+    )
+    assert "motion.addEventListener('change', motionChanged)" in site_races.SCRIPT
+    assert (
+        "if (reduce || document.hidden || ticks.length < 2) return;" in site_home.SCRIPT
+    )
+    assert "if (reduce) { finishLights(); return; }" in site_home.SCRIPT
+    assert (
+        ".dv-pick { display: grid; grid-template-columns: minmax(0, 1fr);"
+        in site_drivers.CSS
+    )
+    assert (
+        ".dv-card:last-child:nth-child(3n + 1) { grid-column: 1 / -1; }"
+        in site_drivers.CSS
+    )
+    # An image role flattens descendant buttons in the accessibility tree.
+    assert 'role="group" aria-labelledby="track-label"' in learn.stepper_html(
+        learn.view(_drivers())["stepper"]
+    )
+
+
+def _contrast(foreground, background):
+    def luminance(color):
+        rgb = [int(color[i : i + 2], 16) / 255 for i in (1, 3, 5)]
+        linear = [
+            c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb
+        ]
+        return sum(c * weight for c, weight in zip(linear, (0.2126, 0.7152, 0.0722)))
+
+    a, b = sorted((luminance(foreground), luminance(background)))
+    return (b + 0.05) / (a + 0.05)
+
+
+def test_reading_and_heatmap_tokens_meet_aa_contrast():
+    tokens = layout.tokens_css()
+    light, dark = tokens.split("@media (prefers-color-scheme: dark)", 1)
+    for theme in (light, dark):
+        values = dict(re.findall(r"--([\w-]+):\s*(#[0-9A-Fa-f]{6})", theme))
+        for ground in ("paper", "soft"):
+            for ink in ("ink", "ink-2", "muted", "blue-ink"):
+                assert _contrast(values[ink], values[ground]) >= 4.5, (ground, ink)
+        assert _contrast(values["paper"], values["blue-ink"]) >= 4.5
+        for i in range(1, 8):
+            ink = "viz-seq-ink-light" if i <= 4 else "viz-seq-ink-dark"
+            assert _contrast(values[ink], values[f"viz-seq-{i}"]) >= 4.5, (i, ink)
+
+
+def test_charts_have_screen_reader_names(acceptance_sites):
+    for files in acceptance_sites:
+        for name, page in _html_pages(files).items():
+            items = Elements(page).items
+            ids = {attrs["id"] for _, attrs in items if "id" in attrs}
+            for _, attrs in items:
+                if attrs.get("role") == "img":
+                    assert attrs.get("aria-label") or (
+                        attrs.get("aria-labelledby")
+                        and set(attrs["aria-labelledby"].split()) <= ids
+                    ), (name, attrs)
+
+
+@pytest.mark.parametrize("fault", ("weight", "link", "fragment", "no-script"))
+def test_acceptance_assertions_reject_regressions(acceptance_sites, fault):
+    files = dict(acceptance_sites[0])
+    if fault == "weight":
+        files["paddock.css"] += " " * (768 * 1024)
+        check = test_every_page_has_a_bounded_cold_load
+    elif fault in ("link", "fragment"):
+        target = "missing.html" if fault == "link" else "#missing-section"
+        files["index.html"] += f'<a href="{target}">Broken</a>'
+        check = test_all_page_links_resources_and_fragments_resolve
+    else:
+        files["index.html"] = files["index.html"].replace(
+            '<main class="wrap">', '<main class="wrap" hidden>'
+        )
+        check = test_every_page_is_readable_without_javascript
+    with pytest.raises(AssertionError):
+        check((files,))
+
+
+def test_browser_widths_keyboard_and_no_script_reading(acceptance_sites, tmp_path):
+    """Optional local browser pass; fast CI needs only the stdlib checks above.
+
+    Install Playwright separately and set PADDOCK_BROWSER_EXECUTABLE to reuse a
+    local Chromium. No browser download, server, or external request is needed.
+    """
+    executable = os.environ.get("PADDOCK_BROWSER_EXECUTABLE")
+    if not executable:
+        pytest.skip("Local Chromium pass requires PADDOCK_BROWSER_EXECUTABLE")
+    browser_api = pytest.importorskip("playwright.sync_api")
+    files = acceptance_sites[1]
+    for name, content in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content.encode() if isinstance(content, str) else content)
+    with browser_api.sync_playwright() as api:
+        browser = api.chromium.launch(executable_path=executable)
+        try:
+            for scripting in (False, True):
+                context = browser.new_context(
+                    java_script_enabled=scripting, reduced_motion="reduce"
+                )
+                context.route("https://**", lambda route: route.abort())
+                page = context.new_page()
+                page.set_default_timeout(5000)
+                page.set_default_navigation_timeout(5000)
+                errors = []
+                page.on("pageerror", lambda error: errors.append(str(error)))
+                for width in (390, 768, 1440):
+                    page.set_viewport_size({"width": width, "height": 950})
+                    for name in _html_pages(files):
+                        page.goto((tmp_path / name).as_uri())
+                        assert page.evaluate(
+                            "document.documentElement.scrollWidth <= innerWidth + 1"
+                        ), (name, width, scripting)
+                        assert page.locator("main").inner_text().strip(), name
+                        unnamed = page.locator(
+                            "button:visible, summary:visible"
+                        ).evaluate_all(
+                            """els => els.filter(e => !(e.textContent.trim() ||
+                            e.getAttribute('aria-label') || e.getAttribute('aria-labelledby')))
+                            .map(e => e.outerHTML)"""
+                        )
+                        assert not unnamed, (name, unnamed)
+                        orphan = page.locator(".dv-cards, .rc-grid").evaluate_all(
+                            """grids => grids.filter(grid => {
+                              const cells = [...grid.children].filter(e => !e.hidden)
+                                .map(e => e.getBoundingClientRect());
+                              if (cells.length < 2) return false;
+                              const last = cells[cells.length - 1];
+                              const row = cells.filter(r => Math.abs(r.top-last.top) < 1);
+                              return row.length === 1 && cells.some(r => r.width < last.width + 1 &&
+                                r.top < last.top) && last.width < grid.clientWidth - 1;
+                            }).map(e => e.className)"""
+                        )
+                        assert not orphan, (name, width, orphan)
+                        if (
+                            scripting
+                            and name.startswith("races/")
+                            and name != "races/index.html"
+                        ):
+                            play = page.locator("[data-lap-play]")
+                            if play.count():
+                                play.focus()
+                                page.keyboard.press("Enter")
+                                assert play.inner_text() == "Play the race", name
+                assert not errors, errors
+                if scripting:
+                    page.set_viewport_size({"width": 390, "height": 950})
+                    page.goto((tmp_path / "index.html").as_uri())
+                    page.keyboard.press("Tab")
+                    assert page.locator(".skip-link").evaluate(
+                        "e => e === document.activeElement"
+                    )
+                    page.keyboard.press("Enter")
+                    assert page.locator("#main-content").evaluate(
+                        "e => e === document.activeElement"
+                    )
+                    menu = page.locator(".nav-burger")
+                    menu.focus()
+                    page.keyboard.press("Enter")
+                    assert menu.get_attribute("aria-expanded") == "true"
+                    page.keyboard.press("Escape")
+                    assert menu.get_attribute("aria-expanded") == "false"
+                    assert menu.evaluate("e => e === document.activeElement")
+                    page.locator("[data-start]").click()
+                    assert (
+                        page.locator("[data-art]").get_attribute("aria-label")
+                        == "Start lights: all out"
+                    )
+                    page.goto((tmp_path / "learn/index.html").as_uri())
+                    sector = page.get_by_role("button", name=re.compile("^Sector 2:"))
+                    sector.focus()
+                    hit = sector.locator(".hit").bounding_box()
+                    assert hit and min(hit["width"], hit["height"]) >= 44
+                    page.keyboard.press("Enter")
+                    assert page.locator('[data-sector-panel="1"]').is_visible()
+                    page.locator('[data-flag="1"]').focus()
+                    page.keyboard.press("Enter")
+                    assert page.locator('[data-flag-panel="1"]').is_visible()
+                context.close()
+        finally:
+            browser.close()
+

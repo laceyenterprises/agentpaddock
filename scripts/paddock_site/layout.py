@@ -148,6 +148,30 @@ TOKEN_ALIASES = """
 
 CSS = """
 /* ---------- layout: header, nav, menu panel, footer (PDW-02) ---------- */
+/* Keep intrinsic content inside its grid cell, including long provider ids. */
+main, main > div, section, article { min-width: 0; }
+main, .footer { overflow-wrap: anywhere; }
+button, input, select { font: inherit; }
+button, summary, select { min-height: 44px; min-width: 44px; }
+:focus-visible { outline: 3px solid var(--blue-ink); outline-offset: 3px; }
+.skip-link {
+  position: fixed; top: 8px; left: 8px; z-index: 100;
+  padding: 12px 18px; background: var(--paper); color: var(--ink);
+  transform: translateY(-160%);
+}
+.skip-link:focus { transform: none; }
+/* White text needs the ink accent; the bright accent remains for graphics. */
+.home-start, .home-start:hover, .home-btn.solid, .home-btn.solid:hover,
+.pill.solid, .pill.solid:hover, .btn.rc-play, .btn.rc-play:hover, .badge-reproduced {
+  background: var(--blue-ink); border-color: var(--blue-ink); color: var(--paper);
+  --pdk-accent: var(--paper);
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important; transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
 .symbols { position: absolute; width: 0; height: 0; overflow: hidden; }
 .glyph { width: 24px; height: 24px; flex: none; }
 
@@ -426,7 +450,7 @@ def page(
     root = up(current)
     head_link = f'<link rel="canonical" href="{SITE_URL}">' if canonical else ""
     inner_class = f' class="{main_class}"' if main_class else ""
-    inner = f"<div{inner_class}>\n{body}\n</div>"
+    inner = f'<div{inner_class} id="main-content" tabindex="-1">\n{body}\n</div>'
     return (
         "<!doctype html>\n"
         '<html lang="en">\n<head>\n<meta charset="utf-8">\n'
@@ -439,6 +463,7 @@ def page(
         + FONTS
         + f'<link rel="stylesheet" href="{root}paddock.css">\n'
         f'<script src="{root}{SCRIPT_NAME}" defer></script>\n</head>\n<body>\n'
+        '<a class="skip-link" href="#main-content">Skip to content</a>\n'
         f"{sprite()}\n"
         f"{header(routes, current, nav_current=nav_current)}\n"
         f'<main class="wrap">{inner}</main>\n'
