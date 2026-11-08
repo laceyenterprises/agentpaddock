@@ -65,8 +65,9 @@ def load(path: Path | str | None) -> dict[str, Any]:
     """The config from a JSON object at ``path``, or the defaults without one."""
     if path is None:
         return resolve()
+    path = Path(path)
     try:
-        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+        raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise ConfigError(f"cannot read site config {path.name}: {exc}") from exc
     if not isinstance(raw, dict):
