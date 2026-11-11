@@ -51,6 +51,11 @@ The `standalone` runner (`standalone.py`) runs one harness CLI per task in
 - `--pull=never`, so the image must already contain the CLI;
 - finite limits of 2048 MiB RAM with no swap, 2 CPUs, and 256 PIDs by default.
 
+Grok is registered but reports `unavailable` because Linux Docker has no
+reviewed Grok artifact. Unavailable harnesses skip concurrent preparation,
+credential resolution, staging and Docker startup. Their provenance names the
+selected harness; only Grok includes the Grok role/auth availability cells.
+
 It is configured with `--harness` and `--image`, or with the `[standalone]` table:
 
 ```toml

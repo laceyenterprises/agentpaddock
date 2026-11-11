@@ -141,6 +141,8 @@ GROK_UNAVAILABLE = (
 
 def grok_unavailable_cells() -> list[dict[str, Any]]:
     """Enumerate the approved platform gap without attempting credential resolution."""
+    # These are literal worker-pool registry class names: reviewer is
+    # harness-first, while remediator and hammer are role-first.
     roles = {
         "builder": "grok",
         "reviewer": "grok-reviewer",
@@ -519,6 +521,8 @@ class StandaloneTrajectorySource:
             time.sleep(1)
 
     def prepare_concurrent(self, stop_event: Event) -> None:
+        if HARNESSES[self.harness].unavailable_reason:
+            return
         self.stop_event = stop_event
 
     # -- TrajectorySource ----------------------------------------------------
@@ -531,9 +535,9 @@ class StandaloneTrajectorySource:
                 error=spec.unavailable_reason,
                 execution_provenance={
                     "runner": "standalone",
-                    "harness": "grok",
+                    "harness": self.harness,
                     "availability": "unsupported-platform",
-                    "cells": grok_unavailable_cells(),
+                    "cells": grok_unavailable_cells() if self.harness == "grok" else [],
                     "costUSD": None,
                 },
             )

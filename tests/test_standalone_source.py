@@ -13,8 +13,10 @@ import os
 import subprocess
 import sys
 import textwrap
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
+from threading import Event
+from unittest.mock import Mock
 
 import pytest
 
@@ -607,11 +609,52 @@ def test_output_collector_retention_is_bounded(monkeypatch):
     assert sum(len(b) for b in collector._buffers) <= 131072
 
 
+@pytest.mark.parametrize("harness", ["grok", "codex"])
+def test_unavailable_harness_skips_preparation_credentials_staging_and_docker(
+    tmp_path, monkeypatch, harness
+):
+    monkeypatch.setitem(
+        HARNESSES, harness, replace(HARNESSES[harness], unavailable_reason="platform gap")
+    )
+    source = StandaloneTrajectorySource(harness=harness, image="unused")
+    credentials = Mock(side_effect=AssertionError("must not resolve credentials"))
+    stage = Mock(side_effect=AssertionError("must not stage a sandbox"))
+    docker = Mock(side_effect=AssertionError("must not start Docker"))
+    monkeypatch.setattr(source, "_credentials", credentials)
+    monkeypatch.setattr("gym.standalone.staging.run_stage_scripts", stage)
+    monkeypatch.setattr("gym.standalone.subprocess.Popen", docker)
+
+    stop = source.stop_event
+    source.prepare_concurrent(Event())
+    assert source.stop_event is stop
+    trajectory = source.run(_task(tmp_path))
+
+    assert trajectory.terminal_status == "unavailable"
+    assert trajectory.error == "platform gap"
+    assert trajectory.execution_provenance["harness"] == harness
+    if harness != "grok":
+        assert trajectory.execution_provenance["cells"] == []
+    assert trajectory.sandbox_root is None
+    credentials.assert_not_called()
+    stage.assert_not_called()
+    docker.assert_not_called()
+    source.close()
+
+
+def test_available_harness_prepares_shared_stop_event():
+    source = StandaloneTrajectorySource(harness="codex", image="unused")
+    stop = Event()
+    source.prepare_concurrent(stop)
+    assert source.stop_event is stop
+    source.close()
+
+
 def test_grok_standalone_is_explicitly_unavailable_before_credentials_or_docker(tmp_path):
     source = StandaloneTrajectorySource(harness="grok", image="unused")
     trajectory = source.run(_task(tmp_path))
     assert trajectory.terminal_status == "unavailable"
     assert "Linux Docker" in trajectory.error
+    assert trajectory.execution_provenance["harness"] == "grok"
     assert trajectory.execution_provenance["costUSD"] is None
     cells = trajectory.execution_provenance["cells"]
     assert len(cells) == 8
