@@ -13,8 +13,10 @@ import os
 import subprocess
 import sys
 import textwrap
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
+from threading import Event
+from unittest.mock import Mock
 
 import pytest
 
@@ -182,7 +184,9 @@ def _invocations(log: Path) -> list[dict]:
     return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
 
 
-@pytest.mark.parametrize("harness", sorted(HARNESSES))
+@pytest.mark.parametrize(
+    "harness", sorted(h for h, spec in HARNESSES.items() if not spec.unavailable_reason)
+)
 def test_fake_harness_cli_yields_a_gradeable_trajectory(fake_docker, tmp_path, harness):
     source = _source(fake_docker, tmp_path, harness)
     task = _task(tmp_path)
@@ -603,3 +607,66 @@ def test_output_collector_retention_is_bounded(monkeypatch):
     collector.finish()
     assert collector.exceeded.is_set()
     assert sum(len(b) for b in collector._buffers) <= 131072
+
+
+@pytest.mark.parametrize("harness", ["grok", "codex"])
+def test_unavailable_harness_skips_preparation_credentials_staging_and_docker(
+    tmp_path, monkeypatch, harness
+):
+    monkeypatch.setitem(
+        HARNESSES, harness, replace(HARNESSES[harness], unavailable_reason="platform gap")
+    )
+    source = StandaloneTrajectorySource(harness=harness, image="unused")
+    credentials = Mock(side_effect=AssertionError("must not resolve credentials"))
+    stage = Mock(side_effect=AssertionError("must not stage a sandbox"))
+    docker = Mock(side_effect=AssertionError("must not start Docker"))
+    monkeypatch.setattr(source, "_credentials", credentials)
+    monkeypatch.setattr("gym.standalone.staging.run_stage_scripts", stage)
+    monkeypatch.setattr("gym.standalone.subprocess.Popen", docker)
+
+    stop = source.stop_event
+    source.prepare_concurrent(Event())
+    assert source.stop_event is stop
+    trajectory = source.run(_task(tmp_path))
+
+    assert trajectory.terminal_status == "unavailable"
+    assert trajectory.error == "platform gap"
+    assert trajectory.execution_provenance["harness"] == harness
+    if harness != "grok":
+        assert trajectory.execution_provenance["cells"] == []
+    assert trajectory.sandbox_root is None
+    credentials.assert_not_called()
+    stage.assert_not_called()
+    docker.assert_not_called()
+    source.close()
+
+
+def test_available_harness_prepares_shared_stop_event():
+    source = StandaloneTrajectorySource(harness="codex", image="unused")
+    stop = Event()
+    source.prepare_concurrent(stop)
+    assert source.stop_event is stop
+    source.close()
+
+
+def test_grok_standalone_is_explicitly_unavailable_before_credentials_or_docker(tmp_path):
+    source = StandaloneTrajectorySource(harness="grok", image="unused")
+    trajectory = source.run(_task(tmp_path))
+    assert trajectory.terminal_status == "unavailable"
+    assert "Linux Docker" in trajectory.error
+    assert trajectory.execution_provenance["harness"] == "grok"
+    assert trajectory.execution_provenance["costUSD"] is None
+    cells = trajectory.execution_provenance["cells"]
+    assert len(cells) == 8
+    assert {c["authKind"] for c in cells} == {"oauth", "api-key"}
+    assert all(c["status"] == "unavailable" and c["costUSD"] is None for c in cells)
+    source.close()
+
+
+def test_grok_lock_serialization_matches_declared_surface():
+    from gym.locks import read_lock, serialize_lock
+
+    path = Path(__file__).parents[1] / "locks/grok.lock.json"
+    tools = read_lock(path, agent="grok")
+    assert tools == ["bash:safe", "read", "write"]
+    assert path.read_text() == serialize_lock("grok", tools)

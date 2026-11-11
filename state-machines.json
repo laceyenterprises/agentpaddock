@@ -570,6 +570,8 @@
       "status = 'timeout'",
       "status = None",
       "status is not None",
+      "status: 'unavailable'",
+      "terminal_status='unavailable'",
       "terminal_status=status"
     ],
     "grader.py": [
