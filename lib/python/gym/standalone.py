@@ -77,6 +77,7 @@ class Harness:
     credential_env: tuple[str, ...]
     #: Non-secret variables that point the harness's state into the tmpfs home.
     home_env: Mapping[str, str] = field(default_factory=dict)
+    unavailable_reason: str | None = None
 
 
 def _claude_argv(prompt: str, model: str | None, reasoning: str | None) -> list[str]:
@@ -132,7 +133,49 @@ _PROVIDER_KEYS = (
     "XAI_API_KEY",
 )
 
+GROK_UNAVAILABLE = (
+    "unavailable: Linux Docker has no reviewed Grok artifact; "
+    "only Grok 1.0.70 darwin-arm64 is approved"
+)
+
+
+def grok_unavailable_cells() -> list[dict[str, Any]]:
+    """Enumerate the approved platform gap without attempting credential resolution."""
+    roles = {
+        "builder": "grok",
+        "reviewer": "grok-reviewer",
+        "remediator": "remediator-grok",
+        "hammer": "hammer-grok",
+    }
+    return [
+        {
+            "harness": "grok",
+            "family": "grok",
+            "role": role,
+            "sourceClass": source,
+            "authKind": kind,
+            "status": "unavailable",
+            "reason": GROK_UNAVAILABLE,
+            "costUSD": None,
+            "modelTurn": False,
+        }
+        for role, source in roles.items()
+        for kind in ("oauth", "api-key")
+    ]
+
+
+def _grok_argv(prompt: str, model: str | None, reasoning: str | None) -> list[str]:
+    raise StandaloneConfigError(GROK_UNAVAILABLE)
+
+
 HARNESSES: dict[str, Harness] = {
+    "grok": Harness(
+        name="grok",
+        argv=_grok_argv,
+        parse=lambda lines: [],
+        credential_env=(),
+        unavailable_reason=GROK_UNAVAILABLE,
+    ),
     "claude-code": Harness(
         name="claude-code",
         argv=_claude_argv,
@@ -482,6 +525,18 @@ class StandaloneTrajectorySource:
 
     def run(self, task: Task) -> Trajectory:
         spec = HARNESSES[self.harness]
+        if spec.unavailable_reason:
+            return Trajectory(
+                terminal_status="unavailable",
+                error=spec.unavailable_reason,
+                execution_provenance={
+                    "runner": "standalone",
+                    "harness": "grok",
+                    "availability": "unsupported-platform",
+                    "cells": grok_unavailable_cells(),
+                    "costUSD": None,
+                },
+            )
         credentials = self._credentials()
         secrets = tuple(sorted({v for v in credentials.values() if v}, key=len, reverse=True))
         launch_id = f"paddock-{_CONTAINER_NAME_UNSAFE.sub('-', task.id)}-{uuid.uuid4().hex[:12]}"

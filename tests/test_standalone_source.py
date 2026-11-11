@@ -182,7 +182,9 @@ def _invocations(log: Path) -> list[dict]:
     return [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
 
 
-@pytest.mark.parametrize("harness", sorted(HARNESSES))
+@pytest.mark.parametrize(
+    "harness", sorted(h for h, spec in HARNESSES.items() if not spec.unavailable_reason)
+)
 def test_fake_harness_cli_yields_a_gradeable_trajectory(fake_docker, tmp_path, harness):
     source = _source(fake_docker, tmp_path, harness)
     task = _task(tmp_path)
@@ -603,3 +605,25 @@ def test_output_collector_retention_is_bounded(monkeypatch):
     collector.finish()
     assert collector.exceeded.is_set()
     assert sum(len(b) for b in collector._buffers) <= 131072
+
+
+def test_grok_standalone_is_explicitly_unavailable_before_credentials_or_docker(tmp_path):
+    source = StandaloneTrajectorySource(harness="grok", image="unused")
+    trajectory = source.run(_task(tmp_path))
+    assert trajectory.terminal_status == "unavailable"
+    assert "Linux Docker" in trajectory.error
+    assert trajectory.execution_provenance["costUSD"] is None
+    cells = trajectory.execution_provenance["cells"]
+    assert len(cells) == 8
+    assert {c["authKind"] for c in cells} == {"oauth", "api-key"}
+    assert all(c["status"] == "unavailable" and c["costUSD"] is None for c in cells)
+    source.close()
+
+
+def test_grok_lock_serialization_matches_declared_surface():
+    from gym.locks import read_lock, serialize_lock
+
+    path = Path(__file__).parents[1] / "locks/grok.lock.json"
+    tools = read_lock(path, agent="grok")
+    assert tools == ["bash:safe", "read", "write"]
+    assert path.read_text() == serialize_lock("grok", tools)

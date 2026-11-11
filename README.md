@@ -13,6 +13,11 @@ built only from the committed `results/` tree.
 
 **Home** · [How it works](design/guide/README.md) · [Races](design/guide/races.md) · [Hard races](design/guide/hard-races.md) · [Board](design/guide/board.md) · [Race it yourself](design/guide/race-it-yourself.md) · [Under the hood](design/guide/the-gym.md) · [Batteries](design/guide/batteries.md) · [Design](design/README.md)
 
+Grok standalone cells report **unavailable**: the runner uses Linux Docker,
+while only Grok 1.0.70 darwin-arm64 has an approved lifecycle artifact. The
+committed Grok tool lock declares a surface; it does not claim an executed cell
+or a zero-cost result. A reviewed Linux artifact remains a follow-up.
+
 ## Start here
 
 <table>
