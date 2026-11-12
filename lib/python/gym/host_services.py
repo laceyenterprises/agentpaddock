@@ -226,7 +226,11 @@ class HostServices:
         raise NotImplementedError
 
     def scratch_dir(self) -> Path:
-        """Host scratch the hidden-test container can bind-mount."""
+        """Host scratch where the hidden-test runner stages per-task inputs.
+
+        The runner copies inputs into each container's own volume; the Docker
+        VM never reads this directory.
+        """
         raise NotImplementedError
 
     def run_records(self) -> RunRecordSink:

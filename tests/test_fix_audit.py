@@ -158,7 +158,7 @@ def test_case_outcomes_exclude_observations(tmp_path, monkeypatch, audit_keys):
 
     def execute(command, work, timeout, *, input_data=b""):
         if not input_data:
-            nonce_path = next(work.glob("gym-bind-*"))
+            nonce_path = next(work.glob("gym-ready-*"))
             return 0, False, "gym-ready\n" + nonce_path.read_text() + "\n"
         response = next(calls)
         if response is None:
@@ -209,7 +209,7 @@ def test_partial_cases_survive_sandbox_failure(tmp_path, monkeypatch):
     def execute(command, work, timeout, *, input_data=b""):
         nonlocal count
         if not input_data:
-            return 0, False, "gym-ready\n" + next(work.glob("gym-bind-*")).read_text() + "\n"
+            return 0, False, "gym-ready\n" + next(work.glob("gym-ready-*")).read_text() + "\n"
         count += 1
         if count == 2:
             raise grader.GraderError("sandbox unavailable")
