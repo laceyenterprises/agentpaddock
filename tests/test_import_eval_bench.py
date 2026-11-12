@@ -296,6 +296,9 @@ def test_unknown_model_label_is_rejected():
 
 
 V2_SAMPLE = MODULE_ROOT / "tests" / "fixtures" / "eval-bench-v2-sample.raw.json"
+#: The committed price table the expected costs below are computed from. A publish that
+#: moves EVAL_BENCH_PRICE_TABLE forward does not change these expectations.
+FIXTURE_PRICE_TABLE = "2026-10-25"
 
 
 def _synthetic_id(number):
@@ -369,12 +372,12 @@ def test_per_attempt_label_effort_and_published_cost(
     raw["rows"] = [row]
     path = tmp_path / V2_SAMPLE.name
     path.write_text(json.dumps(raw))
-    table = lb.load_results().price_tables[import_eval_bench.EVAL_BENCH_PRICE_TABLE]
+    table = lb.load_results().price_tables[FIXTURE_PRICE_TABLE]
     document, published, unrecorded = import_eval_bench.import_eval_bench(
         path, table, set()
     )
     assert (published, unrecorded) == (0, 0)
-    assert document["price_table"] == "2026-10-25"
+    assert document["price_table"] == FIXTURE_PRICE_TABLE
     record = _v2_record(document, 1)
     assert record["model"] == {"provider_id": provider_id, "reasoning": reasoning}
     assert record["cost"] == {"usd": usd, "source": "published-rate", "reason": None}
@@ -566,19 +569,20 @@ def test_each_eval_bench_export_keeps_its_own_price_table(tmp_path, monkeypatch,
     second = "later-eval-bench.raw.json"
     (reports / second).write_text(json.dumps(later))
     v2 = import_eval_bench.import_eval_bench
+    monkeypatch.setattr(import_eval_bench, "EVAL_BENCH_PRICE_TABLE", FIXTURE_PRICE_TABLE)
     monkeypatch.setattr(import_eval_bench, "SOURCES", ((first, v2),))
     alone = import_eval_bench.build(reports, results)
     monkeypatch.setattr(import_eval_bench, "SOURCES", ((first, v2), (second, v2)))
     # Publishing the later export: pin the earlier one, move the default forward.
     monkeypatch.setattr(
-        import_eval_bench, "EVAL_BENCH_PRICE_TABLES", {V2_SAMPLE.name: "2026-10-25"}
+        import_eval_bench, "EVAL_BENCH_PRICE_TABLES", {V2_SAMPLE.name: FIXTURE_PRICE_TABLE}
     )
     monkeypatch.setattr(import_eval_bench, "EVAL_BENCH_PRICE_TABLE", "2026-11-01")
     files = import_eval_bench.build(reports, results)
     earlier = "2026-10-18-eval-bench.json.gz"
     # The earlier document is byte-identical; the later one uses the newer table.
     assert files[earlier] == alone[earlier]
-    assert json.loads(files[earlier])["price_table"] == "2026-10-25"
+    assert json.loads(files[earlier])["price_table"] == FIXTURE_PRICE_TABLE
     later_document = json.loads(files["2026-11-01-eval-bench.json.gz"])
     assert later_document["price_table"] == "2026-11-01"
     earlier_record = _v2_record(json.loads(alone[earlier]), 1)
@@ -635,6 +639,7 @@ def test_registered_v2_source_builds_with_deduplication_and_current_prices(
             "records": [{"run_id": _synthetic_id(3)}],
         },
     )
+    monkeypatch.setattr(import_eval_bench, "EVAL_BENCH_PRICE_TABLE", FIXTURE_PRICE_TABLE)
     # Register v2 first: deduplication must not depend on SOURCES order.
     monkeypatch.setattr(
         import_eval_bench,
@@ -653,7 +658,7 @@ def test_registered_v2_source_builds_with_deduplication_and_current_prices(
     assert _synthetic_id(3) not in ids
     assert _synthetic_id(4) not in ids
     assert len(ids) == 9
-    assert document["price_table"] == "2026-10-25"
+    assert document["price_table"] == FIXTURE_PRICE_TABLE
     assert _v2_record(document, 1)["cost"]["usd"] == 0.0052
     legacy = json.loads(files["2026-10-06-rfd-calibration.json"])
     assert legacy["price_table"] == "2026-10-10"
