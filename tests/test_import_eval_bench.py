@@ -756,6 +756,34 @@ def test_per_attempt_document_validates(v2_import):
     )
 
 
+def test_per_attempt_checks_pass_through(tmp_path):
+    raw = json.loads(V2_SAMPLE.read_text())
+    checks = [
+        {"name": "defect_line", "ok": True, "required": True},
+        {"name": "read_evidence", "ok": True, "required": False},
+    ]
+    raw["rows"][0]["checks"] = checks
+    raw["rows"][1]["checks"] = None
+    path = tmp_path / V2_SAMPLE.name
+    path.write_text(json.dumps(raw))
+    loaded = lb.load_results()
+    document, _, _ = import_eval_bench.import_eval_bench(
+        path, loaded.price_tables["2026-10-18"], set()
+    )
+    assert _v2_record(document, 1)["checks"] == checks
+    assert "checks" not in _v2_record(document, 2)
+    assert lb.retirement(_v2_record(document, 1), [{"check": "defect_line"}]) is None
+    assert (
+        lb.validate_document(
+            "2026-10-18-eval-bench.json",
+            document,
+            price_tables=loaded.price_tables,
+            exclusion_tags={e["excludes"] for e in loaded.changelog if e["excludes"]},
+        )
+        == []
+    )
+
+
 def test_new_price_table_preserves_previous_entries_and_note():
     tables = lb.load_results().price_tables
     previous, current = tables["2026-10-10"], tables["2026-10-18"]

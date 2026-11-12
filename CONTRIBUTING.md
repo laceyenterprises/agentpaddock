@@ -161,6 +161,15 @@ therefore validate today with that warning. No historical evidence is
 fabricated or backfilled. `track-facts` uses the same rule and reports unknown
 checkpoint metrics until checkpoint-bearing exports arrive.
 
+The eval-bench importer preserves each source row's optional `checks` as
+`{name, ok, required}` entries; absent or null checks remain unrecorded.
+This prepares the importer for checkpoint-bearing exports. The currently
+registered `REPORT-eval-bench-2026-10-29.raw.json.gz` has no checks, so its
+published results still leave checkpoints unverified. Publishing and registering
+a checks-bearing export is a follow-up; before claiming published checkpoints,
+confirm the imported records carry checks and the affected track cards validate
+without “checkpoints unverified”.
+
 ```bash
 python3 scripts/leaderboard.py validate-track
 python3 scripts/leaderboard.py validate-track tasks/<task-id>

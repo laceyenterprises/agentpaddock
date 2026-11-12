@@ -215,6 +215,7 @@ class Builder:
         tokens: dict[str, int | None] | None = None,
         wall_seconds: float | None = None,
         reasoning_level: str | None = None,
+        checks: list[dict[str, Any]] | None = None,
     ) -> None:
         if not run_id:
             raise SourceError(f"{task}: a source row has no run id")
@@ -223,8 +224,7 @@ class Builder:
         model = model_of(model_label, reasoning_level)
         if tokens is None:
             tokens = {"input": None, "cache": None, "output": None}
-        self.records.append(
-            {
+        record: dict[str, Any] = {
                 "run_id": run_id,
                 "suite": suite,
                 "task": task,
@@ -246,7 +246,14 @@ class Builder:
                     tokens, str(model["provider_id"]), self.table
                 ),
             }
-        )
+        # The grader's named sub-checks for this grading, when the source recorded them.
+        # A record without them leaves its checkpoints unverified; an empty list would not.
+        if checks is not None:
+            record["checks"] = [
+                {"name": c["name"], "ok": c["ok"], "required": c["required"]}
+                for c in checks
+            ]
+        self.records.append(record)
 
     def document(
         self, *, id: str, date: str, description: str, evidence: str
@@ -419,6 +426,8 @@ def import_eval_bench(
             },
             wall_seconds=row["wallSeconds"],
             excluded=row["excludedBecause"],
+            # Exports before the bench recorded per-run checks have no such key.
+            checks=row.get("checks"),
         )
     document = builder.document(
         id="eval-bench",
