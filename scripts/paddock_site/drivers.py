@@ -90,7 +90,7 @@ def model(site: views.SiteData) -> list[dict[str, Any]]:
 
 def _entry_words(entry: Mapping[str, Any]) -> str:
     """The entry's car and engine map, tagged: bold, each behind its glyph."""
-    return views.entry_tags(entry["car"], entry["map"])
+    return views.entry_tags(entry["car"], entry["map"], entry.get("driver"))
 
 
 def _fuel(value: float | None) -> str:
@@ -187,7 +187,7 @@ def _rows(driver: Mapping[str, Any]) -> tuple[str, int]:
             f'<span class="dv-livery" style="--c:{views.livery(entry["car"])}" aria-hidden="true"></span>'
             '<span class="dv-row-main">'
             f'<span class="dv-row-who">{views.car_tag(entry["car"])}'
-            f"<span>{views.map_tag(entry['map'], entry['car'])} · {_fuel(entry['costPerPass'])}</span></span>"
+            f"<span>{views.map_tag(entry['map'], entry['car'], entry['driver'])} · {_fuel(entry['costPerPass'])}</span></span>"
             f'<span class="dv-bar"><span style="width:{width:.1f}%"></span></span></span>'
             f'<span class="dv-pct">{views.pct(entry["rate"])}</span></button>'
         )

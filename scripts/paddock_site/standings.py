@@ -125,9 +125,9 @@ def place_label(place: int | None, tie: bool) -> str:
     return f"={place}" if tie else str(place)
 
 
-def map_html(engine_map: str, car: str) -> str:
+def map_html(engine_map: str, car: str, route: str | None = None) -> str:
     """``engine map <label>``, the label bold behind its engine-map glyph."""
-    return f"engine map {views.map_tag(engine_map, car)}"
+    return f"engine map {views.map_tag(engine_map, car, route)}"
 
 
 def plural(count: int, one: str, many: str = "") -> str:
@@ -138,10 +138,20 @@ def short_hash(config_hash: str) -> str:
     return config_hash.removeprefix("sha256:")[:8]
 
 
-def who(row: Mapping[str, Any]) -> str:
-    """``<b>driver</b> in car``, as the board writes an entry."""
+def names(standings: Mapping[str, Any]) -> dict[str, str]:
+    """Each standings driver's display name, two routes to one model told apart."""
+    return views.driver_names(
+        row["driver"]
+        for row in list(standings.get("entries", []))
+        + list(standings.get("partial", []))
+        if "driver" in row
+    )
+
+
+def who(row: Mapping[str, Any], names: Mapping[str, str] | None = None) -> str:
+    """``driver in car``, each bold behind its glyph, as the board writes an entry."""
     return (
-        f"<b>{esc(row['driver'])}</b> "
+        f"{views.driver_tag(row['driver'], (names or {}).get(row['driver']))} "
         f'<span class="st-car">in {views.car_tag(row["car"])}</span>'
     )
 
@@ -348,7 +358,9 @@ def _explainer(root: str, entries: Sequence[Mapping[str, Any]], total: int) -> s
     )
 
 
-def _callouts(entries: Sequence[Mapping[str, Any]]) -> str:
+def _callouts(
+    entries: Sequence[Mapping[str, Any]], names: Mapping[str, str] | None = None
+) -> str:
     lead = entries[0]
     leaders = [row for row in entries if row["place"] == 1]
     if len(leaders) > 1:
@@ -359,7 +371,8 @@ def _callouts(entries: Sequence[Mapping[str, Any]]) -> str:
         )
     else:
         verdict = (
-            f"<b>{esc(lead['driver'])} in</b> {views.car_tag(lead['car'])} <b>leads</b> "
+            f"{views.driver_tag(lead['driver'], (names or {}).get(lead['driver']))} "
+            f"<b>in</b> {views.car_tag(lead['car'])} <b>leads</b> "
             f"with {lead['k']} of {lead['n']}."
         )
         if len(entries) > 1 and entries[1]["hi"] >= lead["lo"]:
@@ -413,6 +426,7 @@ def _row(
     tops: tuple[bool, bool],
     clash: set[tuple[str, str, str]],
     root: str,
+    names: Mapping[str, str] | None = None,
 ) -> str:
     place = place_label(row["place"], row["tie"])
     lead = " lead" if row["place"] == 1 else ""
@@ -431,8 +445,8 @@ def _row(
         f'<span class="st-by-pass">{place}</span>'
         f'<span class="st-by-fuel">{fuel[1]}</span></span>'
         f'<span class="st-livery" style="--c:{livery(row["car"])}" aria-hidden="true"></span>'
-        f'<span class="st-who"><span class="st-name">{who(row)}</span>'
-        f'<span class="st-map"><span>{map_html(row["map"], row["car"])}'
+        f'<span class="st-who"><span class="st-name">{who(row, names)}</span>'
+        f'<span class="st-map"><span>{map_html(row["map"], row["car"], row["driver"])}'
         f"{setup_note(row, clash)}</span></span>"
         + _range_bar(row, BOARD_SCALE, "st-range st-pass-only st-ranges-only")
         + f'<span class="sr-only st-pass-only">, honest range {_range_text(row)}</span>'
@@ -461,8 +475,9 @@ def board(root: str, standings: Mapping[str, Any], races: Mapping[str, Any]) -> 
     pass_top = top_by_pass(entries)
     fuel_top = top_by_fuel(entries)
     clash = ambiguous(entries + standings["partial"])
+    shown = names(standings)
     rows = "".join(
-        _row(i, row, fuel[i], (i < pass_top, fuel[i][0] < fuel_top), clash, root)
+        _row(i, row, fuel[i], (i < pass_top, fuel[i][0] < fuel_top), clash, root, shown)
         for i, row in enumerate(entries)
     )
     more = len(entries) > min(pass_top, TOP)
@@ -472,7 +487,7 @@ def board(root: str, standings: Mapping[str, Any], races: Mapping[str, Any]) -> 
         f'data-top="{TOP}">'
         + _controls()
         + _explainer(root, entries, total)
-        + _callouts(entries)
+        + _callouts(entries, shown)
         + '<section class="st-standings" aria-label="Standings">'
         + _scale()
         + f'<ol class="st-list">{rows}</ol>'
@@ -528,16 +543,24 @@ def standings_body(
 # ---------------------------------------------------------------- entries
 
 
-def _chips(entry_id: str, standings: Mapping[str, Any], root: str) -> str:
+def _chips(
+    entry_id: str,
+    standings: Mapping[str, Any],
+    root: str,
+    shown: Mapping[str, str] | None = None,
+) -> str:
     chips = []
     clash = ambiguous(standings["entries"])
+    if shown is None:
+        shown = names(standings)
     for row in standings["entries"]:
         current = ' aria-current="page"' if row["id"] == entry_id else ""
         chips.append(
             f'<a href="{root}entries/{esc(row["id"])}/index.html"{current}>'
             f'<span class="st-livery" style="--c:{livery(row["car"])}" aria-hidden="true">'
-            f"</span>{esc(row['driver'])} in {views.car_tag(row['car'])} · "
-            f"{views.map_tag(row['map'], row['car'])}{setup_note(row, clash)}</a>"
+            f"</span>{views.driver_tag(row['driver'], shown.get(row['driver']))} in "
+            f"{views.car_tag(row['car'])} · "
+            f"{views.map_tag(row['map'], row['car'], row['driver'])}{setup_note(row, clash)}</a>"
         )
     if not chips:
         return ""
@@ -571,7 +594,9 @@ def weakest(challenges: Mapping[str, Mapping[str, int]]) -> tuple[str, int, int]
     return min(rated, key=lambda item: item[1] / item[2])
 
 
-def _hero(entry: Mapping[str, Any]) -> str:
+def _hero(entry: Mapping[str, Any], name: str | None = None) -> str:
+    """The entry's card: its driver as the title behind the driver glyph, then
+    its car and engine map, tagged."""
     who_ = entry["identity"]
     totals, rng = entry["totals"], entry["range"]
     row = {"rate": totals["rate"], "lo": rng["lo"], "hi": rng["hi"]}
@@ -610,8 +635,9 @@ def _hero(entry: Mapping[str, Any]) -> str:
         '<section class="en-hero">'
         f'<div class="en-card" style="--c:{livery(who_["car"])}">'
         f'<div class="en-card-who">{glyphs.icon("driver", "en-card-glyph")}'
-        f"<div><h1>{esc(who_['driver'])}</h1>"
-        f"<p>in {views.car_tag(who_['car'])} · {map_html(who_['map'], who_['car'])}"
+        f"<div><h1>{esc(name or views.model_name(who_['driver']))}</h1>"
+        f"<p>in {views.car_tag(who_['car'])} · "
+        f"{map_html(who_['map'], who_['car'], who_['driver'])}"
         f" · setup <code>{esc(short_hash(who_['configHash']))}</code></p></div></div>"
         f'<p class="en-pct"><b class="num">{pct(totals["rate"])}</b>'
         f"<span>{totals['k']} of {totals['n']} races passed</span></p>"
@@ -734,14 +760,20 @@ def entry_body(
     standings: Mapping[str, Any],
     races: Mapping[str, Any],
     root: str,
+    shown: Mapping[str, str] | None = None,
 ) -> str:
+    if shown is None:
+        shown = names(standings)
     return (
         '<div class="st-page en-page">'
         '<section class="en-top">'
         + _eyebrow("podium", "An entry · its season")
-        + _chips(entry["id"], standings, root)
+        + _chips(entry["id"], standings, root, shown)
         + f'<a class="en-back" href="{root}standings/index.html">Back to the timing tower</a>'
-        "</section>" + _hero(entry) + season(entry, races) + '<section class="en-next">'
+        "</section>"
+        + _hero(entry, shown.get(entry["identity"]["driver"]))
+        + season(entry, races)
+        + '<section class="en-next">'
         f'<a class="en-next-dark" href="{root}pit-wall/index.html"><span>Next</span>'
         "<b>Compare it on the pit wall</b></a>"
         f'<a href="{root}garage/index.html"><span>Or</span>'
@@ -750,14 +782,20 @@ def entry_body(
     )
 
 
-def _entry_link(row: Mapping[str, Any], root: str, clash: set) -> str:
+def _entry_link(
+    row: Mapping[str, Any],
+    root: str,
+    clash: set,
+    names: Mapping[str, str] | None = None,
+) -> str:
     place = place_label(row["place"], row["tie"])
     return (
         f'<li><a class="en-list-row" href="{root}entries/{esc(row["id"])}/index.html">'
         f'<span class="st-pos">{place}</span>'
         f'<span class="st-livery" style="--c:{livery(row["car"])}" aria-hidden="true"></span>'
-        f'<span class="st-who"><span class="st-name">{who(row)}</span>'
-        f'<span class="st-map"><span>{map_html(row["map"], row["car"])}{setup_note(row, clash)}</span></span></span>'
+        f'<span class="st-who"><span class="st-name">{who(row, names)}</span>'
+        f'<span class="st-map"><span>{map_html(row["map"], row["car"], row["driver"])}'
+        f"{setup_note(row, clash)}</span></span></span>"
         f'<span class="st-value num">{pct(row["rate"])}<small>{row["k"]}/{row["n"]}</small>'
         "</span></a></li>"
     )
@@ -774,8 +812,13 @@ def entries_body(standings: Mapping[str, Any], root: str) -> str:
     if standings["state"] == AWAITING:
         return f'<div class="st-page st-narrow">{hero}{awaiting(root)}</div>'
     clash = ambiguous(standings["entries"] + standings["partial"])
-    placed = "".join(_entry_link(row, root, clash) for row in standings["entries"])
-    partial = "".join(_entry_link(row, root, clash) for row in standings["partial"])
+    shown = names(standings)
+    placed = "".join(
+        _entry_link(row, root, clash, shown) for row in standings["entries"]
+    )
+    partial = "".join(
+        _entry_link(row, root, clash, shown) for row in standings["partial"]
+    )
     return (
         '<div class="st-page st-narrow">'
         + hero
@@ -841,6 +884,7 @@ def entry_pages(build: Build) -> dict[str, str]:
     if standings["state"] == AWAITING:
         return {}
     races = _load(build.data, "races.json")
+    shown = names(standings)
     pages = {}
     for row in standings["entries"] + standings["partial"]:
         entry = _load(build.data, f"entries/{row['id']}.json")
@@ -851,10 +895,11 @@ def entry_pages(build: Build) -> dict[str, str]:
             current=current,
             nav_current=ENTRIES,
             title=(
-                f"{who_['driver']} in {car_name(who_['car'])} · "
-                f"{views.map_label(who_['map'], who_['car'])}"
+                f"{shown.get(who_['driver'], views.model_name(who_['driver']))} in "
+                f"{car_name(who_['car'])} · "
+                f"{views.map_label(who_['map'], who_['car'], who_['driver'])}"
             ),
-            body=entry_body(entry, standings, races, layout.up(current)),
+            body=entry_body(entry, standings, races, layout.up(current), shown),
             url=f"{SITE_URL}entries/{row['id']}/",
         )
     return pages
@@ -1100,8 +1145,9 @@ CSS = """
 .en-chips a {
   flex: none; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 14px 0 10px;
   border-radius: 999px; border: 1.5px solid var(--rule); color: var(--ink); text-decoration: none;
-  font: 600 14px var(--body); scroll-snap-align: start; white-space: nowrap;
+  font: 600 14px/1.3 var(--body); scroll-snap-align: start; max-width: min(320px, 82vw); padding-block: 6px;
 }
+.en-chips a .st-livery { flex: none; }
 .en-chips a .st-livery { width: 5px; height: 20px; }
 .en-chips a[aria-current="page"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
 .en-hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 20px; }

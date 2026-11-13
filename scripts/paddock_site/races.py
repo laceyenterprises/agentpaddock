@@ -515,7 +515,12 @@ def _lap(race: Mapping[str, Any]) -> str:
 # ---------------------------------------------------------------- the result
 
 
-def _finisher(position: int, row: Mapping[str, Any]) -> str:
+def _finisher(
+    position: int, row: Mapping[str, Any], names: Mapping[str, str] | None = None
+) -> str:
+    """One classified finisher: the driver, car and engine map, each bold behind
+    its glyph, then its lap time and fuel. ``names`` tells apart two routes to
+    one model on the same list."""
     lap = lap_text(row["lapSeconds"])
     usd = usd_text(row["costUsd"])
     lap_shown = lap or "n/a"
@@ -531,8 +536,9 @@ def _finisher(position: int, row: Mapping[str, Any]) -> str:
         f'<span class="rc-pos{" is-podium" if position <= 3 else ""}">P{position}</span>'
         f'<span class="rc-livery" style="background:{livery(row["car"])}" aria-hidden="true"></span>'
         '<span class="rc-who">'
-        f'<span class="rc-driver">{esc(row["driver"])} <span>in {views.car_tag(row["car"])}</span></span>'
-        f'<span class="rc-map">engine map {views.map_tag(row["map"], row["car"])}</span></span>'
+        f'<span class="rc-driver">{views.driver_tag(row["driver"], (names or {}).get(row["driver"]))} '
+        f'<span class="rc-car">in {views.car_tag(row["car"])}</span></span>'
+        f'<span class="rc-map">engine map {views.map_tag(row["map"], row["car"], row["driver"])}</span></span>'
         '<span class="rc-values">'
         f'<span class="rc-main">{esc(lap_shown)}</span>'
         f'<span class="rc-second">{esc(usd_second)}</span></span></li>'
@@ -601,6 +607,7 @@ def _result(race: Mapping[str, Any]) -> str:
         "are classified by lap time, from lights out to hand-in, or by what the run cost.</p>",
     ]
     if finishers:
+        names = views.driver_names(row["driver"] for row in finishers)
         body.append(
             '<div class="rc-seg" role="radiogroup" aria-label="Classify finishers by" '
             "data-class-order hidden>"
@@ -611,7 +618,7 @@ def _result(race: Mapping[str, Any]) -> str:
             + glyphs.icon("fuel-bill")
             + "Fuel</button></div>"
             '<ol class="rc-classification" data-classification>'
-            + "".join(_finisher(k, row) for k, row in enumerate(finishers, 1))
+            + "".join(_finisher(k, row, names) for k, row in enumerate(finishers, 1))
             + "</ol>"
         )
         if len(finishers) > CLASSIFICATION_FIRST:
@@ -971,7 +978,7 @@ CSS = """
 .rc-livery { width: 6px; height: 36px; border-radius: 2px; }
 .rc-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .rc-driver { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
-.rc-driver span { font-weight: 400; color: var(--ink-2); }
+.rc-car { font-weight: 400; color: var(--ink-2); }
 .rc-map { font-size: 13px; color: var(--muted); }
 .rc-values { display: flex; flex-direction: column; align-items: flex-end; }
 .rc-main { font: 700 24px/1.1 var(--display); font-variant-numeric: tabular-nums; }

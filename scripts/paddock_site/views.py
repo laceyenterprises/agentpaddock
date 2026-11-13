@@ -4,7 +4,8 @@ A data page reads only the JSON files the data layer writes (``data.py``), so
 every number it shows came from ``scripts/leaderboard.py``. This module parses
 those files once per build (:class:`SiteData`) and turns their ids into words:
 a driver's provider id into a model name, a car's harness name into its product
-name, an engine map into its label and glyph. It holds no result of its own.
+name, an engine map into its label and glyph, and a default engine map into
+the setting it ran at (:data:`DEFAULT_SETTINGS`). It holds no result of its own.
 """
 
 from __future__ import annotations
@@ -22,11 +23,75 @@ LEVELS = ("default", "low", "medium", "high", "xhigh", "max")
 
 #: Car (harness name) -> product name, where title case would get it wrong.
 CAR_NAMES = {"claude-code": "Claude Code", "opencode": "OpenCode", "pi": "Pi"}
-#: Car -> the engine map it runs when an entry sets none, where the bench has
-#: checked it. Codex sends its default reasoning effort, medium, when an entry
-#: sets none; observed in the run's own Codex session record (turn context),
-#: 2026-11-13. A car missing here is named only as "<Car> default".
-CAR_DEFAULT_MAPS = {"codex": "medium"}
+#: Route -> the reasoning setting it runs when a request sends none, from the
+#: route's documentation. ``None``: the route documents no default.
+ROUTE_DEFAULTS: dict[str, str | None] = {
+    "anthropic/claude-opus-5-5": "adaptive, medium",
+    "anthropic/claude-sonnet-5-5": "adaptive, high",
+    "openai/gpt-6.1-sol": "medium",
+    "google/gemini-3.8-flash": "medium",
+    "moonshot/kimi-k3": "max",
+    "fireworks/kimi-k3": "max",
+    "fireworks/qwen3.8-max": "xhigh",
+    "zai/glm-5.2": "dynamic thinking, max",
+    "baseten/glm-5.3-flash": "high",
+    "together/deepseek-v4.1-flash": None,
+    "openrouter/qwen3.8-27b": None,
+    "fireworks/qwen3.8-27b": None,
+}
+#: A ``DEFAULT_SETTINGS`` route that stands for every route of its car.
+ANY_ROUTE = "*"
+#: ``(car, route)`` -> ``(level, who)``: the reasoning setting an entry at the
+#: default engine map ran at. ``who`` is ``"car"`` when the car sent ``level``
+#: and ``"route"`` when the car sent nothing, so the route's own default
+#: applied. A level of ``None``, or a pair missing here, is "setting not
+#: recorded": the site claims no setting it has no evidence for.
+DEFAULT_SETTINGS: dict[tuple[str, str], tuple[str | None, str]] = {
+    # Codex, from the run's own session record (turn context): it sends
+    # reasoning_effort "medium" on these routes.
+    **{
+        ("codex", route): ("medium", "car")
+        for route in (
+            "anthropic/claude-opus-5-5",
+            "anthropic/claude-sonnet-5-5",
+            "baseten/glm-5.3-flash",
+            "fireworks/kimi-k3",
+            "google/gemini-3.8-flash",
+            "moonshot/kimi-k3",
+            "together/deepseek-v4.1-flash",
+        )
+    },
+    # Codex, from the car's provider config: it sends none on these routes, so
+    # the route's documented default applies. openai/gpt-6.1-sol is absent:
+    # what Codex sent there is not recorded.
+    **{
+        ("codex", route): (ROUTE_DEFAULTS[route], "route")
+        for route in ("fireworks/qwen3.8-max", "zai/glm-5.2", "openrouter/qwen3.8-27b")
+    },
+    # OpenCode and Pi, from the car's provider config: they send none, so the
+    # route's documented default applies.
+    **{
+        (car, route): (level, "route")
+        for car in ("opencode", "pi")
+        for route, level in ROUTE_DEFAULTS.items()
+    },
+    # Claude Code, from the car's documentation (model configuration): it sends
+    # its own default, medium, to the 5.5 models. For any other route what
+    # reached the model is not recorded.
+    **{
+        ("claude-code", route): ("medium", "car")
+        for route in (
+            "anthropic/claude-opus-5-5",
+            "anthropic/claude-sonnet-5-5",
+            "anthropic/claude-haiku-5-5",
+        )
+    },
+    # Hermes, from the car's documentation: an empty agent.reasoning_effort
+    # sends medium, on every route.
+    ("hermes", ANY_ROUTE): ("medium", "car"),
+}
+#: The label of a default engine map whose setting the bench cannot name.
+NOT_RECORDED = "setting not recorded"
 #: Car -> livery token in ``design/tokens.css``.
 LIVERIES = {
     "claude-code": "car-cc",
@@ -42,7 +107,9 @@ BRANDS = {
     "deepseek": "DeepSeek",
     "glm": "GLM",
     "gpt": "GPT",
+    "openai": "OpenAI",
     "openrouter": "OpenRouter",
+    "zai": "Z.ai",
 }
 
 
@@ -204,18 +271,31 @@ def livery(car: str) -> str:
     return f"var(--{token})" if token else "var(--viz-other)"
 
 
-def map_label(engine_map: str, car: str | None = None) -> str:
-    """The engine map as the site names it: a named level as it is; the default
-    as the level the car ran, when that is known ("medium (Codex default)"),
-    else as whose default it is ("Claude Code default"). Without a car, as
-    "the car's default"."""
+def default_setting(car: str, route: str | None) -> tuple[str | None, str] | None:
+    """``(level, who)`` from :data:`DEFAULT_SETTINGS` for a default-map entry."""
+    if route is not None and (car, route) in DEFAULT_SETTINGS:
+        return DEFAULT_SETTINGS[(car, route)]
+    return DEFAULT_SETTINGS.get((car, ANY_ROUTE))
+
+
+def map_label(engine_map: str, car: str | None = None, route: str | None = None) -> str:
+    """The engine map as the site names it. A named level reads as it is. The
+    default reads as the setting that ran and who chose it: "medium (sent by
+    Codex)" when the car sent it, "xhigh (Fireworks default; Codex sends none)"
+    when the car sent nothing and the route's default applied, and "setting
+    not recorded" when the bench has no evidence. Without a car, as "the car's
+    default": the rung of the ladder, not a claim about a run."""
     if engine_map != "default":
         return engine_map
     if car is None:
         return "the car's default"
-    level = CAR_DEFAULT_MAPS.get(car)
-    owner = car_name(car)
-    return f"{level} ({owner} default)" if level else f"{owner} default"
+    setting = default_setting(car, route)
+    if setting is None or setting[0] is None:
+        return NOT_RECORDED
+    level, who = setting
+    if who == "car":
+        return f"{level} (sent by {car_name(car)})"
+    return f"{level} ({host_name(route or '')} default; {car_name(car)} sends none)"
 
 
 def tag(glyph: str, text: str) -> str:
@@ -233,14 +313,21 @@ def car_tag(car: str) -> str:
     return tag("car", car_name(car))
 
 
-def map_tag(engine_map: str, car: str | None = None) -> str:
+def map_tag(engine_map: str, car: str | None = None, route: str | None = None) -> str:
     """The engine map's label in bold behind its engine-map glyph."""
-    return tag(map_glyph(engine_map), map_label(engine_map, car))
+    return tag(map_glyph(engine_map), map_label(engine_map, car, route))
 
 
-def entry_tags(car: str, engine_map: str) -> str:
+def driver_tag(route: str, name: str | None = None) -> str:
+    """The driver's display name in bold behind the driver glyph, so it reads as
+    the driver. ``name`` overrides :func:`model_name`, for a page that has
+    told two routes to one model apart (:func:`driver_names`)."""
+    return tag("driver", name or model_name(route))
+
+
+def entry_tags(car: str, engine_map: str, route: str | None = None) -> str:
     """``car at engine map level``, both parts tagged: how a page names an entry."""
-    return f"{car_tag(car)} at engine map {map_tag(engine_map, car)}"
+    return f"{car_tag(car)} at engine map {map_tag(engine_map, car, route)}"
 
 
 def map_glyph(engine_map: str) -> str:

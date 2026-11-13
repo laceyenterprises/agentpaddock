@@ -2,8 +2,8 @@
 
 Rebuilds ``design/web/Garage.dc.html``. Pick a driver (model), a car (harness)
 and one of six engine maps (the car's own default, low, medium, high, xhigh,
-max). The default is named for the car that runs it, as the level it sends
-when that is known (``views.map_label``).
+max). The default is named by the setting the driver ran at in that car, and
+who chose it (``views.map_label``), or "setting not recorded".
 
 - **Availability comes from the data.** A level is open for a driver when some
   results document has a counted run of that driver at that level, in any car
@@ -53,9 +53,27 @@ def key(driver: str, car: str, engine_map: str) -> str:
     return f"{driver}|{car}|{engine_map}"
 
 
-def level_reason(name: str, engine_map: str, raced: Sequence[str]) -> str:
-    """Why ``engine_map`` is closed for a driver that has raced at ``raced``."""
-    words = [views.map_label(level) for level in raced]
+def level_reason(
+    name: str,
+    engine_map: str,
+    raced: Sequence[str],
+    defaults: Sequence[str] = (),
+) -> str:
+    """Why ``engine_map`` is closed for a driver that has raced at ``raced``.
+    ``defaults`` names the settings its default-map runs ran at, one per car."""
+    default_words = list(dict.fromkeys(defaults)) or ["the car's default"]
+    words = [
+        word
+        for level in raced
+        for word in (
+            [
+                f"the default ({label})" if label != "the car's default" else label
+                for label in default_words
+            ]
+            if level == "default"
+            else [views.map_label(level)]
+        )
+    ]
     if not words:
         return f"No counted run has {name} at any of these engine maps."
     if len(words) == 1:
@@ -135,6 +153,10 @@ def model(site: views.SiteData) -> dict[str, Any]:
         open_levels = [level for level in LEVELS if level in maps]
         extra = sorted(maps - set(LEVELS), key=views.slug)
         name = names[driver]
+        defaults = {car: views.map_label("default", car, driver) for car in car_order}
+        raced_default = [
+            defaults[c] for d, c, m in ids if d == driver and m == "default"
+        ]
         best = next(
             (e for e in site.placed + site.partial if e["driver"] == driver), None
         )
@@ -149,13 +171,15 @@ def model(site: views.SiteData) -> dict[str, Any]:
                 "levels": {
                     level: ""
                     if level in maps
-                    else level_reason(name, level, open_levels)
+                    else level_reason(name, level, open_levels, raced_default)
                     for level in LEVELS
                 },
+                # The default engine map's label in each car, for this driver.
+                "defaults": defaults,
                 "note": map_note(name, open_levels, extra),
                 "tip": (
                     f"{name} does best in {views.car_name(best['car'])} at engine map "
-                    f"{views.map_label(best['map'], best['car'])} ({best['k']} of {best['n']}). "
+                    f"{views.map_label(best['map'], best['car'], driver)} ({best['k']} of {best['n']}). "
                     "The car changes the result more than people expect."
                     if best
                     else f"{name} has no checked result yet; its runs wait on the community board."
@@ -168,16 +192,7 @@ def model(site: views.SiteData) -> dict[str, Any]:
         "levels": [
             [level, views.map_label(level), views.map_glyph(level)] for level in LEVELS
         ],
-        # The fourth field is the car's own name for the default engine map.
-        "cars": [
-            [
-                car,
-                views.car_name(car),
-                views.livery(car),
-                views.map_label("default", car),
-            ]
-            for car in car_order
-        ],
+        "cars": [[car, views.car_name(car), views.livery(car)] for car in car_order],
         "drivers": drivers,
         "entries": entries,
         "unverified": unverified,
@@ -255,9 +270,9 @@ def _pickers(view: Mapping[str, Any], pick: Sequence[str]) -> str:
             car_id == car,
             inner=f'<span class="stripe" style="--c:{colour}" aria-hidden="true"></span>',
         )
-        for car_id, name, colour, _ in view["cars"]
+        for car_id, name, colour in view["cars"]
     )
-    default_name = next(c[3] for c in view["cars"] if c[0] == car)
+    default_name = chosen["defaults"][car]
     map_chips = ""
     for level, name, glyph in view["levels"]:
         why = chosen["levels"][level]
@@ -291,7 +306,7 @@ def _pickers(view: Mapping[str, Any], pick: Sequence[str]) -> str:
 def _result(view: Mapping[str, Any], pick: Sequence[str], root: str) -> str:
     driver, car, engine_map = pick
     chosen = next(d for d in view["drivers"] if d["id"] == driver)
-    _, car_label, colour, _ = next(c for c in view["cars"] if c[0] == car)
+    _, car_label, colour = next(c for c in view["cars"] if c[0] == car)
     map_glyph = next(g for level, _, g in view["levels"] if level == engine_map)
     combo = key(driver, car, engine_map)
     entry = view["entries"].get(combo)
@@ -305,10 +320,11 @@ def _result(view: Mapping[str, Any], pick: Sequence[str], root: str) -> str:
     return (
         f'<section class="gr-result" style="--c:{colour}" aria-live="polite" data-result>'
         f'<div class="gr-car" data-slot="art">{art}</div>'
-        f'<p class="gr-title"><b data-slot="driver">{esc(chosen["name"])}</b> '
+        f'<p class="gr-title"><b class="ent">{glyphs.icon("driver")}'
+        f'<span data-slot="driver">{esc(chosen["name"])}</span></b> '
         f'<span>in <b class="ent">{glyphs.icon("car")}<span data-slot="car">{esc(car_label)}</span></b>'
         f' · engine map <b class="ent"><span data-slot="mapGlyph">{glyphs.icon(map_glyph)}</span>'
-        f'<span data-slot="map">{esc(views.map_label(engine_map, car))}</span></b></span></p>'
+        f'<span data-slot="map">{esc(views.map_label(engine_map, car, driver))}</span></b></span></p>'
         f'<div class="gr-raced" data-state="raced"{hidden(bool(entry))}>'
         f'<div class="gr-score"><span class="gr-pct" data-slot="pct">{esc(entry["pct"] if entry else "")}</span>'
         f'<span><span data-slot="passOf">{esc(entry["passOf"] if entry else "")}</span> races passed</span></div>'
@@ -398,6 +414,9 @@ CSS = """
 /* ---------- garage (PDW-08) ---------- */
 .gr { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; align-items: start; }
 .gr-pick { display: grid; gap: 26px; }
+/* the default chip names the setting that ran, which can be long: it wraps, never overflows */
+.chip[data-map="default"] { white-space: normal; max-width: 100%; text-align: left; line-height: 1.25; padding-block: 8px; }
+.chip[data-map="default"] .glyph { flex: none; }
 .gr-step { display: grid; gap: 10px; }
 .gr-note { font-size: 14px; line-height: 1.45; color: var(--muted); }
 .gr-more summary { min-height: 44px; display: flex; align-items: center; }
@@ -478,7 +497,7 @@ SCRIPT = """(function () {
     Array.prototype.forEach.call(chips('data-map'), function (c) {
       var level = c.getAttribute('data-map'), why = d.levels[level];
       var label = c.querySelector('[data-label]');
-      if (label) label.textContent = car[3];
+      if (label) label.textContent = d.defaults[state.car];
       c.setAttribute('aria-pressed', level === state.map ? 'true' : 'false');
       if (why) {
         c.setAttribute('aria-disabled', 'true');
@@ -495,7 +514,7 @@ SCRIPT = """(function () {
     art.setAttribute('aria-label', d.name + ' in ' + car[1] + ', in its livery');
     slot('driver').textContent = d.name;
     slot('car').textContent = car[1];
-    slot('map').textContent = state.map === 'default' ? car[3] : state.map;
+    slot('map').textContent = state.map === 'default' ? d.defaults[state.car] : state.map;
     slot('mapGlyph').querySelector('use').setAttribute('href', '#' + levelGlyphs[state.map]);
     slot('note').textContent = d.note;
     garage.querySelector('[data-state="raced"]').hidden = !entry;

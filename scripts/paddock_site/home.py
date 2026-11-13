@@ -191,21 +191,34 @@ def plural(count: int, singular: str, plural_form: str = "") -> str:
     return f"{count} {singular if count == 1 else plural_form or singular + 's'}"
 
 
-def entry_name(entry: Mapping[str, Any]) -> str:
-    """``driver in Car · engine map`` as plain text, for the ticker."""
-    identity = entry.get("identity", entry)
-    car, engine_map = identity["car"], identity.get("map")
-    name = f"{identity['driver']} in {views.car_name(car)}"
-    return f"{name} · {views.map_label(engine_map, car)}" if engine_map else name
+def driver_names(standings: Mapping[str, Any]) -> dict[str, str]:
+    """Each standings driver's display name, two routes to one model told apart."""
+    return views.driver_names(
+        row["driver"]
+        for row in list(standings.get("entries", []))
+        + list(standings.get("partial", []))
+        if "driver" in row
+    )
 
 
-def entry_html(entry: Mapping[str, Any]) -> str:
-    """:func:`entry_name` as markup: the car and the engine map bold, each
-    behind its glyph."""
+def entry_name(entry: Mapping[str, Any], names: Mapping[str, str] | None = None) -> str:
+    """``Driver in Car · engine map`` as plain text, for the ticker."""
     identity = entry.get("identity", entry)
-    car, engine_map = identity["car"], identity.get("map")
-    name = f"{esc(identity['driver'])} in {views.car_tag(car)}"
-    return f"{name} · {views.map_tag(engine_map, car)}" if engine_map else name
+    route, car, engine_map = identity["driver"], identity["car"], identity.get("map")
+    driver = (names or {}).get(route) or views.model_name(route)
+    name = f"{driver} in {views.car_name(car)}"
+    return f"{name} · {views.map_label(engine_map, car, route)}" if engine_map else name
+
+
+def entry_html(entry: Mapping[str, Any], names: Mapping[str, str] | None = None) -> str:
+    """:func:`entry_name` as markup: the driver, the car and the engine map bold,
+    each behind its glyph."""
+    identity = entry.get("identity", entry)
+    route, car, engine_map = identity["driver"], identity["car"], identity.get("map")
+    name = (
+        f"{views.driver_tag(route, (names or {}).get(route))} in {views.car_tag(car)}"
+    )
+    return f"{name} · {views.map_tag(engine_map, car, route)}" if engine_map else name
 
 
 def challenge_label(challenge: str) -> str:
@@ -270,6 +283,7 @@ def sample_ticks(
     of the red flag, so the fallback teaches every flag the feed can show."""
     finishes: list[dict[str, str]] = []
     dnfs: list[dict[str, str]] = []
+    names = driver_names(standings)
     for standing in standings.get("entries", [])[:6]:
         entry = entries.get(standing["id"])
         if not entry:
@@ -286,7 +300,7 @@ def sample_ticks(
             if race:
                 bucket.append(
                     {
-                        "who": entry_name(entry),
+                        "who": entry_name(entry, names),
                         "what": f"{challenge_label(race['challenge'])}: {race['name']}",
                         "when": "From the committed results",
                         "kind": "passed" if passed else "dnf",
@@ -402,6 +416,7 @@ def photo_finish(standings: Mapping[str, Any]) -> str:
         why = ""
     floor = _range_scale(front)
     span = 1 - floor or 1
+    names = driver_names(standings)
 
     def at(value: float) -> str:
         return f"{max(0.0, min(1.0, (value - floor) / span)) * 100:.1f}%"
@@ -411,7 +426,7 @@ def photo_finish(standings: Mapping[str, Any]) -> str:
         '<a class="home-leader" href="standings/index.html">'
         f"{_livery(row['car'])}"
         '<span class="home-leader-who">'
-        f'<span class="home-leader-name">{entry_html(row)}</span>'
+        f'<span class="home-leader-name">{entry_html(row, names)}</span>'
         f'<span class="home-range" style="--lo:{at(row["lo"])};--hi:{at(row["hi"])};'
         f'--dot:{at(row["rate"])}" aria-hidden="true"><i></i><b></b><em></em></span>'
         f'<span class="sr-only">Honest range {pct(row["lo"])} to {pct(row["hi"])}</span>'
@@ -573,13 +588,14 @@ def hardest_card(races: Mapping[str, Any]) -> str:
 def fuel_card(standings: Mapping[str, Any]) -> str:
     glyph = glyphs.icon("fuel-bill", "home-card-glyph")
     pair = fuel_pair(standings)
+    names = driver_names(standings)
     if pair:
         cheap, dear = pair
         ratio = dear["costPerPass"] / cheap["costPerPass"]
         title = f"Same finish. {ratio_text(ratio)} the mileage."
         line = (
-            f"{entry_html(cheap)} passes a race for {usd(cheap['costPerPass'])}. "
-            f"{entry_html(dear)}, tied on the finish, pays {usd(dear['costPerPass'])}."
+            f"{entry_html(cheap, names)} passes a race for {usd(cheap['costPerPass'])}. "
+            f"{entry_html(dear, names)}, tied on the finish, pays {usd(dear['costPerPass'])}."
         )
     else:
         priced = [
@@ -589,7 +605,7 @@ def fuel_card(standings: Mapping[str, Any]) -> str:
             best = priced[0]
             title = "The fuel bill."
             line = (
-                f"{entry_html(best)}, the best-placed priced entry, passes a race for "
+                f"{entry_html(best, names)}, the best-placed priced entry, passes a race for "
                 f"{usd(best['costPerPass'])}."
             )
         else:
