@@ -318,6 +318,9 @@ def _result(view: Mapping[str, Any], pick: Sequence[str], root: str) -> str:
 
     setups = entry["setups"] if entry else 1
     art = CAR_ART.format(label=esc(f"{chosen['name']} in {car_label}, in its livery"))
+    map_before, map_space, map_last = views.map_label(
+        engine_map, car, driver
+    ).rpartition(" ")
     return (
         f'<section class="gr-result" style="--c:{colour}" aria-live="polite" data-result>'
         f'<div class="gr-car" data-slot="art">{art}</div>'
@@ -325,8 +328,9 @@ def _result(view: Mapping[str, Any], pick: Sequence[str], root: str) -> str:
         f'<span data-slot="driver">{esc(chosen["name"])}</span></b> '
         f'<span>in <b class="ent">{glyphs.icon("car")}<span data-slot="car">{esc(car_label)}</span></b>'
         f' · engine map <b class="ent"><span data-slot="mapGlyph">{glyphs.icon(map_glyph)}</span>'
-        f'<span data-slot="map">{esc(views.map_label(engine_map, car, driver))}</span></b>'
-        f"{views.map_info(views.map_tip(car, driver), context=car_label + ' on ' + chosen['name'], hidden=engine_map != 'default')}</span></p>"
+        f'<span data-slot="map">{esc(map_before + map_space)}</span>'
+        f'<span class="map-tail"><span data-slot="mapLast">{esc(map_last)}</span>'
+        f"{views.map_info(views.map_tip(car, driver), context=car_label + ' on ' + chosen['name'], hidden=engine_map != 'default')}</span></b></span></p>"
         f'<div class="gr-raced" data-state="raced"{hidden(bool(entry))}>'
         f'<div class="gr-score"><span class="gr-pct" data-slot="pct">{esc(entry["pct"] if entry else "")}</span>'
         f'<span><span data-slot="passOf">{esc(entry["passOf"] if entry else "")}</span> races passed</span></div>'
@@ -516,7 +520,10 @@ SCRIPT = """(function () {
     art.setAttribute('aria-label', d.name + ' in ' + car[1] + ', in its livery');
     slot('driver').textContent = d.name;
     slot('car').textContent = car[1];
-    slot('map').textContent = state.map === 'default' ? d.defaults[state.car] : state.map;
+    var mapLabel = state.map === 'default' ? d.defaults[state.car] : state.map;
+    var lastSpace = mapLabel.lastIndexOf(' ');
+    slot('map').textContent = mapLabel.slice(0, lastSpace + 1);
+    slot('mapLast').textContent = mapLabel.slice(lastSpace + 1);
     var info = garage.querySelector('.map-info');
     info.querySelector('.map-tip').hidePopover();
     info.querySelector('button').setAttribute('aria-expanded', 'false');

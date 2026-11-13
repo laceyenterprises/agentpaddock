@@ -361,13 +361,25 @@ def map_info(note: str, *, context: str = "", hidden: bool = False) -> str:
     )
 
 
-def tag(glyph: str, text: str) -> str:
+def tag(glyph: str, text: str, *, info: str = "") -> str:
     """``text`` in bold behind ``glyph``. The glyph stays on the line of the first
     word; the rest wraps like any text, so a narrow column never overflows."""
     first, space, rest = text.partition(" ")
+    if info:
+        if space:
+            before, gap, last = rest.rpartition(" ")
+            rest = f'{esc(before)}{gap}<span class="map-tail">{esc(last)}{info}</span>'
+        else:
+            first = esc(first)
+            return (
+                f'<b class="ent"><span class="ent-lead map-tail">'
+                f"{glyphs.icon(glyph)}{first}{info}</span></b>"
+            )
+    else:
+        rest = esc(rest)
     return (
         f'<b class="ent"><span class="ent-lead">{glyphs.icon(glyph)}{esc(first)}</span>'
-        f"{space}{esc(rest)}</b>"
+        f"{space}{rest}</b>"
     )
 
 
@@ -378,14 +390,15 @@ def car_tag(car: str) -> str:
 
 def map_tag(engine_map: str, car: str | None = None, route: str | None = None) -> str:
     """The engine map's label in bold behind its engine-map glyph."""
-    label = tag(map_glyph(engine_map), map_label(engine_map, car, route))
     context = car_name(car) if car else ""
     if route:
         context += f" on {model_name(route)} via {host_name(route)}"
-    return label + (
-        map_info(map_tip(car, route), context=context.strip())
+    return tag(
+        map_glyph(engine_map),
+        map_label(engine_map, car, route),
+        info=map_info(map_tip(car, route), context=context.strip())
         if engine_map == "default"
-        else ""
+        else "",
     )
 
 
@@ -481,10 +494,14 @@ CSS = """
 .ent svg.glyph { display: inline-block; width: 1.15em; height: 1.15em; margin-right: .2em; vertical-align: -.22em; }
 .map-info { display: inline; }
 .map-info[hidden] { display: none; }
-.map-info-button { display: inline-flex; vertical-align: middle; align-items: center; justify-content: center;
-  width: 28px; height: 28px; padding: 4px; border: 0; border-radius: 50%; background: transparent;
+.map-tail { white-space: nowrap; }
+.map-info-button { display: inline-flex; vertical-align: -.15em; align-items: center; justify-content: center;
+  box-sizing: content-box; font: inherit; line-height: 1; width: 1em; height: 1em;
+  min-width: 0; min-height: 0; padding: max(0px, calc((24px - 1em) / 2));
+  margin: calc(-1 * max(0px, (24px - 1em) / 2)) 0;
+  border: 0; border-radius: 50%; background: transparent;
   color: inherit; cursor: pointer; }
-.map-info-button .glyph { width: 18px; height: 18px; }
+.map-info-button svg.glyph { width: 1em; height: 1em; margin: 0; vertical-align: 0; }
 .map-info-button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .map-tip { position: fixed; inset: auto 0 16px; margin: 0 auto; box-sizing: border-box;
   width: min(360px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto;
