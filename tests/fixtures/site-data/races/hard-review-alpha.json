@@ -33,6 +33,21 @@
     "Read the code",
     "Right verdict"
   ],
+  "checkpointRates": [
+    {
+      "label": "Read the code",
+      "n": 14,
+      "rate": 0.8571428571428571,
+      "optional": false
+    },
+    {
+      "label": "Right verdict",
+      "n": 14,
+      "rate": 0.9285714285714286,
+      "optional": false
+    }
+  ],
+  "singleResult": false,
   "moreChecks": 3,
   "funnel": {
     "runs": 13,

@@ -729,6 +729,30 @@ def _sha(value: Any) -> bool:
     return isinstance(value, str) and CONFIG_HASH.fullmatch(value) is not None
 
 
+def check_identity(run: Mapping[str, Any]) -> tuple:
+    """The four fields identifying one published grading."""
+    return tuple(run.get(key) for key in ("run_id", "task", "task_version", "attempt"))
+
+
+def matching_checks(record: Mapping[str, Any], run: Mapping[str, Any]) -> bool:
+    """Only the same grading, with a measured score, can supply checkpoints."""
+    if "checks" in record or check_identity(record) != check_identity(run):
+        return False
+    checks = run.get("checks")
+    if not isinstance(checks, list) or not checks:
+        return False
+    errors: list[str] = []
+    _validate_checks("companion", checks, errors)
+    if errors:
+        return False
+    score = record.get("score")
+    return (
+        isinstance(score, (int, float))
+        and not isinstance(score, bool)
+        and abs(sum(c["ok"] for c in checks) / len(checks) - score) <= 5e-5
+    )
+
+
 def _validate_checks(at: str, checks: Any, errors: list[str]) -> None:
     if not isinstance(checks, list):
         errors.append(f"{at}: checks must be a list")
@@ -1473,7 +1497,11 @@ def _read_json(path: Path, errors: list[str], label: str) -> Any:
 
 def result_paths(results_dir: Path) -> list[Path]:
     """Sorted results paths, rejecting two storage forms of the same document."""
-    paths = sorted([*results_dir.glob("*.json"), *results_dir.glob("*.json.gz")])
+    paths = sorted(
+        path
+        for path in [*results_dir.glob("*.json"), *results_dir.glob("*.json.gz")]
+        if not path.name.endswith((".checks.json", ".checks.json.gz"))
+    )
     names = {path.name for path in paths}
     duplicates = [
         f"{path.name} and {path.name}.gz: duplicate results document"
@@ -1553,6 +1581,40 @@ def load_results(results_dir: Path = DEFAULT_RESULTS) -> Results:
     if trust_path.exists():
         trust = _read_json(trust_path, errors, "meta/trust.json")
         errors.extend(validate_trust(trust, documents))
+    if errors:
+        raise ResultsError("\n".join(errors))
+    # Companion checks are validated against the immutable grading at load time.
+    for name, document in documents.items():
+        companion = results_dir / (
+            name.removesuffix(".gz").removesuffix(".json") + ".checks.json.gz"
+        )
+        if not companion.exists():
+            continue
+        raw = _read_json(companion, errors, companion.name)
+        if (
+            not isinstance(raw, dict)
+            or raw.get("schema") != 1
+            or raw.get("document") != document["id"]
+            or not isinstance(raw.get("runs"), list)
+        ):
+            errors.append(f"{companion.name}: invalid checks companion")
+            continue
+        by_id = {check_identity(record): record for record in document["records"]}
+        seen = set()
+        for run in raw["runs"]:
+            if not isinstance(run, dict):
+                errors.append(f"{companion.name}: invalid run")
+                continue
+            key = check_identity(run)
+            record = by_id.get(key)
+            if key in seen or record is None:
+                errors.append(f"{companion.name}: duplicate or unmatched run")
+            elif "checks" not in record:
+                if matching_checks(record, run):
+                    record["checks"] = run["checks"]
+                else:
+                    errors.append(f"{companion.name}: checks disagree with grading")
+            seen.add(key)
     if errors:
         raise ResultsError("\n".join(errors))
     records = [

@@ -393,6 +393,7 @@ def _view(
         "mode": mode,
         "key": key,
         "n": start,
+        "counts": list(counts),
         "widths": [
             round(RIBBON_PX * count / start, 1) if start else 0 for count in counts
         ],
@@ -420,7 +421,9 @@ def funnel_views(race: Mapping[str, Any]) -> list[dict[str, Any]]:
     return views
 
 
-def _stations(view: Mapping[str, Any], labels: Sequence[str]) -> str:
+def _stations(
+    view: Mapping[str, Any], labels: Sequence[str], rates: Sequence[Mapping[str, Any]]
+) -> str:
     names = ["Lights out", *labels, "Checkered flag"]
     last = len(names) - 1
     selected = view["worst"] or last
@@ -437,6 +440,16 @@ def _stations(view: Mapping[str, Any], labels: Sequence[str]) -> str:
         classes = "rc-station is-lit" + (
             " is-worst" if k and k == view["worst"] else ""
         )
+        checkpoint_rate = ""
+        if 0 < k < last:
+            rate = rates[k - 1]
+            shown = f"{rate['rate']:.0%}" if rate["rate"] is not None else "n/a"
+            checkpoint_rate = (
+                f'<span class="rc-checkpoint-rate">{shown} pass · {rate["n"]:,} runs'
+                + (" · optional" if rate["optional"] else "")
+                + "</span>"
+                + f'<span class="rc-still-racing">{view["counts"][k]:,} still racing</span>'
+            )
         rows.append(
             f'<li class="{classes}" data-station="{k}">'
             '<div class="rc-rail" aria-hidden="true">'
@@ -446,7 +459,8 @@ def _stations(view: Mapping[str, Any], labels: Sequence[str]) -> str:
             "</div>"
             f'<button type="button" class="rc-station-card" aria-pressed="{"true" if k == selected else "false"}">'
             f'<span class="rc-station-name">{esc(name)}</span>'
-            f'<span class="rc-station-stat">{esc(view["stats"][k])}</span></button></li>'
+            + checkpoint_rate
+            + f'<span class="rc-station-stat">{esc(view["stats"][k])}</span></button></li>'
         )
     return '<ol class="rc-stations">' + "".join(rows) + "</ol>"
 
@@ -460,9 +474,13 @@ def _lap(race: Mapping[str, Any]) -> str:
         return (
             '<section class="rc-section" id="lap">'
             + head
-            + '<p class="rc-copy">The lap shows where runs retire, checkpoint by checkpoint. '
-            "The runs of this race at this version do not record their checks yet, so its "
-            "funnel appears once they do.</p></section>"
+            + '<p class="rc-copy">'
+            + (
+                "This race is graded as one result, so it has no checkpoints."
+                if race.get("singleResult")
+                else "This race's runs do not record checkpoints, so it has no track map yet."
+            )
+            + "</p></section>"
         )
     labels = race["checkpoints"] or []
     views = funnel_views(race)
@@ -504,8 +522,9 @@ def _lap(race: Mapping[str, Any]) -> str:
         f'data-playback-ms="{PLAYBACK_MS}">'
         '<div class="rc-lap-copy">'
         + head
-        + '<p class="rc-copy">The blue ribbon is every run still racing. A run retires at '
-        "the first checkpoint it misses. Tap a checkpoint to see how many cleared it.</p>"
+        + '<p class="rc-copy">Each pass rate counts every submission at this race version '
+        "that recorded that checkpoint, across all entries and attempts; "
+        "the second number and blue ribbon count runs still racing in the selected view.</p>"
         '<div class="rc-lap-controls" data-lap-controls hidden>'
         f'<div class="rc-seg" role="radiogroup" aria-label="Show the lap for">{mode_buttons}</div>'
         f'<div class="rc-scroll"><div class="rc-hscroll" data-lap-options>{options}</div></div>'
@@ -513,7 +532,7 @@ def _lap(race: Mapping[str, Any]) -> str:
         "</div>" + worst + '<div class="rc-panel" data-lap-panel aria-live="polite">'
         f"<b>{esc(view['titles'][selected])}</b><span>{esc(view['bodies'][selected])}</span></div>"
         f'<p class="rc-caption" data-lap-caption>{esc(view["caption"])}</p>'
-        "</div>" + _stations(view, labels) + "</section>"
+        "</div>" + _stations(view, labels, race["checkpointRates"]) + "</section>"
     )
 
 
@@ -991,7 +1010,9 @@ CSS = """
 }
 .rc-station-card[aria-pressed="true"] { border-color: var(--blue); }
 .rc-station:has(.rc-station-card[aria-pressed="true"]) .rc-dot { background: var(--ink); color: var(--paper); }
-.rc-station-name { font-size: 16px; font-weight: 600; }
+.rc-station-name { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.rc-checkpoint-rate { font-size: 14px; font-weight: 600; }
+.rc-still-racing { font-size: 14px; color: var(--ink-2); }
 .rc-station-stat { font-size: 14px; color: var(--ink-2); }
 
 .rc-result { display: flex; flex-direction: column; gap: 14px; max-width: 760px; }
@@ -1184,6 +1205,8 @@ SCRIPT = """(function () {
         station.classList.toggle('is-lit', k <= step);
         station.classList.toggle('is-worst', k > 0 && k === view.worst);
         station.querySelector('.rc-station-stat').textContent = view.stats[k];
+        var remaining = station.querySelector('.rc-still-racing');
+        if (remaining) remaining.textContent = view.counts[k].toLocaleString('en-US') + ' still racing';
         station.querySelector('.rc-station-card').setAttribute('aria-pressed', k === selected ? 'true' : 'false');
       });
       panel.querySelector('b').textContent = view.titles[selected];

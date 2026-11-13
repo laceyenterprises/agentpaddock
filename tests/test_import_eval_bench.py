@@ -264,7 +264,10 @@ def test_haiku_model_labels(label, suffix, reasoning):
 
 @pytest.mark.parametrize(
     "label",
-    ["openrouter/qwen3.8-27b", import_eval_bench.PROXY_PREFIX + "openrouter/qwen3.8-27b"],
+    [
+        "openrouter/qwen3.8-27b",
+        import_eval_bench.PROXY_PREFIX + "openrouter/qwen3.8-27b",
+    ],
 )
 def test_openrouter_qwen_labels(label):
     # Hermes names the route directly; the proxy harnesses add the proxy prefix.
@@ -569,13 +572,17 @@ def test_each_eval_bench_export_keeps_its_own_price_table(tmp_path, monkeypatch,
     second = "later-eval-bench.raw.json"
     (reports / second).write_text(json.dumps(later))
     v2 = import_eval_bench.import_eval_bench
-    monkeypatch.setattr(import_eval_bench, "EVAL_BENCH_PRICE_TABLE", FIXTURE_PRICE_TABLE)
+    monkeypatch.setattr(
+        import_eval_bench, "EVAL_BENCH_PRICE_TABLE", FIXTURE_PRICE_TABLE
+    )
     monkeypatch.setattr(import_eval_bench, "SOURCES", ((first, v2),))
     alone = import_eval_bench.build(reports, results)
     monkeypatch.setattr(import_eval_bench, "SOURCES", ((first, v2), (second, v2)))
     # Publishing the later export: pin the earlier one, move the default forward.
     monkeypatch.setattr(
-        import_eval_bench, "EVAL_BENCH_PRICE_TABLES", {V2_SAMPLE.name: FIXTURE_PRICE_TABLE}
+        import_eval_bench,
+        "EVAL_BENCH_PRICE_TABLES",
+        {V2_SAMPLE.name: FIXTURE_PRICE_TABLE},
     )
     monkeypatch.setattr(import_eval_bench, "EVAL_BENCH_PRICE_TABLE", "2026-11-01")
     files = import_eval_bench.build(reports, results)
@@ -639,7 +646,9 @@ def test_registered_v2_source_builds_with_deduplication_and_current_prices(
             "records": [{"run_id": _synthetic_id(3)}],
         },
     )
-    monkeypatch.setattr(import_eval_bench, "EVAL_BENCH_PRICE_TABLE", FIXTURE_PRICE_TABLE)
+    monkeypatch.setattr(
+        import_eval_bench, "EVAL_BENCH_PRICE_TABLE", FIXTURE_PRICE_TABLE
+    )
     # Register v2 first: deduplication must not depend on SOURCES order.
     monkeypatch.setattr(
         import_eval_bench,
@@ -856,3 +865,84 @@ def test_import_failed_migration_preserves_plain_sibling(tmp_path, monkeypatch):
         import_eval_bench.main(["--reports", str(tmp_path), "--results", str(tmp_path)])
     assert sibling.read_bytes() == b"previous document"
     assert not (tmp_path / name).exists()
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {},
+        {"runId": "synthetic-other"},
+        {"task": "synthetic-other"},
+        {"taskVersion": 99},
+        {"attempt": 99},
+        {"checks": [{"name": "result", "ok": False, "required": True}]},
+        {"checks": []},
+        {"checks": None},
+    ],
+)
+def test_checks_companion_matches_only_the_published_grading(tmp_path, change):
+    raw = json.loads(V2_SAMPLE.read_text())
+    row = raw["rows"][0]
+    row["checks"] = [{"name": "result", "ok": True, "required": True}]
+    raw["rows"] = [row]
+    source = tmp_path / "synthetic.raw.json"
+    source.write_text(json.dumps(raw))
+    table = lb.load_results().price_tables[FIXTURE_PRICE_TABLE]
+    document, _, _ = import_eval_bench.import_eval_bench(source, table, set())
+    document["records"][0].pop("checks")
+    document["records"][0]["score"] = 1
+    target = tmp_path / "2026-10-18-eval-bench.json.gz"
+    lb.write_document(target, document)
+    original = target.read_bytes()
+    row.update(change)
+    source.write_text(json.dumps(raw))
+    args = [
+        "--results",
+        str(tmp_path),
+        "--checks-source",
+        str(source),
+        "--checks-document",
+        target.name,
+    ]
+    assert import_eval_bench.main(args + ["--check"]) == 1
+    assert import_eval_bench.main(args) == 0
+    companion = tmp_path / "2026-10-18-eval-bench.checks.json.gz"
+    first = companion.read_bytes()
+    value = json.loads(gzip.decompress(first))
+    assert value["schema"] == 1 and value["document"] == document["id"]
+    assert len(value["runs"]) == (0 if change else 1)
+    assert import_eval_bench.main(args) == 0
+    assert companion.read_bytes() == first
+    assert target.read_bytes() == original
+    assert import_eval_bench.main(args + ["--check"]) == 0
+    lb.write_document_text(companion, json.dumps({**value, "runs": [{"stale": True}]}))
+    assert import_eval_bench.main(args + ["--check"]) == 1
+    assert target.read_bytes() == original
+
+
+def test_checks_companion_score_tolerance_inline_checks_and_sorting(tmp_path):
+    raw = json.loads(V2_SAMPLE.read_text())
+    template = raw["rows"][0]
+    checks = [
+        {"name": "first", "ok": True, "required": True},
+        {"name": "second", "ok": False, "required": False},
+    ]
+    raw["rows"] = [
+        {**template, "runId": f"synthetic-{i}", "checks": checks, "score": score}
+        for i, score in enumerate([0.50004, 0.50006, None, 0.5, 0.5])
+    ]
+    source = tmp_path / "synthetic.raw.json"
+    source.write_text(json.dumps(raw))
+    table = lb.load_results().price_tables[FIXTURE_PRICE_TABLE]
+    document, _, _ = import_eval_bench.import_eval_bench(source, table, set())
+    for record in document["records"][:-1]:
+        record.pop("checks")
+    document["records"].reverse()
+    target = tmp_path / "2026-10-18-eval-bench.json.gz"
+    lb.write_document(target, document)
+    files = import_eval_bench.build_checks(source, target)
+    companion = json.loads(next(iter(files.values())))
+    assert [run["run_id"] for run in companion["runs"]] == [
+        "synthetic-0",
+        "synthetic-3",
+    ]

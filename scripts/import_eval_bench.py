@@ -225,27 +225,27 @@ class Builder:
         if tokens is None:
             tokens = {"input": None, "cache": None, "output": None}
         record: dict[str, Any] = {
-                "run_id": run_id,
-                "suite": suite,
-                "task": task,
-                "task_version": task_version,
-                "attempt": attempt,
-                "harness": {
-                    "name": config["harness"],
-                    "version": None,
-                    "config_hash": key,
-                },
-                "model": model,
-                "verdict": verdict,
-                "score": score,
-                "tokens": tokens,
-                "wall_seconds": wall_seconds,
-                "paddock_commit": None,
-                "excludedBecause": excluded_because(verdict, excluded),
-                "cost": leaderboard.price_cost(
-                    tokens, str(model["provider_id"]), self.table
-                ),
-            }
+            "run_id": run_id,
+            "suite": suite,
+            "task": task,
+            "task_version": task_version,
+            "attempt": attempt,
+            "harness": {
+                "name": config["harness"],
+                "version": None,
+                "config_hash": key,
+            },
+            "model": model,
+            "verdict": verdict,
+            "score": score,
+            "tokens": tokens,
+            "wall_seconds": wall_seconds,
+            "paddock_commit": None,
+            "excludedBecause": excluded_because(verdict, excluded),
+            "cost": leaderboard.price_cost(
+                tokens, str(model["provider_id"]), self.table
+            ),
+        }
         # The grader's named sub-checks for this grading, when the source recorded them.
         # A record without them leaves its checkpoints unverified; an empty list would not.
         if checks is not None:
@@ -501,14 +501,30 @@ def build(reports: Path, results: Path) -> dict[str, str]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument(
-        "--reports", type=Path, required=True, help="the reports directory"
-    )
+    parser.add_argument("--reports", type=Path, help="the reports directory")
     parser.add_argument("--results", type=Path, default=leaderboard.DEFAULT_RESULTS)
     parser.add_argument("--check", action="store_true", help="fail if results/ differs")
+    parser.add_argument(
+        "--checks-source", type=Path, help="export supplying checks only"
+    )
+    parser.add_argument(
+        "--checks-document",
+        help="published results filename to enrich with a companion",
+    )
     args = parser.parse_args(argv)
+    if bool(args.checks_source) != bool(args.checks_document):
+        parser.error("--checks-source and --checks-document must be used together")
+    if not args.checks_source and not args.reports:
+        parser.error("--reports is required unless writing a checks companion")
     try:
-        files = build(args.reports, args.results)
+        if args.checks_source:
+            if Path(args.checks_document).name != args.checks_document:
+                raise SourceError("--checks-document must be a results filename")
+            files = build_checks(
+                args.checks_source, args.results / args.checks_document
+            )
+        else:
+            files = build(args.reports, args.results)
     except (OSError, ValueError) as exc:
         print(f"cannot import results: {exc}", file=sys.stderr)
         return 1
@@ -537,6 +553,42 @@ def main(argv: list[str] | None = None) -> int:
         sibling.unlink(missing_ok=True)
     print("Imported: " + ", ".join(sorted(files)))
     return 0
+
+
+def build_checks(source: Path, path: Path) -> dict[str, str]:
+    """Import only checks for this document's already-published gradings."""
+    raw = _load(source)
+    if raw["schema"] != "eval-bench-evidence/v2":
+        raise SourceError("expected eval-bench-evidence/v2")
+    document = _load(path)
+    candidates: dict[tuple, list] = {}
+    for row in raw["rows"]:
+        run = {
+            "run_id": row["runId"],
+            "task": row["task"],
+            "task_version": row["taskVersion"],
+            "attempt": row["attempt"],
+            "checks": row.get("checks"),
+        }
+        candidates.setdefault(leaderboard.check_identity(run), []).append(run)
+    runs = []
+    for record in document["records"]:
+        matches = [
+            run
+            for run in candidates.get(leaderboard.check_identity(record), [])
+            if leaderboard.matching_checks(record, run)
+        ]
+        # Contradictory source gradings must never choose checks by row order.
+        if matches and all(run == matches[0] for run in matches):
+            runs.append(matches[0])
+    runs.sort(key=lambda run: (run["task"], run["run_id"], run["attempt"] or 0))
+    companion = {"schema": 1, "document": document["id"], "runs": runs}
+    name = path.name.removesuffix(".gz").removesuffix(".json") + ".checks.json.gz"
+    print(
+        f"Matched {len(runs)} runs across {len({run['task'] for run in runs})} races",
+        file=sys.stderr,
+    )
+    return {name: json.dumps(companion, sort_keys=True, indent=2) + "\n"}
 
 
 def _differs(path: Path, text: str) -> bool:

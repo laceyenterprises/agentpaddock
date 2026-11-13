@@ -458,6 +458,22 @@ The vendor is credited in the changelog entry unless they ask not to be.
 
 ## Tasks and grading
 
+Older eval-bench documents can gain recorded checkpoints without being rewritten:
+
+```bash
+python3 scripts/import_eval_bench.py --checks-source export.raw.json.gz \
+  --checks-document 2026-10-29-eval-bench.json.gz
+```
+
+This mode imports no new runs. It writes a deterministic checks companion beside
+the document, with `schema: 1`, the document's `id` in `document`, and `runs`
+sorted by `(task, run_id, attempt)`. Each run carries `run_id`, `task`,
+`task_version`, `attempt` and the grader's ordered `checks` list. All four identity
+fields must match, and the checks' passing fraction must equal the published
+score within 0.00005. Records with their own checks keep them. Add `--check` to
+verify that the companion is current. Result loading validates and attaches the
+companion checks in memory.
+
 Grading changes need their own pull request and a changelog entry. A change to a
 task's content bumps its `task_version` in `task.toml`; results compare only
 within one version, so the new version starts its own board.

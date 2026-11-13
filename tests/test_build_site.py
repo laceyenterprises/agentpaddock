@@ -2519,6 +2519,118 @@ def test_race_page_funnel_comes_from_the_data(tmp_path):
         assert view["stats"][-1] == f"{data[-1]} of {data[0]} finish"
 
 
+def test_race_page_companion_rates_count_each_checkpoint_independently(tmp_path):
+    results = _site_tree(tmp_path)
+    path = results / BENCH
+    document = json.loads(path.read_text())
+    companion_runs = []
+    for record in document["records"]:
+        if record["task"] != "hard-review-alpha" or not record.get("checks"):
+            continue
+        checks = record.pop("checks")
+        record["score"] = sum(check["ok"] for check in checks) / len(checks)
+        companion_runs.append(
+            {key: record[key] for key in ("run_id", "task", "task_version", "attempt")}
+            | {"checks": checks}
+        )
+    lb.write_document(path, document)
+    original = path.read_bytes()
+    companion = path.with_name(path.stem + ".checks.json.gz")
+    lb.write_document_text(
+        companion,
+        json.dumps(
+            {
+                "schema": 1,
+                "document": document["id"],
+                "runs": companion_runs,
+            }
+        ),
+    )
+    files = build_site.build(results)
+    race = json.loads(files["data/races/hard-review-alpha.json"])
+    page = files["races/hard-review-alpha/index.html"]
+    rates = race["checkpointRates"]
+    assert rates and len({r["rate"] for r in rates}) > 1
+    # Independent rates include every submission and later attempts, even
+    # when the funnel has already retired a run at an earlier checkpoint.
+    assert [(r["n"], r["rate"]) for r in rates] == [(14, 12 / 14), (14, 13 / 14)]
+    assert race["funnel"]["runs"] == 13
+    assert 'data-station="1"' in page and 'data-station="2"' in page
+    for rate in rates:
+        assert rate["label"] in page
+        assert f"{rate['rate']:.0%} pass · {rate['n']} runs" in page
+    assert "still racing" in page
+    assert path.read_bytes() == original
+    # The map works without a track card, with grading order and optional marks.
+    (tmp_path / "tasks/hard-review-alpha/track.toml").unlink()
+    files = build_site.build(results)
+    page = files["races/hard-review-alpha/index.html"]
+    assert "· optional" in page
+    race = json.loads(files["data/races/hard-review-alpha.json"])
+    expected = [
+        c["name"].replace("_", " ").capitalize()
+        for c in companion_runs[0]["checks"]
+        if not c["name"].startswith(lb.FACT_CHECK_PREFIX)
+    ]
+    assert race["checkpoints"] == expected
+
+
+def test_race_page_without_checks_uses_the_verifier_data(tmp_path):
+    results = _site_tree(tmp_path)
+    tasks = tmp_path / "tasks/docs-beta"
+    task = tasks / "task.toml"
+    task.write_text(task.read_text() + '\n[verifier]\nentrypoint = "verifier.py"\n')
+    verifier = tasks / "verifier.py"
+    verifier.write_text("import gym_verifier as gv\ngv.passed()\n")
+    page = build_site.build(results)["races/docs-beta/index.html"]
+    assert "This race is graded as one result, so it has no checkpoints." in page
+    assert "no track map yet" not in page
+    verifier.write_text(
+        'import gym_verifier as gv\ngv.check("result", True)\ngv.passed()\n'
+    )
+    page = build_site.build(results)["races/docs-beta/index.html"]
+    assert (
+        "This race's runs do not record checkpoints, so it has no track map yet."
+        in page
+    )
+
+
+@pytest.mark.parametrize("change", ["score", "version", "document", "inline"])
+def test_companion_loading_rechecks_the_grading_and_preserves_inline_checks(
+    tmp_path, change
+):
+    results = _site_tree(tmp_path)
+    path = results / BENCH
+    document = json.loads(path.read_text())
+    record = document["records"][0]
+    checks = record["checks"]
+    record["score"] = sum(check["ok"] for check in checks) / len(checks)
+    run = {
+        key: record[key] for key in ("run_id", "task", "task_version", "attempt")
+    } | {"checks": checks}
+    companion = {"schema": 1, "document": document["id"], "runs": [run]}
+    if change != "inline":
+        record.pop("checks")
+    if change == "score":
+        record["score"] = 0
+    elif change == "version":
+        run["task_version"] += 1
+    elif change == "document":
+        companion["document"] = "synthetic-other"
+    else:
+        run["checks"] = [{"name": "replacement", "ok": False, "required": True}]
+    lb.write_document(path, document)
+    lb.write_document_text(
+        path.with_name(path.stem + ".checks.json.gz"), json.dumps(companion)
+    )
+    if change == "inline":
+        loaded = lb.load_results(results)
+        assert loaded.documents[BENCH]["records"][0]["checks"] == checks
+    else:
+        with pytest.raises(lb.ResultsError, match="checks|unmatched"):
+            lb.load_results(results)
+
+
 @pytest.mark.parametrize(
     ("lap_seconds", "lap_label"),
     [(None, "lap n/a"), (0, "0:00 lap"), (95, "1:35 lap")],
@@ -4332,7 +4444,11 @@ def _names_a_setting(label: str) -> bool:
 
 
 def test_every_default_map_entry_names_its_setting():
-    docs = sorted(lb.DEFAULT_RESULTS.glob("*eval-bench*.json*"))
+    docs = [
+        path
+        for path in lb.result_paths(lb.DEFAULT_RESULTS)
+        if "eval-bench" in path.name
+    ]
     assert docs
     seen = set()
     for path in docs:
