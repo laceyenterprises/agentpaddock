@@ -57,15 +57,19 @@ def _fuel(entry: Mapping[str, Any]) -> str:
     return f"${cost:,.2f} fuel bill per race passed"
 
 
-def real_card(entry: Mapping[str, Any]) -> str:
-    """One community entry, as the site data gives it."""
+def real_card(entry: Mapping[str, Any], names: Mapping[str, str] | None = None) -> str:
+    """One community entry, as the site data gives it: driver, car and engine
+    map, each bold behind its glyph. ``names`` tells two routes to one model
+    apart."""
     engine_map = entry["map"]
     short_hash = entry["configHash"].removeprefix("sha256:")[:8]
     return (
         '<article class="tile result">'
         '<div class="card-head"><div>'
-        f"{views.car_tag(entry['car'])} · <b>{esc(entry['driver'])}</b>"
-        f'<span class="mono">engine map {views.map_tag(engine_map, entry["car"])} · car {esc(short_hash)}</span>'
+        f"{views.driver_tag(entry['driver'], (names or {}).get(entry['driver']))} · "
+        f"{views.car_tag(entry['car'])}"
+        f'<span class="mono">engine map {views.map_tag(engine_map, entry["car"], entry["driver"])}'
+        f" · car {esc(short_hash)}</span>"
         f"</div>{kit.badge(entry['trust'], size='sm')}</div>"
         f'<div class="score"><b>{int(entry["k"])} of {int(entry["n"])}</b>'
         f"<span>races passed · {esc(_fuel(entry))}</span></div></article>"
@@ -157,7 +161,8 @@ def _tracks_panel() -> str:
 
 
 def _forks_panel(entries: Sequence[Mapping[str, Any]]) -> str:
-    card = real_card(entries[0]) if entries else _example_fork_card()
+    names = views.driver_names(entry["driver"] for entry in entries)
+    card = real_card(entries[0], names) if entries else _example_fork_card()
     return (
         '<div class="tabpanel" role="tabpanel" id="tab-forks" aria-labelledby="tabbtn-forks">'
         '<h2 class="tab-title">Fork results</h2>'
@@ -190,6 +195,7 @@ def _board(entries: Sequence[Mapping[str, Any]], documents: int, root: str) -> s
             "</section>"
         )
     noun = "document" if documents == 1 else "documents"
+    names = views.driver_names(entry["driver"] for entry in entries)
     return (
         '<section aria-labelledby="board-title">'
         '<span class="kicker">The community board</span>'
@@ -197,7 +203,7 @@ def _board(entries: Sequence[Mapping[str, Any]], documents: int, root: str) -> s
         f'<p class="note">{len(entries)} {"entry" if len(entries) == 1 else "entries"} from '
         f"{documents} handed-in results {noun}, highest badge first.</p>"
         '<div class="board-cards">'
-        + "".join(real_card(entry) for entry in entries)
+        + "".join(real_card(entry, names) for entry in entries)
         + "</div></section>"
     )
 

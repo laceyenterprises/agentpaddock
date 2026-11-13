@@ -2506,7 +2506,16 @@ def test_race_page_classification_comes_from_the_data(tmp_path):
         assert f">P{position}</span>" in row
         assert f'data-lap="{finisher["lapSeconds"]}"' in row
         assert f'data-usd="{finisher["costUsd"]}"' in row
-        assert f"{html.escape(finisher['driver'])} <span>in " in row
+        # The driver by display name behind its glyph, then the car; never the raw id.
+        assert (
+            f'<span class="rc-driver">{site_views.driver_tag(finisher["driver"])} '
+            in row
+        )
+        assert (
+            f'<span class="rc-car">in {site_views.car_tag(finisher["car"])}</span>'
+            in row
+        )
+        assert finisher["driver"] not in row
         assert site_races.lap_text(finisher["lapSeconds"]) in row
     assert (
         f'<h2 class="rc-h2">{len(finishers)} finished. '
@@ -2937,7 +2946,12 @@ def test_community_shows_examples_until_real_records_exist(tmp_path):
     files = build_site.build(results)
     main = _main(files["community/index.html"])
     # The fork document is self-reported: a real card with its badge, no empty state.
-    assert f"{site_views.car_tag('gamma-cli')} · <b>bolt/coder-small</b>" in main
+    # Driver, then car, each bold behind its glyph; the raw route id is not shown.
+    assert (
+        f"{site_views.driver_tag('bolt/coder-small')} · {site_views.car_tag('gamma-cli')}"
+        in main
+    )
+    assert "<b>bolt/coder-small</b>" not in main
     assert "The board is empty for now" not in main
     assert '<span class="badge badge-self badge-sm">' in main
     community = json.loads(files["data/community.json"])
@@ -3101,13 +3115,22 @@ def test_home_fuel_card_compares_a_shared_finish(tmp_path):
     }
     card = site_home.fuel_card(standings)
     assert "Same finish. 8× the mileage." in card
-    # Each entry names its car and engine map in bold behind their glyphs; a
-    # default map says whose default it is.
-    pi, tag = site_views.car_tag("pi"), site_views.map_tag
-    assert f"d/one in {pi} · {tag('default', 'pi')} passes a race for $0.040." in card
-    assert ">Pi</span> default</b>" in card
+    # Each entry names its driver, car and engine map in bold behind their
+    # glyphs; a default map with no recorded setting says so.
+    pi, tag, driver = (
+        site_views.car_tag("pi"),
+        site_views.map_tag,
+        site_views.driver_tag,
+    )
     assert (
-        f"d/two in {pi} · {tag('high', 'pi')}, tied on the finish, pays $0.320." in card
+        f"{driver('d/one')} in {pi} · {tag('default', 'pi', 'd/one')} passes a race for $0.040."
+        in card
+    )
+    assert ">setting</span> not recorded</b>" in card
+    assert "Pi default" not in card
+    assert (
+        f"{driver('d/two')} in {pi} · {tag('high', 'pi')}, tied on the finish, pays $0.320."
+        in card
     )
     # Without two priced entries sharing a place, the card makes no comparison.
     alone = site_home.fuel_card({"entries": standings["entries"][1:]})
@@ -3854,7 +3877,7 @@ def test_garage_level_availability_comes_from_the_data(tmp_path):
     # A level seen only in a self-reported document still opens the level.
     assert open_levels("bolt/coder-small") == ["default", "max"]
     assert drivers["local/coder-tiny"]["levels"]["high"] == (
-        "Coder Tiny has raced at one engine map only: the car's default."
+        "Coder Tiny has raced at one engine map only: the default (setting not recorded)."
     )
     assert "It runs at one setting only." in drivers["local/coder-tiny"]["note"]
     # Featured drivers (a placed entry) first; a partial-only driver has no page.
@@ -4006,23 +4029,122 @@ def _best_line(page: str) -> str:
 
 
 @pytest.mark.parametrize(
-    ("car", "engine_map", "label"),
+    ("car", "engine_map", "route", "label"),
     [
-        ("codex", "default", "medium (Codex default)"),
-        ("claude-code", "default", "Claude Code default"),
-        ("alpha-cli", "default", "Alpha Cli default"),
-        ("codex", "high", "high"),
-        ("pi", "low", "low"),
+        # The car sent the level (the run's own session record, or the car's docs).
+        ("codex", "default", "anthropic/claude-opus-5-5", "medium (sent by Codex)"),
+        ("codex", "default", "moonshot/kimi-k3", "medium (sent by Codex)"),
+        (
+            "claude-code",
+            "default",
+            "anthropic/claude-sonnet-5-5",
+            "medium (sent by Claude Code)",
+        ),
+        ("hermes", "default", "openai/gpt-6.1-sol", "medium (sent by Hermes)"),
+        # The three routes Codex sends nothing on: the route's own default applies.
+        (
+            "codex",
+            "default",
+            "fireworks/qwen3.8-max",
+            "xhigh (Fireworks default; Codex sends none)",
+        ),
+        (
+            "codex",
+            "default",
+            "zai/glm-5.2",
+            "dynamic thinking, max (Z.ai default; Codex sends none)",
+        ),
+        ("codex", "default", "openrouter/qwen3.8-27b", "setting not recorded"),
+        # OpenCode and Pi send nothing.
+        (
+            "opencode",
+            "default",
+            "anthropic/claude-sonnet-5-5",
+            "adaptive, high (Anthropic default; OpenCode sends none)",
+        ),
+        ("pi", "default", "moonshot/kimi-k3", "max (Moonshot default; Pi sends none)"),
+        (
+            "pi",
+            "default",
+            "openai/gpt-6.1-sol",
+            "medium (OpenAI default; Pi sends none)",
+        ),
+        ("pi", "default", "together/deepseek-v4.1-flash", "setting not recorded"),
+        # What reached the model is not recorded.
+        ("codex", "default", "openai/gpt-6.1-sol", "setting not recorded"),
+        ("claude-code", "default", "anthropic/claude-sonnet-5", "setting not recorded"),
+        ("claude-code", "default", "fireworks/kimi-k3", "setting not recorded"),
+        ("alpha-cli", "default", "acme/coder-large", "setting not recorded"),
+        ("codex", "default", None, "setting not recorded"),
+        # A named level reads as it is.
+        ("codex", "high", "openai/gpt-6.1-sol", "high"),
+        ("pi", "low", None, "low"),
     ],
 )
-def test_engine_map_label_names_the_setting_that_ran(car, engine_map, label):
-    assert site_views.map_label(engine_map, car) == label
+def test_engine_map_label_names_the_setting_that_ran(car, engine_map, route, label):
+    assert site_views.map_label(engine_map, car, route) == label
     first, space, rest = label.partition(" ")
     glyph = site_glyphs.icon(site_views.map_glyph(engine_map))
-    assert site_views.map_tag(engine_map, car) == (
+    assert site_views.map_tag(engine_map, car, route) == (
         f'<b class="ent"><span class="ent-lead">{glyph}{html.escape(first)}</span>'
         f"{space}{html.escape(rest)}</b>"
     )
+
+
+#: A level a default-map label must name, unless it says the setting is not recorded.
+_LEVEL_WORD = re.compile(r"\b(?:low|medium|high|xhigh|max)\b")
+
+
+def _names_a_setting(label: str) -> bool:
+    return label == site_views.NOT_RECORDED or bool(_LEVEL_WORD.search(label))
+
+
+def test_every_default_map_entry_names_its_setting():
+    docs = sorted(lb.DEFAULT_RESULTS.glob("*eval-bench*.json*"))
+    assert docs
+    seen = set()
+    for path in docs:
+        for record in json.loads(lb.read_document_text(path))["records"]:
+            car, _, route, engine_map = site_data.identity(record)
+            if engine_map == "default":
+                seen.add((car, route))
+    assert seen
+    # A synthetic route and car the table has never heard of.
+    seen |= {
+        ("codex", "newhost/brand-new-model"),
+        ("delta-cli", "newhost/brand-new-model"),
+    }
+    for car, route in sorted(seen):
+        label = site_views.map_label("default", car, route)
+        assert _names_a_setting(label), (car, route, label)
+        assert f"{site_views.car_name(car)} default" not in label, (car, route, label)
+    assert site_views.map_label("default", "codex", "newhost/brand-new-model") == (
+        "setting not recorded"
+    )
+
+
+def _car_default_without_level(text: str, cars: set[str]) -> list[str]:
+    """Each "<Car> default" in ``text`` (tags stripped) not led by "<level> ("."""
+    plain = html.unescape(re.sub(r"<[^>]+>", "", text))
+    found = []
+    for car in cars:
+        for match in re.finditer(rf"\b{re.escape(car)} default\b", plain):
+            if not re.search(
+                r"\b(?:low|medium|high|xhigh|max) \($", plain[: match.start()]
+            ):
+                found.append(plain[max(0, match.start() - 40) : match.end() + 20])
+    return found
+
+
+def test_no_built_page_names_a_car_default_without_its_level(tmp_path, committed_pages):
+    for files, site in (committed_pages, _data_pages(_site_tree(tmp_path))):
+        cars = {
+            site_views.car_name(entry["car"])
+            for entry in site.placed + site.partial + list(site.community["entries"])
+        } | set(site_views.CAR_NAMES.values())
+        for name, content in files.items():
+            if isinstance(content, str) and name.endswith(".html"):
+                assert not _car_default_without_level(content, cars), name
 
 
 def test_driver_best_entry_marks_the_car_and_bolds_the_setting(committed_pages):
@@ -4033,7 +4155,7 @@ def test_driver_best_entry_marks_the_car_and_bolds_the_setting(committed_pages):
         best = driver["best"]
         line = _best_line(files[driver["file"]])
         car = site_views.car_name(best["car"])
-        label = site_views.map_label(best["map"], best["car"])
+        label = site_views.map_label(best["map"], best["car"], best["driver"])
         glyph = site_views.map_glyph(best["map"])
         assert line.startswith(
             f"<span>in {site_views.tag('car', car)}"
@@ -4042,27 +4164,87 @@ def test_driver_best_entry_marks_the_car_and_bolds_the_setting(committed_pages):
         assert '<use href="#car"/>' in line and "<b" in line
 
 
-def test_default_map_entries_name_the_car_default(data_page_site):
+def test_default_map_entries_name_the_setting_that_ran(data_page_site, monkeypatch):
     site = data_page_site
     best = site.placed[0]
     best.update(car="codex", map="default")
     route = next(r for r in build_site.ROUTES if r.file == site_drivers.INDEX)
-    pages = site_drivers.pages(site, route, build_site.ROUTES)
-    page = pages[site_drivers.model(site)[0]["file"]]
+
+    def driver_page() -> str:
+        pages = site_drivers.pages(site, route, build_site.ROUTES)
+        return pages[site_drivers.model(site)[0]["file"]]
+
+    # No evidence for this car and route: the page says so, and claims no default.
+    page = driver_page()
     line = _best_line(page)
     assert '<use href="#car"/></svg>Codex</span></b> at engine map' in line
-    assert '<use href="#engine-map"/></svg>medium</span> (Codex default)</b> · ' in line
-    # The car-by-car row names it the same way.
-    assert page.count("medium</span> (Codex default)") >= 2
-    # A car whose default the bench has not checked is named only as its default.
-    best.update(car="alpha-cli")
-    page = site_drivers.pages(site, route, build_site.ROUTES)[
-        site_drivers.model(site)[0]["file"]
-    ]
+    assert '<use href="#engine-map"/></svg>setting</span> not recorded</b> · ' in line
+    assert "Codex default" not in page
+    # The car sent the level.
+    settings = site_views.DEFAULT_SETTINGS
+    monkeypatch.setitem(settings, ("codex", best["driver"]), ("medium", "car"))
+    page = driver_page()
     line = _best_line(page)
-    assert '<use href="#car"/></svg>Alpha</span> Cli</b> at engine map' in line
-    assert '<use href="#engine-map"/></svg>Alpha</span> Cli default</b> · ' in line
-    assert "Codex default" not in line
+    assert '<use href="#engine-map"/></svg>medium</span> (sent by Codex)</b> · ' in line
+    # The car-by-car row names it the same way.
+    assert page.count("medium</span> (sent by Codex)") >= 2
+    # The car sent nothing: the route's default, under the route's host.
+    monkeypatch.setitem(settings, ("codex", best["driver"]), ("xhigh", "route"))
+    host = site_views.host_name(best["driver"])
+    line = _best_line(driver_page())
+    assert (
+        f'<use href="#engine-map"/></svg>xhigh</span> ({host} default; Codex sends none)</b> · '
+        in line
+    )
+
+
+def test_driver_tag_names_the_model_behind_the_driver_glyph():
+    glyph = site_glyphs.icon("driver")
+    assert site_views.driver_tag("anthropic/claude-opus-5-5") == (
+        f'<b class="ent"><span class="ent-lead">{glyph}Claude</span> Opus 5.5</b>'
+    )
+    # A page that told two routes to one model apart passes its own name.
+    assert site_views.driver_tag("fireworks/kimi-k3", "Kimi K3 · Fireworks") == (
+        f'<b class="ent"><span class="ent-lead">{glyph}Kimi</span> K3 · Fireworks</b>'
+    )
+
+
+def test_race_finishers_show_driver_car_and_map_glyphs(tmp_path):
+    _, files = _race_site(tmp_path)
+    race = json.loads(files["data/races/hard-review-alpha.json"])
+    page = files["races/hard-review-alpha/index.html"]
+    rows = re.findall(r'<li class="rc-finisher"[^>]*>.*?</li>', page)
+    assert rows
+    for row, finisher in zip(rows, race["classification"]["finishers"]):
+        who = _between(row, '<span class="rc-who">', '<span class="rc-values">')
+        # helmet, then car, then gauge, in that order.
+        marks = re.findall(r'<use href="#([a-z-]+)"/>', who)
+        assert marks[:2] == ["driver", "car"] and marks[2].startswith("engine-map")
+        assert (
+            f">{html.escape(site_views.model_name(finisher['driver']).split(' ')[0])}<"
+            in who
+        )
+        assert finisher["driver"] not in who
+
+
+def test_entry_pages_and_board_rows_tag_the_driver(tmp_path):
+    files = build_site.build(_site_tree(tmp_path))
+    standings = json.loads(files["data/standings.json"])
+    names = site_views.driver_names(
+        row["driver"] for row in standings["entries"] + standings["partial"]
+    )
+    board = _main(files["standings/index.html"])
+    home = _main(files["index.html"])
+    for row in standings["entries"]:
+        tag = site_views.driver_tag(row["driver"], names[row["driver"]])
+        assert tag in board, row["driver"]
+        entry = _main(files[f"entries/{row['id']}/index.html"])
+        # The chips name every entry by its tag; the hero names its own driver.
+        assert tag in entry
+        hero = _between(entry, '<section class="en-hero">', "</h1>")
+        assert hero.endswith(html.escape(names[row["driver"]]))
+    for leader in (row for row in standings["entries"] if row["place"] == 1):
+        assert site_views.driver_tag(leader["driver"], names[leader["driver"]]) in home
 
 
 def test_no_built_file_says_provider_default(tmp_path, committed_pages):
