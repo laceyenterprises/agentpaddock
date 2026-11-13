@@ -217,9 +217,10 @@ def race_card(race: Mapping[str, Any], href: str) -> str:
     red = rate is not None and rate < RED_UNDER
     lap = lap_text(race["medianLapSeconds"])
     about = race.get("about")
+    what = about.get("what") if isinstance(about, Mapping) else None
     description = (
-        about.get("what") if isinstance(about, Mapping) else None
-    ) or race.get("title")
+        what.strip() if isinstance(what, str) and what.strip() else race.get("title")
+    )
     return (
         f'<a class="rc-card" href="{esc(href)}" data-challenge="{esc(race["challenge"])}" '
         f'data-rate="{rate_attr}" data-name="{esc(race["shortName"].lower())}">'

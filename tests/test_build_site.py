@@ -20,6 +20,7 @@ from collections import defaultdict
 from copy import deepcopy
 from html.parser import HTMLParser
 from pathlib import Path
+from types import MappingProxyType
 from urllib.parse import urlsplit
 
 import build_site
@@ -2533,6 +2534,28 @@ def test_race_page_classification_comes_from_the_data(tmp_path):
     assert "Show all 12 finishers" in more and 'data-first="10"' in more
 
 
+def test_race_context_loader_accepts_immutable_mapping(tmp_path, monkeypatch):
+    task_dir = tmp_path / "race"
+    task_dir.mkdir()
+    (task_dir / "task.toml").touch()
+    monkeypatch.setattr(
+        lb,
+        "read_toml",
+        lambda path: {
+            "id": "race",
+            "suite": "coding",
+            "task_version": 1,
+            "about": MappingProxyType({"what": " Work ", "hard": " Constraints "}),
+        },
+    )
+    races = site_data.load_races(tmp_path)
+    assert len(races) == 1
+    assert next(iter(races.values())).about == {
+        "what": "Work",
+        "hard": "Constraints",
+    }
+
+
 def test_race_context_loads_and_renders_without_changing_legacy_pages(tmp_path):
     results, before = _race_site(tmp_path)
     task_dir = results.parent / "tasks" / "docs-beta"
@@ -2781,6 +2804,10 @@ def test_races_grid_awaits_trust_sign_off_without_cards(tmp_path):
         ("invalid context", "Legacy title"),
         ({"what": None}, "Legacy title"),
         ({"what": ""}, "Legacy title"),
+        ({"what": " \t\n"}, "Legacy title"),
+        ({"what": 42}, "Legacy title"),
+        ({"what": ["Review code"]}, "Legacy title"),
+        ({"what": " Review code \n"}, "Review code"),
         ({"what": "Review <code> & contracts"}, "Review <code> & contracts"),
     ],
 )

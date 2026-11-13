@@ -139,7 +139,7 @@ def load_races(tasks_dir: Path) -> dict[tuple[str, str, int], Race]:
         dispatch = task.get("dispatch")
         prompt = dispatch.get("prompt") if isinstance(dispatch, dict) else None
         about = task.get("about")
-        if not isinstance(about, dict) or not all(
+        if not isinstance(about, Mapping) or not all(
             isinstance(about.get(key), str) and about[key].strip()
             for key in ("what", "hard")
         ):
