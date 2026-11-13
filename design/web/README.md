@@ -59,6 +59,14 @@ all sector and flag explanations before JavaScript selects a panel. Reduced
 motion disables transitions, the start-light sequence, ticker rotation and lap
 playback; the controls still show the completed state.
 
+Default engine map info buttons name their car and driver for screen readers.
+On a fine pointer, hovering opens a tip beside its button; moving into the tip
+keeps it open for reading or selecting text. Clicking pins a tip until another
+click, Escape or an outside click dismisses it. Hovering other info buttons
+does not dismiss a pinned tip. Touch devices show the tip near the bottom of
+the viewport. The garage refreshes both the explanation and the button's
+accessible name when its car or driver changes.
+
 The cold-load budget per page is **768 KiB uncompressed and 128 KiB gzip**,
 counting its HTML and each directly loaded first-party stylesheet, script and
 image once. Embedded data and the glyph sprite count inside the HTML. Fonts

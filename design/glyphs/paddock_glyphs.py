@@ -209,6 +209,14 @@ GLYPHS = [
      '<path d="M3 10.5c1.2-1.3 2.4 1.3 3.6 0s2.4 1.3 3.6 0"/>'
      f'<path d="M2 15.5c1.2-1.3 2.4 1.3 3.6 0s2.4 1.3 3.6 0" {A}/>'),
     # New
+    (
+        "info",
+        None,
+        "new",
+        "a note about this value",
+        '<circle cx="12" cy="12" r="9"/><path d="M12 11v6"/>'
+        f'<circle cx="12" cy="7.5" r="1" {INK}/>',
+    ),
     ("start-lights", None, "new", "Lights out: a run starts",
      '<rect x="2" y="4" width="20" height="7.5" rx="2"/><path d="M12 11.5v10M8.5 21.5h7"/>'
      + "".join(f'<circle cx="{x}" cy="7.75" r="1.3" {AF}/>' for x in (5.2, 8.6, 12, 15.4, 18.8))),
