@@ -4741,6 +4741,13 @@ def test_map_info_has_text_sized_glyph_and_24px_hit_area(committed_pages):
     assert ".map-info-button:focus-visible { outline: 2px solid currentColor;" in css
 
 
+def test_map_tip_resets_inherited_label_styles(committed_pages):
+    files, _ = committed_pages
+    tip = _between(files["paddock.css"], ".map-tip {", "}")
+    assert "white-space: normal;" in tip
+    assert "font: 400 15px/1.5 var(--body);" in tip
+
+
 def test_garage_map_info_stays_with_last_word(committed_pages):
     files, _ = committed_pages
     assert re.search(
@@ -6124,6 +6131,12 @@ def test_browser_engine_map_tips(committed_pages, tmp_path, width, touch):
     if not executable:
         pytest.skip("Local Chromium pass requires PADDOCK_BROWSER_EXECUTABLE")
     browser_api = pytest.importorskip("playwright.sync_api")
+
+    def assert_tip_layout(note):
+        assert note.evaluate("el => getComputedStyle(el).whiteSpace") == "normal"
+        assert note.evaluate("el => getComputedStyle(el).fontWeight") == "400"
+        assert note.evaluate("el => el.scrollWidth <= el.clientWidth")
+
     files, _ = committed_pages
     for name, content in files.items():
         path = tmp_path / name
@@ -6171,6 +6184,7 @@ def test_browser_engine_map_tips(committed_pages, tmp_path, width, touch):
             )
             rect = note.bounding_box()
             assert rect and rect["x"] >= 0 and rect["x"] + rect["width"] <= width
+            assert_tip_layout(note)
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
             if not touch:
                 other = page.locator(".map-info-button").nth(1)
@@ -6203,6 +6217,7 @@ def test_browser_engine_map_tips(committed_pages, tmp_path, width, touch):
             )
             info.locator("button").click()
             assert info.locator(".map-tip").is_visible()
+            assert_tip_layout(info.locator(".map-tip"))
             page.locator('[data-car="opencode"]').click()
             assert info.locator(".map-tip").text_content() == site_views.map_tip(
                 "opencode", "anthropic/claude-opus-5-5"
