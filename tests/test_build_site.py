@@ -2934,7 +2934,7 @@ def test_community_shows_examples_until_real_records_exist(tmp_path):
     files = build_site.build(results)
     main = _main(files["community/index.html"])
     # The fork document is self-reported: a real card with its badge, no empty state.
-    assert f"<b>{site_views.car_tag('gamma-cli')} · bolt/coder-small</b>" in main
+    assert f"{site_views.car_tag('gamma-cli')} · <b>bolt/coder-small</b>" in main
     assert "The board is empty for now" not in main
     assert '<span class="badge badge-self badge-sm">' in main
     community = json.loads(files["data/community.json"])

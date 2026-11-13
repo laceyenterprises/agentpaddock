@@ -64,7 +64,7 @@ def real_card(entry: Mapping[str, Any]) -> str:
     return (
         '<article class="tile result">'
         '<div class="card-head"><div>'
-        f"<b>{views.car_tag(entry['car'])} · {esc(entry['driver'])}</b>"
+        f"{views.car_tag(entry['car'])} · <b>{esc(entry['driver'])}</b>"
         f'<span class="mono">engine map {views.map_tag(engine_map, entry["car"])} · car {esc(short_hash)}</span>'
         f"</div>{kit.badge(entry['trust'], size='sm')}</div>"
         f'<div class="score"><b>{int(entry["k"])} of {int(entry["n"])}</b>'

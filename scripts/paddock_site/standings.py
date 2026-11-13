@@ -359,7 +359,7 @@ def _callouts(entries: Sequence[Mapping[str, Any]]) -> str:
         )
     else:
         verdict = (
-            f"<b>{esc(lead['driver'])} in {views.car_tag(lead['car'])} leads</b> "
+            f"<b>{esc(lead['driver'])} in</b> {views.car_tag(lead['car'])} <b>leads</b> "
             f"with {lead['k']} of {lead['n']}."
         )
         if len(entries) > 1 and entries[1]["hi"] >= lead["lo"]:
