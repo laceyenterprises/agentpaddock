@@ -2712,9 +2712,7 @@ def test_companion_loading_rechecks_the_grading_and_preserves_inline_checks(
     else:
         run["checks"] = [{"name": "replacement", "ok": False, "required": True}]
     lb.write_document(path, document)
-    lb.write_document_text(
-        path.with_name(path.stem + suffix), json.dumps(companion)
-    )
+    lb.write_document_text(path.with_name(path.stem + suffix), json.dumps(companion))
     if change == "inline":
         loaded = lb.load_results(results)
         assert loaded.documents[BENCH]["records"][0]["checks"] == checks
@@ -3544,7 +3542,7 @@ def test_home_fuel_card_compares_a_shared_finish(tmp_path):
         f"{driver('d/one')} in {pi} · {tag('default', 'pi', 'd/one')} passes a race for $0.040."
         in card
     )
-    assert ">not</span> recorded</b>" in card
+    assert '>not</span> <span class="map-tail">recorded<span class="map-info">' in card
     assert "Pi default" not in card
     assert (
         f"{driver('d/two')} in {pi} · {tag('high', 'pi')}, tied on the finish, pays $0.320."
@@ -4412,7 +4410,7 @@ def test_garage_start_skips_unsupported_maps(data_page_site, source):
     else:
         assert view["start"] == [candidate["driver"], candidate["car"], "high"]
         assert 'data-map="high" aria-pressed="true"' in page
-        assert 'data-slot="map">high<' in page
+        assert 'data-slot="mapLast">high<' in page
 
 
 def test_driver_labels_include_community_name_collisions(data_page_site):
@@ -4534,13 +4532,14 @@ def test_engine_map_label_names_the_setting_that_ran(car, engine_map, route, lab
     assert site_views.map_label(engine_map, car, route) == label
     first, space, rest = label.partition(" ")
     glyph = site_glyphs.icon(site_views.map_glyph(engine_map))
-    assert site_views.map_tag(engine_map, car, route).startswith(
-        f'<b class="ent"><span class="ent-lead">{glyph}{html.escape(first)}</span>'
-        f"{space}{html.escape(rest)}</b>"
-    )
     markup = site_views.map_tag(engine_map, car, route)
     if engine_map == "default":
-        assert '</b><span class="map-info"><button' in markup
+        before, gap, last = rest.rpartition(" ")
+        assert markup.startswith(
+            f'<b class="ent"><span class="ent-lead">{glyph}{html.escape(first)}</span>'
+            f'{space}{html.escape(before)}{gap}<span class="map-tail">{html.escape(last)}'
+            '<span class="map-info"><button'
+        )
         assert '<use href="#info"/>' in markup
         context = site_views.car_name(car) if car else ""
         if route:
@@ -4554,6 +4553,10 @@ def test_engine_map_label_names_the_setting_that_ran(car, engine_map, route, lab
         assert 'popover="auto"' in markup
         assert html.escape(site_views.map_tip(car, route)) in markup
     else:
+        assert markup == (
+            f'<b class="ent"><span class="ent-lead">{glyph}{html.escape(first)}</span>'
+            f"{space}{html.escape(rest)}</b>"
+        )
         assert "map-info" not in markup
 
 
@@ -4690,7 +4693,9 @@ def test_built_engine_map_labels_have_only_default_tips(committed_pages):
             page,
             re.S,
         ):
-            label = html.unescape(re.sub(r"<[^>]+>", "", match[0]))
+            label = html.unescape(
+                re.sub(r"<[^>]+>", "", match[0].split('<span class="map-info">')[0])
+            )
             assert not any(
                 word in label
                 for word in ("sends none", "sent by", "setting not recorded")
@@ -4700,10 +4705,58 @@ def test_built_engine_map_labels_have_only_default_tips(committed_pages):
                 or label == "the car's default"
                 or label.endswith(" default)")
             )
-            followed_by_tip = page[match.end() :].startswith('<span class="map-info">')
-            assert followed_by_tip == default, (name, label)
+            has_tip = '<span class="map-info">' in match[0]
+            assert has_tip == default, (name, label)
             count += default
     assert count > 100
+
+
+def test_finisher_map_info_stays_with_last_word(committed_pages):
+    files, _ = committed_pages
+    rows = [
+        row
+        for name, page in files.items()
+        if name.startswith("races/") and name.endswith(".html")
+        for row in re.findall(r'<li class="rc-finisher"[^>]*>.*?</li>', page)
+        if 'class="map-info"' in row
+    ]
+    assert rows
+    for row in rows:
+        assert re.search(
+            r'<span class="map-tail">[^<\s]+<span class="map-info"><button', row
+        )
+
+
+def test_map_info_has_text_sized_glyph_and_24px_hit_area(committed_pages):
+    files, _ = committed_pages
+    css = files["paddock.css"]
+    assert ".map-tail { white-space: nowrap; }" in css
+    button = _between(css, ".map-info-button {", "}")
+    assert "width: 1em; height: 1em;" in button
+    assert "padding: max(0px, calc((24px - 1em) / 2))" in button
+    assert "margin: calc(-1 * max(0px, (24px - 1em) / 2)) 0" in button
+    assert "box-sizing: content-box" in button
+    assert "font: inherit" in button
+    assert "28px" not in button
+    assert ".map-info-button:focus-visible { outline: 2px solid currentColor;" in css
+
+
+def test_garage_map_info_stays_with_last_word(committed_pages):
+    files, _ = committed_pages
+    assert re.search(
+        r'<span class="map-tail"><span data-slot="mapLast">[^<\s]+</span>'
+        r'<span class="map-info"(?: hidden)?><button',
+        files["garage/index.html"],
+    )
+    assert "var lastSpace = mapLabel.lastIndexOf(' ')" in site_garage.SCRIPT
+    assert (
+        "slot('map').textContent = mapLabel.slice(0, lastSpace + 1)"
+        in site_garage.SCRIPT
+    )
+    assert (
+        "slot('mapLast').textContent = mapLabel.slice(lastSpace + 1)"
+        in site_garage.SCRIPT
+    )
 
 
 def test_garage_uses_the_same_default_notes(committed_pages):
@@ -4805,21 +4858,30 @@ def test_default_map_entries_name_the_setting_that_ran(data_page_site, monkeypat
     page = driver_page()
     line = _best_line(page)
     assert '<use href="#car"/></svg>Codex</span></b> at engine map' in line
-    assert '<use href="#engine-map"/></svg>not</span> recorded</b>' in line
+    assert (
+        '<use href="#engine-map"/></svg>not</span> '
+        '<span class="map-tail">recorded<span class="map-info">' in line
+    )
     assert "Codex default" not in page
     # The car sent the level.
     settings = site_views.DEFAULT_SETTINGS
     monkeypatch.setitem(settings, ("codex", best["driver"]), ("medium", "car"))
     page = driver_page()
     line = _best_line(page)
-    assert '<use href="#engine-map"/></svg>medium</span> (Codex default)</b>' in line
+    assert (
+        '<use href="#engine-map"/></svg>medium</span> (Codex '
+        '<span class="map-tail">default)<span class="map-info">' in line
+    )
     # The car-by-car row names it the same way.
-    assert page.count("medium</span> (Codex default)") >= 2
+    assert page.count('medium</span> (Codex <span class="map-tail">default)') >= 2
     # The car sent nothing: the route's default, under the route's host.
     monkeypatch.setitem(settings, ("codex", best["driver"]), ("xhigh", "route"))
     host = site_views.host_name(best["driver"])
     line = _best_line(driver_page())
-    assert f'<use href="#engine-map"/></svg>xhigh</span> ({host} default)</b>' in line
+    assert (
+        f'<use href="#engine-map"/></svg>xhigh</span> ({host} '
+        '<span class="map-tail">default)<span class="map-info">' in line
+    )
 
 
 def test_driver_tag_names_the_model_behind_the_driver_glyph():
