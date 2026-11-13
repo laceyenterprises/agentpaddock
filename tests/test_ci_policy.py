@@ -40,7 +40,25 @@ WORKFLOWS_DIR = ROOT / ".github" / "workflows"
 
 #: The R1 workflows: file name -> (workflow name, its only job).
 R1_WORKFLOWS = {"ci.yml": ("ci", "fast"), "pages.yml": ("pages", "deploy")}
-PAGES_PATHS = ["results/**", "site/**", "scripts/build_site.py"]
+#: Everything ``scripts/build_site.py`` reads: the results, its own code, the
+#: site package, the leaderboard module and the gym package it loads, the
+#: share card, the design tokens and glyphs, the tasks, and the documents the
+#: Race-it-yourself page quotes its commands from.
+PAGES_PATHS = [
+    "results/**",
+    "site/**",
+    "scripts/build_site.py",
+    "scripts/paddock_site/**",
+    "scripts/leaderboard.py",
+    "scripts/social-card.png",
+    "design/tokens.css",
+    "design/glyphs/**",
+    "design/guide/race-it-yourself.md",
+    "lib/python/gym/**",
+    "tasks/**",
+    "README.md",
+    "CONTRIBUTING.md",
+]
 PAGES_LAUNCH_CONDITION = "${{ vars.PADDOCK_SITE_LIVE == 'true' }}"
 ALLOWED_EVENTS = frozenset({"pull_request", "push", "workflow_dispatch"})
 LINUX_RUNNERS = frozenset({"ubuntu-latest", "ubuntu-24.04", "ubuntu-22.04"})

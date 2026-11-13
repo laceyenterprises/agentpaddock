@@ -2934,7 +2934,7 @@ def test_community_shows_examples_until_real_records_exist(tmp_path):
     files = build_site.build(results)
     main = _main(files["community/index.html"])
     # The fork document is self-reported: a real card with its badge, no empty state.
-    assert "gamma-cli · bolt/coder-small" in main
+    assert f"<b>{site_views.car_tag('gamma-cli')} · bolt/coder-small</b>" in main
     assert "The board is empty for now" not in main
     assert '<span class="badge badge-self badge-sm">' in main
     community = json.loads(files["data/community.json"])
@@ -3031,7 +3031,7 @@ def test_home_builds_from_the_site_data_fixtures(tmp_path):
         in finish
     )
     for leader in leaders:
-        assert html.escape(site_home.entry_name(leader)) in finish
+        assert site_home.entry_html(leader) in finish
     assert finish.count('<a class="home-leader" href="standings/index.html">') == 2
     assert site_home.pct(leaders[0]["rate"]) in finish
     # The hardest race and the challenge row read races.json.
@@ -3098,8 +3098,14 @@ def test_home_fuel_card_compares_a_shared_finish(tmp_path):
     }
     card = site_home.fuel_card(standings)
     assert "Same finish. 8× the mileage." in card
-    assert "d/one in pi passes a race for $0.040." in card
-    assert "d/two in pi · high, tied on the finish, pays $0.320." in card
+    # Each entry names its car and engine map in bold behind their glyphs; a
+    # default map says whose default it is.
+    pi, tag = site_views.car_tag("pi"), site_views.map_tag
+    assert f"d/one in {pi} · {tag('default', 'pi')} passes a race for $0.040." in card
+    assert ">Pi</span> default</b>" in card
+    assert (
+        f"d/two in {pi} · {tag('high', 'pi')}, tied on the finish, pays $0.320." in card
+    )
     # Without two priced entries sharing a place, the card makes no comparison.
     alone = site_home.fuel_card({"entries": standings["entries"][1:]})
     assert "Same finish" not in alone and "The fuel bill." in alone
@@ -3845,7 +3851,7 @@ def test_garage_level_availability_comes_from_the_data(tmp_path):
     # A level seen only in a self-reported document still opens the level.
     assert open_levels("bolt/coder-small") == ["default", "max"]
     assert drivers["local/coder-tiny"]["levels"]["high"] == (
-        "Coder Tiny has raced at one engine map only: provider default."
+        "Coder Tiny has raced at one engine map only: the car's default."
     )
     assert "It runs at one setting only." in drivers["local/coder-tiny"]["note"]
     # Featured drivers (a placed entry) first; a partial-only driver has no page.
@@ -3988,6 +3994,98 @@ def test_driver_fuel_note_handles_missing_prices(best_cost, other_cost, phrase):
         "cheapest": min(priced, key=lambda e: e["costPerPass"]) if priced else None,
     }
     assert site_drivers.fuel_note(driver).endswith(phrase)
+
+
+def _best_line(page: str) -> str:
+    """The best-entry line of a built driver page: "in <car> at engine map <map> · fuel"."""
+    panel = _between(page, '<div class="panel dark dv-best">', "</section>")
+    return panel.split('<div class="dv-best-num">', 1)[1].split("</div>", 1)[1]
+
+
+@pytest.mark.parametrize(
+    ("car", "engine_map", "label"),
+    [
+        ("codex", "default", "medium (Codex default)"),
+        ("claude-code", "default", "Claude Code default"),
+        ("alpha-cli", "default", "Alpha Cli default"),
+        ("codex", "high", "high"),
+        ("pi", "low", "low"),
+    ],
+)
+def test_engine_map_label_names_the_setting_that_ran(car, engine_map, label):
+    assert site_views.map_label(engine_map, car) == label
+    first, space, rest = label.partition(" ")
+    glyph = site_glyphs.icon(site_views.map_glyph(engine_map))
+    assert site_views.map_tag(engine_map, car) == (
+        f'<b class="ent"><span class="ent-lead">{glyph}{html.escape(first)}</span>'
+        f"{space}{html.escape(rest)}</b>"
+    )
+
+
+def test_driver_best_entry_marks_the_car_and_bolds_the_setting(committed_pages):
+    files, site = committed_pages
+    drivers = site_drivers.model(site)
+    assert drivers
+    for driver in drivers:
+        best = driver["best"]
+        line = _best_line(files[driver["file"]])
+        car = site_views.car_name(best["car"])
+        label = site_views.map_label(best["map"], best["car"])
+        glyph = site_views.map_glyph(best["map"])
+        assert line.startswith(
+            f"<span>in {site_views.tag('car', car)}"
+            f" at engine map {site_views.tag(glyph, label)} · "
+        ), (driver["file"], line)
+        assert '<use href="#car"/>' in line and "<b" in line
+
+
+def test_default_map_entries_name_the_car_default(data_page_site):
+    site = data_page_site
+    best = site.placed[0]
+    best.update(car="codex", map="default")
+    route = next(r for r in build_site.ROUTES if r.file == site_drivers.INDEX)
+    pages = site_drivers.pages(site, route, build_site.ROUTES)
+    page = pages[site_drivers.model(site)[0]["file"]]
+    line = _best_line(page)
+    assert '<use href="#car"/></svg>Codex</span></b> at engine map' in line
+    assert '<use href="#engine-map"/></svg>medium</span> (Codex default)</b> · ' in line
+    # The car-by-car row names it the same way.
+    assert page.count("medium</span> (Codex default)") >= 2
+    # A car whose default the bench has not checked is named only as its default.
+    best.update(car="alpha-cli")
+    page = site_drivers.pages(site, route, build_site.ROUTES)[
+        site_drivers.model(site)[0]["file"]
+    ]
+    line = _best_line(page)
+    assert '<use href="#car"/></svg>Alpha</span> Cli</b> at engine map' in line
+    assert '<use href="#engine-map"/></svg>Alpha</span> Cli default</b> · ' in line
+    assert "Codex default" not in line
+
+
+def test_no_built_file_says_provider_default(tmp_path, committed_pages):
+    for files in (committed_pages[0], build_site.build(_site_tree(tmp_path))):
+        for name, content in files.items():
+            if isinstance(content, str):
+                assert "provider default" not in content, name
+    for module in (site_garage, site_home, site_races, standings_pages, site_views):
+        assert "provider default" not in Path(module.__file__).read_text("utf-8")
+
+
+def test_pages_deploys_when_the_site_code_changes():
+    pages_yml = lb.MODULE_ROOT / ".github" / "workflows" / "pages.yml"
+    workflow = pages_yml.read_text("utf-8")
+    push = workflow.split("  push:", 1)[1].split("  workflow_dispatch:", 1)[0]
+    paths = re.findall(r'^\s+- "([^"]+)"$', push, flags=re.M)
+    # Everything the build reads code or styles from redeploys the site.
+    for needed in (
+        "results/**",
+        "scripts/build_site.py",
+        "scripts/paddock_site/**",
+        "scripts/leaderboard.py",
+        "design/tokens.css",
+        "design/glyphs/**",
+    ):
+        assert needed in paths, needed
 
 
 def test_pit_wall_sort_toggles_direction_and_keeps_missing_values_last():

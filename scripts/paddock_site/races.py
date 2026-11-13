@@ -29,7 +29,7 @@ from typing import Any, Mapping, Sequence
 import leaderboard as lb
 
 from . import data as site_data
-from . import glyphs, layout
+from . import glyphs, layout, views
 from .routes import SITE_URL, Build, Route
 
 #: The grid shows this many cards before "Show all".
@@ -134,14 +134,6 @@ def car_name(car: str) -> str:
 
 def livery(car: str) -> str:
     return f"var(--{LIVERY.get(car, 'tower-mute')})"
-
-
-def map_text(engine_map: str) -> str:
-    return (
-        "the car's default engine map"
-        if engine_map == "default"
-        else f"engine map {engine_map}"
-    )
 
 
 def _attr(value: Any) -> str:
@@ -539,8 +531,8 @@ def _finisher(position: int, row: Mapping[str, Any]) -> str:
         f'<span class="rc-pos{" is-podium" if position <= 3 else ""}">P{position}</span>'
         f'<span class="rc-livery" style="background:{livery(row["car"])}" aria-hidden="true"></span>'
         '<span class="rc-who">'
-        f'<span class="rc-driver">{esc(row["driver"])} <span>in {esc(car_name(row["car"]))}</span></span>'
-        f'<span class="rc-map">{esc(map_text(row["map"]))}</span></span>'
+        f'<span class="rc-driver">{esc(row["driver"])} <span>in {views.car_tag(row["car"])}</span></span>'
+        f'<span class="rc-map">engine map {views.map_tag(row["map"], row["car"])}</span></span>'
         '<span class="rc-values">'
         f'<span class="rc-main">{esc(lap_shown)}</span>'
         f'<span class="rc-second">{esc(usd_second)}</span></span></li>'

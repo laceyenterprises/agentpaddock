@@ -13,6 +13,16 @@ on:
       - "results/**"
       - "site/**"
       - "scripts/build_site.py"
+      - "scripts/paddock_site/**"
+      - "scripts/leaderboard.py"
+      - "scripts/social-card.png"
+      - "design/tokens.css"
+      - "design/glyphs/**"
+      - "design/guide/race-it-yourself.md"
+      - "lib/python/gym/**"
+      - "tasks/**"
+      - "README.md"
+      - "CONTRIBUTING.md"
   workflow_dispatch:
 
 concurrency:

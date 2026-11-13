@@ -27,7 +27,7 @@ import math
 from itertools import zip_longest
 from typing import Any, Mapping, Sequence
 
-from . import glyphs, layout, site_config
+from . import glyphs, layout, site_config, views
 from .routes import Route
 
 TITLE = "The open leaderboard for coding agents"
@@ -192,11 +192,20 @@ def plural(count: int, singular: str, plural_form: str = "") -> str:
 
 
 def entry_name(entry: Mapping[str, Any]) -> str:
-    """``driver in car``, with the engine map unless it is the default."""
+    """``driver in Car · engine map`` as plain text, for the ticker."""
     identity = entry.get("identity", entry)
-    name = f"{identity['driver']} in {identity['car']}"
-    engine_map = identity.get("map")
-    return f"{name} · {engine_map}" if engine_map and engine_map != "default" else name
+    car, engine_map = identity["car"], identity.get("map")
+    name = f"{identity['driver']} in {views.car_name(car)}"
+    return f"{name} · {views.map_label(engine_map, car)}" if engine_map else name
+
+
+def entry_html(entry: Mapping[str, Any]) -> str:
+    """:func:`entry_name` as markup: the car and the engine map bold, each
+    behind its glyph."""
+    identity = entry.get("identity", entry)
+    car, engine_map = identity["car"], identity.get("map")
+    name = f"{esc(identity['driver'])} in {views.car_tag(car)}"
+    return f"{name} · {views.map_tag(engine_map, car)}" if engine_map else name
 
 
 def challenge_label(challenge: str) -> str:
@@ -402,7 +411,7 @@ def photo_finish(standings: Mapping[str, Any]) -> str:
         '<a class="home-leader" href="standings/index.html">'
         f"{_livery(row['car'])}"
         '<span class="home-leader-who">'
-        f'<span class="home-leader-name">{esc(entry_name(row))}</span>'
+        f'<span class="home-leader-name">{entry_html(row)}</span>'
         f'<span class="home-range" style="--lo:{at(row["lo"])};--hi:{at(row["hi"])};'
         f'--dot:{at(row["rate"])}" aria-hidden="true"><i></i><b></b><em></em></span>'
         f'<span class="sr-only">Honest range {pct(row["lo"])} to {pct(row["hi"])}</span>'
@@ -569,8 +578,8 @@ def fuel_card(standings: Mapping[str, Any]) -> str:
         ratio = dear["costPerPass"] / cheap["costPerPass"]
         title = f"Same finish. {ratio_text(ratio)} the mileage."
         line = (
-            f"{entry_name(cheap)} passes a race for {usd(cheap['costPerPass'])}. "
-            f"{entry_name(dear)}, tied on the finish, pays {usd(dear['costPerPass'])}."
+            f"{entry_html(cheap)} passes a race for {usd(cheap['costPerPass'])}. "
+            f"{entry_html(dear)}, tied on the finish, pays {usd(dear['costPerPass'])}."
         )
     else:
         priced = [
@@ -580,7 +589,7 @@ def fuel_card(standings: Mapping[str, Any]) -> str:
             best = priced[0]
             title = "The fuel bill."
             line = (
-                f"{entry_name(best)}, the best-placed priced entry, passes a race for "
+                f"{entry_html(best)}, the best-placed priced entry, passes a race for "
                 f"{usd(best['costPerPass'])}."
             )
         else:
@@ -589,7 +598,7 @@ def fuel_card(standings: Mapping[str, Any]) -> str:
     return (
         '<a class="home-card" href="standings/index.html">'
         f'{glyph}<span class="home-card-title">{esc(title)}</span>'
-        f'<span class="home-card-line">{esc(line)}</span></a>'
+        f'<span class="home-card-line">{line}</span></a>'
     )
 
 

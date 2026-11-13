@@ -98,7 +98,7 @@ def _row(row: Mapping[str, Any], index: int, root: str) -> str:
         '<th scope="row" class="pw-entry"><div class="pw-entry-in">'
         f'<span class="pw-livery" style="--c:{views.livery(row["car"])}" aria-hidden="true"></span>'
         f'<span class="pw-who"><a href="{root}{esc(row["driverPage"])}">{esc(row["driverName"])}</a>'
-        f"<small>{esc(row['carName'])} · {esc(views.map_name(row['map']))}"
+        f"<small>{views.car_tag(row['car'])} · {views.map_tag(row['map'], row['car'])}"
         f" · {esc(views.place(row))}</small></span></div></th>"
         + cells
         + _cell(row["k"], row["n"], total=True)

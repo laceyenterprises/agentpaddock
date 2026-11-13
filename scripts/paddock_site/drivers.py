@@ -89,9 +89,8 @@ def model(site: views.SiteData) -> list[dict[str, Any]]:
 
 
 def _entry_words(entry: Mapping[str, Any]) -> str:
-    return (
-        f"{views.car_name(entry['car'])} at engine map {views.map_name(entry['map'])}"
-    )
+    """The entry's car and engine map, tagged: bold, each behind its glyph."""
+    return views.entry_tags(entry["car"], entry["map"])
 
 
 def _fuel(value: float | None) -> str:
@@ -133,7 +132,7 @@ def fuel_note(driver: Mapping[str, Any]) -> str:
             "fuel bill to compare."
         )
     text = (
-        f"Cheapest way to run {esc(name)}: {esc(_entry_words(cheapest))}, "
+        f"Cheapest way to run {esc(name)}: {_entry_words(cheapest)}, "
         f"{_fuel(cheapest['costPerPass'])}."
     )
     if cheapest is best:
@@ -172,8 +171,7 @@ def _best(driver: Mapping[str, Any]) -> str:
         f'<span class="label">{glyphs.icon("podium")}Its best entry</span>'
         f'<div class="dv-best-num"><span class="big-num">{views.pct(best["rate"])}</span>'
         f"<span>{best['k']} of {best['n']} races passed · {esc(views.place(best))} on the board</span></div>"
-        f"<span>in <b>{esc(views.car_name(best['car']))}</b> at engine map "
-        f"{esc(views.map_name(best['map']))} · {_fuel(best['costPerPass'])}</span></div>"
+        f"<span>in {_entry_words(best)} · {_fuel(best['costPerPass'])}</span></div>"
     )
 
 
@@ -188,9 +186,8 @@ def _rows(driver: Mapping[str, Any]) -> tuple[str, int]:
             f'aria-pressed="{"true" if index == 0 else "false"}" aria-controls="slips-{index}">'
             f'<span class="dv-livery" style="--c:{views.livery(entry["car"])}" aria-hidden="true"></span>'
             '<span class="dv-row-main">'
-            f'<span class="dv-row-who"><b>{esc(views.car_name(entry["car"]))}</b>'
-            + glyphs.icon(views.map_glyph(entry["map"]))
-            + f"<span>{esc(views.map_name(entry['map']))} · {_fuel(entry['costPerPass'])}</span></span>"
+            f'<span class="dv-row-who">{views.car_tag(entry["car"])}'
+            f"<span>{views.map_tag(entry['map'], entry['car'])} · {_fuel(entry['costPerPass'])}</span></span>"
             f'<span class="dv-bar"><span style="width:{width:.1f}%"></span></span></span>'
             f'<span class="dv-pct">{views.pct(entry["rate"])}</span></button>'
         )
@@ -209,7 +206,7 @@ def _slips(driver: Mapping[str, Any]) -> str:
         )
         panels.append(
             f'<div class="dv-slips" id="slips-{index}" data-slips="{index}">'
-            f'<span class="dv-slips-title">{esc(driver["name"])} in {esc(_entry_words(entry))}: '
+            f'<span class="dv-slips-title">{esc(driver["name"])} in {_entry_words(entry)}: '
             f"{entry['k']} of {entry['n']}</span>{rows}"
             f'<p class="dv-note">{slips_note(entry)}</p></div>'
         )
@@ -288,7 +285,7 @@ def index_body(site: views.SiteData, drivers: Sequence[Mapping[str, Any]]) -> st
         f'<a class="dv-card" href="{layout.href(driver["file"], INDEX)}">'
         f"<b>{esc(driver['name'])}</b>"
         f'<span class="dv-card-num">{views.pct(driver["best"]["rate"])}</span>'
-        f"<span>best: {esc(_entry_words(driver['best']))}</span>"
+        f"<span>best: {_entry_words(driver['best'])}</span>"
         f'<span class="dv-card-meta">{esc(career(driver))}</span></a>'
         for driver in drivers
     )

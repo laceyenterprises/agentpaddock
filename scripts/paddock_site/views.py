@@ -22,6 +22,11 @@ LEVELS = ("default", "low", "medium", "high", "xhigh", "max")
 
 #: Car (harness name) -> product name, where title case would get it wrong.
 CAR_NAMES = {"claude-code": "Claude Code", "opencode": "OpenCode", "pi": "Pi"}
+#: Car -> the engine map it runs when an entry sets none, where the bench has
+#: checked it. Codex sends its default reasoning effort, medium, when an entry
+#: sets none; observed in the run's own Codex session record (turn context),
+#: 2026-11-13. A car missing here is named only as "<Car> default".
+CAR_DEFAULT_MAPS = {"codex": "medium"}
 #: Car -> livery token in ``design/tokens.css``.
 LIVERIES = {
     "claude-code": "car-cc",
@@ -199,8 +204,43 @@ def livery(car: str) -> str:
     return f"var(--{token})" if token else "var(--viz-other)"
 
 
-def map_name(engine_map: str) -> str:
-    return "provider default" if engine_map == "default" else engine_map
+def map_label(engine_map: str, car: str | None = None) -> str:
+    """The engine map as the site names it: a named level as it is; the default
+    as the level the car ran, when that is known ("medium (Codex default)"),
+    else as whose default it is ("Claude Code default"). Without a car, as
+    "the car's default"."""
+    if engine_map != "default":
+        return engine_map
+    if car is None:
+        return "the car's default"
+    level = CAR_DEFAULT_MAPS.get(car)
+    owner = car_name(car)
+    return f"{level} ({owner} default)" if level else f"{owner} default"
+
+
+def tag(glyph: str, text: str) -> str:
+    """``text`` in bold behind ``glyph``. The glyph stays on the line of the first
+    word; the rest wraps like any text, so a narrow column never overflows."""
+    first, space, rest = text.partition(" ")
+    return (
+        f'<b class="ent"><span class="ent-lead">{glyphs.icon(glyph)}{esc(first)}</span>'
+        f"{space}{esc(rest)}</b>"
+    )
+
+
+def car_tag(car: str) -> str:
+    """The car's name in bold behind the car glyph, so it reads as a car."""
+    return tag("car", car_name(car))
+
+
+def map_tag(engine_map: str, car: str | None = None) -> str:
+    """The engine map's label in bold behind its engine-map glyph."""
+    return tag(map_glyph(engine_map), map_label(engine_map, car))
+
+
+def entry_tags(car: str, engine_map: str) -> str:
+    """``car at engine map level``, both parts tagged: how a page names an entry."""
+    return f"{car_tag(car)} at engine map {map_tag(engine_map, car)}"
 
 
 def map_glyph(engine_map: str) -> str:
@@ -277,6 +317,10 @@ CSS = """
 /* ---------- data pages: shared (PDW-08) ---------- */
 .label { display: inline-flex; align-items: center; gap: 10px; font: 600 12px/1.2 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
 .label .glyph { width: 26px; height: 26px; color: var(--ink); }
+/* an entry's car and engine map: bold, the glyph kept on the line of the first word */
+.ent { font-weight: 700; }
+.ent-lead { display: inline-block; max-width: 100%; }
+.ent svg.glyph { display: inline-block; width: 1.15em; height: 1.15em; margin-right: .2em; vertical-align: -.22em; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {
   display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 999px;

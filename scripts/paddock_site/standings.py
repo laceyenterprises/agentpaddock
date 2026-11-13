@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
-from . import glyphs, layout
+from . import glyphs, layout, views
 from .routes import SITE_URL, Build
 
 STANDINGS = "standings/index.html"
@@ -125,15 +125,9 @@ def place_label(place: int | None, tie: bool) -> str:
     return f"={place}" if tie else str(place)
 
 
-def map_glyph(engine_map: str) -> str:
-    named = f"engine-map-{engine_map}"
-    return named if named in glyphs.published_ids() else "engine-map"
-
-
-def map_label(engine_map: str) -> str:
-    if engine_map == "default":
-        return "default engine map"
-    return f"engine map {engine_map}"
+def map_html(engine_map: str, car: str) -> str:
+    """``engine map <label>``, the label bold behind its engine-map glyph."""
+    return f"engine map {views.map_tag(engine_map, car)}"
 
 
 def plural(count: int, one: str, many: str = "") -> str:
@@ -148,7 +142,7 @@ def who(row: Mapping[str, Any]) -> str:
     """``<b>driver</b> in car``, as the board writes an entry."""
     return (
         f"<b>{esc(row['driver'])}</b> "
-        f'<span class="st-car">in {esc(car_name(row["car"]))}</span>'
+        f'<span class="st-car">in {views.car_tag(row["car"])}</span>'
     )
 
 
@@ -365,7 +359,7 @@ def _callouts(entries: Sequence[Mapping[str, Any]]) -> str:
         )
     else:
         verdict = (
-            f"<b>{esc(lead['driver'])} in {esc(car_name(lead['car']))} leads</b> "
+            f"<b>{esc(lead['driver'])} in {views.car_tag(lead['car'])} leads</b> "
             f"with {lead['k']} of {lead['n']}."
         )
         if len(entries) > 1 and entries[1]["hi"] >= lead["lo"]:
@@ -438,8 +432,8 @@ def _row(
         f'<span class="st-by-fuel">{fuel[1]}</span></span>'
         f'<span class="st-livery" style="--c:{livery(row["car"])}" aria-hidden="true"></span>'
         f'<span class="st-who"><span class="st-name">{who(row)}</span>'
-        f'<span class="st-map">{glyphs.icon(map_glyph(row["map"]), "st-map-glyph")}'
-        f"<span>{esc(map_label(row['map']))}{setup_note(row, clash)}</span></span>"
+        f'<span class="st-map"><span>{map_html(row["map"], row["car"])}'
+        f"{setup_note(row, clash)}</span></span>"
         + _range_bar(row, BOARD_SCALE, "st-range st-pass-only st-ranges-only")
         + f'<span class="sr-only st-pass-only">, honest range {_range_text(row)}</span>'
         "</span>"
@@ -542,8 +536,8 @@ def _chips(entry_id: str, standings: Mapping[str, Any], root: str) -> str:
         chips.append(
             f'<a href="{root}entries/{esc(row["id"])}/index.html"{current}>'
             f'<span class="st-livery" style="--c:{livery(row["car"])}" aria-hidden="true">'
-            f"</span>{esc(row['driver'])} in {esc(car_name(row['car']))} · "
-            f"{esc(row['map'])}{setup_note(row, clash)}</a>"
+            f"</span>{esc(row['driver'])} in {views.car_tag(row['car'])} · "
+            f"{views.map_tag(row['map'], row['car'])}{setup_note(row, clash)}</a>"
         )
     if not chips:
         return ""
@@ -617,7 +611,7 @@ def _hero(entry: Mapping[str, Any]) -> str:
         f'<div class="en-card" style="--c:{livery(who_["car"])}">'
         f'<div class="en-card-who">{glyphs.icon("driver", "en-card-glyph")}'
         f"<div><h1>{esc(who_['driver'])}</h1>"
-        f"<p>in {esc(car_name(who_['car']))} · {esc(map_label(who_['map']))}"
+        f"<p>in {views.car_tag(who_['car'])} · {map_html(who_['map'], who_['car'])}"
         f" · setup <code>{esc(short_hash(who_['configHash']))}</code></p></div></div>"
         f'<p class="en-pct"><b class="num">{pct(totals["rate"])}</b>'
         f"<span>{totals['k']} of {totals['n']} races passed</span></p>"
@@ -763,7 +757,7 @@ def _entry_link(row: Mapping[str, Any], root: str, clash: set) -> str:
         f'<span class="st-pos">{place}</span>'
         f'<span class="st-livery" style="--c:{livery(row["car"])}" aria-hidden="true"></span>'
         f'<span class="st-who"><span class="st-name">{who(row)}</span>'
-        f'<span class="st-map">{esc(map_label(row["map"]))}{setup_note(row, clash)}</span></span>'
+        f'<span class="st-map"><span>{map_html(row["map"], row["car"])}{setup_note(row, clash)}</span></span></span>'
         f'<span class="st-value num">{pct(row["rate"])}<small>{row["k"]}/{row["n"]}</small>'
         "</span></a></li>"
     )
@@ -856,7 +850,10 @@ def entry_pages(build: Build) -> dict[str, str]:
             routes=build.routes,
             current=current,
             nav_current=ENTRIES,
-            title=f"{who_['driver']} in {car_name(who_['car'])} · {who_['map']}",
+            title=(
+                f"{who_['driver']} in {car_name(who_['car'])} · "
+                f"{views.map_label(who_['map'], who_['car'])}"
+            ),
             body=entry_body(entry, standings, races, layout.up(current)),
             url=f"{SITE_URL}entries/{row['id']}/",
         )
@@ -1059,7 +1056,6 @@ CSS = """
 .st-name b { font-weight: 600; }
 .st-car { color: var(--ink-2); }
 .st-map { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
-.st-map-glyph { width: 18px; height: 18px; color: var(--ink); }
 .st-range, .en-range { position: relative; display: block; height: 10px; margin-top: 2px; }
 .st-range::before, .en-range::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 2px; background: var(--rule); }
 .st-band { position: absolute; top: 3px; height: 4px; background: var(--viz-interval); }
