@@ -23,11 +23,15 @@ place the entries with a first result on every calendar race, so every placed
 entry is measured on the same races; the others are listed as ``partial``.
 Every entry with a counted result on a calendar race gets an entry file.
 
-Checkpoints come only from record ``checks`` and the race's track card, shown
-only as the card discloses (``label``: named with its clear rate; ``count``:
-adds to "N more checks"; ``hidden``: omitted). A docs fact check is never
-named. A race whose counted runs carry no ``checks`` has null stages, funnel
-and retirements.
+Checkpoints come only from record ``checks``. A race's track card controls
+disclosure (``label``: named with its clear rate; ``count``: adds to "N more
+checks"; ``hidden``: omitted). Without a card, recorded grading order supplies
+the checkpoints. A docs fact check is never named. A race whose counted runs
+carry no ``checks`` has null stages, funnel and retirements.
+
+Checkpoint pass rates pool every submission recording that checkpoint at the
+race version, including later attempts. Funnel views retain the counted,
+trusted-run basis used by the rest of the standings.
 
 A race file also carries the track card's ``[briefing] show`` policy, the
 staged file and line counts ``leaderboard.track_facts`` reports for a race with
@@ -51,12 +55,13 @@ bytes) and ``basis`` (what was counted).
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import re
 import statistics
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -91,7 +96,7 @@ class Race:
     version: int
     title: str | None
     name: str
-    #: The card's checkpoints in lap order, or ``()`` without a card.
+    #: Checkpoints in lap order, from the card or the recorded grading.
     checkpoints: tuple[Mapping[str, Any], ...]
     #: The plain-words name the pages show (``names.short_name``).
     short_name: str = ""
@@ -105,6 +110,8 @@ class Race:
     has_card: bool = False
     #: Public, display-only context from the task's optional [about] table.
     about: Mapping[str, str] | None = None
+    #: Whether the local verifier explicitly grades one result without gv.check.
+    single_result: bool = False
 
     @property
     def key(self) -> tuple[str, str, int]:
@@ -139,6 +146,52 @@ def load_races(tasks_dir: Path) -> dict[tuple[str, str, int], Race]:
         dispatch = task.get("dispatch")
         prompt = dispatch.get("prompt") if isinstance(dispatch, dict) else None
         about = task.get("about")
+        single_result = False
+        verifier_table = task.get("verifier")
+        verifier = (
+            verifier_table.get("entrypoint")
+            if isinstance(verifier_table, Mapping)
+            else None
+        )
+        if isinstance(verifier, str):
+            try:
+                tree = ast.parse(
+                    lb.public_prompt_path(path.parent, verifier).read_text("utf-8")
+                )
+                aliases = {
+                    alias.asname or alias.name
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.Import)
+                    for alias in node.names
+                    if alias.name == "gym_verifier"
+                }
+                functions = {
+                    alias.asname or alias.name: alias.name
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.ImportFrom)
+                    and node.module == "gym_verifier"
+                    and node.level == 0
+                    for alias in node.names
+                    if alias.name in {"passed", "check"}
+                }
+                calls = {
+                    node.func.attr
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id in aliases
+                }
+                calls.update(
+                    functions[node.func.id]
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id in functions
+                )
+                single_result = "passed" in calls and "check" not in calls
+            except (OSError, SyntaxError, UnicodeError, lb.ResultsError):
+                pass
         if not isinstance(about, Mapping) or not all(
             isinstance(about.get(key), str) and about[key].strip()
             for key in ("what", "hard")
@@ -162,6 +215,7 @@ def load_races(tasks_dir: Path) -> dict[tuple[str, str, int], Race]:
             about=(
                 {key: about[key].strip() for key in ("what", "hard")} if about else None
             ),
+            single_result=single_result,
         )
         races[race.key] = race
     return races
@@ -274,6 +328,36 @@ class SiteData:
 
 def model(results: lb.Results, tasks_dir: Path) -> SiteData:
     races = load_races(tasks_dir)
+    # A track card owns disclosure. Without one, the grading's checks supply
+    # the map in recorded order, borrowing existing plain-word labels.
+    labels = {
+        checkpoint["check"]: checkpoint["label"]
+        for race in races.values()
+        for checkpoint in race.checkpoints
+        if lb.disclosure(checkpoint) == "label"
+    }
+    for key, race in list(races.items()):
+        if race.has_card:
+            continue
+        checks = {}
+        for record in results.records:
+            if race_key(record) == key:
+                for check in record.get("checks", []):
+                    checks.setdefault(check["name"], check)
+        if checks:
+            races[key] = replace(
+                race,
+                checkpoints=tuple(
+                    {
+                        "check": name,
+                        "label": labels.get(name, name.replace("_", " ").capitalize()),
+                        "disclose": "count"
+                        if name.startswith(lb.FACT_CHECK_PREFIX)
+                        else "label",
+                    }
+                    for name in checks
+                ),
+            )
     trust = {
         name: lb.document_trust(name, document, results.trust)
         for name, document in results.documents.items()
@@ -634,6 +718,31 @@ def race(data: SiteData, race: Race, ids: Mapping[tuple, str]) -> dict[str, Any]
     runs = data.runs.get(race.key, [])
     firsts = sorted(data.firsts.get(race.key, []), key=identity)
     checked = [run for run in runs if run.get("checks")]
+    submissions = [
+        run
+        for run in data.results.records
+        if race_key(run) == race.key and run.get("checks")
+    ]
+    checkpoint_rates = []
+    for index, label in _stations(race):
+        name = race.checkpoints[index]["check"]
+        checks = [
+            check
+            for run in submissions
+            for check in run["checks"]
+            if check["name"] == name
+        ]
+        checkpoint_rates.append(
+            {
+                "label": label,
+                "n": len(checks),
+                "rate": sum(check["ok"] for check in checks) / len(checks)
+                if checks
+                else None,
+                "optional": bool(checks)
+                and all(not check["required"] for check in checks),
+            }
+        )
     funnel = None
     if checked:
         by_car: dict[str, list] = defaultdict(list)
@@ -679,6 +788,8 @@ def race(data: SiteData, race: Race, ids: Mapping[tuple, str]) -> dict[str, Any]
         **{key: summary[key] for key in ("calendar", "n", "k", "rate", "lo", "hi")},
         "difficulty": summary["difficulty"],
         "checkpoints": [label for _, label in _stations(race)] if checked else None,
+        "checkpointRates": checkpoint_rates if checked else None,
+        "singleResult": race.single_result,
         "moreChecks": summary["stages"]["moreChecks"] if summary["stages"] else None,
         "funnel": funnel,
         **_track(data, race),

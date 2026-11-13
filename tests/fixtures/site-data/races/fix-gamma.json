@@ -30,6 +30,8 @@
   "hi": 0.9385080559790691,
   "difficulty": null,
   "checkpoints": null,
+  "checkpointRates": null,
+  "singleResult": false,
   "moreChecks": null,
   "funnel": null,
   "briefing": {
