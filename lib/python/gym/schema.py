@@ -308,7 +308,7 @@ def parse_task_dict(data: dict[str, Any], *, task_dir: Path | None = None) -> Ta
             value = raw_about.get(name)
             if not isinstance(value, str) or not value.strip():
                 raise TaskSchemaError(f"about.{name} must be a non-empty string")
-        about = About(what=raw_about["what"], hard=raw_about["hard"])
+        about = About(what=raw_about["what"].strip(), hard=raw_about["hard"].strip())
 
     dispatch: dict[str, Any] = {}
     if "dispatch" in data:

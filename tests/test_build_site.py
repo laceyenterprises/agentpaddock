@@ -2550,9 +2550,9 @@ def test_race_context_loads_and_renders_without_changing_legacy_pages(tmp_path):
     manifest.write_text(
         original
         + "\n[about]\nwhat = "
-        + json.dumps(what)
+        + json.dumps(" \t" + what + "\n")
         + "\nhard = "
-        + json.dumps(hard)
+        + json.dumps("\n" + hard + " \t")
         + "\n"
     )
     assert site_data.load_races(task_dir.parent)[key].about == {
@@ -2740,6 +2740,39 @@ def test_races_grid_awaits_trust_sign_off_without_cards(tmp_path):
     assert "<h1>Races are on their way.</h1>" in grid
     assert "rc-card" not in grid and "data-races-grid" not in grid
     assert not [name for name in files if re.fullmatch(r"races/.+/index\.html", name)]
+
+
+@pytest.mark.parametrize(
+    ("about", "description"),
+    [
+        (None, "Legacy title"),
+        ({}, "Legacy title"),
+        ({"hard": "No what field"}, "Legacy title"),
+        ("invalid context", "Legacy title"),
+        ({"what": None}, "Legacy title"),
+        ({"what": ""}, "Legacy title"),
+        ({"what": "Review <code> & contracts"}, "Review <code> & contracts"),
+    ],
+)
+def test_race_card_description_handles_sparse_context(about, description):
+    race = {
+        "challenge": "review",
+        "shortName": "X",
+        "title": "Legacy title",
+        "about": about,
+        "rate": None,
+        "k": 0,
+        "n": 0,
+        "entries": 0,
+        "medianLapSeconds": None,
+        "medianCostUsd": None,
+        "stages": None,
+    }
+    card = site_races.race_card(race, "x/index.html")
+    assert f'<p class="rc-title">{html.escape(description, quote=True)}</p>' in card
+    race.pop("about")
+    race.pop("title")
+    assert '<p class="rc-title">' not in site_races.race_card(race, "x/index.html")
 
 
 def test_card_stage_bars_mark_the_weakest_in_red():

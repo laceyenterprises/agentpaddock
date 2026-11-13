@@ -159,7 +159,9 @@ def load_races(tasks_dir: Path) -> dict[tuple[str, str, int], Race]:
             task_dir=path.parent,
             prompt=prompt if isinstance(prompt, str) else "prompt.md",
             has_card=card_path.is_file(),
-            about={key: about[key] for key in ("what", "hard")} if about else None,
+            about=(
+                {key: about[key].strip() for key in ("what", "hard")} if about else None
+            ),
         )
         races[race.key] = race
     return races

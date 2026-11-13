@@ -46,6 +46,9 @@ readers who have never seen the repository:
 - `hard`: one to three sentences describing the kind of difficulty, such as
   misleading evidence, interacting contracts or an incomplete recommendation.
 
+The task parser and site loader trim leading and trailing whitespace from both
+fields before exposing them to consumers.
+
 Keep each field under about 60 words. Variants should explain what changed or
 became harder relative to the base race. Avoid internal codenames, ticket IDs,
 hostnames and personal names. Context must not disclose an expected answer,

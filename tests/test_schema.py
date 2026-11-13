@@ -62,6 +62,19 @@ def test_about_is_optional_display_context():
     assert with_about.task_version == without.task_version
 
 
+def test_about_strings_are_trimmed_without_mutating_input():
+    data = copy.deepcopy(VALID)
+    data["about"] = {
+        "what": " \tDiagnose a stalled job.\n",
+        "hard": "\nThe evidence is noisy. \t",
+    }
+    original = copy.deepcopy(data)
+    task = parse_task_dict(data)
+    assert task.about.what == "Diagnose a stalled job."
+    assert task.about.hard == "The evidence is noisy."
+    assert data == original
+
+
 @pytest.mark.parametrize("with_about", [False, True])
 def test_load_task_with_optional_about(tmp_path, with_about):
     manifest = (
