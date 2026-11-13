@@ -17,3 +17,7 @@ findings = { type = "list", required = true, max_items = 32, items = { file = { 
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Review a change that recovers an existing development branch and workspace for further work."
+hard = "The code handles several combinations of local state, remote state and active workspace ownership. The agent must reason about preservation of unfinished work across those paths."

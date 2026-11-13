@@ -17,3 +17,7 @@ findings = { type = "list", required = true, max_items = 32, items = { file = { 
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Review registry updates and queued event delivery in a version with more indirect dependencies than the base lookup race."
+hard = "Connections between components run through configuration and subscriber wiring. The agent must discover those relationships and assess the change across files, where a simple search for direct callers may be insufficient."

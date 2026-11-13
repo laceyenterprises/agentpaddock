@@ -2533,6 +2533,68 @@ def test_race_page_classification_comes_from_the_data(tmp_path):
     assert "Show all 12 finishers" in more and 'data-first="10"' in more
 
 
+def test_race_context_loads_and_renders_without_changing_legacy_pages(tmp_path):
+    results, before = _race_site(tmp_path)
+    task_dir = results.parent / "tasks" / "docs-beta"
+    manifest = task_dir / "task.toml"
+    original = manifest.read_text()
+    key = next(
+        key for key in site_data.load_races(task_dir.parent) if key[1] == "docs-beta"
+    )
+    assert site_data.load_races(task_dir.parent)[key].about is None
+    page_file = "races/docs-beta/index.html"
+    assert "What it is" not in before[page_file]
+    assert "What makes it hard" not in before[page_file]
+    what = 'Update a guide with <examples> & "quotes".'
+    hard = "Several contracts interact."
+    manifest.write_text(
+        original
+        + "\n[about]\nwhat = "
+        + json.dumps(what)
+        + "\nhard = "
+        + json.dumps(hard)
+        + "\n"
+    )
+    assert site_data.load_races(task_dir.parent)[key].about == {
+        "what": what,
+        "hard": hard,
+    }
+    after = build_site.build(results)
+    page = after[page_file]
+    paragraphs = (
+        '<p class="rc-copy"><strong>What it is:</strong> '
+        + html.escape(what, quote=True)
+        + '</p><p class="rc-copy"><strong>What makes it hard:</strong> '
+        + hard
+        + "</p>"
+    )
+    section = (
+        '<section class="rc-section" aria-label="About this race">'
+        + paragraphs
+        + "</section>"
+    )
+    assert section in page
+    assert page.index(section) < page.index(
+        '<section class="rc-section rc-split" id="briefing">'
+    )
+    assert page.replace(section, "") == before[page_file]
+    grid = after["races/index.html"]
+    assert f'<p class="rc-title">{html.escape(what, quote=True)}</p>' in grid
+    summary = next(
+        race
+        for race in json.loads(after["data/races.json"])["races"]
+        if race["id"] == "docs-beta"
+    )
+    assert summary["about"] == {"what": what, "hard": hard}
+    # A sibling without context retains both its HTML and its data shape.
+    assert (
+        after["races/hard-review-alpha/index.html"]
+        == before["races/hard-review-alpha/index.html"]
+    )
+    manifest.write_text(original)
+    assert build_site.build(results) == before
+
+
 def test_race_page_shows_the_briefing_as_the_track_card_allows(tmp_path):
     results = _site_tree(tmp_path)
     tasks = results.parent / "tasks"

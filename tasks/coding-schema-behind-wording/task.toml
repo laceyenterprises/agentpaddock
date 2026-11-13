@@ -23,3 +23,7 @@ recoverable = { type = "boolean", required = true, description = "whether the be
 [verifier]
 entrypoint = "verifier.py"
 description = "The answer must identify that the regex matches only 'not at Alembic head' and must also parse 'behind Alembic head'."
+
+[about]
+what = "Diagnose why a database recovery helper fails to recognize an error message it should understand."
+hard = "The code and the observed message describe the same situation differently. The agent must compare the actual evidence with the parser rather than assume the existing wording covers every case."

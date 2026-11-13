@@ -17,3 +17,7 @@ findings = { type = "list", required = true, max_items = 32, items = { file = { 
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Review a change that plans archival and cleanup of finished worker records before performing destructive actions."
+hard = "The proposal intentionally changes existing behavior. The agent must evaluate ordering, failure handling and stated requirements carefully, without treating every difference as a regression."

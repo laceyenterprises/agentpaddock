@@ -18,3 +18,7 @@ done = { type = "boolean" }
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Update a user guide to explain a cache and its command-line controls from the implementation."
+hard = "The existing prose contains stale claims. The agent must translate code into clear guidance while keeping defaults, exceptional cases and related options consistent."

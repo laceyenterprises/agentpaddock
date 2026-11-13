@@ -15,6 +15,10 @@ task_version = 1              # bump when graded content changes
 suite = "rca"                 # injection | rca
 persona = "claude-code"
 
+[about]                      # optional; public, display-only context
+what = "Diagnose a small incident from a supplied artifact."
+hard = "The evidence needs careful reading before drawing a conclusion."
+
 [[stages]]
 run = "stages/stage-input.sh"
 
@@ -33,6 +37,23 @@ Each graded cell, `hq gym run --json` cell and stored result records the
 version, and the baseline keeps a `task_versions` map beside `verdicts`.
 Results are compared only within one version (see the regression gate below).
 `tests/test_task_versions.py` keeps every task's declaration literal.
+
+The optional `[about]` table supplies two non-empty plain-language strings for
+readers who have never seen the repository:
+
+- `what`: one or two sentences naming the kind of work (a bug fix, documentation
+  check, review-finding fix, review or diagnosis) and what the agent is asked to do.
+- `hard`: one to three sentences describing the kind of difficulty, such as
+  misleading evidence, interacting contracts or an incomplete recommendation.
+
+Keep each field under about 60 words. Variants should explain what changed or
+became harder relative to the base race. Avoid internal codenames, ticket IDs,
+hostnames and personal names. Context must not disclose an expected answer,
+known-wrong answer, verifier checks or values from `expected/`; when in doubt,
+say less. This metadata is for display only and does not change grading or
+require a `task_version` bump. Race pages show both labelled paragraphs above
+the briefing; race cards use `what` as their description. Without `[about]`,
+pages and cards retain their previous rendering.
 
 List fields in `task.toml` require a nonnegative integer `max_items` and an
 `items` table of scalar field specs. Direct Python construction of a

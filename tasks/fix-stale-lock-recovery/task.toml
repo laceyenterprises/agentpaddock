@@ -25,3 +25,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix a review finding about workers interfering with each other while recovering an abandoned file lock."
+hard = "A repair that looks safe in a single process can still fail when another worker acts between steps. The agent must reason about competing operations instead of relying on favorable timing."

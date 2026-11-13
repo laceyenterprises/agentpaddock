@@ -25,3 +25,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix account cleanup during partial directory failures in a version with richer lookup behavior than the earlier races."
+hard = "The review finding gives less guidance, and the service contract distinguishes more situations. The agent must reconstruct the intended behavior across files rather than reuse an earlier repair mechanically."

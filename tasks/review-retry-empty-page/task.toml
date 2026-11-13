@@ -17,3 +17,7 @@ findings = { type = "list", required = true, max_items = 32, items = { file = { 
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Review a change intended to keep a data-refresh job responsive during upstream outages."
+hard = "The happy path obscures how errors affect later progress. The agent must follow the contract between fetching data, storing it and deciding what to retry."

@@ -26,3 +26,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix a review finding about an account-cleanup job that removes active accounts during a directory-service outage."
+hard = "The behavior crosses a lookup helper and its caller. Repairing the reported function can change what another part of the program receives, so the agent must follow both contracts together."

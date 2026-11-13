@@ -21,3 +21,7 @@ fixed_entries = { type = "integer" }
 [verifier]
 entrypoint = "verifier.py"
 description = "All diagnosis and counterexample fields graded independently with MEG-05 sub-checks."
+
+[about]
+what = "Diagnose why a cache returns the wrong saved result when several customers and name spellings share it."
+hard = "The behavior depends on contracts spread across several files. A plausible local fix can solve one collision while leaving others, so the agent must trace concrete requests through the whole system."

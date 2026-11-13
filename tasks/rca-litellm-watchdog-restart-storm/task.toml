@@ -41,3 +41,7 @@ evidence_id = { type = "string", required = false }
 [verifier]
 entrypoint = "verifier.py"
 description = "root_cause == over-broad banner match AND evidence cites ev-801 (the healthy-banner match line)."
+
+[about]
+what = "Diagnose why an automated watchdog repeatedly restarts a model-serving service."
+hard = "Logs, configuration and earlier troubleshooting suggestions point in competing directions. The agent must explain the sustained incident from the evidence rather than select the most alarming symptom."

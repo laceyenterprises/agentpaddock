@@ -17,3 +17,7 @@ findings = { type = "list", required = true, max_items = 32, items = { file = { 
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Review a refactor that combines publishing with delivery-receipt collection."
+hard = "A small rearrangement can affect behavior before the function returns. The agent must trace the sequence of externally visible actions against the account’s permissions."

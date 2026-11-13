@@ -29,3 +29,7 @@ suppressed_by_2devnull = { type = "boolean", required = true, description = "doe
 [verifier]
 entrypoint = "verifier.py"
 description = "The terminating line, the responsible shell option, and whether 2>/dev/null defends against it."
+
+[about]
+what = "Diagnose a shell probe that exits unsuccessfully without printing any explanation."
+hard = "The absence of output hides the useful clues. The agent must reason about shell behavior across a compound command, including interactions that are easy to miss when reading one line at a time."

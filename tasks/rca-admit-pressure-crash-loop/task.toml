@@ -41,3 +41,7 @@ evidence_id = { type = "string", required = false }
 [verifier]
 entrypoint = "verifier.py"
 description = "root_cause == in-memory-only retry lost on death AND evidence cites ev-901 or ev-902 (pressure eased but no retry)."
+
+[about]
+what = "Diagnose an incident where a worker queue remains stuck around repeated service crashes."
+hard = "The incident bundle offers several plausible explanations and noisy symptoms. The agent must distinguish what triggered the incident from what kept the system stuck, grounding the conclusion in evidence."

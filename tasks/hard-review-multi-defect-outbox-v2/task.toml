@@ -17,3 +17,7 @@ findings = { type = "list", required = true, max_items = 32, items = { file = { 
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Review a larger message-delivery queue change with more surrounding functionality than the base outbox race."
+hard = "The longer diff mixes subtle problems with reasonable implementation choices. Understanding behavior also requires reading unchanged context, increasing the work needed to distinguish actionable findings from false alarms."

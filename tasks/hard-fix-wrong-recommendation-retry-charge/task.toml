@@ -26,3 +26,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix a review finding about payment collection stalling after an uncertain gateway response."
+hard = "The recommendation addresses the visible delay but needs to be evaluated against the payment service’s contract. The agent must reason about external effects that an error response does not fully describe."

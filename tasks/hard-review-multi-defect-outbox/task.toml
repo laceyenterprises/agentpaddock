@@ -17,3 +17,7 @@ findings = { type = "list", required = true, max_items = 32, items = { file = { 
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Review a message-delivery queue that stores outgoing work and retries unsuccessful sends."
+hard = "Several interacting behaviors need attention across the storage and delivery paths. Finding one convincing issue can distract from the rest, while ordinary successful sends reveal little about recovery behavior."

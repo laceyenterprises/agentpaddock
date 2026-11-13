@@ -47,12 +47,15 @@ def is_fix_family(suite: str | None) -> bool:
 
 # result_schema field types. "enum" is the closed-set case the deterministic
 # verifiers lean on (SPEC §5/§6): the agent must submit one of a fixed set.
-FIELD_TYPES: frozenset[str] = frozenset({"string", "integer", "number", "boolean", "enum", "list"})
+FIELD_TYPES: frozenset[str] = frozenset(
+    {"string", "integer", "number", "boolean", "enum", "list"}
+)
 
 _TOP_LEVEL_KEYS: frozenset[str] = frozenset(
     {
         "id",
         "title",
+        "about",
         "suite",
         "task_version",
         "persona",
@@ -105,6 +108,14 @@ class Stage:
 
 
 @dataclass(frozen=True)
+class About:
+    """Display-only context for readers; never part of a task's grading."""
+
+    what: str
+    hard: str
+
+
+@dataclass(frozen=True)
 class Task:
     """A parsed, validated gym task."""
 
@@ -130,6 +141,7 @@ class Task:
     regression_test_path: str | None = None
     regression_test_timeout_seconds: int = 60
     regression_test_must_fail_variants: tuple[str, ...] = ()
+    about: About | None = None
 
     def field_spec(self, name: str) -> FieldSpec | None:
         for spec in self.result_schema:
@@ -158,10 +170,14 @@ def _require_mapping(value: Any, *, where: str) -> dict[str, Any]:
     return value
 
 
-def _reject_unknown(mapping: dict[str, Any], allowed: frozenset[str], *, where: str) -> None:
+def _reject_unknown(
+    mapping: dict[str, Any], allowed: frozenset[str], *, where: str
+) -> None:
     unknown = sorted(set(mapping) - allowed)
     if unknown:
-        raise TaskSchemaError(f"{where}: unknown key(s) {unknown}; allowed: {sorted(allowed)}")
+        raise TaskSchemaError(
+            f"{where}: unknown key(s) {unknown}; allowed: {sorted(allowed)}"
+        )
 
 
 def _parse_field_spec(name: str, raw: Any, *, scalar_only: bool = False) -> FieldSpec:
@@ -178,7 +194,9 @@ def _parse_field_spec(name: str, raw: Any, *, scalar_only: bool = False) -> Fiel
         if scalar_only:
             raise TaskSchemaError("nested lists are not supported")
         raw_items = _require_mapping(spec.get("items"), where=f"{name}.items")
-        items = tuple(_parse_field_spec(k, v, scalar_only=True) for k, v in raw_items.items())
+        items = tuple(
+            _parse_field_spec(k, v, scalar_only=True) for k, v in raw_items.items()
+        )
         max_items = spec.get("max_items")
         if type(max_items) is not int or max_items < 0:
             raise TaskSchemaError(f"{name}.max_items must be a nonnegative integer")
@@ -193,7 +211,9 @@ def _parse_field_spec(name: str, raw: Any, *, scalar_only: bool = False) -> Fiel
             )
         enum_values = tuple(raw_enum)
     elif "enum" in spec:
-        raise TaskSchemaError(f"result_schema.{name}: 'enum' is only valid when type = 'enum'")
+        raise TaskSchemaError(
+            f"result_schema.{name}: 'enum' is only valid when type = 'enum'"
+        )
     required = spec.get("required", True)
     if not isinstance(required, bool):
         raise TaskSchemaError(f"result_schema.{name}.required must be a boolean")
@@ -238,14 +258,18 @@ def parse_task_dict(data: dict[str, Any], *, task_dir: Path | None = None) -> Ta
 
     task_id = data.get("id")
     if not isinstance(task_id, str) or not task_id:
-        raise TaskSchemaError("task.toml: 'id' is required and must be a non-empty string")
+        raise TaskSchemaError(
+            "task.toml: 'id' is required and must be a non-empty string"
+        )
 
     if "result_schema" not in data:
         raise TaskSchemaError("task.toml: 'result_schema' table is required")
     raw_schema = _require_mapping(data["result_schema"], where="result_schema")
     if not raw_schema:
         raise TaskSchemaError("result_schema must declare at least one field")
-    result_schema = tuple(_parse_field_spec(name, spec) for name, spec in raw_schema.items())
+    result_schema = tuple(
+        _parse_field_spec(name, spec) for name, spec in raw_schema.items()
+    )
 
     if "verifier" not in data:
         raise TaskSchemaError("task.toml: '[verifier]' table is required")
@@ -257,16 +281,34 @@ def parse_task_dict(data: dict[str, Any], *, task_dir: Path | None = None) -> Ta
 
     suite = data.get("suite")
     if suite is not None and suite not in SUITES:
-        raise TaskSchemaError(f"suite must be one of {sorted(SUITES)} (or omitted), got {suite!r}")
+        raise TaskSchemaError(
+            f"suite must be one of {sorted(SUITES)} (or omitted), got {suite!r}"
+        )
 
     task_version = data.get("task_version", 1)
-    if isinstance(task_version, bool) or not isinstance(task_version, int) or task_version < 1:
-        raise TaskSchemaError(f"task_version must be a positive integer, got {task_version!r}")
+    if (
+        isinstance(task_version, bool)
+        or not isinstance(task_version, int)
+        or task_version < 1
+    ):
+        raise TaskSchemaError(
+            f"task_version must be a positive integer, got {task_version!r}"
+        )
 
     for optional_str in ("title", "persona"):
         value = data.get(optional_str)
         if value is not None and not isinstance(value, str):
             raise TaskSchemaError(f"{optional_str} must be a string")
+
+    about = None
+    if "about" in data:
+        raw_about = _require_mapping(data["about"], where="about")
+        _reject_unknown(raw_about, frozenset({"what", "hard"}), where="about")
+        for name in ("what", "hard"):
+            value = raw_about.get(name)
+            if not isinstance(value, str) or not value.strip():
+                raise TaskSchemaError(f"about.{name} must be a non-empty string")
+        about = About(what=raw_about["what"], hard=raw_about["hard"])
 
     dispatch: dict[str, Any] = {}
     if "dispatch" in data:
@@ -292,7 +334,9 @@ def parse_task_dict(data: dict[str, Any], *, task_dir: Path | None = None) -> Ta
             or ".." in Path(path).parts
             or path == "."
         ):
-            raise TaskSchemaError("capture.files paths must be workspace-relative without '..'")
+            raise TaskSchemaError(
+                "capture.files paths must be workspace-relative without '..'"
+            )
 
     hidden_entrypoint = None
     hidden_timeout = 120
@@ -319,10 +363,14 @@ def parse_task_dict(data: dict[str, Any], *, task_dir: Path | None = None) -> Ta
             raise TaskSchemaError("hidden_tests.entrypoint must be hidden/<file>.json")
         hidden_timeout = hidden.get("timeout_seconds", 120)
         if type(hidden_timeout) is not int or not 1 <= hidden_timeout <= 120:
-            raise TaskSchemaError("hidden_tests.timeout_seconds must be an integer from 1 to 120")
+            raise TaskSchemaError(
+                "hidden_tests.timeout_seconds must be an integer from 1 to 120"
+            )
         hidden_expected_tests = hidden.get("expected_tests")
         if type(hidden_expected_tests) is not int or hidden_expected_tests < 1:
-            raise TaskSchemaError("hidden_tests.expected_tests must be a positive integer")
+            raise TaskSchemaError(
+                "hidden_tests.expected_tests must be a positive integer"
+            )
 
     regression_path = None
     regression_timeout = 60
@@ -358,8 +406,13 @@ def parse_task_dict(data: dict[str, Any], *, task_dir: Path | None = None) -> Ta
                 "without built-in collisions"
             )
         for name in must_fail_variants:
-            if task_dir is not None and not (task_dir / "hidden/variants" / name).is_dir():
-                raise TaskSchemaError(f"regression_test: missing variant directory {name!r}")
+            if (
+                task_dir is not None
+                and not (task_dir / "hidden/variants" / name).is_dir()
+            ):
+                raise TaskSchemaError(
+                    f"regression_test: missing variant directory {name!r}"
+                )
         regression_path = regression.get("path")
         if (
             not isinstance(regression_path, str)
@@ -371,7 +424,9 @@ def parse_task_dict(data: dict[str, Any], *, task_dir: Path | None = None) -> Ta
             )
         regression_timeout = regression.get("timeout_seconds", 60)
         if type(regression_timeout) is not int or not 1 <= regression_timeout <= 60:
-            raise TaskSchemaError("regression_test.timeout_seconds must be an integer from 1 to 60")
+            raise TaskSchemaError(
+                "regression_test.timeout_seconds must be an integer from 1 to 60"
+            )
 
     required_commands = data.get("required_large_output_commands", [])
     if "required_large_output_commands" in data:
@@ -405,6 +460,7 @@ def parse_task_dict(data: dict[str, Any], *, task_dir: Path | None = None) -> Ta
         verifier_entrypoint=entrypoint,
         suite=suite,
         title=data.get("title"),
+        about=about,
         task_version=task_version,
         persona=data.get("persona"),
         dispatch=dict(dispatch),
@@ -455,7 +511,9 @@ def validate_result(task: Task, result: Any) -> str | None:
     return _validate_fields(task.result_schema, result)
 
 
-def _validate_fields(specs: tuple[FieldSpec, ...], result: dict[str, Any]) -> str | None:
+def _validate_fields(
+    specs: tuple[FieldSpec, ...], result: dict[str, Any]
+) -> str | None:
     allowed = {spec.name for spec in specs}
     extra = sorted(set(result) - allowed)
     if extra:

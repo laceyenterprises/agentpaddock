@@ -17,3 +17,7 @@ findings = { type = "list", required = true, max_items = 32, items = { file = { 
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Review a change that lets a data-refresh job resume from saved progress after a restart."
+hard = "Normal operation looks straightforward, but persisted state can outlive a failed run. The agent must examine how the new component fits into the surrounding recovery lifecycle."

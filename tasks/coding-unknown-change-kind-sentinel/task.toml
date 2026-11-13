@@ -23,3 +23,7 @@ invalid_explicit_still_errors = { type = "boolean", required = true, description
 [verifier]
 entrypoint = "verifier.py"
 description = "The answer must treat the resolver's own terminal sentinel as not-declared while preserving errors for invalid kinds."
+
+[about]
+what = "Diagnose a change-classification helper that rejects a value previously produced by the same system."
+hard = "The same input path handles both stored state and explicit user choices. The agent must reconcile those meanings without weakening the surrounding validation contract."

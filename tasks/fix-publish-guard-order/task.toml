@@ -25,3 +25,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix a review finding about a publishing operation that can act on a disabled account."
+hard = "The returned result does not tell the whole story: an operation may already have had an external effect. The agent must reason about the sequence of actions and preserve normal successful behavior."

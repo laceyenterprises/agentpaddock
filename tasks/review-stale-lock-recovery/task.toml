@@ -17,3 +17,7 @@ findings = { type = "list", required = true, max_items = 32, items = { file = { 
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Review a file-lock change that lets multiple processes recover after a lock holder crashes."
+hard = "Operations that look safe in isolation can overlap with another worker’s actions. The agent must construct a possible interleaving and assess its effect on the promised mutual exclusion."

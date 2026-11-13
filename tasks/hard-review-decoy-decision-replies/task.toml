@@ -17,3 +17,7 @@ findings = { type = "list", required = true, max_items = 32, items = { file = { 
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Review a system that records human decisions, delivers replies to waiting workers and handles delayed responses."
+hard = "Several processes can act on related state, and some suspicious-looking choices are intentional. The agent must separate concrete defects from concerns already addressed by the documented contracts."

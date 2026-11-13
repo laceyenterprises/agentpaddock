@@ -62,6 +62,14 @@ def test_corpus_is_discovered():
     assert SCRUBBED <= {manifest.parent.name for manifest in MANIFESTS}
 
 
+@pytest.mark.parametrize("manifest", MANIFESTS, ids=lambda p: p.parent.name)
+def test_every_task_has_public_context(manifest):
+    about = load_task(manifest.parent).about
+    assert about is not None
+    assert about.what.strip()
+    assert about.hard.strip()
+
+
 def test_read_evidence_regrade_covers_every_review_checks_verifier():
     users = {
         verifier.parent.name

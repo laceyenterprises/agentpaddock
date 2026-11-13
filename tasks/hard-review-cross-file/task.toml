@@ -17,3 +17,7 @@ findings = { type = "list", required = true, max_items = 32, items = { file = { 
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Review a change to a shared registry lookup used by other parts of a program."
+hard = "The consequences extend beyond the edited lines. The agent must follow the relationship between a changed interface and the code that depends on it, including files outside the diff."

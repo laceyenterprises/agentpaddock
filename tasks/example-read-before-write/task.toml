@@ -26,3 +26,7 @@ evidence_id = { type = "string", required = true }
 [verifier]
 entrypoint = "verifier.py"
 description = "root_cause == ground truth, evidence cited, and read preceded write."
+
+[about]
+what = "Diagnose a small example incident from a supplied artifact and support the conclusion with evidence."
+hard = "This introductory race asks the agent to ground its answer in the supplied material. Familiar-sounding explanations are no substitute for reading what happened."

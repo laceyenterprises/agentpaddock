@@ -25,3 +25,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix request throttling and retry guidance when requests consume different amounts of capacity, extending the earlier rate-limit race."
+hard = "Variable request costs make the timing behavior more demanding, and the findings are less prescriptive. The agent must derive a consistent repair from the caller’s full contract."

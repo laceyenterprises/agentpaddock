@@ -17,3 +17,7 @@ findings = { type = "list", required = true, max_items = 32, items = { file = { 
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Review a model-serving change that lets coding agents request and receive tool calls."
+hard = "The bridge has to reconcile model output, client requests and different response paths. The agent must follow those contracts across files and avoid stopping after the first plausible issue."

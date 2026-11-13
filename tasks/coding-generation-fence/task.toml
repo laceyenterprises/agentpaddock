@@ -21,3 +21,7 @@ fixed_wrong_schedules = { type = "integer" }
 [verifier]
 entrypoint = "verifier.py"
 description = "All diagnosis and counterexample fields graded independently with MEG-05 sub-checks."
+
+[about]
+what = "Diagnose why a screen can show the wrong result when several background loads finish in different orders."
+hard = "Start order and finish order are different. The agent has to follow several possible schedules and distinguish a fix that works once from one that preserves the promised behavior throughout."

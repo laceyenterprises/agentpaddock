@@ -21,3 +21,7 @@ fixed_receipts = { type = "integer" }
 [verifier]
 entrypoint = "verifier.py"
 description = "All diagnosis and counterexample fields graded independently with MEG-05 sub-checks."
+
+[about]
+what = "Diagnose repeated balance changes in a payment-processing example and choose a repair."
+hard = "Retries, crashes and delayed responses make the apparent sequence of events misleading. The agent must reason about what has already happened when a failure is reported, rather than judge a patch by its happy path."

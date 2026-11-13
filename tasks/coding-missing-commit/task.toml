@@ -27,3 +27,7 @@ teardown_line = { type = "integer", required = true, description = "1-indexed li
 [verifier]
 entrypoint = "verifier.py"
 description = "Defect class plus both ends of the write path: where the row is written and where it is discarded."
+
+[about]
+what = "Diagnose a queue-processing job that reports completed work while its database table stays empty."
+hard = "The visible statements look reasonable individually. Explaining the symptom requires following the full lifecycle of the work, including what happens when the job finishes."

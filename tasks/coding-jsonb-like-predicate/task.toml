@@ -28,3 +28,7 @@ offending_column = { type = "string", required = true, description = "the column
 [verifier]
 entrypoint = "verifier.py"
 description = "Line, defect class, and column must match; the agent must read the schema, not only the query."
+
+[about]
+what = "Diagnose why a database query that looks valid cannot run against its database."
+hard = "The query alone is insufficient evidence. The agent must connect it to a separate schema and resist judging familiar-looking code in isolation."

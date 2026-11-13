@@ -25,3 +25,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix a review finding about a data-import job that skips work after a temporary upstream failure."
+hard = "Successful responses and failed reads travel through closely related paths. The agent must preserve the caller’s progress rules across both, rather than merely suppress the exception."

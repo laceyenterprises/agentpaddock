@@ -30,3 +30,7 @@ must_fail_variants = ["literal-advice", "all-days", "inclusive-end"]
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix a weekly release-freeze policy and add regression coverage, extending the earlier daily-window races."
+hard = "Calendar recurrence adds another layer to time-window reasoning, and the finding supplies less guidance. The agent must combine policy and caller contracts to design both a complete fix and a useful test."
