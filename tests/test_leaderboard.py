@@ -1333,6 +1333,24 @@ def test_checkpoint_names_verified_by_exact_task_version(community_track):
     assert lb.validate_track(community_track, []) == ([], ["checkpoints unverified"])
 
 
+@pytest.mark.parametrize(
+    "about", ['"Public checkpoint explanation."', "42", "false", "[]"]
+)
+def test_validate_track_optional_checkpoint_about(community_track, about):
+    card = community_track / "track.toml"
+    card.write_text(
+        card.read_text().replace(
+            'label = "Quality"', f'label = "Quality"\nabout = {about}'
+        )
+    )
+    errors, warnings = lb.validate_track(community_track, _track_records())
+    assert not warnings
+    if about.startswith('"'):
+        assert not errors
+    else:
+        assert errors == ["track: checkpoint about must be nonempty public text"]
+
+
 def test_legacy_checkpoint_absence_cannot_verify_card(community_track):
     rows = _track_records()
     for row in rows:

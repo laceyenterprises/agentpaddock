@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gzip
+import ast
 import hashlib
 import html
 import io
@@ -2517,6 +2518,219 @@ def test_race_page_funnel_comes_from_the_data(tmp_path):
         data = funnel["byCar" if view["mode"] == "car" else "byDriver"][view["key"]]
         assert view["n"] == data[0]
         assert view["stats"][-1] == f"{data[-1]} of {data[0]} finish"
+
+
+def test_committed_checkpoint_copy_covers_results_and_companions():
+    results = lb.load_results()
+    model = site_data.model(results, lb.MODULE_ROOT / "tasks")
+    races_by_task = {(r.suite, r.id): r for r in model.races.values()}
+    glossary = lb.read_toml(site_data.CHECKPOINT_GLOSSARY)
+    seen = set()
+    for record in results.records:
+        # Coverage includes historical task versions in the committed bundles.
+        race = races_by_task[(record["suite"], record["task"])]
+        card = {c["check"]: c for c in race.checkpoints}
+        for check in record.get("checks", []):
+            name = check["name"]
+            if name.startswith(lb.FACT_CHECK_PREFIX):
+                assert not site_data.checkpoint_copy(glossary, race.suite, name)
+                if name in card:
+                    assert lb.disclosure(card[name]) != "label"
+                continue
+            copy = site_data.checkpoint_copy(glossary, race.suite, name)
+            # An explicit card field may supply either part of the copy.
+            copy = {**copy, **card.get(name, {})}
+            assert copy.get("label") and copy.get("about"), (race.id, name)
+            # A derived fallback cannot silently satisfy coverage.
+            authored = site_data.checkpoint_copy(glossary, race.suite, name)
+            raw_card = (
+                lb.read_toml(race.task_dir / "track.toml") if race.has_card else {}
+            )
+            explicit = next(
+                (c for c in raw_card.get("checkpoints", []) if c["check"] == name), {}
+            )
+            assert all(explicit.get(k) or authored.get(k) for k in ("label", "about"))
+            seen.add((race.suite, name))
+    assert seen
+
+
+def test_checkpoint_copy_precedence_is_per_field_and_challenge(tmp_path, monkeypatch):
+    results = _site_tree(tmp_path)
+    glossary = tmp_path / "checkpoints.toml"
+    glossary.write_text(
+        '[checks.read_files]\nlabel = "Shared label"\nabout = "Shared explanation."\n'
+        "[challenges.hard-review.read_files]\n"
+        'label = "Challenge label"\nabout = "Challenge explanation."\n'
+        '[checks.verdict_right]\nlabel = "Shared verdict"\nabout = "Verdict explanation."\n'
+    )
+    monkeypatch.setattr(site_data, "CHECKPOINT_GLOSSARY", glossary)
+    card = results.parent / "tasks/hard-review-alpha/track.toml"
+    original = card.read_text()
+    card.write_text(original.replace('label = "Read the code"', 'label = "Card label"'))
+    race = json.loads(_site_files(results)["data/races/hard-review-alpha.json"])
+    assert race["checkpointRates"][0]["label"] == "Card label"
+    assert race["checkpointRates"][0]["about"] == "Challenge explanation."
+    card.write_text(
+        original.replace(
+            'label = "Read the code"',
+            'label = "Card label"\nabout = "Card explanation."',
+        )
+    )
+    race = json.loads(_site_files(results)["data/races/hard-review-alpha.json"])
+    assert race["checkpointRates"][0]["about"] == "Card explanation."
+    card.unlink()
+    race = json.loads(_site_files(results)["data/races/hard-review-alpha.json"])
+    assert race["checkpointRates"][0]["label"] == "Challenge label"
+    assert race["checkpointRates"][0]["about"] == "Challenge explanation."
+    assert site_data.checkpoint_copy(
+        lb.read_toml(glossary), "review", "read_files"
+    ) == {"label": "Shared label", "about": "Shared explanation."}
+
+
+def test_checkpoint_glossary_exact_names_win_over_families():
+    glossary = {
+        "checks": {
+            "synthetic:*": {"label": "Family"},
+            "synthetic:one": {"label": "Exact"},
+        },
+        "challenges": {"review": {"synthetic:*": {"label": "Challenge"}}},
+    }
+    assert site_data.checkpoint_copy(glossary, "coding", "synthetic:one") == {
+        "label": "Exact"
+    }
+    assert site_data.checkpoint_copy(glossary, "review", "synthetic:one") == {
+        "label": "Challenge"
+    }
+    assert not site_data.checkpoint_copy(glossary, "coding", "unlisted")
+
+
+def test_public_checkpoint_copy_does_not_quote_grading_material():
+    tasks = lb.MODULE_ROOT / "tasks"
+    glossary = lb.read_toml(site_data.CHECKPOINT_GLOSSARY)
+    copies = list(glossary["checks"].values())
+    for entries in glossary.get("challenges", {}).values():
+        copies.extend(entries.values())
+    for path in tasks.glob("*/track.toml"):
+        copies.extend(lb.read_toml(path)["checkpoints"])
+    texts = [c[field] for c in copies for field in ("label", "about") if c.get(field)]
+    protected = []
+    for directory in ("expected", "hidden"):
+        for path in tasks.glob(f"*/{directory}/**/*"):
+            if path.is_file():
+                protected.append(path.read_text("utf-8"))
+    verifiers = list(tasks.glob("*/verifier.py")) + [
+        lb.MODULE_ROOT / "lib/python/gym/review_checks.py",
+        lb.MODULE_ROOT / "lib/python/gym/doc_checks.py",
+    ]
+    reasons = set()
+    for path in verifiers:
+        for node in ast.walk(ast.parse(path.read_text("utf-8"))):
+            if not isinstance(node, ast.Call):
+                continue
+            name = getattr(node.func, "attr", getattr(node.func, "id", ""))
+            candidates = [kw.value for kw in node.keywords if kw.arg == "reason"]
+            if name in ("check", "add", "record") and len(node.args) >= 3:
+                candidates.append(node.args[2])
+            elif name == "fail" and node.args:
+                candidates.append(node.args[0])
+            for reason in candidates:
+                # Dynamic reasons have fixed prose around their interpolations.
+                for part in ast.walk(reason):
+                    if isinstance(part, ast.Constant) and isinstance(part.value, str):
+                        if len(part.value.split()) >= 3:
+                            reasons.add(part.value.strip())
+    for text in texts:
+        assert not any(reason in text for reason in reasons), text
+        for source in protected:
+            assert text not in source, text
+            assert not any(
+                line.strip() in text
+                for line in source.splitlines()
+                if len(line.strip()) >= 30
+            ), text
+
+
+def test_committed_race_track_sections_match_lap_numbers_and_rates(committed_pages):
+    files, _ = committed_pages
+    for path, content in files.items():
+        if not path.startswith("data/races/") or not path.endswith(".json"):
+            continue
+        race = json.loads(content)
+        page_path = site_races.race_file(race["id"])
+        # Race data also includes tasks below the calendar's publication minimum.
+        if page_path not in files:
+            continue
+        page = files[page_path]
+        if not race["checkpointRates"] and not race["moreChecks"]:
+            assert 'id="track"' not in page
+            continue
+        track = page.split('id="track">', 1)[1].split("</section>", 1)[0]
+        assert "The track" in track
+        assert (
+            page.index('id="lap"')
+            < page.index('id="track"')
+            < page.index('id="result"')
+        )
+        assert _texts(page, "rc-station-name")[1:-1] == [
+            c["label"] for c in race["checkpointRates"] or []
+        ]
+        for number, checkpoint in enumerate(race["checkpointRates"] or [], 1):
+            assert f'href="#checkpoint-{number}"' in page
+            row = track.split(f'id="checkpoint-{number}">', 1)[1].split("</li>", 1)[0]
+            assert f'class="rc-track-number">{number}</span>' in row
+            assert html.escape(checkpoint["label"]) in row
+            assert checkpoint["about"] and html.escape(checkpoint["about"]) in row
+            status = "optional" if checkpoint["optional"] else "required"
+            rate = (
+                f"{checkpoint['rate']:.0%}" if checkpoint["rate"] is not None else "n/a"
+            )
+            assert f"{status} · {rate} pass · {checkpoint['n']:,} runs" in row
+        if race["moreChecks"]:
+            assert (
+                f"{race['moreChecks']} more checks the track card does not name"
+                in track
+            )
+
+
+def test_browser_race_checkpoint_guide_at_phone_widths(committed_pages, tmp_path):
+    executable = os.environ.get("PADDOCK_BROWSER_EXECUTABLE")
+    if not executable:
+        pytest.skip("Local Chromium pass requires PADDOCK_BROWSER_EXECUTABLE")
+    browser_api = pytest.importorskip("playwright.sync_api")
+    files, _ = committed_pages
+    for name, content in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content.encode() if isinstance(content, str) else content)
+    # Cover review copy, diagnosis copy, repeated generic labels and counted facts.
+    races = (
+        "hard-review-multi-defect-outbox-v2",
+        "coding-cache-context",
+        "hard-fix-regression-test-dedupe-v2",
+        "docs-gym-run-flags",
+    )
+    with browser_api.sync_playwright() as api:
+        browser = api.chromium.launch(executable_path=executable)
+        try:
+            for scripting in (False, True):
+                context = browser.new_context(java_script_enabled=scripting)
+                context.route("https://**", lambda route: route.abort())
+                page = context.new_page()
+                for width in (320, 360, 390, 430):
+                    page.set_viewport_size({"width": width, "height": 900})
+                    for race in races:
+                        page.goto((tmp_path / site_races.race_file(race)).as_uri())
+                        assert page.evaluate(
+                            "document.documentElement.scrollWidth <= innerWidth + 1"
+                        ), (race, width, scripting)
+                        assert page.locator("#track").is_visible()
+                        links = page.locator(".rc-checkpoint-link")
+                        assert links.count() == page.locator(".rc-track-row").count()
+                        links.first.click()
+                        assert page.evaluate("location.hash") == "#checkpoint-1"
+                context.close()
+        finally:
+            browser.close()
 
 
 def test_race_lap_chips_name_the_driver_and_car(tmp_path):
