@@ -3,7 +3,7 @@
 Rebuilds ``design/web/Garage.dc.html``. Pick a driver (model), a car (harness)
 and one of six engine maps (the car's own default, low, medium, high, xhigh,
 max). The default is named by the setting the driver ran at in that car, and
-who chose it (``views.map_label``), or "setting not recorded".
+who chose it (``views.map_label``), or "not recorded".
 
 - **Availability comes from the data.** A level is open for a driver when some
   results document has a counted run of that driver at that level, in any car
@@ -176,6 +176,7 @@ def model(site: views.SiteData) -> dict[str, Any]:
                 },
                 # The default engine map's label in each car, for this driver.
                 "defaults": defaults,
+                "defaultTips": {car: views.map_tip(car, driver) for car in car_order},
                 "note": map_note(name, open_levels, extra),
                 "tip": (
                     f"{name} does best in {views.car_name(best['car'])} at engine map "
@@ -324,7 +325,8 @@ def _result(view: Mapping[str, Any], pick: Sequence[str], root: str) -> str:
         f'<span data-slot="driver">{esc(chosen["name"])}</span></b> '
         f'<span>in <b class="ent">{glyphs.icon("car")}<span data-slot="car">{esc(car_label)}</span></b>'
         f' · engine map <b class="ent"><span data-slot="mapGlyph">{glyphs.icon(map_glyph)}</span>'
-        f'<span data-slot="map">{esc(views.map_label(engine_map, car, driver))}</span></b></span></p>'
+        f'<span data-slot="map">{esc(views.map_label(engine_map, car, driver))}</span></b>'
+        f"{views.map_info(views.map_tip(car, driver), hidden=engine_map != 'default')}</span></p>"
         f'<div class="gr-raced" data-state="raced"{hidden(bool(entry))}>'
         f'<div class="gr-score"><span class="gr-pct" data-slot="pct">{esc(entry["pct"] if entry else "")}</span>'
         f'<span><span data-slot="passOf">{esc(entry["passOf"] if entry else "")}</span> races passed</span></div>'
@@ -515,6 +517,12 @@ SCRIPT = """(function () {
     slot('driver').textContent = d.name;
     slot('car').textContent = car[1];
     slot('map').textContent = state.map === 'default' ? d.defaults[state.car] : state.map;
+    var info = garage.querySelector('.map-info');
+    info.querySelector('.map-tip').hidePopover();
+    info.querySelector('button').setAttribute('aria-expanded', 'false');
+    info.querySelector('button').dataset.pinned = 'false';
+    info.hidden = state.map !== 'default';
+    info.querySelector('.map-tip').textContent = d.defaultTips[state.car];
     slot('mapGlyph').querySelector('use').setAttribute('href', '#' + levelGlyphs[state.map]);
     slot('note').textContent = d.note;
     garage.querySelector('[data-state="raced"]').hidden = !entry;

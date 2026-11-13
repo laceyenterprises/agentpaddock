@@ -3328,7 +3328,7 @@ def test_home_fuel_card_compares_a_shared_finish(tmp_path):
         f"{driver('d/one')} in {pi} · {tag('default', 'pi', 'd/one')} passes a race for $0.040."
         in card
     )
-    assert ">setting</span> not recorded</b>" in card
+    assert ">not</span> recorded</b>" in card
     assert "Pi default" not in card
     assert (
         f"{driver('d/two')} in {pi} · {tag('high', 'pi')}, tied on the finish, pays $0.320."
@@ -4060,19 +4060,19 @@ def _data_page_names(files) -> list[str]:
     [
         (
             ["default"],
-            ["medium (sent by Codex)"],
-            "Coder has raced at one engine map only: the default (medium (sent by Codex)).",
+            ["medium (Codex default)"],
+            "Coder has raced at one engine map only: the default (medium (Codex default)).",
         ),
         (
             ["default", "medium"],
-            ["medium (sent by Codex)"],
+            ["medium (Codex default)"],
             "No counted run has Coder at high; it has raced at "
-            "the default (medium (sent by Codex)) and medium.",
+            "the default (medium (Codex default)) and medium.",
         ),
         (
             ["default"],
-            ["setting not recorded"],
-            "Coder has raced at one engine map only: the default (setting not recorded).",
+            ["not recorded"],
+            "Coder has raced at one engine map only: the default (not recorded).",
         ),
         (
             ["default"],
@@ -4109,7 +4109,7 @@ def test_garage_level_availability_comes_from_the_data(tmp_path):
     # A level seen only in a self-reported document still opens the level.
     assert open_levels("bolt/coder-small") == ["default", "max"]
     assert drivers["local/coder-tiny"]["levels"]["high"] == (
-        "Coder Tiny has raced at one engine map only: the default (setting not recorded)."
+        "Coder Tiny has raced at one engine map only: the default (not recorded)."
     )
     assert "It runs at one setting only." in drivers["local/coder-tiny"]["note"]
     # Featured drivers (a placed entry) first; a partial-only driver has no page.
@@ -4264,63 +4264,188 @@ def _best_line(page: str) -> str:
     ("car", "engine_map", "route", "label"),
     [
         # The car sent the level (the run's own session record, or the car's docs).
-        ("codex", "default", "anthropic/claude-opus-5-5", "medium (sent by Codex)"),
-        ("codex", "default", "moonshot/kimi-k3", "medium (sent by Codex)"),
+        ("codex", "default", "anthropic/claude-opus-5-5", "medium (Codex default)"),
+        ("codex", "default", "moonshot/kimi-k3", "medium (Codex default)"),
         (
             "claude-code",
             "default",
             "anthropic/claude-sonnet-5-5",
-            "medium (sent by Claude Code)",
+            "medium (Claude Code default)",
         ),
-        ("hermes", "default", "openai/gpt-6.1-sol", "medium (sent by Hermes)"),
+        ("hermes", "default", "openai/gpt-6.1-sol", "medium (Hermes default)"),
         # The three routes Codex sends nothing on: the route's own default applies.
         (
             "codex",
             "default",
             "fireworks/qwen3.8-max",
-            "xhigh (Fireworks default; Codex sends none)",
+            "xhigh (Fireworks default)",
         ),
         (
             "codex",
             "default",
             "zai/glm-5.2",
-            "dynamic thinking, max (Z.ai default; Codex sends none)",
+            "max (Z.ai default)",
         ),
-        ("codex", "default", "openrouter/qwen3.8-27b", "setting not recorded"),
+        ("codex", "default", "openrouter/qwen3.8-27b", "not recorded"),
         # OpenCode and Pi send nothing.
         (
             "opencode",
             "default",
             "anthropic/claude-sonnet-5-5",
-            "adaptive, high (Anthropic default; OpenCode sends none)",
+            "high (Anthropic default)",
         ),
-        ("pi", "default", "moonshot/kimi-k3", "max (Moonshot default; Pi sends none)"),
+        ("pi", "default", "moonshot/kimi-k3", "max (Moonshot default)"),
         (
             "pi",
             "default",
             "openai/gpt-6.1-sol",
-            "medium (OpenAI default; Pi sends none)",
+            "medium (OpenAI default)",
         ),
-        ("pi", "default", "together/deepseek-v4.1-flash", "setting not recorded"),
+        ("pi", "default", "together/deepseek-v4.1-flash", "not recorded"),
         # What reached the model is not recorded.
-        ("codex", "default", "openai/gpt-6.1-sol", "setting not recorded"),
-        ("claude-code", "default", "anthropic/claude-sonnet-5", "setting not recorded"),
-        ("claude-code", "default", "fireworks/kimi-k3", "setting not recorded"),
-        ("alpha-cli", "default", "acme/coder-large", "setting not recorded"),
-        ("codex", "default", None, "setting not recorded"),
+        ("codex", "default", "openai/gpt-6.1-sol", "not recorded"),
+        ("claude-code", "default", "anthropic/claude-sonnet-5", "not recorded"),
+        ("claude-code", "default", "fireworks/kimi-k3", "not recorded"),
+        ("alpha-cli", "default", "acme/coder-large", "not recorded"),
+        ("codex", "default", None, "not recorded"),
         # A named level reads as it is.
         ("codex", "high", "openai/gpt-6.1-sol", "high"),
         ("pi", "low", None, "low"),
+        (None, "default", None, "the car's default"),
     ],
 )
 def test_engine_map_label_names_the_setting_that_ran(car, engine_map, route, label):
     assert site_views.map_label(engine_map, car, route) == label
     first, space, rest = label.partition(" ")
     glyph = site_glyphs.icon(site_views.map_glyph(engine_map))
-    assert site_views.map_tag(engine_map, car, route) == (
+    assert site_views.map_tag(engine_map, car, route).startswith(
         f'<b class="ent"><span class="ent-lead">{glyph}{html.escape(first)}</span>'
         f"{space}{html.escape(rest)}</b>"
     )
+    markup = site_views.map_tag(engine_map, car, route)
+    if engine_map == "default":
+        assert '</b><span class="map-info"><button' in markup
+        assert '<use href="#info"/>' in markup
+        assert 'aria-label="About this engine map"' in markup
+        assert 'popover="auto"' in markup
+        assert html.escape(site_views.map_tip(car, route)) in markup
+    else:
+        assert "map-info" not in markup
+
+
+@pytest.mark.parametrize(
+    "car,route,note",
+    [
+        (
+            "codex",
+            "anthropic/claude-opus-5-5",
+            "Codex sends its own default thinking level, medium, when an entry sets none.",
+        ),
+        (
+            "claude-code",
+            "anthropic/claude-opus-5-5",
+            "Claude Code sends its own default effort, medium, when an entry sets none.",
+        ),
+        (
+            "hermes",
+            "openai/gpt-6.1-sol",
+            "Hermes sends its default thinking level, medium, when its setting is left empty.",
+        ),
+        (
+            "pi",
+            "openai/gpt-6.1-sol",
+            "Pi sends no thinking level for this model, so OpenAI's default applies: medium.",
+        ),
+        (
+            "opencode",
+            "anthropic/claude-sonnet-5-5",
+            "OpenCode's setup for this model sets no thinking level, so Anthropic's default applies: adaptive thinking at high effort.",
+        ),
+        (
+            "opencode",
+            "anthropic/claude-opus-5-5",
+            "OpenCode's setup for this model sets no thinking level, so Anthropic's default applies: adaptive thinking at medium effort.",
+        ),
+        (
+            "codex",
+            "zai/glm-5.2",
+            "Codex has no thinking-level default for this model, so it sends none and Z.ai's default applies: dynamic thinking at max effort.",
+        ),
+        (
+            "codex",
+            "fireworks/qwen3.8-max",
+            "Codex has no thinking-level default for this model, so it sends none and Fireworks's default applies: xhigh.",
+        ),
+        (
+            "codex",
+            "openrouter/qwen3.8-27b",
+            "Codex sends no thinking level for this model, and OpenRouter publishes no default, so the level that ran is not recorded.",
+        ),
+        (
+            "pi",
+            "together/deepseek-v4.1-flash",
+            "Pi sends no thinking level for this model, and Together publishes no default, so the level that ran is not recorded.",
+        ),
+        (
+            "codex",
+            "openai/gpt-6.1-sol",
+            "The bench did not record which thinking level Codex sent to this model.",
+        ),
+        (
+            "alpha-cli",
+            "acme/coder-large",
+            "The bench did not record which thinking level Alpha Cli sent to this model.",
+        ),
+    ],
+)
+def test_default_map_tip_explains_the_evidence(car, route, note):
+    assert site_views.map_tip(car, route) == note
+
+
+def test_info_is_one_published_glyph():
+    sprite = (REPO / "design/glyphs/paddock-glyphs.svg").read_text("utf-8")
+    assert sprite.count('<symbol id="info" ') == 1
+    index = json.loads((REPO / "design/glyphs/index.json").read_text("utf-8"))
+    assert [g for g in index if g["id"] == "info"] == [
+        {"id": "info", "group": "new", "meaning": "a note about this value"}
+    ]
+
+
+def test_built_engine_map_labels_have_only_default_tips(committed_pages):
+    files, _ = committed_pages
+    count = 0
+    for name, page in files.items():
+        if not name.endswith(".html") or not isinstance(page, str):
+            continue
+        for match in re.finditer(
+            r'<b class="ent">(?:(?!</b>).)*?href="#engine-map(?:-[^"]+)?"(?:(?!</b>).)*?</b>',
+            page,
+            re.S,
+        ):
+            label = html.unescape(re.sub(r"<[^>]+>", "", match[0]))
+            assert not any(
+                word in label
+                for word in ("sends none", "sent by", "setting not recorded")
+            ), (name, label)
+            default = (
+                label == "not recorded"
+                or label == "the car's default"
+                or label.endswith(" default)")
+            )
+            followed_by_tip = page[match.end() :].startswith('<span class="map-info">')
+            assert followed_by_tip == default, (name, label)
+            count += default
+    assert count > 100
+
+
+def test_garage_uses_the_same_default_notes(committed_pages):
+    _, site = committed_pages
+    view = site_garage.model(site)
+    for driver in view["drivers"]:
+        for car, *_ in view["cars"]:
+            assert driver["defaultTips"][car] == site_views.map_tip(car, driver["id"])
+    assert "info.hidden = state.map !== 'default'" in site_garage.SCRIPT
+    assert "d.defaultTips[state.car]" in site_garage.SCRIPT
 
 
 #: A level a default-map label must name, unless it says the setting is not recorded.
@@ -4349,9 +4474,9 @@ def test_every_default_map_entry_names_its_setting():
     for car, route in sorted(seen):
         label = site_views.map_label("default", car, route)
         assert _names_a_setting(label), (car, route, label)
-        assert f"{site_views.car_name(car)} default" not in label, (car, route, label)
+
     assert site_views.map_label("default", "codex", "newhost/brand-new-model") == (
-        "setting not recorded"
+        "not recorded"
     )
 
 
@@ -4362,7 +4487,7 @@ def _car_default_without_level(text: str, cars: set[str]) -> list[str]:
     for car in cars:
         for match in re.finditer(rf"\b{re.escape(car)} default\b", plain):
             if not re.search(
-                r"\b(?:low|medium|high|xhigh|max) \($", plain[: match.start()]
+                r"(?:low|medium|high|xhigh|max) \($", plain[: match.start()]
             ):
                 found.append(plain[max(0, match.start() - 40) : match.end() + 20])
     return found
@@ -4387,11 +4512,9 @@ def test_driver_best_entry_marks_the_car_and_bolds_the_setting(committed_pages):
         best = driver["best"]
         line = _best_line(files[driver["file"]])
         car = site_views.car_name(best["car"])
-        label = site_views.map_label(best["map"], best["car"], best["driver"])
-        glyph = site_views.map_glyph(best["map"])
         assert line.startswith(
             f"<span>in {site_views.tag('car', car)}"
-            f" at engine map {site_views.tag(glyph, label)} · "
+            f" at engine map {site_views.map_tag(best['map'], best['car'], best['driver'])} · "
         ), (driver["file"], line)
         assert '<use href="#car"/>' in line and "<b" in line
 
@@ -4410,24 +4533,21 @@ def test_default_map_entries_name_the_setting_that_ran(data_page_site, monkeypat
     page = driver_page()
     line = _best_line(page)
     assert '<use href="#car"/></svg>Codex</span></b> at engine map' in line
-    assert '<use href="#engine-map"/></svg>setting</span> not recorded</b> · ' in line
+    assert '<use href="#engine-map"/></svg>not</span> recorded</b>' in line
     assert "Codex default" not in page
     # The car sent the level.
     settings = site_views.DEFAULT_SETTINGS
     monkeypatch.setitem(settings, ("codex", best["driver"]), ("medium", "car"))
     page = driver_page()
     line = _best_line(page)
-    assert '<use href="#engine-map"/></svg>medium</span> (sent by Codex)</b> · ' in line
+    assert '<use href="#engine-map"/></svg>medium</span> (Codex default)</b>' in line
     # The car-by-car row names it the same way.
-    assert page.count("medium</span> (sent by Codex)") >= 2
+    assert page.count("medium</span> (Codex default)") >= 2
     # The car sent nothing: the route's default, under the route's host.
     monkeypatch.setitem(settings, ("codex", best["driver"]), ("xhigh", "route"))
     host = site_views.host_name(best["driver"])
     line = _best_line(driver_page())
-    assert (
-        f'<use href="#engine-map"/></svg>xhigh</span> ({host} default; Codex sends none)</b> · '
-        in line
-    )
+    assert f'<use href="#engine-map"/></svg>xhigh</span> ({host} default)</b>' in line
 
 
 def test_driver_tag_names_the_model_behind_the_driver_glyph():
@@ -5658,5 +5778,83 @@ def test_browser_widths_keyboard_and_no_script_reading(acceptance_sites, tmp_pat
                     page.keyboard.press("Enter")
                     assert page.locator('[data-flag-panel="1"]').is_visible()
                 context.close()
+        finally:
+            browser.close()
+
+
+@pytest.mark.parametrize(
+    "width,touch", [(1280, False), (320, True), (375, True), (430, True)]
+)
+def test_browser_engine_map_tips(committed_pages, tmp_path, width, touch):
+    executable = os.environ.get("PADDOCK_BROWSER_EXECUTABLE")
+    if not executable:
+        pytest.skip("Local Chromium pass requires PADDOCK_BROWSER_EXECUTABLE")
+    browser_api = pytest.importorskip("playwright.sync_api")
+    files, _ = committed_pages
+    for name, content in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content.encode() if isinstance(content, str) else content)
+    with browser_api.sync_playwright() as api:
+        browser = api.chromium.launch(executable_path=executable)
+        try:
+            context = browser.new_context(
+                viewport={"width": width, "height": 800},
+                has_touch=touch,
+                is_mobile=touch,
+            )
+            context.route("https://**", lambda route: route.abort())
+            page = context.new_page()
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.goto(
+                (tmp_path / "drivers/anthropic-claude-opus-5-5/index.html").as_uri()
+            )
+            button = page.locator(".map-info-button").first
+            note = button.locator("xpath=following-sibling::*[1]")
+            button.scroll_into_view_if_needed()
+            if not touch:
+                button.hover()
+                assert note.is_visible()
+                page.mouse.move(0, 0)
+                assert not note.is_visible()
+            # Click pins the note, and the second click dismisses it, even when hover opened it.
+            button.click()
+            assert note.is_visible()
+            page.wait_for_function(
+                "document.querySelector('.map-info-button').getAttribute('aria-expanded') === 'true'"
+            )
+            rect = note.bounding_box()
+            assert rect and rect["x"] >= 0 and rect["x"] + rect["width"] <= width
+            assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            button.click()
+            assert not note.is_visible()
+            page.mouse.move(0, 0)
+            button.focus()
+            page.keyboard.press("Enter")
+            assert note.is_visible()
+            page.keyboard.press("Escape")
+            assert not note.is_visible()
+            assert button.evaluate("el => el === document.activeElement")
+            # The garage refreshes the explanation when a car/driver changes and hides it for named levels.
+            page.goto((tmp_path / "garage/index.html").as_uri())
+            page.locator('[data-driver="anthropic/claude-opus-5-5"]').click()
+            page.locator('[data-car="codex"]').click()
+            page.locator('[data-map="default"]').click()
+            info = page.locator(".gr-result .map-info")
+            assert info.is_visible()
+            assert info.locator(".map-tip").text_content() == site_views.map_tip(
+                "codex", "anthropic/claude-opus-5-5"
+            )
+            info.locator("button").click()
+            assert info.locator(".map-tip").is_visible()
+            page.locator('[data-car="opencode"]').click()
+            assert info.locator(".map-tip").text_content() == site_views.map_tip(
+                "opencode", "anthropic/claude-opus-5-5"
+            )
+            assert not info.locator(".map-tip").is_visible()
+            page.locator('[data-map="high"]').click()
+            assert not info.is_visible()
+            assert not errors
         finally:
             browser.close()

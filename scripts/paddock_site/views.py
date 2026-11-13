@@ -90,8 +90,43 @@ DEFAULT_SETTINGS: dict[tuple[str, str], tuple[str | None, str]] = {
     # sends medium, on every route.
     ("hermes", ANY_ROUTE): ("medium", "car"),
 }
+#: Explanations for each evidenced car/case, filled with route and setting data.
+DEFAULT_TIPS = {
+    (
+        "codex",
+        "car",
+    ): "Codex sends its own default thinking level, {setting}, when an entry sets none.",
+    (
+        "claude-code",
+        "car",
+    ): "Claude Code sends its own default effort, {setting}, when an entry sets none.",
+    (
+        "hermes",
+        "car",
+    ): "Hermes sends its default thinking level, {setting}, when its setting is left empty.",
+    (
+        "pi",
+        "route",
+    ): "Pi sends no thinking level for this model, so {host}'s default applies: {setting}.",
+    (
+        "opencode",
+        "route",
+    ): "OpenCode's setup for this model sets no thinking level, so {host}'s default applies: {setting}.",
+    (
+        "codex",
+        "route",
+    ): "Codex has no thinking-level default for this model, so it sends none and {host}'s default applies: {setting}.",
+    "no-default": "{car} sends no thinking level for this model, and {host} publishes no default, so the level that ran is not recorded.",
+    "no-evidence": "The bench did not record which thinking level {car} sent to this model.",
+    "no-car": "The car's default applies when an entry sets no thinking level.",
+}
+FULL_SETTINGS = {
+    "adaptive, medium": "adaptive thinking at medium effort",
+    "adaptive, high": "adaptive thinking at high effort",
+    "dynamic thinking, max": "dynamic thinking at max effort",
+}
 #: The label of a default engine map whose setting the bench cannot name.
-NOT_RECORDED = "setting not recorded"
+NOT_RECORDED = "not recorded"
 #: Car -> livery token in ``design/tokens.css``.
 LIVERIES = {
     "claude-code": "car-cc",
@@ -279,12 +314,7 @@ def default_setting(car: str, route: str | None) -> tuple[str | None, str] | Non
 
 
 def map_label(engine_map: str, car: str | None = None, route: str | None = None) -> str:
-    """The engine map as the site names it. A named level reads as it is. The
-    default reads as the setting that ran and who chose it: "medium (sent by
-    Codex)" when the car sent it, "xhigh (Fireworks default; Codex sends none)"
-    when the car sent nothing and the route's default applied, and "setting
-    not recorded" when the bench has no evidence. Without a car, as "the car's
-    default": the rung of the ladder, not a claim about a run."""
+    """Name the level and whose default applied, keeping the explanation in the tip."""
     if engine_map != "default":
         return engine_map
     if car is None:
@@ -294,8 +324,37 @@ def map_label(engine_map: str, car: str | None = None, route: str | None = None)
         return NOT_RECORDED
     level, who = setting
     if who == "car":
-        return f"{level} (sent by {car_name(car)})"
-    return f"{level} ({host_name(route or '')} default; {car_name(car)} sends none)"
+        return f"{level} ({car_name(car)} default)"
+    return f"{level.split(', ')[-1]} ({host_name(route or '')} default)"
+
+
+def map_tip(car: str | None = None, route: str | None = None) -> str:
+    """The evidence behind a default-map label, as one sentence."""
+    setting = default_setting(car, route) if car else None
+    if car is None:
+        template = DEFAULT_TIPS["no-car"]
+    elif setting is None:
+        template = DEFAULT_TIPS["no-evidence"]
+    elif setting[0] is None:
+        template = DEFAULT_TIPS["no-default"]
+    else:
+        template = DEFAULT_TIPS[(car, setting[1])]
+    level = setting[0] if setting else None
+    return template.format(
+        car=car_name(car or ""),
+        host=host_name(route or ""),
+        setting=FULL_SETTINGS.get(level, level),
+    )
+
+
+def map_info(note: str, *, hidden: bool = False) -> str:
+    """A keyboard reachable info button and its native, viewport bounded popover."""
+    return (
+        f'<span class="map-info"{" hidden" if hidden else ""}>'
+        '<button type="button" class="map-info-button" aria-label="About this engine map" '
+        f'aria-expanded="false">{glyphs.icon("info")}</button>'
+        f'<span class="map-tip" popover="auto">{esc(note)}</span></span>'
+    )
 
 
 def tag(glyph: str, text: str) -> str:
@@ -315,7 +374,8 @@ def car_tag(car: str) -> str:
 
 def map_tag(engine_map: str, car: str | None = None, route: str | None = None) -> str:
     """The engine map's label in bold behind its engine-map glyph."""
-    return tag(map_glyph(engine_map), map_label(engine_map, car, route))
+    label = tag(map_glyph(engine_map), map_label(engine_map, car, route))
+    return label + (map_info(map_tip(car, route)) if engine_map == "default" else "")
 
 
 def driver_tag(route: str, name: str | None = None) -> str:
@@ -408,6 +468,18 @@ CSS = """
 .ent { font-weight: 700; }
 .ent-lead { display: inline-block; max-width: 100%; }
 .ent svg.glyph { display: inline-block; width: 1.15em; height: 1.15em; margin-right: .2em; vertical-align: -.22em; }
+.map-info { display: inline; }
+.map-info[hidden] { display: none; }
+.map-info-button { display: inline-flex; vertical-align: middle; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 4px; border: 0; border-radius: 50%; background: transparent;
+  color: inherit; cursor: pointer; }
+.map-info-button .glyph { width: 18px; height: 18px; }
+.map-info-button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.map-tip { position: fixed; inset: auto 0 16px; margin: 0 auto; box-sizing: border-box;
+  width: min(360px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto;
+  white-space: normal; overflow-wrap: anywhere; padding: 14px 18px; border: 1px solid var(--rule);
+  border-radius: 12px; background: var(--paper); color: var(--ink); font: 400 15px/1.5 var(--body);
+  text-align: left; letter-spacing: normal; text-transform: none; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {
   display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 999px;
@@ -448,6 +520,33 @@ CSS = """
 
 #: The sideways-scroll cue: fade the edge out once a strip reaches its end.
 SCRIPT = """(function () {
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest('.map-info-button');
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    var note = button.nextElementSibling;
+    var pinned = button.dataset.pinned === 'true';
+    button.dataset.pinned = pinned ? 'false' : 'true';
+    if (pinned) note.hidePopover();
+    else note.showPopover({ source: button });
+  });
+  document.addEventListener('toggle', function (event) {
+    if (!event.target.matches('.map-tip')) return;
+    var button = event.target.previousElementSibling;
+    button.setAttribute('aria-expanded', event.newState === 'open' ? 'true' : 'false');
+    if (event.newState === 'closed') button.dataset.pinned = 'false';
+  }, true);
+  ['pointerover', 'pointerout'].forEach(function (kind) {
+    document.addEventListener(kind, function (event) {
+      if (!window.matchMedia || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+      var button = event.target.closest('.map-info-button');
+      if (!button || button.contains(event.relatedTarget)) return;
+      var note = button.nextElementSibling;
+      if (kind === 'pointerover') note.showPopover({ source: button });
+      else if (button.dataset.pinned !== 'true') note.hidePopover();
+    });
+  });
   var strips = document.querySelectorAll('[data-hscroll]');
   Array.prototype.forEach.call(strips, function (strip) {
     var track = strip.querySelector('[data-hscroll-track]') || strip;

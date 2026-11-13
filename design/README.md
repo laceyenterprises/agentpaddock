@@ -87,7 +87,7 @@ Board scale (1600 × 900): eyebrow 13, body 17 to 19, card title 22 to 30, board
 
 ## Glyphs
 
-[`glyphs/paddock-glyphs.svg`](glyphs/paddock-glyphs.svg) holds 43 line glyphs, drawn in code by Lacey Enterprises:
+[`glyphs/paddock-glyphs.svg`](glyphs/paddock-glyphs.svg) holds 44 line glyphs, drawn in code by Lacey Enterprises:
 the cast (driver, car, entry, engine map and its five settings), grip and coaching (tires, team radio, briefing),
 flags, the race and its results, rules and fairness, fuel, running the bench, and four drawn new.
 

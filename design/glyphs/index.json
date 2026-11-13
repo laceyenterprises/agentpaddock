@@ -195,6 +195,11 @@
     "meaning": "Shakedown: the bench doubles as the fleet's smoke test"
   },
   {
+    "id": "info",
+    "group": "new",
+    "meaning": "a note about this value"
+  },
+  {
     "id": "start-lights",
     "group": "new",
     "meaning": "Lights out: a run starts"
