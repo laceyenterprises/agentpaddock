@@ -1589,6 +1589,8 @@ def load_results(results_dir: Path = DEFAULT_RESULTS) -> Results:
             name.removesuffix(".gz").removesuffix(".json") + ".checks.json.gz"
         )
         if not companion.exists():
+            companion = companion.with_suffix("")
+        if not companion.exists():
             continue
         raw = _read_json(companion, errors, companion.name)
         if (

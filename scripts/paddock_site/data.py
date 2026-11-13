@@ -147,7 +147,12 @@ def load_races(tasks_dir: Path) -> dict[tuple[str, str, int], Race]:
         prompt = dispatch.get("prompt") if isinstance(dispatch, dict) else None
         about = task.get("about")
         single_result = False
-        verifier = task.get("verifier", {}).get("entrypoint")
+        verifier_table = task.get("verifier")
+        verifier = (
+            verifier_table.get("entrypoint")
+            if isinstance(verifier_table, Mapping)
+            else None
+        )
         if isinstance(verifier, str):
             try:
                 tree = ast.parse(
@@ -160,6 +165,15 @@ def load_races(tasks_dir: Path) -> dict[tuple[str, str, int], Race]:
                     for alias in node.names
                     if alias.name == "gym_verifier"
                 }
+                functions = {
+                    alias.asname or alias.name: alias.name
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.ImportFrom)
+                    and node.module == "gym_verifier"
+                    and node.level == 0
+                    for alias in node.names
+                    if alias.name in {"passed", "check"}
+                }
                 calls = {
                     node.func.attr
                     for node in ast.walk(tree)
@@ -168,6 +182,13 @@ def load_races(tasks_dir: Path) -> dict[tuple[str, str, int], Race]:
                     and isinstance(node.func.value, ast.Name)
                     and node.func.value.id in aliases
                 }
+                calls.update(
+                    functions[node.func.id]
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id in functions
+                )
                 single_result = "passed" in calls and "check" not in calls
             except (OSError, SyntaxError, UnicodeError, lb.ResultsError):
                 pass

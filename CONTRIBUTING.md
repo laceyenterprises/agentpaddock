@@ -472,7 +472,9 @@ sorted by `(task, run_id, attempt)`. Each run carries `run_id`, `task`,
 fields must match, and the checks' passing fraction must equal the published
 score within 0.00005. Records with their own checks keep them. Add `--check` to
 verify that the companion is current. Result loading validates and attaches the
-companion checks in memory.
+companion checks in memory. The importer writes `.checks.json.gz`; loading also
+accepts `.checks.json` when the gzip companion is absent. If both exist, the gzip
+companion takes precedence.
 
 Grading changes need their own pull request and a changelog entry. A change to a
 task's content bumps its `task_version` in `task.toml`; results compare only

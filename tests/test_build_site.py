@@ -2519,7 +2519,11 @@ def test_race_page_funnel_comes_from_the_data(tmp_path):
         assert view["stats"][-1] == f"{data[-1]} of {data[0]} finish"
 
 
-def test_race_page_companion_rates_count_each_checkpoint_independently(tmp_path):
+@pytest.mark.parametrize("suffix", [".checks.json", ".checks.json.gz"])
+@pytest.mark.parametrize("compressed_document", [False, True])
+def test_race_page_companion_rates_count_each_checkpoint_independently(
+    tmp_path, suffix, compressed_document
+):
     results = _site_tree(tmp_path)
     path = results / BENCH
     document = json.loads(path.read_text())
@@ -2533,9 +2537,12 @@ def test_race_page_companion_rates_count_each_checkpoint_independently(tmp_path)
             {key: record[key] for key in ("run_id", "task", "task_version", "attempt")}
             | {"checks": checks}
         )
+    if compressed_document:
+        path.unlink()
+        path = path.with_suffix(".json.gz")
     lb.write_document(path, document)
     original = path.read_bytes()
-    companion = path.with_name(path.stem + ".checks.json.gz")
+    companion = results / (BENCH.removesuffix(".json") + suffix)
     lb.write_document_text(
         companion,
         json.dumps(
@@ -2575,19 +2582,42 @@ def test_race_page_companion_rates_count_each_checkpoint_independently(tmp_path)
     assert race["checkpoints"] == expected
 
 
-def test_race_page_without_checks_uses_the_verifier_data(tmp_path):
+@pytest.mark.parametrize(
+    ("imports", "passed", "check"),
+    [
+        ("import gym_verifier as gv", "gv.passed", "gv.check"),
+        ("import gym_verifier", "gym_verifier.passed", "gym_verifier.check"),
+        ("from gym_verifier import passed, check", "passed", "check"),
+        (
+            "from gym_verifier import passed as finish, check as checkpoint",
+            "finish",
+            "checkpoint",
+        ),
+        (
+            "import gym_verifier as gv\nfrom gym_verifier import check",
+            "gv.passed",
+            "check",
+        ),
+        (
+            "from gym_verifier import passed\nimport gym_verifier as gv",
+            "passed",
+            "gv.check",
+        ),
+    ],
+)
+def test_race_page_without_checks_uses_the_verifier_data(
+    tmp_path, imports, passed, check
+):
     results = _site_tree(tmp_path)
     tasks = tmp_path / "tasks/docs-beta"
     task = tasks / "task.toml"
     task.write_text(task.read_text() + '\n[verifier]\nentrypoint = "verifier.py"\n')
     verifier = tasks / "verifier.py"
-    verifier.write_text("import gym_verifier as gv\ngv.passed()\n")
+    verifier.write_text(f"{imports}\n{passed}()\n")
     page = build_site.build(results)["races/docs-beta/index.html"]
     assert "This race is graded as one result, so it has no checkpoints." in page
     assert "no track map yet" not in page
-    verifier.write_text(
-        'import gym_verifier as gv\ngv.check("result", True)\ngv.passed()\n'
-    )
+    verifier.write_text(f'{imports}\n{check}("result", True)\n{passed}()\n')
     page = build_site.build(results)["races/docs-beta/index.html"]
     assert (
         "This race's runs do not record checkpoints, so it has no track map yet."
@@ -2595,9 +2625,22 @@ def test_race_page_without_checks_uses_the_verifier_data(tmp_path):
     )
 
 
+@pytest.mark.parametrize("verifier", ['"verifier.py"', "false", "[]", "{}"])
+def test_race_page_ignores_non_table_or_empty_verifier(tmp_path, verifier):
+    results = _site_tree(tmp_path)
+    task = tmp_path / "tasks/docs-beta/task.toml"
+    task.write_text(f"verifier = {verifier}\n" + task.read_text())
+    page = build_site.build(results)["races/docs-beta/index.html"]
+    assert (
+        "This race's runs do not record checkpoints, so it has no track map yet."
+        in page
+    )
+
+
+@pytest.mark.parametrize("suffix", [".checks.json", ".checks.json.gz"])
 @pytest.mark.parametrize("change", ["score", "version", "document", "inline"])
 def test_companion_loading_rechecks_the_grading_and_preserves_inline_checks(
-    tmp_path, change
+    tmp_path, change, suffix
 ):
     results = _site_tree(tmp_path)
     path = results / BENCH
@@ -2621,7 +2664,7 @@ def test_companion_loading_rechecks_the_grading_and_preserves_inline_checks(
         run["checks"] = [{"name": "replacement", "ok": False, "required": True}]
     lb.write_document(path, document)
     lb.write_document_text(
-        path.with_name(path.stem + ".checks.json.gz"), json.dumps(companion)
+        path.with_name(path.stem + suffix), json.dumps(companion)
     )
     if change == "inline":
         loaded = lb.load_results(results)
@@ -2629,6 +2672,18 @@ def test_companion_loading_rechecks_the_grading_and_preserves_inline_checks(
     else:
         with pytest.raises(lb.ResultsError, match="checks|unmatched"):
             lb.load_results(results)
+
+
+def test_companion_loading_prefers_gzip_over_uncompressed(tmp_path):
+    results = _site_tree(tmp_path)
+    stem = BENCH.removesuffix(".json")
+    # The unused fallback must not override or invalidate the preferred file.
+    (results / (stem + ".checks.json")).write_text("invalid JSON")
+    lb.write_document_text(
+        results / (stem + ".checks.json.gz"),
+        json.dumps({"schema": 1, "document": "bench", "runs": []}),
+    )
+    assert lb.load_results(results).documents[BENCH]["id"] == "bench"
 
 
 @pytest.mark.parametrize(
