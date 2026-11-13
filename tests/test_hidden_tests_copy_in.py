@@ -15,6 +15,7 @@ for the real-engine tests).
 
 import json
 import re
+import subprocess
 import sys
 from dataclasses import replace
 
@@ -66,6 +67,9 @@ if args[:2] == ["volume", "create"]:
 elif args[:2] == ["volume", "rm"]:
     if not (volumes / args[-1]).is_dir():
         no_such("volume", args[-1])
+    if any(path.read_text() == args[-1] for path in containers.iterdir()):
+        sys.stderr.write("volume is in use\n")
+        sys.exit(1)
     shutil.rmtree(volumes / args[-1])
 elif args[0] == "create":
     name = args[args.index("--name") + 1]
@@ -282,6 +286,117 @@ def test_work_volume_cleanup_failure_is_a_grader_error(tmp_path, fake_docker):
     fake_docker.fail("volume-rm")
     with pytest.raises(GraderError, match="owned work volume cleanup failed"):
         hidden_tests.run(task, capture)
+
+
+@pytest.fixture
+def container_process(fake_docker, monkeypatch):
+    """Keep daemon ownership separate from the Docker CLI's lifetime."""
+    original = subprocess.Popen
+
+    class Process:
+        pid = 123
+        returncode = None
+        killed = False
+        wait_error = None
+
+        def wait(self, timeout):
+            assert not self.container.exists(), (
+                "container must be removed before reaping"
+            )
+            if self.wait_error:
+                raise self.wait_error
+            self.returncode = -9 if self.killed else 0
+            return self.returncode
+
+        def kill(self):
+            self.killed = True
+
+    proc = Process()
+
+    def popen(command, **kwargs):
+        if command[:2] != [str(fake_docker.path), "run"]:
+            return original(command, **kwargs)
+        name = command[command.index("--name") + 1]
+        proc.container = fake_docker.state / "containers" / name
+        proc.container.write_text(hidden_tests._work_volume(command))
+        return proc
+
+    monkeypatch.setattr(hidden_tests.subprocess, "Popen", popen)
+    monkeypatch.setattr(hidden_tests.os, "waitid", lambda *args: object())
+    return proc
+
+
+def test_setup_duration_uses_runner_clock(
+    tmp_path, fake_docker, container_process, monkeypatch
+):
+    work = tmp_path / "work"
+    work.mkdir()
+    clock = iter([100.0, 107.5])
+    monkeypatch.setattr(hidden_tests, "_monotonic", lambda: next(clock))
+    command = hidden_tests._command(work, [sys.executable, "-c", "pass"])
+
+    _, timed_out, output = hidden_tests._execute(command, work, 1)
+
+    assert output.setup_seconds == 7.5
+    assert not timed_out
+    assert fake_docker.leftovers() == []
+
+
+def test_timeout_removes_container_before_volume(
+    tmp_path, fake_docker, container_process, monkeypatch
+):
+    work = tmp_path / "work"
+    work.mkdir()
+    monkeypatch.setattr(hidden_tests.os, "waitid", lambda *args: None)
+    command = hidden_tests._command(work, [sys.executable, "-c", "while True: pass"])
+
+    _, timed_out, _ = hidden_tests._execute(command, work, 0)
+
+    assert timed_out
+    calls = fake_docker.calls()
+    name = command[command.index("--name") + 1]
+    assert calls.index(["rm", "--force", name]) < calls.index(
+        ["volume", "rm", "--force", name + "-work"]
+    )
+    assert fake_docker.leftovers() == []
+
+
+@pytest.mark.parametrize("failure", ["monitor", "reap", "files", "spawn"])
+def test_volume_disposal_survives_execution_errors(
+    tmp_path, fake_docker, container_process, monkeypatch, failure
+):
+    work = tmp_path / "work"
+    work.mkdir()
+    command = hidden_tests._command(work, [sys.executable, "-c", "pass"])
+
+    def interrupted(*args, **kwargs):
+        raise KeyboardInterrupt("injected interruption")
+
+    expected = KeyboardInterrupt
+    if failure == "monitor":
+        monkeypatch.setattr(hidden_tests.os, "waitid", interrupted)
+    elif failure == "reap":
+        container_process.wait_error = subprocess.TimeoutExpired(command, 5)
+        expected = subprocess.TimeoutExpired
+    elif failure == "files":
+        monkeypatch.setattr(hidden_tests.tempfile, "TemporaryFile", interrupted)
+    else:
+        original = hidden_tests.subprocess.Popen
+
+        def unavailable(command, **kwargs):
+            if command[:2] == [str(fake_docker.path), "run"]:
+                raise OSError("injected spawn failure")
+            return original(command, **kwargs)
+
+        monkeypatch.setattr(hidden_tests.subprocess, "Popen", unavailable)
+        expected = GraderError
+
+    with pytest.raises(expected):
+        hidden_tests._execute(command, work, 1)
+
+    if failure == "reap":
+        assert container_process.killed
+    assert fake_docker.leftovers() == []
 
 
 def test_setup_time_is_excluded_from_the_shared_budget(tmp_path, monkeypatch):

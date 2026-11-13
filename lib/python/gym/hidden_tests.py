@@ -452,108 +452,115 @@ def _execute(
             "PYTHONDONTWRITEBYTECODE": "1",
         }
     )
-    setup_started = time.monotonic()
-    if volume:
-        # Copy before the output files below are opened inside `work`.
-        _copy_work_in(command[0], volume, work, env)
-    setup_seconds = time.monotonic() - setup_started
-    with (
-        tempfile.TemporaryFile(dir=work) as output,
-        tempfile.TemporaryFile(dir=work) as diagnostics,
-        tempfile.TemporaryFile(dir=work) as input_file,
-    ):
-        input_file.write(input_data)
-        input_file.seek(0)
-        try:
-            proc = subprocess.Popen(
-                command,
-                cwd=work,
-                env=env,
-                stdin=input_file,
-                stdout=output,
-                stderr=diagnostics,
-                start_new_session=True,
-                preexec_fn=lambda: _limits(timeout),
-            )
-        except OSError as exc:
-            if volume:
-                _discard_work(command[0], volume, env)
-            raise GraderError(f"hidden-test sandbox unavailable: {exc}") from exc
-        timed_out = False
-        cleanup_error = None
-        try:
-            # WNOWAIT preserves ownership of the leader PID until cleanup; poll()
-            # and wait() both reap and would allow a recycled process group.
-            deadline = time.monotonic() + timeout
-            while os.waitid(os.P_PID, proc.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT) is None:
-                if time.monotonic() >= deadline:
-                    timed_out = True
-                    break
-                time.sleep(0.02)
-        finally:
+    result = None
+    try:
+        setup_started = _monotonic()
+        if volume:
+            # Copy before the output files below are opened inside `work`.
+            _copy_work_in(command[0], volume, work, env)
+        setup_seconds = _monotonic() - setup_started
+        with (
+            tempfile.TemporaryFile(dir=work) as output,
+            tempfile.TemporaryFile(dir=work) as diagnostics,
+            tempfile.TemporaryFile(dir=work) as input_file,
+        ):
+            input_file.write(input_data)
+            input_file.seek(0)
+            try:
+                proc = subprocess.Popen(
+                    command,
+                    cwd=work,
+                    env=env,
+                    stdin=input_file,
+                    stdout=output,
+                    stderr=diagnostics,
+                    start_new_session=True,
+                    preexec_fn=lambda: _limits(timeout),
+                )
+            except OSError as exc:
+                raise GraderError(f"hidden-test sandbox unavailable: {exc}") from exc
+            timed_out = False
+            cleanup_error = None
+            try:
+                # WNOWAIT preserves ownership of the leader PID until cleanup; poll()
+                # and wait() both reap and would allow a recycled process group.
+                deadline = time.monotonic() + timeout
+                while (
+                    os.waitid(os.P_PID, proc.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+                    is None
+                ):
+                    if time.monotonic() >= deadline:
+                        timed_out = True
+                        break
+                    time.sleep(0.02)
+            finally:
+                cleanup_started = time.monotonic()
+                if container:
+                    try:
+                        removed = subprocess.run(
+                            [command[0], "rm", "--force", container],
+                            env=env,
+                            capture_output=True,
+                            timeout=15,
+                        )
+                        if (
+                            removed.returncode
+                            and b"No such container" not in removed.stderr
+                        ):
+                            cleanup_error = "owned container cleanup failed"
+                    except (OSError, subprocess.TimeoutExpired):
+                        cleanup_error = "owned container cleanup unavailable"
+                if container:
+                    # Container ownership, including every descendant, is enforced
+                    # by Docker's unique name. The CLI may need time to observe rm.
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()  # Unreaped, owned leader only; no PID reuse.
+                        proc.wait(timeout=5)
+                else:
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    except PermissionError:
+                        if timed_out:
+                            cleanup_error = "owned process-group cleanup denied"
+                    proc.wait(timeout=5)
+            cleanup_seconds = time.monotonic() - cleanup_started
+            if cleanup_error:
+                raise GraderError(cleanup_error)
+            diagnostics.seek(0, os.SEEK_END)
+            diagnostics.seek(max(0, diagnostics.tell() - 16384))
+            diagnostics_tail = diagnostics.read().decode("utf-8", errors="replace")
+            output.seek(0, os.SEEK_END)
+            oversized = output.tell() > 16384
+            output.seek(max(0, output.tell() - 16384))
+            tail = output.read().decode("utf-8", errors="replace")
+            tail = tail.encode("utf-8")[-16384:].decode("utf-8", errors="ignore")
+            if oversized:
+                tail = "OUTPUT_LIMIT_EXCEEDED\n" + tail.encode("utf-8")[-16362:].decode(
+                    "utf-8", errors="ignore"
+                )
+            protocol = tail
+            if diagnostics_tail:
+                tail = (
+                    (tail + "\n" + diagnostics_tail)
+                    .encode("utf-8")[-16384:]
+                    .decode("utf-8", errors="ignore")
+                )
+            result = _ExecutionOutput(tail, protocol, cleanup_seconds, setup_seconds)
+            return proc.returncode, timed_out, result
+    finally:
+        if volume:
+            # Always dispose of copied inputs, even if setup, reaping or reading
+            # output raises. The execution finally removes the container first.
             cleanup_started = time.monotonic()
-            if container:
-                try:
-                    removed = subprocess.run(
-                        [command[0], "rm", "--force", container],
-                        env=env,
-                        capture_output=True,
-                        timeout=15,
-                    )
-                    if removed.returncode and b"No such container" not in removed.stderr:
-                        cleanup_error = "owned container cleanup failed"
-                except (OSError, subprocess.TimeoutExpired):
-                    cleanup_error = "owned container cleanup unavailable"
-            if container:
-                # Container ownership, including every descendant, is enforced
-                # by Docker's unique name. The CLI may need time to observe rm.
-                try:
-                    proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    proc.kill()  # Unreaped, owned leader only; no PID reuse.
-                    proc.wait(timeout=5)
-                if volume:
-                    # The container is gone, so its work volume is no longer in use.
-                    drop = ("volume", "rm", "--force", volume)
-                    error = _docker(command[0], drop, env, missing_ok=True)
-                    if error and not cleanup_error:
-                        cleanup_error = "owned work volume cleanup failed"
-            else:
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                except PermissionError:
-                    if timed_out:
-                        cleanup_error = "owned process-group cleanup denied"
-                proc.wait(timeout=5)
-        cleanup_seconds = time.monotonic() - cleanup_started
-        if cleanup_error:
-            raise GraderError(cleanup_error)
-        diagnostics.seek(0, os.SEEK_END)
-        diagnostics.seek(max(0, diagnostics.tell() - 16384))
-        diagnostics_tail = diagnostics.read().decode("utf-8", errors="replace")
-        output.seek(0, os.SEEK_END)
-        oversized = output.tell() > 16384
-        output.seek(max(0, output.tell() - 16384))
-        tail = output.read().decode("utf-8", errors="replace")
-        tail = tail.encode("utf-8")[-16384:].decode("utf-8", errors="ignore")
-        if oversized:
-            tail = "OUTPUT_LIMIT_EXCEEDED\n" + tail.encode("utf-8")[-16362:].decode(
-                "utf-8", errors="ignore"
-            )
-        protocol = tail
-        if diagnostics_tail:
-            tail = (
-                (tail + "\n" + diagnostics_tail)
-                .encode("utf-8")[-16384:]
-                .decode("utf-8", errors="ignore")
-            )
-        return (
-            proc.returncode,
-            timed_out,
-            _ExecutionOutput(tail, protocol, cleanup_seconds, setup_seconds),
-        )
+            error = _discard_work(command[0], volume, env)
+            if result is not None:
+                result.cleanup_seconds += time.monotonic() - cleanup_started
+            if error and sys.exc_info()[0] is None:
+                raise GraderError(f"owned work volume cleanup failed: {error}")
 
 
 def _ready(work: Path, python: str) -> None:

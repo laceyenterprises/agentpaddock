@@ -251,6 +251,9 @@ no-new-privileges. Only the copied-in volume is mounted. HOME/TMPDIR point to
 scratch. Readiness has a 20 s bound and one timeout-only retry; other failures
 are immediate harness errors before submitted bytes are copied. Cleanup removes
 the uniquely named owned container, including descendants, on success and timeout.
+Work-volume and copy-helper disposal runs in a `finally` block, including when
+setup, process reaping or output reading raises. An earlier execution exception
+takes precedence over a secondary disposal error.
 Missing Docker, image, engine or enforceable limits fails closed, and so does
 a failed copy-in or volume removal. Readiness proves the copy reached `/work`
 by reading back a random nonce file. Copy-in and cleanup time extend the shared
