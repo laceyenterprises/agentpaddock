@@ -67,7 +67,7 @@ def level_reason(
         for level in raced
         for word in (
             [
-                f"the default ({label})" if label == views.NOT_RECORDED else label
+                f"the default ({label})" if label != "the car's default" else label
                 for label in default_words
             ]
             if level == "default"

@@ -2270,6 +2270,56 @@ def test_entry_pages_ignore_rows_awaiting_trust_sign_off(bucket):
     assert standings_pages.entry_pages(build) == {}
 
 
+@pytest.mark.parametrize(
+    "standings, expected",
+    [
+        ({}, {}),
+        (
+            {"entries": [{}, {"driver": "acme/coder-large"}]},
+            {"acme/coder-large": "Coder Large"},
+        ),
+        (
+            {"partial": [{}, {"driver": "acme/coder-large"}]},
+            {"acme/coder-large": "Coder Large"},
+        ),
+        (
+            {
+                "entries": [{"driver": "acme/coder-large"}],
+                "partial": [{"driver": "other/coder-large"}],
+            },
+            {
+                "acme/coder-large": "Coder Large · Acme",
+                "other/coder-large": "Coder Large · Other",
+            },
+        ),
+    ],
+)
+def test_standings_names_accept_sparse_rows(standings, expected):
+    assert standings_pages.names(standings) == expected
+
+
+def test_entry_pages_derive_names_once(tmp_path, monkeypatch):
+    files = _site_files(_site_tree(tmp_path))
+    build = site_routes.Build(
+        results=None,
+        data={path: json.loads(text) for path, text in files.items()},
+        routes=(),
+    )
+    derive_names = standings_pages.names
+    calls = []
+
+    def counted_names(standings):
+        calls.append(standings)
+        return derive_names(standings)
+
+    monkeypatch.setattr(standings_pages, "names", counted_names)
+    pages = standings_pages.entry_pages(build)
+    standings = build.data["data/standings.json"]
+    assert len(pages) == len(standings["entries"]) + len(standings["partial"]) > 1
+    assert len(calls) == 1
+    assert calls[0] is standings
+
+
 @pytest.mark.parametrize("ran", [0, 1, 2])
 def test_clean_sweep_requires_a_complete_calendar(tmp_path, ran):
     files = _site_files(_site_tree(tmp_path))
@@ -3851,6 +3901,36 @@ def _data_page_names(files) -> list[str]:
         if name.startswith(("garage/", "pit-wall/", "drivers/"))
         and name.endswith(".html")
     ]
+
+
+@pytest.mark.parametrize(
+    "raced, defaults, expected",
+    [
+        (
+            ["default"],
+            ["medium (sent by Codex)"],
+            "Coder has raced at one engine map only: the default (medium (sent by Codex)).",
+        ),
+        (
+            ["default", "medium"],
+            ["medium (sent by Codex)"],
+            "No counted run has Coder at high; it has raced at "
+            "the default (medium (sent by Codex)) and medium.",
+        ),
+        (
+            ["default"],
+            ["setting not recorded"],
+            "Coder has raced at one engine map only: the default (setting not recorded).",
+        ),
+        (
+            ["default"],
+            [],
+            "Coder has raced at one engine map only: the car's default.",
+        ),
+    ],
+)
+def test_garage_closed_map_reason_distinguishes_default(raced, defaults, expected):
+    assert site_garage.level_reason("Coder", "high", raced, defaults) == expected
 
 
 def test_garage_level_availability_comes_from_the_data(tmp_path):

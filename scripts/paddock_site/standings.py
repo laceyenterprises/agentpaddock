@@ -141,7 +141,10 @@ def short_hash(config_hash: str) -> str:
 def names(standings: Mapping[str, Any]) -> dict[str, str]:
     """Each standings driver's display name, two routes to one model told apart."""
     return views.driver_names(
-        row["driver"] for row in list(standings["entries"]) + list(standings["partial"])
+        row["driver"]
+        for row in list(standings.get("entries", []))
+        + list(standings.get("partial", []))
+        if "driver" in row
     )
 
 
@@ -540,10 +543,16 @@ def standings_body(
 # ---------------------------------------------------------------- entries
 
 
-def _chips(entry_id: str, standings: Mapping[str, Any], root: str) -> str:
+def _chips(
+    entry_id: str,
+    standings: Mapping[str, Any],
+    root: str,
+    shown: Mapping[str, str] | None = None,
+) -> str:
     chips = []
     clash = ambiguous(standings["entries"])
-    shown = names(standings)
+    if shown is None:
+        shown = names(standings)
     for row in standings["entries"]:
         current = ' aria-current="page"' if row["id"] == entry_id else ""
         chips.append(
@@ -751,15 +760,18 @@ def entry_body(
     standings: Mapping[str, Any],
     races: Mapping[str, Any],
     root: str,
+    shown: Mapping[str, str] | None = None,
 ) -> str:
+    if shown is None:
+        shown = names(standings)
     return (
         '<div class="st-page en-page">'
         '<section class="en-top">'
         + _eyebrow("podium", "An entry · its season")
-        + _chips(entry["id"], standings, root)
+        + _chips(entry["id"], standings, root, shown)
         + f'<a class="en-back" href="{root}standings/index.html">Back to the timing tower</a>'
         "</section>"
-        + _hero(entry, names(standings).get(entry["identity"]["driver"]))
+        + _hero(entry, shown.get(entry["identity"]["driver"]))
         + season(entry, races)
         + '<section class="en-next">'
         f'<a class="en-next-dark" href="{root}pit-wall/index.html"><span>Next</span>'
@@ -887,7 +899,7 @@ def entry_pages(build: Build) -> dict[str, str]:
                 f"{car_name(who_['car'])} · "
                 f"{views.map_label(who_['map'], who_['car'], who_['driver'])}"
             ),
-            body=entry_body(entry, standings, races, layout.up(current)),
+            body=entry_body(entry, standings, races, layout.up(current), shown),
             url=f"{SITE_URL}entries/{row['id']}/",
         )
     return pages
