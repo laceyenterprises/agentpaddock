@@ -334,6 +334,7 @@ def _view(
     counts: Sequence[int],
     labels: Sequence[str],
     more_checks: int,
+    name: str = "",
 ) -> dict[str, Any]:
     """One funnel view: station widths, stats and panel copy, all from ``counts``.
 
@@ -341,7 +342,7 @@ def _view(
     checkpoint, and at the finish.
     """
     start = counts[0]
-    who = {"all": "", "car": f" in {car_name(key)}", "driver": f" by {key}"}[mode]
+    who = {"all": "", "car": f" in {name}", "driver": f" by {name}"}[mode]
     drops = [counts[k - 1] - counts[k] for k in range(1, len(labels) + 1)]
     worst = 0
     if drops and max(drops) > 0:
@@ -392,6 +393,7 @@ def _view(
     return {
         "mode": mode,
         "key": key,
+        "name": name,
         "n": start,
         "counts": list(counts),
         "widths": [
@@ -412,13 +414,20 @@ def funnel_views(race: Mapping[str, Any]) -> list[dict[str, Any]]:
     funnel = race["funnel"]
     labels = race["checkpoints"] or []
     more = race["moreChecks"] or 0
-    views = [_view("all", "", funnel["all"], labels, more)]
+    lap_views = [_view("all", "", funnel["all"], labels, more)]
     for car, counts in funnel["byCar"].items():
-        views.append(_view("car", car, counts, labels, more))
+        lap_views.append(_view("car", car, counts, labels, more, views.car_name(car)))
+    names = views.driver_names(
+        driver
+        for driver, counts in funnel["byDriver"].items()
+        if counts[0] >= DRIVER_MIN_RUNS
+    )
     for driver, counts in funnel["byDriver"].items():
         if counts[0] >= DRIVER_MIN_RUNS:
-            views.append(_view("driver", driver, counts, labels, more))
-    return views
+            lap_views.append(
+                _view("driver", driver, counts, labels, more, names[driver])
+            )
+    return lap_views
 
 
 def _stations(
@@ -483,13 +492,13 @@ def _lap(race: Mapping[str, Any]) -> str:
             + "</p></section>"
         )
     labels = race["checkpoints"] or []
-    views = funnel_views(race)
-    view = views[0]
+    lap_views = funnel_views(race)
+    view = lap_views[0]
     selected = view["worst"] or len(labels) + 1
     modes = [("all", "All runs", view["n"])]
-    if any(v["mode"] == "car" for v in views):
+    if any(v["mode"] == "car" for v in lap_views):
         modes.append(("car", "By car", None))
-    if any(v["mode"] == "driver" for v in views):
+    if any(v["mode"] == "driver" for v in lap_views):
         modes.append(("driver", "By driver", None))
     mode_buttons = "".join(
         f'<button type="button" role="radio" aria-checked="{"true" if mode == "all" else "false"}" '
@@ -503,12 +512,13 @@ def _lap(race: Mapping[str, Any]) -> str:
         f'data-mode="{v["mode"]}" data-key="{esc(v["key"])}" hidden>'
         + (
             f'<span class="rc-swatch" style="background:{livery(v["key"])}" aria-hidden="true"></span>'
+            + views.car_tag(v["key"])
             if v["mode"] == "car"
-            else ""
+            else views.driver_tag(v["key"], v["name"])
         )
-        + f"{esc(car_name(v['key']) if v['mode'] == 'car' else v['key'])} "
+        + " "
         f'<span class="rc-chip-n">{v["n"]}</span></button>'
-        for v in views[1:]
+        for v in lap_views[1:]
     )
     worst = (
         f'<p class="rc-worst" data-lap-worst>The worst checkpoint is '
@@ -518,7 +528,7 @@ def _lap(race: Mapping[str, Any]) -> str:
         else '<p class="rc-worst" data-lap-worst>No checkpoint retires a run.</p>'
     )
     return (
-        f'<section class="rc-section rc-lap" id="lap" data-funnel="{_attr(views)}" '
+        f'<section class="rc-section rc-lap" id="lap" data-funnel="{_attr(lap_views)}" '
         f'data-playback-ms="{PLAYBACK_MS}">'
         '<div class="rc-lap-copy">'
         + head

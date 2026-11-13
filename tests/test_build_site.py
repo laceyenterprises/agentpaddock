@@ -2519,6 +2519,55 @@ def test_race_page_funnel_comes_from_the_data(tmp_path):
         assert view["stats"][-1] == f"{data[-1]} of {data[0]} finish"
 
 
+def test_race_lap_chips_name_the_driver_and_car(tmp_path):
+    _, files = _race_site(tmp_path)
+    page = files["races/hard-review-alpha/index.html"]
+    views = _attr_json(page, "funnel")[1:]
+    chips = re.findall(r'<button[^>]*class="rc-chip rc-option".*?</button>', page)
+    assert len(chips) == len(views)
+    names = site_views.driver_names(v["key"] for v in views if v["mode"] == "driver")
+    assert {v["mode"] for v in views} == {"car", "driver"}
+    for chip, view in zip(chips, views):
+        attrs = Elements(chip).items[0][1]
+        assert attrs["data-key"] == view["key"]
+        assert attrs["data-mode"] == view["mode"]
+        assert chip.count(f'<use href="#{view["mode"]}"/>') == 1
+        assert chip.count("<svg") == 1
+        assert chip.count('class="rc-swatch"') == (view["mode"] == "car")
+        name = (
+            site_views.car_name(view["key"])
+            if view["mode"] == "car"
+            else names[view["key"]]
+        )
+        assert view["name"] == name
+        assert " ".join("".join(Text(chip).text).split()) == f"{name} {view['n']}"
+        assert f'<span class="rc-chip-n">{view["n"]}</span>' in chip
+        assert name in view["caption"]
+        assert all(name in body for body in view["bodies"])
+        if view["mode"] == "driver":
+            assert view["key"] not in "".join(Text(chip).text)
+            assert view["key"] not in view["caption"]
+            assert all(view["key"] not in body for body in view["bodies"])
+
+
+def test_race_lap_tells_routes_to_one_model_apart(tmp_path):
+    _, files = _race_site(tmp_path)
+    race = json.loads(files["data/races/hard-review-alpha.json"])
+    counts = race["funnel"]["all"]
+    routes = ["acme/coder-small", "bolt/coder-small"]
+    race["funnel"]["byDriver"] = {route: counts for route in routes}
+    page = site_races._lap(race)
+    names = site_views.driver_names(routes)
+    assert len(set(names.values())) == 2
+    for view in _attr_json(page, "funnel"):
+        if view["mode"] == "driver":
+            name = names[view["key"]]
+            assert site_views.driver_tag(view["key"], name) in page
+            assert view["name"] == name
+            assert name in view["caption"]
+            assert all(name in body for body in view["bodies"])
+
+
 @pytest.mark.parametrize("suffix", [".checks.json", ".checks.json.gz"])
 @pytest.mark.parametrize("compressed_document", [False, True])
 def test_race_page_companion_rates_count_each_checkpoint_independently(
