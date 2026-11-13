@@ -2531,7 +2531,9 @@ def test_race_lap_chips_name_the_driver_and_car(tmp_path):
         attrs = Elements(chip).items[0][1]
         assert attrs["data-key"] == view["key"]
         assert attrs["data-mode"] == view["mode"]
-        assert f'<use href="#{view["mode"]}"/>' in chip
+        assert chip.count(f'<use href="#{view["mode"]}"/>') == 1
+        assert chip.count("<svg") == 1
+        assert chip.count('class="rc-swatch"') == (view["mode"] == "car")
         name = (
             site_views.car_name(view["key"])
             if view["mode"] == "car"

@@ -512,11 +512,7 @@ def _lap(race: Mapping[str, Any]) -> str:
         f'data-mode="{v["mode"]}" data-key="{esc(v["key"])}" hidden>'
         + (
             f'<span class="rc-swatch" style="background:{livery(v["key"])}" aria-hidden="true"></span>'
-            if v["mode"] == "car"
-            else ""
-        )
-        + (
-            views.car_tag(v["key"])
+            + views.car_tag(v["key"])
             if v["mode"] == "car"
             else views.driver_tag(v["key"], v["name"])
         )
