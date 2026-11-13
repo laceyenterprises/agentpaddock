@@ -1201,7 +1201,10 @@ def test_documented_navigation_order_matches_registry():
         cells = [cell.strip().strip("`") for cell in line.split("|")]
         if len(cells) == 8 and cells[3].lower() == "bar":
             documented.append(cells[1])
-    expected = ["/" + route.path for route in site_routes.nav_routes(build_site.ROUTES, site_routes.BAR)]
+    expected = [
+        "/" + route.path
+        for route in site_routes.nav_routes(build_site.ROUTES, site_routes.BAR)
+    ]
     assert documented == expected
 
 
@@ -4233,6 +4236,24 @@ def _check_driver_pages(files, site) -> None:
     assert {f"drivers/{slugs[d]}/index.html" for d in featured} <= _local_links(
         site_drivers.INDEX, index
     )
+    # The overview carries one pick row: a chip per driver page, in card order,
+    # and none of them current.
+    cards = re.findall(r'<a class="dv-card" href="([^"]+)"', index)
+    assert index.count('<nav class="dv-pick"') == 1
+    pick = _between(index, '<nav class="dv-pick"', "</nav>")
+    hero, after = index.split('<nav class="dv-pick"', 1)
+    assert 'class="page-hero"' in hero
+    assert after.split("</nav>", 1)[1].startswith('<div class="dv-cards">')
+    chips = re.findall(r'<a class="chip" href="([^"]+)"([^>]*)>', pick)
+    assert (
+        [href for href, _ in chips]
+        == cards
+        == [
+            layout.href(site_drivers.page_file(slugs[d]), site_drivers.INDEX)
+            for d in featured
+        ]
+    )
+    assert all("aria-current" not in rest for _, rest in chips)
     names = site.driver_names
     for driver in featured:
         name = site_drivers.page_file(slugs[driver])
@@ -4249,6 +4270,16 @@ def _check_driver_pages(files, site) -> None:
         assert {f"drivers/{slugs[d]}/index.html" for d in featured} <= _local_links(
             name, page
         )
+        # Its own pick row lists every driver page and marks only this one.
+        assert page.count('<nav class="dv-pick"') == 1
+        pick = _between(page, '<nav class="dv-pick"', "</nav>")
+        chips = re.findall(r'<a class="chip" href="([^"]+)"([^>]*)>', pick)
+        assert [href for href, _ in chips] == [
+            layout.href(site_drivers.page_file(slugs[d]), name) for d in featured
+        ]
+        assert [href for href, rest in chips if 'aria-current="page"' in rest] == [
+            layout.href(name, name)
+        ]
         assert "Cheapest way to run" in page or "no fuel bill to compare" in page
 
 
@@ -4717,9 +4748,7 @@ def test_live_template_routes_and_narrow_storage_permissions():
     template = _template()
     resources = template["Resources"]
     function = resources["SubmissionFunction"]["Properties"]
-    assert function["ReservedConcurrentExecutions"] == {
-        "!Ref": "ReservedConcurrency"
-    }
+    assert function["ReservedConcurrentExecutions"] == {"!Ref": "ReservedConcurrency"}
     assert template["Parameters"]["ReservedConcurrency"]["Default"] == 5
     assert resources["SubmissionApi"]["Properties"]["DefaultRouteSettings"] == {
         "ThrottlingRateLimit": {"!Ref": "ThrottleRate"},
@@ -5217,4 +5246,3 @@ def test_browser_widths_keyboard_and_no_script_reading(acceptance_sites, tmp_pat
                 context.close()
         finally:
             browser.close()
-

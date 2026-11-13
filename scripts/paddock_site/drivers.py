@@ -5,7 +5,7 @@ a driver (model) with at least one placed standings entry, so it has raced the
 complete calendar in some car. Each page shows the driver's best entry, every
 placed entry car by car, where the picked entry wins and slips by challenge,
 and its cheapest entry against its best on fuel. ``/drivers/`` lands on the
-list of featured drivers.
+same pick row and the list of featured drivers.
 
 Every number is a placed entry from ``data/standings.json``.
 """
@@ -297,7 +297,8 @@ def index_body(site: views.SiteData, drivers: Sequence[Mapping[str, Any]]) -> st
         if others
         else ""
     )
-    return hero + f'<div class="dv-cards">{cards}</div>' + more
+    # The same pick row as a driver page, in card order; none is current here.
+    return hero + _chips(drivers, INDEX) + f'<div class="dv-cards">{cards}</div>' + more
 
 
 def pages(
@@ -373,6 +374,7 @@ CSS = """
 .dv-cat.slip .dv-cat-num { color: var(--red-ink); font-weight: 700; }
 .dv-fuel { display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 18px; border: 1.5px solid var(--rule); }
 .dv-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.dv-pick + .dv-cards { margin-top: 28px; }
 @media (min-width: 720px) {
   .dv-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dv-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
