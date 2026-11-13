@@ -9,6 +9,8 @@ infographic = "" # Reuse the challenge's existing id; new types name a new id.
 [[checkpoints]] # Repeat in lap order using the verifier's recorded names.
 check = ""
 label = "" # Plain words suitable for public display.
+# Optional; label and about each override results/meta/checkpoints.toml.
+about = "" # One or two public sentences on what passing measures; no answers.
 disclose = "label" # label: public label/rate; count: N more checks; hidden: omit.
 # Unlisted recorded checks also contribute to N more checks.
 # Docs fact names should use count, since names can reveal required facts.

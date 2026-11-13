@@ -28,6 +28,9 @@ disclosure (``label``: named with its clear rate; ``count``: adds to "N more
 checks"; ``hidden``: omitted). Without a card, recorded grading order supplies
 the checkpoints. A docs fact check is never named. A race whose counted runs
 carry no ``checks`` has null stages, funnel and retirements.
+Labels and explanations come from ``results/meta/checkpoints.toml``, with
+challenge-specific entries for differing meanings. A card may override either
+field; it continues to own disclosure and ordering.
 
 Checkpoint pass rates pool every submission recording that checkpoint at the
 race version, including later attempts. Funnel views retain the counted,
@@ -60,6 +63,7 @@ import hashlib
 import json
 import re
 import statistics
+from fnmatch import fnmatchcase
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -73,6 +77,26 @@ LIVE = "live"
 AWAITING = "awaiting-trust-sign-off"
 #: The challenge the engine-map ladders compare on.
 LADDER_CHALLENGE = "hard-review"
+CHECKPOINT_GLOSSARY = lb.MODULE_ROOT / "results" / "meta" / "checkpoints.toml"
+
+
+def checkpoint_copy(
+    glossary: Mapping[str, Any], challenge: str, check: str
+) -> Mapping[str, str]:
+    """Challenge copy wins over shared copy; exact names win over families."""
+    if check.startswith(lb.FACT_CHECK_PREFIX):
+        return {}
+    for entries in (
+        glossary.get("challenges", {}).get(challenge, {}),
+        glossary.get("checks", {}),
+    ):
+        if check in entries:
+            return entries[check]
+        for pattern, copy in entries.items():
+            if pattern.endswith("*") and fnmatchcase(check, pattern):
+                return copy
+    return {}
+
 
 SCHEMAS = {
     "standings": "paddock-site-standings/v1",
@@ -328,36 +352,41 @@ class SiteData:
 
 def model(results: lb.Results, tasks_dir: Path) -> SiteData:
     races = load_races(tasks_dir)
+    glossary = lb.read_toml(CHECKPOINT_GLOSSARY)
     # A track card owns disclosure. Without one, the grading's checks supply
-    # the map in recorded order, borrowing existing plain-word labels.
-    labels = {
-        checkpoint["check"]: checkpoint["label"]
-        for race in races.values()
-        for checkpoint in race.checkpoints
-        if lb.disclosure(checkpoint) == "label"
-    }
+    # the map in recorded order. Resolve label and about independently, so a
+    # card can override either field while borrowing the other from the glossary.
     for key, race in list(races.items()):
-        if race.has_card:
-            continue
         checks = {}
         for record in results.records:
             if race_key(record) == key:
                 for check in record.get("checks", []):
                     checks.setdefault(check["name"], check)
-        if checks:
-            races[key] = replace(
-                race,
-                checkpoints=tuple(
-                    {
-                        "check": name,
-                        "label": labels.get(name, name.replace("_", " ").capitalize()),
-                        "disclose": "count"
-                        if name.startswith(lb.FACT_CHECK_PREFIX)
-                        else "label",
-                    }
-                    for name in checks
-                ),
+        checkpoints = (
+            race.checkpoints
+            if race.has_card
+            else tuple(
+                {
+                    "check": name,
+                    "disclose": "count"
+                    if name.startswith(lb.FACT_CHECK_PREFIX)
+                    else "label",
+                }
+                for name in checks
             )
+        )
+        races[key] = replace(
+            race,
+            checkpoints=tuple(
+                {
+                    "label": checkpoint["check"].replace("_", " ").capitalize(),
+                    "about": None,
+                    **checkpoint_copy(glossary, race.suite, checkpoint["check"]),
+                    **checkpoint,
+                }
+                for checkpoint in checkpoints
+            ),
+        )
     trust = {
         name: lb.document_trust(name, document, results.trust)
         for name, document in results.documents.items()
@@ -735,6 +764,11 @@ def race(data: SiteData, race: Race, ids: Mapping[tuple, str]) -> dict[str, Any]
         checkpoint_rates.append(
             {
                 "label": label,
+                **(
+                    {"about": race.checkpoints[index]["about"]}
+                    if race.checkpoints[index].get("about")
+                    else {}
+                ),
                 "n": len(checks),
                 "rate": sum(check["ok"] for check in checks) / len(checks)
                 if checks

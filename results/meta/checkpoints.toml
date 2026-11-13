@@ -1,0 +1,187 @@
+# Authored public checkpoint copy. Track-card fields override these individually.
+# Exact names win over trailing-* families; challenge entries win over shared ones.
+# Keep facts counted. Never copy reasons, answers, locations or planted variant names.
+
+[checks.defect_found]
+label = "Find the real defects"
+about = "Checks whether blocking findings locate the defects in the reviewed change. Passing means each defect has its own matching finding."
+
+[challenges.hard-review.recall]
+label = "Find the real defects"
+about = "Measures how much of the change's real defect set the blocking findings cover. Passing means the review found enough distinct defects to clear this checkpoint."
+
+[checks.well_formed_findings]
+label = "Submit usable findings"
+about = "Checks each finding's file, line range, blocking flag and category. Passing means every finding has a valid shape for matching against the reviewed code."
+
+[checks.decoy_resistance]
+label = "Avoid false alarms"
+about = "Checks whether blocking findings flag deliberately tempting code that is valid under the task's contracts. Passing means the review stays within the allowance for those false alarms."
+
+[checks.precision]
+label = "Keep findings precise"
+about = "Counts excess or unsupported blocking findings, with designated decoys assessed separately. Passing means the review stays within the track's allowance for claims beyond the real defects and explicitly tolerated findings."
+
+[checks.category]
+label = "Classify the defects"
+about = "Checks the categories attached to findings that match the defects. Passing means each defect with a category requirement has a matching finding in that category."
+
+[checks.no_blocking]
+label = "Let sound code through"
+about = "Checks whether the review leaves a clean change free of blocking findings. Passing means the reviewer lets this change finish without a blocker."
+
+[checks.read_evidence]
+label = "Show evidence of reading"
+about = "Looks for the relevant code files in recorded tool arguments. Passing means those files are mentioned in the tool record before hand-in."
+
+[challenges.review.read_evidence]
+label = "Read the reviewed code"
+about = "Looks for every designated review file in read-like tool arguments or read command segments. Passing means the tool record contains evidence of reading the required code."
+
+[challenges.hard-review.read_evidence]
+label = "Read the reviewed code"
+about = "Looks for every designated review file in read-like tool arguments or read command segments. Passing means the tool record contains evidence of reading the required code."
+
+[checks.edited_only_allowed_files]
+label = "Respect the edit boundary"
+about = "Checks the captured file set and the contents of protected inputs. Passing means the submission changes only what the task permits."
+
+[checks.hidden_tests_pass]
+label = "Pass the hidden tests"
+about = "Checks that the captured repair passes the complete hidden test set. Passing means it clears the tested defect and regression cases."
+
+[checks.small_diff]
+label = "Keep the change focused"
+about = "Measures added and removed lines in the editable code. Passing means the required files are present and the patch stays within this track's change allowance."
+
+[checks."regression_test_fails_on_*"]
+label = "Catch a known-wrong version"
+about = "Runs the submitted regression test against a faulty implementation. Passing means the test reports a failure on that version, showing it can catch incorrect behavior."
+
+[checks.regression_test_passes_on_reference]
+label = "Accept a correct implementation"
+about = "Runs the submitted regression test against a separate correct implementation. Passing means the test accepts that implementation's behavior."
+
+[checks.regression_test_passes_on_submission]
+label = "Test the submitted repair"
+about = "Runs the submitted regression test against the submitted code. Passing means the test and repair work together successfully."
+
+[checks.document_captured]
+label = "Hand in the document"
+about = "Checks that the edited guide was captured for grading. Passing means there is document text to inspect."
+
+[checks.document_shape]
+label = "Keep document lines bounded"
+about = "Checks the length of each document line before the content checks run. Passing means every line fits the document checker's size limit."
+
+[checks.known_flags]
+label = "Use supported flags"
+about = "Checks option names mentioned in the guide against the supplied interface. Passing means the document introduces no unrecognized flags."
+
+[checks.known_config_keys]
+label = "Use supported configuration keys"
+about = "Checks configuration names recognized in the guide against the supplied interface. Passing means no unrecognized keys appear within the configuration namespaces being checked."
+
+[checks."heading:*"]
+label = "Preserve the guide's headings"
+about = "Checks that an existing section heading remains in the edited guide. Passing means the required heading is still present as a heading."
+
+[checks."stale:*"]
+label = "Remove outdated claims"
+about = "Checks the edited guide for a superseded claim. Passing means that claim no longer appears in the document."
+
+[challenges.rca.root_cause]
+label = "Identify the root cause"
+about = "Checks the diagnosis selected from the incident's candidate explanations. Passing means the submission identifies the underlying cause."
+
+[challenges.rca.evidence]
+label = "Cite decisive evidence"
+about = "Checks the submitted evidence identifier against the incident's supporting records. Passing means the citation points to evidence that directly supports the root cause."
+
+[challenges.coding.defect_line]
+label = "Locate the faulty code"
+about = "Checks the submitted line number against the accepted location of the fault. Passing means the diagnosis points to the relevant code."
+
+[challenges.coding.terminal_status]
+label = "Choose the final status"
+about = "Checks the proposed status for the failure described in the task. Passing means the diagnosis chooses the appropriate terminal classification."
+
+[challenges.coding.retryable]
+label = "Assess whether retry helps"
+about = "Checks the submitted retryability decision. Passing means the diagnosis correctly determines whether another attempt can resolve this failure."
+
+[challenges.coding.sentinel_handling]
+label = "Handle the sentinel correctly"
+about = "Checks the proposed treatment of the resolver's sentinel value. Passing means the diagnosis chooses the behavior required by the resolver's contract."
+
+[challenges.coding.invalid_explicit_still_errors]
+label = "Preserve invalid-input handling"
+about = "Checks the diagnosis of how invalid explicit inputs should behave. Passing means the submitted decision preserves the resolver's error contract."
+
+[challenges.coding.fix]
+label = "Select the correct repair"
+about = "Checks the repair selected from the task's candidate changes. Passing means the selection satisfies the supplied behavioral contract."
+
+[challenges.coding.original]
+label = "Trace the original replay"
+about = "Checks the predicted values from replaying the original code. Passing means the submitted trace matches the supplied scenario."
+
+[challenges.coding.tenant_only]
+label = "Trace the partial repair"
+about = "Checks the replay predicted for the task's partial cache-key change. Passing means the diagnosis follows that candidate's behavior through the scenario."
+
+[challenges.coding.fixed_third]
+label = "Predict the repaired lookup"
+about = "Checks a requested lookup value after the selected cache repair. Passing means the prediction agrees with the repaired replay."
+
+[challenges.coding.fixed_entries]
+label = "Count the repaired cache entries"
+about = "Checks the predicted cache size after the repaired replay. Passing means the diagnosis accounts for the distinct entries created by the scenario."
+
+[challenges.coding.original_balance]
+label = "Predict the original balance"
+about = "Checks the predicted final balance under the original transaction flow. Passing means the diagnosis follows the scenario's deliveries and failures correctly."
+
+[challenges.coding.reorder_balance]
+label = "Evaluate the reordered transaction"
+about = "Checks the predicted balance after the task's proposed transaction reordering. Passing means the diagnosis correctly traces that candidate change."
+
+[challenges.coding.fixed_balance]
+label = "Predict the repaired balance"
+about = "Checks the predicted final balance with the selected repair. Passing means the diagnosis correctly accounts for the repaired transaction behavior."
+
+[challenges.coding.fixed_receipts]
+label = "Count the repaired receipts"
+about = "Checks the predicted receipt count after the repaired replay. Passing means the diagnosis accounts for the receipts left by the scenario."
+
+[challenges.coding.original_wrong_schedules]
+label = "Count incorrect original schedules"
+about = "Checks how many completion orders leave the original code showing the wrong final value. Passing means the submitted count matches the scenario's schedules."
+
+[challenges.coding.original_trace]
+label = "Trace the original completions"
+about = "Checks the predicted visible value after each completion in the requested schedule. Passing means the trace follows the original code's publication behavior."
+
+[challenges.coding.fixed_trace]
+label = "Trace the repaired completions"
+about = "Checks the predicted visible value after each completion with the selected repair. Passing means the trace follows the repaired publication behavior."
+
+[challenges.coding.fixed_wrong_schedules]
+label = "Count incorrect repaired schedules"
+about = "Checks how many completion orders still end with the wrong visible value after the selected repair. Passing means the submitted count matches the repaired replay."
+
+[challenges.coding.profile]
+label = "Resolve the selected profile"
+about = "Checks which concrete profile the consumer selects after the registry finishes loading. Passing means the diagnosis follows the registry's final bindings."
+
+[challenges.coding.template_limit]
+label = "Read the template's initial limit"
+about = "Checks the predicted template limit before requests run. Passing means the diagnosis resolves the initial value from the complete registry."
+
+[challenges.coding.original_first_tags]
+label = "Trace the original request tags"
+about = "Checks the predicted tag count on the first request after the original replay. Passing means the diagnosis follows the sharing behavior across both requests."
+
+[challenges.coding.fixed_template_tags]
+label = "Trace the repaired template tags"
+about = "Checks the predicted template tag count after the repaired replay. Passing means the diagnosis follows how the selected repair affects the shared template."
