@@ -197,10 +197,17 @@ _REGRESSION_COUNTS = (
 class _ExecutionOutput(str):
     """Bounded operator output with a separate stdout protocol channel."""
 
-    def __new__(cls, tail: str, protocol: str, cleanup_seconds: float = 0):
+    def __new__(
+        cls,
+        tail: str,
+        protocol: str,
+        cleanup_seconds: float = 0,
+        setup_seconds: float = 0,
+    ):
         value = super().__new__(cls, tail)
         value.protocol = protocol
         value.cleanup_seconds = cleanup_seconds
+        value.setup_seconds = setup_seconds
         return value
 
 
@@ -226,6 +233,15 @@ def _limits(timeout: int) -> None:
 # Pinned stdlib runtime; provision explicitly with docker pull, never at grade time.
 _IMAGE = "python@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea"
 
+# Inputs reach /work by copy into a per-container Docker volume, never by a bind
+# mount of the host work directory. On macOS the engine runs in a VM, and a bind
+# source is served over the VM's shared host filesystem: the guest keeps an inode
+# for each file a container opened, and the VM process keeps one host descriptor
+# per cached inode long after the container and the file are gone. The label
+# makes an interrupted grader's leftover volumes and helpers easy to find.
+_WORK_LABEL = "org.agentpaddock.gym-work=1"
+_DOCKER_STEP_TIMEOUT = 30
+
 
 def containment_image() -> str:
     """Return the pinned Docker image used by the hidden-test runner."""
@@ -233,7 +249,11 @@ def containment_image() -> str:
 
 
 def shared_work_root() -> Path:
-    """Resolve group-writable host scratch shared by HQ users and the Docker VM."""
+    """Resolve group-writable host scratch shared by HQ users.
+
+    Per-task inputs are staged here and copied into each container's work
+    volume; the Docker VM never reads this directory.
+    """
     from gym import host_services
 
     root = host_services.current().scratch_dir()
@@ -267,17 +287,19 @@ def _command(work: Path, args: list[str]) -> list[str]:
     if not backend:
         raise GraderError("hidden tests require usable Docker Linux containment")
     # Caller context/host is used unchanged. No socket, credentials or host
-    # environment are mounted/passed to the container. Only copied input bytes.
+    # environment are mounted/passed to the container. Only copied input bytes:
+    # _execute fills the named work volume from `work` before the container runs.
     # No --init: a same-UID init would retain reopenable protocol descriptors
     # under /proc/1/fd. The non-dumpable trusted wrapper is container PID 1.
     work.chmod(0o755)
     for path in work.rglob("*"):
         path.chmod(0o755 if path.is_dir() else 0o644)
+    name = "gym-hidden-" + secrets.token_hex(16)
     return [
         backend,
         "run",
         "--name",
-        "gym-hidden-" + secrets.token_hex(16),
+        name,
         "--pull=never",
         "--rm",
         "--interactive",
@@ -299,7 +321,7 @@ def _command(work: Path, args: list[str]) -> list[str]:
         "--tmpfs",
         "/tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777",
         "--mount",
-        f"type=bind,src={work},dst=/work,readonly",
+        f"type=volume,src={name}-work,dst=/work,readonly",
         "--workdir=/work",
         "--env",
         "HOME=/tmp",
@@ -327,12 +349,99 @@ def _client_env() -> dict[str, str]:
     return env
 
 
+def _work_volume(command: list[str]) -> str | None:
+    """The named volume a container command mounts at /work, if any."""
+    for flag, value in zip(command, command[1:]):
+        if flag != "--mount":
+            continue
+        fields = dict(part.partition("=")[::2] for part in value.split(","))
+        if fields.get("type") == "volume" and fields.get("dst") == "/work":
+            return fields.get("src") or None
+    return None
+
+
+def _docker(
+    backend: str,
+    args: tuple[str, ...],
+    env: dict[str, str],
+    *,
+    missing_ok: bool = False,
+) -> str | None:
+    """Run one bounded Docker CLI step; return an error description or None.
+
+    With missing_ok an already-absent object is not an error, so removal is
+    idempotent. Creation and copy steps never tolerate a missing object.
+    """
+    step = " ".join(args[:2])
+    try:
+        done = subprocess.run(
+            [backend, *args], env=env, capture_output=True, timeout=_DOCKER_STEP_TIMEOUT
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return f"docker {step} unavailable: {exc}"
+    if done.returncode and not (missing_ok and b"no such" in done.stderr.lower()):
+        return f"docker {step} failed: " + done.stderr.decode(errors="replace")[-500:]
+    return None
+
+
+def _discard_work(backend: str, volume: str, env: dict[str, str]) -> str | None:
+    """Remove a work volume and its copy helper; return the first error."""
+    errors = [
+        _docker(backend, ("rm", "--force", volume + "-copy"), env, missing_ok=True),
+        _docker(backend, ("volume", "rm", "--force", volume), env, missing_ok=True),
+    ]
+    return next((error for error in errors if error), None)
+
+
+def _copy_work_in(backend: str, volume: str, work: Path, env: dict[str, str]) -> None:
+    """Fill a fresh named volume with the work tree; no host path is mounted.
+
+    `docker cp` streams a tar over the engine socket into a helper container
+    that is created but never started, so no task file is looked up through
+    the VM's shared host filesystem. The run container mounts the volume
+    read-only; _execute removes it after the container.
+    """
+    from gym.grader import GraderError
+
+    helper = volume + "-copy"
+    steps = (
+        ("volume", "create", "--label", _WORK_LABEL, volume),
+        (
+            "create",
+            "--name",
+            helper,
+            "--pull=never",
+            "--network=none",
+            "--label",
+            _WORK_LABEL,
+            "--mount",
+            f"type=volume,src={volume},dst=/work",
+            _IMAGE,
+            "true",
+        ),
+        ("cp", f"{work}/.", f"{helper}:/work"),
+    )
+    for args in steps:
+        error = _docker(backend, args, env)
+        if error:
+            cleanup = _discard_work(backend, volume, env)
+            detail = f"{error}; cleanup: {cleanup}" if cleanup else error
+            raise GraderError(
+                f"hidden-test sandbox unusable: work copy failed: {detail}"
+            )
+    error = _docker(backend, ("rm", "--force", helper), env, missing_ok=True)
+    if error:
+        cleanup = _discard_work(backend, volume, env)
+        raise GraderError(f"owned copy helper cleanup failed: {cleanup or error}")
+
+
 def _execute(
     command: list[str], work: Path, timeout: int, *, input_data: bytes = b""
 ) -> tuple[int, bool, str]:
     from gym.grader import GraderError
 
     container = command[command.index("--name") + 1] if "--name" in command else None
+    volume = _work_volume(command) if container else None
     env = (
         _client_env()
         if container
@@ -343,100 +452,128 @@ def _execute(
             "PYTHONDONTWRITEBYTECODE": "1",
         }
     )
-    with (
-        tempfile.TemporaryFile(dir=work) as output,
-        tempfile.TemporaryFile(dir=work) as diagnostics,
-        tempfile.TemporaryFile(dir=work) as input_file,
-    ):
-        input_file.write(input_data)
-        input_file.seek(0)
-        try:
-            proc = subprocess.Popen(
-                command,
-                cwd=work,
-                env=env,
-                stdin=input_file,
-                stdout=output,
-                stderr=diagnostics,
-                start_new_session=True,
-                preexec_fn=lambda: _limits(timeout),
-            )
-        except OSError as exc:
-            raise GraderError(f"hidden-test sandbox unavailable: {exc}") from exc
-        timed_out = False
-        cleanup_error = None
-        try:
-            # WNOWAIT preserves ownership of the leader PID until cleanup; poll()
-            # and wait() both reap and would allow a recycled process group.
-            deadline = time.monotonic() + timeout
-            while os.waitid(os.P_PID, proc.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT) is None:
-                if time.monotonic() >= deadline:
-                    timed_out = True
-                    break
-                time.sleep(0.02)
-        finally:
+    result = None
+    try:
+        setup_started = _monotonic()
+        if volume:
+            # Copy before the output files below are opened inside `work`.
+            _copy_work_in(command[0], volume, work, env)
+        setup_seconds = _monotonic() - setup_started
+        with (
+            tempfile.TemporaryFile(dir=work) as output,
+            tempfile.TemporaryFile(dir=work) as diagnostics,
+            tempfile.TemporaryFile(dir=work) as input_file,
+        ):
+            input_file.write(input_data)
+            input_file.seek(0)
+            try:
+                proc = subprocess.Popen(
+                    command,
+                    cwd=work,
+                    env=env,
+                    stdin=input_file,
+                    stdout=output,
+                    stderr=diagnostics,
+                    start_new_session=True,
+                    preexec_fn=lambda: _limits(timeout),
+                )
+            except OSError as exc:
+                raise GraderError(f"hidden-test sandbox unavailable: {exc}") from exc
+            timed_out = False
+            cleanup_error = None
+            try:
+                # WNOWAIT preserves ownership of the leader PID until cleanup; poll()
+                # and wait() both reap and would allow a recycled process group.
+                deadline = time.monotonic() + timeout
+                while (
+                    os.waitid(os.P_PID, proc.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+                    is None
+                ):
+                    if time.monotonic() >= deadline:
+                        timed_out = True
+                        break
+                    time.sleep(0.02)
+            finally:
+                cleanup_started = time.monotonic()
+                if container:
+                    try:
+                        removed = subprocess.run(
+                            [command[0], "rm", "--force", container],
+                            env=env,
+                            capture_output=True,
+                            timeout=15,
+                        )
+                        if (
+                            removed.returncode
+                            and b"No such container" not in removed.stderr
+                        ):
+                            cleanup_error = "owned container cleanup failed"
+                    except (OSError, subprocess.TimeoutExpired):
+                        cleanup_error = "owned container cleanup unavailable"
+                if container:
+                    # Container ownership, including every descendant, is enforced
+                    # by Docker's unique name. The CLI may need time to observe rm.
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()  # Unreaped, owned leader only; no PID reuse.
+                        proc.wait(timeout=5)
+                else:
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    except PermissionError:
+                        if timed_out:
+                            cleanup_error = "owned process-group cleanup denied"
+                    proc.wait(timeout=5)
+            cleanup_seconds = time.monotonic() - cleanup_started
+            if cleanup_error:
+                raise GraderError(cleanup_error)
+            diagnostics.seek(0, os.SEEK_END)
+            diagnostics.seek(max(0, diagnostics.tell() - 16384))
+            diagnostics_tail = diagnostics.read().decode("utf-8", errors="replace")
+            output.seek(0, os.SEEK_END)
+            oversized = output.tell() > 16384
+            output.seek(max(0, output.tell() - 16384))
+            tail = output.read().decode("utf-8", errors="replace")
+            tail = tail.encode("utf-8")[-16384:].decode("utf-8", errors="ignore")
+            if oversized:
+                tail = "OUTPUT_LIMIT_EXCEEDED\n" + tail.encode("utf-8")[-16362:].decode(
+                    "utf-8", errors="ignore"
+                )
+            protocol = tail
+            if diagnostics_tail:
+                tail = (
+                    (tail + "\n" + diagnostics_tail)
+                    .encode("utf-8")[-16384:]
+                    .decode("utf-8", errors="ignore")
+                )
+            result = _ExecutionOutput(tail, protocol, cleanup_seconds, setup_seconds)
+            return proc.returncode, timed_out, result
+    finally:
+        if volume:
+            # Always dispose of copied inputs, even if setup, reaping or reading
+            # output raises. The execution finally removes the container first.
             cleanup_started = time.monotonic()
-            if container:
-                try:
-                    removed = subprocess.run(
-                        [command[0], "rm", "--force", container],
-                        env=env,
-                        capture_output=True,
-                        timeout=15,
-                    )
-                    if removed.returncode and b"No such container" not in removed.stderr:
-                        cleanup_error = "owned container cleanup failed"
-                except (OSError, subprocess.TimeoutExpired):
-                    cleanup_error = "owned container cleanup unavailable"
-            if container:
-                # Container ownership, including every descendant, is enforced
-                # by Docker's unique name. The CLI may need time to observe rm.
-                try:
-                    proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    proc.kill()  # Unreaped, owned leader only; no PID reuse.
-                    proc.wait(timeout=5)
-            else:
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                except PermissionError:
-                    if timed_out:
-                        cleanup_error = "owned process-group cleanup denied"
-                proc.wait(timeout=5)
-        cleanup_seconds = time.monotonic() - cleanup_started
-        if cleanup_error:
-            raise GraderError(cleanup_error)
-        diagnostics.seek(0, os.SEEK_END)
-        diagnostics.seek(max(0, diagnostics.tell() - 16384))
-        diagnostics_tail = diagnostics.read().decode("utf-8", errors="replace")
-        output.seek(0, os.SEEK_END)
-        oversized = output.tell() > 16384
-        output.seek(max(0, output.tell() - 16384))
-        tail = output.read().decode("utf-8", errors="replace")
-        tail = tail.encode("utf-8")[-16384:].decode("utf-8", errors="ignore")
-        if oversized:
-            tail = "OUTPUT_LIMIT_EXCEEDED\n" + tail.encode("utf-8")[-16362:].decode(
-                "utf-8", errors="ignore"
-            )
-        protocol = tail
-        if diagnostics_tail:
-            tail = (
-                (tail + "\n" + diagnostics_tail)
-                .encode("utf-8")[-16384:]
-                .decode("utf-8", errors="ignore")
-            )
-        return proc.returncode, timed_out, _ExecutionOutput(tail, protocol, cleanup_seconds)
+            error = _discard_work(command[0], volume, env)
+            if result is not None:
+                result.cleanup_seconds += time.monotonic() - cleanup_started
+            if error and sys.exc_info()[0] is None:
+                raise GraderError(f"owned work volume cleanup failed: {error}")
 
 
 def _ready(work: Path, python: str) -> None:
-    """Probe the exact sandbox/interpreter before copying or executing code."""
+    """Probe the exact sandbox/interpreter before copying or executing code.
+
+    The probe reads a nonce file back from /work, proving the copied inputs
+    reach the container before any submitted bytes are staged.
+    """
     from gym.grader import GraderError
 
-    bind_nonce = secrets.token_hex(32)
-    nonce_file = "gym-bind-" + secrets.token_hex(16)
-    (work / nonce_file).write_text(bind_nonce, encoding="utf-8")
+    copy_nonce = secrets.token_hex(32)
+    nonce_file = "gym-ready-" + secrets.token_hex(16)
+    (work / nonce_file).write_text(copy_nonce, encoding="utf-8")
     probe_code = (
         "from pathlib import Path; import os; "
         "c=Path('/sys/fs/cgroup'); "
@@ -452,11 +589,11 @@ def _ready(work: Path, python: str) -> None:
         if not timeout:
             break
     protocol = getattr(output, "protocol", output).splitlines()
-    if protocol and protocol[0] == "gym-ready" and protocol[1:] != [bind_nonce]:
+    if protocol and protocol[0] == "gym-ready" and protocol[1:] != [copy_nonce]:
         raise GraderError(
-            f"hidden tests: work root is not shared with the Docker VM: {work}\n{output}"
+            f"hidden tests: copied inputs did not reach /work: {work}\n{output}"
         )
-    if code or timeout or protocol != ["gym-ready", bind_nonce]:
+    if code or timeout or protocol != ["gym-ready", copy_nonce]:
         detail = "timed out: " + output if timeout else output
         raise GraderError(f"hidden-test sandbox unusable: {detail}")
     (work / nonce_file).unlink()
@@ -491,7 +628,7 @@ def run(
     work_root: Path | None = None,
     audit_cases: list | None = None,
 ) -> dict:
-    """Run immutable hidden tests; work_root must be shared with the Docker VM."""
+    """Run immutable hidden tests; inputs are staged under work_root, then copied in."""
     from gym.grader import GraderError, snapshot_verifiers
     from gym.schema import is_fix_family
 
@@ -502,7 +639,7 @@ def run(
     if type(task.hidden_tests_expected_tests) is not int or task.hidden_tests_expected_tests < 1:
         raise GraderError("hidden tests require a positive expected_tests count")
     if work_root is not None and not work_root.is_dir():
-        raise GraderError("work_root must be an existing VM-shared directory")
+        raise GraderError("work_root must be an existing directory")
     files = snapshot_verifiers([task]) if files is None else files
     with tempfile.TemporaryDirectory(prefix="gym-hidden-", dir=work_root) as temporary:
         work = Path(temporary).resolve()
@@ -580,7 +717,8 @@ def run(
             )
             elapsed = _monotonic() - started
             cleanup_seconds = getattr(output, "cleanup_seconds", 0)
-            deadline += cleanup_seconds
+            # Copy-in and cleanup are harness overhead, not submission time.
+            deadline += cleanup_seconds + getattr(output, "setup_seconds", 0)
             if code and not first_nonzero_code:
                 first_nonzero_code = code
             timed_out |= timeout
@@ -757,7 +895,7 @@ def run_regression_test(
     if not 1 <= task.regression_test_timeout_seconds <= 60:
         raise GraderError("invalid regression-test timeout")
     if work_root is not None and not work_root.is_dir():
-        raise GraderError("work_root must be an existing VM-shared directory")
+        raise GraderError("work_root must be an existing directory")
     files = snapshot_verifiers([task]) if files is None else files
     variants = _variant_files(task, files, editable_files(task, files))
     runs = [

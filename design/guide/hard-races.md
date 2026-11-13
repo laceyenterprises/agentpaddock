@@ -60,8 +60,9 @@ presence, runs ordinary passing and socket-denial fixtures on the real backend, 
 checks fail. The probe uses the public `gym.hidden_tests.containment_image()`
 accessor for the runner's pinned image and accepts only a tagged ENETUNREACH or
 EHOSTUNREACH denial from the socket fixture. It stages fixtures and hidden-runner
-bind sources inside a disposable mode-0700 directory under the resolved HQ
-root's `tmp/`; the Docker VM must share that root. PMA does not depend on the
+inputs inside a disposable mode-0700 directory under the resolved HQ root's
+`tmp/`; the runner copies them into each container's work volume, so the root
+need not be shared with the Docker VM. PMA does not depend on the
 daemon's inherited `TMPDIR`. Engine connection failures and `docker info` timeouts print the JSON report
 and exit nonzero with a `service unavailable` diagnostic so PMA's bounded
 transient retry applies. A reachable engine with a missing image or invalid

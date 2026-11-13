@@ -116,45 +116,52 @@ def api():
     return make_api()
 
 
+def protocol_args(args, work_prefix):
+    """Strip container-only probe asserts; /work/ paths resolve under work_prefix."""
+    import gym.hidden_tests as runner
+
+    # Synthetic protocol tests do not claim container enforcement.
+    if "memory.swap.max" in args[-1]:
+        return [
+            *args[:-1],
+            "from pathlib import Path; "
+            + args[-1][args[-1].index("print('gym-ready'") :].replace(
+                "/work/", work_prefix
+            ),
+        ]
+    if sys.platform != "linux" and args[-1] in (
+        runner._WRAPPER,
+        runner._REGRESSION_WRAPPER,
+    ):
+        return [
+            *args[:-1],
+            args[-1].replace("protect_parent()\nrequest", "request"),
+        ]
+    return args
+
+
 @pytest.fixture
 def protocol_backend(monkeypatch):
     """Only synthetic test bytes use this seam; it proves no OS containment."""
     import gym.hidden_tests as runner
 
     def command(work, args):
-        # Synthetic protocol tests do not claim container enforcement.
-        if "memory.swap.max" in args[-1]:
-            return [
-                *args[:-1],
-                "from pathlib import Path; "
-                + args[-1][args[-1].index("print('gym-ready'") :].replace(
-                    "/work/", str(work) + "/"
-                ),
-            ]
-        if sys.platform != "linux" and args[-1] in (
-            runner._WRAPPER,
-            runner._REGRESSION_WRAPPER,
-        ):
-            return [
-                *args[:-1],
-                args[-1].replace("protect_parent()\nrequest", "request"),
-            ]
-        return args
+        return protocol_args(args, str(work) + "/")
 
     monkeypatch.setattr(runner, "_command", command)
 
 
 @pytest.fixture
 def docker_backend(monkeypatch, request):
-    """Intentionally use the VM-shared HQ tmp parent; children are isolated and removed.
+    """Intentionally use the canonical HQ tmp parent; children are isolated and removed.
 
-    The canonical shared_work_root may create/chmod that parent. Ordinary pytest
-    TMPDIR is not necessarily mounted in the Docker VM and cannot prove containment.
+    The canonical shared_work_root may create/chmod that parent. Inputs reach
+    each container by copy into a Docker volume, so the parent need not be
+    shared with the Docker VM.
     """
     require_docker_backend()
     from gym import hidden_tests
 
-    # HQ scratch is VM-shared; pytest tmp_path/default TMPDIR need not be.
     import tempfile
     from gym import host_services
 

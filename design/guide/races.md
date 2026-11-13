@@ -219,9 +219,18 @@ must never be used with agent output or in host containment/activation probes.
 Real containment tests require a usable Docker Linux engine on macOS or Linux.
 The caller's normal Docker context/host is honored; the grader never escalates
 ownership or passes credentials, host environment, or a Docker socket inside.
-`gym.hidden_tests.run(..., work_root=path)` creates its disposable bind source
-under an existing directory shared with the Docker VM. Omitting `work_root`
-uses the caller's default temp directory, which must also be VM-shared.
+`gym.hidden_tests.run(..., work_root=path)` stages its disposable inputs under
+an existing host directory. Omitting `work_root` uses the caller's default temp
+directory. Neither needs to be shared with the Docker VM: each container's
+inputs are copied into a fresh named volume with `docker cp`, through a helper
+container that is created but never started, and the volume is mounted
+read-only at `/work`. The volume is removed with its container. No host
+directory is bind-mounted, because on macOS a bind source is served over the
+VM's shared filesystem and the VM keeps a host file descriptor for every file a
+container opened there long after the container and the file are gone.
+Volumes and helpers carry the label `org.agentpaddock.gym-work=1`, so leftovers
+from an interrupted grader can be listed with
+`docker volume ls --filter label=org.agentpaddock.gym-work=1`.
 The grader and activation probe resolve their shared parent through
 `gym.hidden_tests.shared_work_root()` at `<hq_root>/tmp`. It requests mode 0775
 and ensures group read/write/traverse access when the caller owns the directory,
@@ -238,15 +247,18 @@ docker pull python@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9
 Each disposable container has a 256 MiB hard cgroup memory limit, zero swap,
 32 PIDs, one CPU, a 16 MiB noexec scratch tmpfs, read-only root and `/work`
 (hidden specs are excluded), no network, uid/gid 65534, no capabilities and
-no-new-privileges. Only the copied inputs are mounted. HOME/TMPDIR point to
+no-new-privileges. Only the copied-in volume is mounted. HOME/TMPDIR point to
 scratch. Readiness has a 20 s bound and one timeout-only retry; other failures
 are immediate harness errors before submitted bytes are copied. Cleanup removes
 the uniquely named owned container, including descendants, on success and timeout.
-Missing Docker, image, engine or enforceable limits fails closed.
-The Docker VM must share the host temporary directory used for copied inputs;
-on macOS, set host `TMPDIR` to a shared directory (for example `$HQ_ROOT/tmp`)
-if the default `/var/folders` directory cannot be bind-mounted. Container
-HOME/TMPDIR still resolve to its bounded scratch tmpfs.
+Work-volume and copy-helper disposal runs in a `finally` block, including when
+setup, process reaping or output reading raises. An earlier execution exception
+takes precedence over a secondary disposal error.
+Missing Docker, image, engine or enforceable limits fails closed, and so does
+a failed copy-in or volume removal. Readiness proves the copy reached `/work`
+by reading back a random nonce file. Copy-in and cleanup time extend the shared
+hidden-test budget instead of consuming it. Container HOME/TMPDIR resolve to
+its bounded scratch tmpfs.
 
 **RFDLIFT-01 opens fix activation with a protocol-access audit.** Hidden JSON case specs remain
 in the trusted grader process and are never mounted in the container. Each case

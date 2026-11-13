@@ -71,7 +71,7 @@ def test_invalid_responses(tmp_path, protocol_backend, monkeypatch, kind):
 
     def execute(command, work, timeout, *, input_data=b""):
         if not input_data:
-            return 0, False, "gym-ready\n" + next(work.glob("gym-bind-*")).read_text()
+            return 0, False, "gym-ready\n" + next(work.glob("gym-ready-*")).read_text()
         nonce = json.loads(input_data.splitlines()[0])["nonce"]
         record = {"nonce": nonce, "ok": 42}
         if kind == "missing":
@@ -196,7 +196,10 @@ def test_docker_resource_contract(tmp_path, monkeypatch):
         "--pull=never",
     ):
         assert flag in command
-    assert f"type=bind,src={tmp_path},dst=/work,readonly" in command
+    name = command[command.index("--name") + 1]
+    # Inputs are copied into the container's own volume; no host path is mounted.
+    assert f"type=volume,src={name}-work,dst=/work,readonly" in command
+    assert not any("type=bind" in flag or str(tmp_path) in flag for flag in command)
     assert "/tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777" in command
     assert "--init" not in command
     assert not any("seccomp=" in flag for flag in command)
@@ -649,7 +652,7 @@ def test_invalid_work_root_raises_grader_error(tmp_path, kind):
     if kind == "file":
         root.write_text("not a directory")
     with pytest.raises(
-        GraderError, match="work_root must be an existing VM-shared directory"
+        GraderError, match="work_root must be an existing directory"
     ):
         run(task, capture, work_root=root)
 
@@ -810,11 +813,11 @@ def test_numeric_representation_is_contract(tmp_path, protocol_backend):
             1,
             "gym-ready\n",
             'Traceback (most recent call last):\n  File "<string>", line 1, in <module>\n'
-            "PermissionError: [Errno 13] Permission denied: '/work/gym-bind-test'\n",
+            "PermissionError: [Errno 13] Permission denied: '/work/gym-ready-test'\n",
         ),
     ],
 )
-def test_bind_preflight_refuses_before_copy_and_cleans(
+def test_copy_preflight_refuses_before_staging_and_cleans(
     tmp_path, monkeypatch, code, protocol, diagnostics
 ):
     from gym import hidden_tests
@@ -834,12 +837,12 @@ def test_bind_preflight_refuses_before_copy_and_cleans(
         assert not (work / "target.py").exists()
         assert not (work / "hidden").exists()
         assert len(list(work.iterdir())) == 1
-        assert "Path('/work/gym-bind-" in command[-1]
+        assert "Path('/work/gym-ready-" in command[-1]
         return code, False, reported
 
     monkeypatch.setattr(hidden_tests, "_execute", execute)
     with pytest.raises(
-        GraderError, match="work root is not shared with the Docker VM"
+        GraderError, match="copied inputs did not reach /work"
     ) as error:
         run(task, capture, work_root=work_root)
     assert str(reported) in str(error.value)

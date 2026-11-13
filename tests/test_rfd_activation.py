@@ -242,12 +242,14 @@ def test_probe_real_runner_mounts_shared_root_despite_default_tmp(
         # Exercise real run(), snapshotting and Docker command construction.
         assert work.is_relative_to(probe_roots / "tmp")
         assert work.parent.stat().st_mode & 0o777 == 0o700
+        name = command[command.index("--name") + 1]
         assert command[command.index("--mount") + 1] == (
-            f"type=bind,src={work},dst=/work,readonly"
+            f"type=volume,src={name}-work,dst=/work,readonly"
         )
+        assert not any(str(work) in arg for arg in command)
         mounts.append(work)
         if not input_data:
-            return 0, False, "gym-ready\n" + next(work.glob("gym-bind-*")).read_text()
+            return 0, False, "gym-ready\n" + next(work.glob("gym-ready-*")).read_text()
         request = json.loads(input_data)
         assert not (work / "hidden").exists()
         socket_fixture = "socket.create_connection" in request["call"]
@@ -377,13 +379,15 @@ def test_grader_real_runner_mounts_shared_root_despite_default_tmp(
 
     def execute(command, work, timeout, *, input_data=b""):
         assert work.parent == hidden_tests.shared_work_root() == probe_roots / "tmp"
+        name = command[command.index("--name") + 1]
         assert (
             command[command.index("--mount") + 1]
-            == f"type=bind,src={work},dst=/work,readonly"
+            == f"type=volume,src={name}-work,dst=/work,readonly"
         )
+        assert not any(str(work) in arg for arg in command)
         mounts.append(work)
         if not input_data:
-            return 0, False, "gym-ready\n" + next(work.glob("gym-bind-*")).read_text()
+            return 0, False, "gym-ready\n" + next(work.glob("gym-ready-*")).read_text()
         request = json.loads(input_data)
         return (
             0,
