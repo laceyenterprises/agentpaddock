@@ -2595,6 +2595,36 @@ def test_race_context_loads_and_renders_without_changing_legacy_pages(tmp_path):
     assert build_site.build(results) == before
 
 
+@pytest.mark.parametrize(
+    "about",
+    [
+        None,
+        {},
+        "invalid context",
+        ["what", "hard"],
+        1,
+        {"what": "A race"},
+        {"hard": "Interacting contracts"},
+        {"what": None, "hard": "Interacting contracts"},
+        {"what": "A race", "hard": None},
+        {"what": 1, "hard": "Interacting contracts"},
+        {"what": "A race", "hard": []},
+        {"what": "", "hard": "Interacting contracts"},
+        {"what": "A race", "hard": ""},
+        {"what": " \t\n", "hard": "Interacting contracts"},
+        {"what": "A race", "hard": " \t\n"},
+    ],
+)
+def test_race_page_omits_invalid_context(tmp_path, about):
+    _, files = _race_site(tmp_path)
+    race = json.loads(files["data/races/hard-review-alpha.json"])
+    race.pop("about", None)
+    legacy = site_races.race_page(race, None, 2, build_site.ROUTES)
+    assert 'aria-label="About this race"' not in legacy
+    race["about"] = about
+    assert site_races.race_page(race, None, 2, build_site.ROUTES) == legacy
+
+
 def test_race_page_shows_the_briefing_as_the_track_card_allows(tmp_path):
     results = _site_tree(tmp_path)
     tasks = results.parent / "tasks"

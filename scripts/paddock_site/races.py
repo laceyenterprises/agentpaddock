@@ -784,7 +784,10 @@ def _header(race: Mapping[str, Any], calendar_size: int) -> str:
 
 def _about(race: Mapping[str, Any]) -> str:
     about = race.get("about")
-    if not about:
+    if not isinstance(about, Mapping) or not all(
+        isinstance(about.get(key), str) and about[key].strip()
+        for key in ("what", "hard")
+    ):
         return ""
     return (
         '<section class="rc-section" aria-label="About this race">'
