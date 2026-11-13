@@ -21,3 +21,7 @@ fixed_template_tags = { type = "integer" }
 [verifier]
 entrypoint = "verifier.py"
 description = "All diagnosis and counterexample fields graded independently with MEG-05 sub-checks."
+
+[about]
+what = "Diagnose request settings that unexpectedly affect other requests in a program with a long configuration registry."
+hard = "Early defaults can be superseded later in the file, and values can be shared across calls. The agent must read beyond the opening definitions and trace how configuration becomes request state."

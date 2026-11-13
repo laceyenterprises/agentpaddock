@@ -30,3 +30,7 @@ must_fail_variants = ["global-key", "joined-key", "rewrite-row"]
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix newsletter subscriber selection across multiple lists and add regression coverage, extending the earlier single-list races."
+hard = "The caller defines a broader set of input and sharing rules, while the finding is less explicit. Both the repair and the test require understanding the public behavior across files."

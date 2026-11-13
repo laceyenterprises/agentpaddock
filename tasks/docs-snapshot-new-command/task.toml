@@ -18,3 +18,7 @@ done = { type = "boolean" }
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Write user documentation for a new command that inspects saved records."
+hard = "The implementation is the source of truth. The agent must explain how to use the command and interpret its outcomes while avoiding assumptions borrowed from similar commands."

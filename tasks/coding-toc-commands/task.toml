@@ -22,3 +22,7 @@ regressing_commit_subject = { type = "string", required = true, description = "E
 [verifier]
 entrypoint = "verifier.py"
 description = "Regressing commit named from git history, pytest run before and after the fix, and test.py left untouched."
+
+[about]
+what = "Find the change that broke a small program, repair it, and confirm the repair with the existing test."
+hard = "The agent must connect repository history with a reproduced failure. A convincing explanation alone is insufficient to carry out the full investigation and repair workflow."

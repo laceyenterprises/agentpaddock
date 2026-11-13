@@ -18,3 +18,7 @@ done = { type = "boolean" }
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Document a benchmark command option and how it affects the identity of comparable runs."
+hard = "The option has several accepted forms and interacts with other run settings. The agent must explain both ordinary use and compatibility behavior without adding unsupported promises."

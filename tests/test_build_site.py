@@ -20,6 +20,7 @@ from collections import defaultdict
 from copy import deepcopy
 from html.parser import HTMLParser
 from pathlib import Path
+from types import MappingProxyType
 from urllib.parse import urlsplit
 
 import build_site
@@ -2592,6 +2593,120 @@ def test_race_page_classification_comes_from_the_data(tmp_path):
     assert "Show all 12 finishers" in more and 'data-first="10"' in more
 
 
+def test_race_context_loader_accepts_immutable_mapping(tmp_path, monkeypatch):
+    task_dir = tmp_path / "race"
+    task_dir.mkdir()
+    (task_dir / "task.toml").touch()
+    monkeypatch.setattr(
+        lb,
+        "read_toml",
+        lambda path: {
+            "id": "race",
+            "suite": "coding",
+            "task_version": 1,
+            "about": MappingProxyType({"what": " Work ", "hard": " Constraints "}),
+        },
+    )
+    races = site_data.load_races(tmp_path)
+    assert len(races) == 1
+    assert next(iter(races.values())).about == {
+        "what": "Work",
+        "hard": "Constraints",
+    }
+
+
+def test_race_context_loads_and_renders_without_changing_legacy_pages(tmp_path):
+    results, before = _race_site(tmp_path)
+    task_dir = results.parent / "tasks" / "docs-beta"
+    manifest = task_dir / "task.toml"
+    original = manifest.read_text()
+    key = next(
+        key for key in site_data.load_races(task_dir.parent) if key[1] == "docs-beta"
+    )
+    assert site_data.load_races(task_dir.parent)[key].about is None
+    page_file = "races/docs-beta/index.html"
+    assert "What it is" not in before[page_file]
+    assert "What makes it hard" not in before[page_file]
+    what = 'Update a guide with <examples> & "quotes".'
+    hard = "Several contracts interact."
+    manifest.write_text(
+        original
+        + "\n[about]\nwhat = "
+        + json.dumps(" \t" + what + "\n")
+        + "\nhard = "
+        + json.dumps("\n" + hard + " \t")
+        + "\n"
+    )
+    assert site_data.load_races(task_dir.parent)[key].about == {
+        "what": what,
+        "hard": hard,
+    }
+    after = build_site.build(results)
+    page = after[page_file]
+    paragraphs = (
+        '<p class="rc-copy"><strong>What it is:</strong> '
+        + html.escape(what, quote=True)
+        + '</p><p class="rc-copy"><strong>What makes it hard:</strong> '
+        + hard
+        + "</p>"
+    )
+    section = (
+        '<section class="rc-section" aria-label="About this race">'
+        + paragraphs
+        + "</section>"
+    )
+    assert section in page
+    assert page.index(section) < page.index(
+        '<section class="rc-section rc-split" id="briefing">'
+    )
+    assert page.replace(section, "") == before[page_file]
+    grid = after["races/index.html"]
+    assert f'<p class="rc-title">{html.escape(what, quote=True)}</p>' in grid
+    summary = next(
+        race
+        for race in json.loads(after["data/races.json"])["races"]
+        if race["id"] == "docs-beta"
+    )
+    assert summary["about"] == {"what": what, "hard": hard}
+    # A sibling without context retains both its HTML and its data shape.
+    assert (
+        after["races/hard-review-alpha/index.html"]
+        == before["races/hard-review-alpha/index.html"]
+    )
+    manifest.write_text(original)
+    assert build_site.build(results) == before
+
+
+@pytest.mark.parametrize(
+    "about",
+    [
+        None,
+        {},
+        "invalid context",
+        ["what", "hard"],
+        1,
+        {"what": "A race"},
+        {"hard": "Interacting contracts"},
+        {"what": None, "hard": "Interacting contracts"},
+        {"what": "A race", "hard": None},
+        {"what": 1, "hard": "Interacting contracts"},
+        {"what": "A race", "hard": []},
+        {"what": "", "hard": "Interacting contracts"},
+        {"what": "A race", "hard": ""},
+        {"what": " \t\n", "hard": "Interacting contracts"},
+        {"what": "A race", "hard": " \t\n"},
+    ],
+)
+def test_race_page_omits_invalid_context(tmp_path, about):
+    _, files = _race_site(tmp_path)
+    race = json.loads(files["data/races/hard-review-alpha.json"])
+    race.pop("about", None)
+    legacy = site_races.race_page(race, None, 2, build_site.ROUTES)
+    assert 'aria-label="About this race"' not in legacy
+    race["about"] = about
+    assert site_races.race_page(race, None, 2, build_site.ROUTES) == legacy
+
+
 def test_race_page_shows_the_briefing_as_the_track_card_allows(tmp_path):
     results = _site_tree(tmp_path)
     tasks = results.parent / "tasks"
@@ -2737,6 +2852,43 @@ def test_races_grid_awaits_trust_sign_off_without_cards(tmp_path):
     assert "<h1>Races are on their way.</h1>" in grid
     assert "rc-card" not in grid and "data-races-grid" not in grid
     assert not [name for name in files if re.fullmatch(r"races/.+/index\.html", name)]
+
+
+@pytest.mark.parametrize(
+    ("about", "description"),
+    [
+        (None, "Legacy title"),
+        ({}, "Legacy title"),
+        ({"hard": "No what field"}, "Legacy title"),
+        ("invalid context", "Legacy title"),
+        ({"what": None}, "Legacy title"),
+        ({"what": ""}, "Legacy title"),
+        ({"what": " \t\n"}, "Legacy title"),
+        ({"what": 42}, "Legacy title"),
+        ({"what": ["Review code"]}, "Legacy title"),
+        ({"what": " Review code \n"}, "Review code"),
+        ({"what": "Review <code> & contracts"}, "Review <code> & contracts"),
+    ],
+)
+def test_race_card_description_handles_sparse_context(about, description):
+    race = {
+        "challenge": "review",
+        "shortName": "X",
+        "title": "Legacy title",
+        "about": about,
+        "rate": None,
+        "k": 0,
+        "n": 0,
+        "entries": 0,
+        "medianLapSeconds": None,
+        "medianCostUsd": None,
+        "stages": None,
+    }
+    card = site_races.race_card(race, "x/index.html")
+    assert f'<p class="rc-title">{html.escape(description, quote=True)}</p>' in card
+    race.pop("about")
+    race.pop("title")
+    assert '<p class="rc-title">' not in site_races.race_card(race, "x/index.html")
 
 
 def test_card_stage_bars_mark_the_weakest_in_red():

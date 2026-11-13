@@ -30,3 +30,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix duplicate campaign deliveries and write a regression test that demonstrates the repair."
+hard = "Removing duplicates is only part of the job: existing caller behavior must survive. The agent must write a behavioral test that can distinguish a complete repair from a plausible partial one."

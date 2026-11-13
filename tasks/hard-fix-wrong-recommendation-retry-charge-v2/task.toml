@@ -27,3 +27,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix stalled payment collection for orders with several separate payments, extending the base single-charge race."
+hard = "The review advice sounds more complete, but the caller adds distinctions it does not fully address. The agent must reconcile repeated attempts with the behavior of the whole collection process."

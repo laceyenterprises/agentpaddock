@@ -24,3 +24,7 @@ retryable = { type = "boolean", required = true, description = "whether this Git
 [verifier]
 entrypoint = "verifier.py"
 description = "The answer must classify a no-PullRequest GitHub response as terminal skipped, not retryable failed."
+
+[about]
+what = "Diagnose a deployment sweep that stops making progress after encountering a misleading pull-request reference."
+hard = "The failure resembles a temporary service problem. The agent must use the surrounding contract to decide what the response means for future progress."

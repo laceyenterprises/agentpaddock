@@ -24,3 +24,7 @@ non_dict_action = { type = "enum", required = true, enum = ["skip-audit", "audit
 [verifier]
 entrypoint = "verifier.py"
 description = "The answer must identify the bare `.get()` call and preserve non-dict payload tolerance by skipping the audit."
+
+[about]
+what = "Diagnose a deployment job that fails while inspecting a harmless migration result."
+hard = "A nearby defensive check makes the code look safer than it is. The agent must trace the same input through the surrounding control flow and distinguish an absent result from an actual failure."

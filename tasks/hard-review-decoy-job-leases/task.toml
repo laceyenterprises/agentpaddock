@@ -17,3 +17,7 @@ findings = { type = "list", required = true, max_items = 32, items = { file = { 
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Review a job queue that assigns work to workers and recovers jobs after interruptions."
+hard = "Ownership changes and recovery paths require reasoning across processes and files. Plausible concerns can be contradicted by the surrounding contracts, so findings need a concrete trigger and consequence."

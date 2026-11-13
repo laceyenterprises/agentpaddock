@@ -46,6 +46,77 @@ def test_shipped_example_task_loads_from_disk():
     assert task.field_spec("root_cause").type == "enum"
 
 
+def test_about_is_optional_display_context():
+    data = copy.deepcopy(VALID)
+    without = parse_task_dict(data)
+    assert without.about is None
+    data["about"] = {
+        "what": "Diagnose a stalled job.",
+        "hard": "The evidence is noisy.",
+    }
+    with_about = parse_task_dict(data)
+    assert with_about.about.what == data["about"]["what"]
+    assert with_about.about.hard == data["about"]["hard"]
+    # Public context changes neither the result contract nor the task version.
+    assert with_about.result_schema == without.result_schema
+    assert with_about.task_version == without.task_version
+
+
+def test_about_strings_are_trimmed_without_mutating_input():
+    data = copy.deepcopy(VALID)
+    data["about"] = {
+        "what": " \tDiagnose a stalled job.\n",
+        "hard": "\nThe evidence is noisy. \t",
+    }
+    original = copy.deepcopy(data)
+    task = parse_task_dict(data)
+    assert task.about.what == "Diagnose a stalled job."
+    assert task.about.hard == "The evidence is noisy."
+    assert data == original
+
+
+@pytest.mark.parametrize("with_about", [False, True])
+def test_load_task_with_optional_about(tmp_path, with_about):
+    manifest = (
+        'id = "example"\n'
+        "[result_schema]\n"
+        'done = { type = "boolean" }\n'
+        "[verifier]\n"
+        'entrypoint = "verifier.py"\n'
+    )
+    if with_about:
+        manifest += (
+            "[about]\n"
+            'what = "Diagnose a stalled job."\n'
+            'hard = "The evidence is noisy."\n'
+        )
+    (tmp_path / "task.toml").write_text(manifest)
+    (tmp_path / "verifier.py").write_text("")
+    task = load_task(tmp_path)
+    assert (task.about is not None) == with_about
+    assert validate_result(task, {"done": True}) is None
+
+
+@pytest.mark.parametrize(
+    "about",
+    [
+        None,
+        "context",
+        {},
+        {"what": "A race"},
+        {"what": "A race", "hard": "   "},
+        {"what": 1, "hard": "Difficult"},
+        {"what": "A race", "hard": False},
+        {"what": "A race", "hard": "Difficult", "typo": "unknown"},
+    ],
+)
+def test_invalid_about_is_rejected(about):
+    data = copy.deepcopy(VALID)
+    data["about"] = about
+    with pytest.raises(TaskSchemaError, match="about"):
+        parse_task_dict(data)
+
+
 def test_missing_result_schema_rejected():
     data = copy.deepcopy(VALID)
     del data["result_schema"]

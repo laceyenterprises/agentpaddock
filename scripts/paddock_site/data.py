@@ -103,6 +103,8 @@ class Race:
     task_dir: Path | None = None
     prompt: str = "prompt.md"
     has_card: bool = False
+    #: Public, display-only context from the task's optional [about] table.
+    about: Mapping[str, str] | None = None
 
     @property
     def key(self) -> tuple[str, str, int]:
@@ -136,6 +138,12 @@ def load_races(tasks_dir: Path) -> dict[tuple[str, str, int], Race]:
         pitch = card.get("pitch")
         dispatch = task.get("dispatch")
         prompt = dispatch.get("prompt") if isinstance(dispatch, dict) else None
+        about = task.get("about")
+        if not isinstance(about, Mapping) or not all(
+            isinstance(about.get(key), str) and about[key].strip()
+            for key in ("what", "hard")
+        ):
+            about = None
         race = Race(
             id=task_id,
             suite=suite,
@@ -151,6 +159,9 @@ def load_races(tasks_dir: Path) -> dict[tuple[str, str, int], Race]:
             task_dir=path.parent,
             prompt=prompt if isinstance(prompt, str) else "prompt.md",
             has_card=card_path.is_file(),
+            about=(
+                {key: about[key].strip() for key in ("what", "hard")} if about else None
+            ),
         )
         races[race.key] = race
     return races
@@ -437,6 +448,7 @@ def _race_summary(data: SiteData, race: Race) -> dict[str, Any]:
         "name": race.name,
         "shortName": race.short_name,
         "title": race.title,
+        **({"about": dict(race.about)} if race.about else {}),
         "challenge": race.suite,
         "version": race.version,
         "calendar": race in data.calendar,
@@ -663,6 +675,7 @@ def race(data: SiteData, race: Race, ids: Mapping[tuple, str]) -> dict[str, Any]
             for key in ("id", "name", "shortName", "title", "challenge", "version")
         },
         "pitch": race.pitch,
+        **({"about": dict(race.about)} if race.about else {}),
         **{key: summary[key] for key in ("calendar", "n", "k", "rate", "lo", "hi")},
         "difficulty": summary["difficulty"],
         "checkpoints": [label for _, label in _stations(race)] if checked else None,

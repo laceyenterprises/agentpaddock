@@ -17,3 +17,7 @@ findings = { type = "list", required = true, max_items = 32, items = { file = { 
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Review a substantial change to alert delivery, including quiet hours, grouped notifications and duplicate suppression."
+hard = "The change introduces many intentional behavior differences and unfamiliar-looking choices. The agent must assess each concern against the stated requirements and support actionable findings without turning uncertainty into a defect claim."

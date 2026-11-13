@@ -25,3 +25,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix payment collection after uncertain responses in a version that also supports reconciliation and later collection attempts."
+hard = "Compared with the earlier payment races, the contract spans more lifecycle changes and the finding gives fewer clues. A repair must remain coherent across separate runs, rather than only within one call."

@@ -27,3 +27,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix two review findings in request throttling and retry guidance, replacing the base race’s alert-formatting scenario."
+hard = "The two components must agree with their caller, and one recommendation needs independent scrutiny. A local patch can look reasonable while leaving the complete retry behavior inconsistent."

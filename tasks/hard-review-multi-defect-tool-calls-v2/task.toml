@@ -17,3 +17,7 @@ findings = { type = "list", required = true, max_items = 32, items = { file = { 
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Review a broader tool-calling implementation with more model formats and request-handling code than the base bridge race."
+hard = "The larger change contains both subtle problems and deliberate distractions. Behavior depends on unchanged parsing context as well as the diff, so familiar API shapes alone are insufficient evidence."

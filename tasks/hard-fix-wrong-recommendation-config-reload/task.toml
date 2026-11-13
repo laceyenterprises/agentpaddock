@@ -26,3 +26,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix a review finding about a service that crashes when its configuration is reloaded after a bad edit."
+hard = "The finding identifies a real problem, but its suggested remedy can conflict with the service’s operating contract. The agent must read the caller and distinguish continued operation from correct recovery."

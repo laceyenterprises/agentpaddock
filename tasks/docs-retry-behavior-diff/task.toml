@@ -18,3 +18,7 @@ done = { type = "boolean" }
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Update delivery documentation after a code change to retry and failure behavior."
+hard = "The old guide and the new implementation disagree. The agent must follow the changed control flow and describe success, retry and failure paths consistently."

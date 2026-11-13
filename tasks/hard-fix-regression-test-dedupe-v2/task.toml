@@ -32,3 +32,7 @@ must_fail_variants = ["plausible-wrong"]
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix duplicate newsletter deliveries and add regression coverage in a version with stronger caller constraints than the base campaign race."
+hard = "The review recommendation is tempting but needs scrutiny against another file’s contract. A useful regression test must protect existing behavior as well as demonstrate that the reported symptom is fixed."

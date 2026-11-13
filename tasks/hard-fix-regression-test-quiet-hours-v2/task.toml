@@ -32,3 +32,7 @@ must_fail_variants = ["plausible-wrong"]
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix a release-freeze schedule and add regression coverage, moving the base quiet-hours problem into deployment policy."
+hard = "The suggested repair must be checked against policy documented elsewhere. Fixing the reported window is insufficient if the change alters other supported schedules."

@@ -40,3 +40,7 @@ evidence_id = { type = "string", required = false }
 [verifier]
 entrypoint = "verifier.py"
 description = "root_cause == polymorphic FK mismatch AND evidence cites ev-703 or ev-704 (the FK-violation line)."
+
+[about]
+what = "Diagnose an outage in a service that records worker activity, using logs and database-change notes."
+hard = "High resource use and repeated errors make several theories sound convincing. The agent must connect evidence across artifacts and distinguish the underlying failure from its visible consequences."

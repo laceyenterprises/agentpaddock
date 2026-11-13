@@ -26,3 +26,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix two review findings in an alert-formatting pipeline so messages remain suitable for delivery."
+hard = "The two changes interact in one output path. The agent must repair both behaviors together and account for text that behaves differently from the simple visible examples."

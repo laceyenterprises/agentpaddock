@@ -18,3 +18,7 @@ done = { type = "boolean" }
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Correct configuration documentation by reading how the program loads and validates its settings."
+hard = "Plausible configuration advice can still disagree with the implementation. The agent must distinguish supported choices from defaults and remove outdated guidance without inventing new settings."

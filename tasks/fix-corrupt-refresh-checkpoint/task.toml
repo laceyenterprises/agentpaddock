@@ -25,3 +25,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix a review finding about a refresh job that stops working after its saved progress is damaged."
+hard = "The review advice must be reconciled with the fixture’s more specific contract. A broad recovery strategy can conceal failures that need different treatment."

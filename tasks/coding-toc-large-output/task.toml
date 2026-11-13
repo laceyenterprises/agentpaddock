@@ -25,3 +25,7 @@ failure_marker = { type = "string", required = true, description = "Diagnostic m
 [verifier]
 entrypoint = "verifier.py"
 description = "Regressing commit named from git history, pytest run before and after the fix, and test.py left untouched."
+
+[about]
+what = "Find and fix a small program regression using repository history and test output that are much longer than in the basic history-and-test race."
+hard = "The relevant evidence can fall outside an initial output preview. The agent must keep investigating long command results while maintaining a clear link between the historical change, the failure and the repair."

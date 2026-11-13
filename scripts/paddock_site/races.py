@@ -216,6 +216,11 @@ def race_card(race: Mapping[str, Any], href: str) -> str:
     rate_attr = f"{rate:.6f}" if rate is not None else ""
     red = rate is not None and rate < RED_UNDER
     lap = lap_text(race["medianLapSeconds"])
+    about = race.get("about")
+    what = about.get("what") if isinstance(about, Mapping) else None
+    description = (
+        what.strip() if isinstance(what, str) and what.strip() else race.get("title")
+    )
     return (
         f'<a class="rc-card" href="{esc(href)}" data-challenge="{esc(race["challenge"])}" '
         f'data-rate="{rate_attr}" data-name="{esc(race["shortName"].lower())}">'
@@ -227,7 +232,7 @@ def race_card(race: Mapping[str, Any], href: str) -> str:
         '<div class="rc-card-rate">'
         f'<span class="rc-rate{" is-red" if red else ""}">{esc(rate_text(rate))}</span>'
         f'<span class="rc-of">{race["k"]:,} of {plural(race["n"], "run")}</span></div></div>'
-        + (f'<p class="rc-title">{esc(race["title"])}</p>' if race["title"] else "")
+        + (f'<p class="rc-title">{esc(description)}</p>' if description else "")
         + _stages(race)
         + '<p class="rc-stats">'
         f"<span>{glyphs.icon('entry')}{esc(plural(race['entries'], 'entry', 'entries'))}</span>"
@@ -785,6 +790,26 @@ def _header(race: Mapping[str, Any], calendar_size: int) -> str:
     )
 
 
+def _about(race: Mapping[str, Any]) -> str:
+    about = race.get("about")
+    if not isinstance(about, Mapping) or not all(
+        isinstance(about.get(key), str) and about[key].strip()
+        for key in ("what", "hard")
+    ):
+        return ""
+    return (
+        '<section class="rc-section" aria-label="About this race">'
+        + "".join(
+            f'<p class="rc-copy"><strong>{label}:</strong> {esc(about[key])}</p>'
+            for key, label in (
+                ("what", "What it is"),
+                ("hard", "What makes it hard"),
+            )
+        )
+        + "</section>"
+    )
+
+
 def race_page(
     race: Mapping[str, Any],
     brief: Mapping[str, str] | None,
@@ -793,6 +818,7 @@ def race_page(
 ) -> str:
     body = (
         _header(race, calendar_size)
+        + _about(race)
         + _lap(race)
         + _result(race)
         + '<section class="rc-section rc-split" id="briefing">'

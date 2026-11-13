@@ -30,3 +30,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix alert quiet-hours behavior and write a regression test for the reported scheduling problem."
+hard = "Time windows have edge cases that ordinary daytime examples do not exercise. The agent must make a behavioral test that catches incomplete fixes while respecting the documented scheduling rules."

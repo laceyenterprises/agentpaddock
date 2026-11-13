@@ -18,3 +18,7 @@ done = { type = "boolean" }
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Explain how a benchmark stores comparison results for different task and model combinations, including older saved results."
+hard = "Current behavior and upgrade guidance have to agree. The agent must turn conditional code into readable documentation without flattening distinctions that matter to existing users."

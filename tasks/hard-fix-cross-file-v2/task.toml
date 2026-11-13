@@ -26,3 +26,7 @@ timeout_seconds = 20
 
 [verifier]
 entrypoint = "verifier.py"
+
+[about]
+what = "Fix the account-cleanup outage from the base race in a version that selects its lookup through configuration."
+hard = "The dependency is indirect, making affected callers harder to discover. The agent must trace configured behavior across files and keep the whole job consistent with its documentation."
