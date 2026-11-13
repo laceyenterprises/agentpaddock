@@ -4326,7 +4326,15 @@ def test_engine_map_label_names_the_setting_that_ran(car, engine_map, route, lab
     if engine_map == "default":
         assert '</b><span class="map-info"><button' in markup
         assert '<use href="#info"/>' in markup
-        assert 'aria-label="About this engine map"' in markup
+        context = site_views.car_name(car) if car else ""
+        if route:
+            context += (
+                f" on {site_views.model_name(route)} via {site_views.host_name(route)}"
+            )
+        accessible_name = "About this engine map" + (
+            f" for {context.strip()}" if context else ""
+        )
+        assert f'aria-label="{html.escape(accessible_name)}"' in markup
         assert 'popover="auto"' in markup
         assert html.escape(site_views.map_tip(car, route)) in markup
     else:
@@ -4396,10 +4404,54 @@ def test_engine_map_label_names_the_setting_that_ran(car, engine_map, route, lab
             "acme/coder-large",
             "The bench did not record which thinking level Alpha Cli sent to this model.",
         ),
+        (
+            "codex",
+            None,
+            "The bench did not record which thinking level Codex sent by default.",
+        ),
+        (
+            "alpha-cli",
+            None,
+            "The bench did not record which thinking level Alpha Cli sent by default.",
+        ),
+        (
+            "hermes",
+            None,
+            "Hermes sends its default thinking level, medium, when its setting is left empty.",
+        ),
     ],
 )
 def test_default_map_tip_explains_the_evidence(car, route, note):
     assert site_views.map_tip(car, route) == note
+
+
+@pytest.mark.parametrize(
+    "car", ["claude-code", "hermes", "pi", "opencode", "alpha-cli"]
+)
+@pytest.mark.parametrize("who", ["car", "route"])
+def test_default_map_tip_supports_new_evidenced_pairings(monkeypatch, car, who):
+    route = "acme/coder-large"
+    monkeypatch.setitem(site_views.DEFAULT_SETTINGS, (car, route), ("high", who))
+    name = site_views.car_name(car)
+    expected = (
+        f"{name} sends its own default thinking level, high, when an entry sets none."
+        if who == "car"
+        else f"{name} sends no thinking level for this model, so Acme's default applies: high."
+    )
+    # Existing car-specific wording takes precedence over the generic fallback.
+    if (car, who) in site_views.DEFAULT_TIPS:
+        expected = site_views.DEFAULT_TIPS[(car, who)].format(
+            car=name, host="Acme", setting="high"
+        )
+    assert site_views.map_tip(car, route) == expected
+
+
+def test_map_info_escapes_accessible_context():
+    markup = site_views.map_info("Evidence", context='Car on "Model" <route>')
+    assert (
+        'aria-label="About this engine map for Car on &quot;Model&quot; &lt;route&gt;"'
+        in markup
+    )
 
 
 def test_info_is_one_published_glyph():
@@ -5816,6 +5868,17 @@ def test_browser_engine_map_tips(committed_pages, tmp_path, width, touch):
             if not touch:
                 button.hover()
                 assert note.is_visible()
+                # Move through real coordinates, including the edge between the button and tip.
+                rect = note.bounding_box()
+                assert rect
+                page.mouse.move(
+                    rect["x"] + rect["width"] / 2,
+                    rect["y"] + rect["height"] / 2,
+                    steps=30,
+                )
+                assert note.is_visible()
+                button.hover()
+                assert note.is_visible()
                 page.mouse.move(0, 0)
                 assert not note.is_visible()
             # Click pins the note, and the second click dismisses it, even when hover opened it.
@@ -5827,6 +5890,13 @@ def test_browser_engine_map_tips(committed_pages, tmp_path, width, touch):
             rect = note.bounding_box()
             assert rect and rect["x"] >= 0 and rect["x"] + rect["width"] <= width
             assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+            if not touch:
+                other = page.locator(".map-info-button").nth(1)
+                other.hover()
+                assert note.is_visible()
+                assert not other.locator("xpath=following-sibling::*[1]").is_visible()
+                page.mouse.move(0, 0)
+                assert note.is_visible()
             button.click()
             assert not note.is_visible()
             page.mouse.move(0, 0)
@@ -5846,13 +5916,23 @@ def test_browser_engine_map_tips(committed_pages, tmp_path, width, touch):
             assert info.locator(".map-tip").text_content() == site_views.map_tip(
                 "codex", "anthropic/claude-opus-5-5"
             )
+            assert info.locator("button").get_attribute("aria-label") == (
+                "About this engine map for Codex on Claude Opus 5.5"
+            )
             info.locator("button").click()
             assert info.locator(".map-tip").is_visible()
             page.locator('[data-car="opencode"]').click()
             assert info.locator(".map-tip").text_content() == site_views.map_tip(
                 "opencode", "anthropic/claude-opus-5-5"
             )
+            assert info.locator("button").get_attribute("aria-label") == (
+                "About this engine map for OpenCode on Claude Opus 5.5"
+            )
             assert not info.locator(".map-tip").is_visible()
+            page.locator('[data-driver="openai/gpt-6.1-sol"]').click()
+            assert info.locator("button").get_attribute("aria-label") == (
+                "About this engine map for OpenCode on GPT-6.1 Sol"
+            )
             page.locator('[data-map="high"]').click()
             assert not info.is_visible()
             assert not errors

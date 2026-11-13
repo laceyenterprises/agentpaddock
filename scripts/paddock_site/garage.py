@@ -326,7 +326,7 @@ def _result(view: Mapping[str, Any], pick: Sequence[str], root: str) -> str:
         f'<span>in <b class="ent">{glyphs.icon("car")}<span data-slot="car">{esc(car_label)}</span></b>'
         f' · engine map <b class="ent"><span data-slot="mapGlyph">{glyphs.icon(map_glyph)}</span>'
         f'<span data-slot="map">{esc(views.map_label(engine_map, car, driver))}</span></b>'
-        f"{views.map_info(views.map_tip(car, driver), hidden=engine_map != 'default')}</span></p>"
+        f"{views.map_info(views.map_tip(car, driver), context=car_label + ' on ' + chosen['name'], hidden=engine_map != 'default')}</span></p>"
         f'<div class="gr-raced" data-state="raced"{hidden(bool(entry))}>'
         f'<div class="gr-score"><span class="gr-pct" data-slot="pct">{esc(entry["pct"] if entry else "")}</span>'
         f'<span><span data-slot="passOf">{esc(entry["passOf"] if entry else "")}</span> races passed</span></div>'
@@ -520,6 +520,7 @@ SCRIPT = """(function () {
     var info = garage.querySelector('.map-info');
     info.querySelector('.map-tip').hidePopover();
     info.querySelector('button').setAttribute('aria-expanded', 'false');
+    info.querySelector('button').setAttribute('aria-label', 'About this engine map for ' + car[1] + ' on ' + d.name);
     info.querySelector('button').dataset.pinned = 'false';
     info.hidden = state.map !== 'default';
     info.querySelector('.map-tip').textContent = d.defaultTips[state.car];

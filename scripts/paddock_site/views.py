@@ -118,7 +118,10 @@ DEFAULT_TIPS = {
     ): "Codex has no thinking-level default for this model, so it sends none and {host}'s default applies: {setting}.",
     "no-default": "{car} sends no thinking level for this model, and {host} publishes no default, so the level that ran is not recorded.",
     "no-evidence": "The bench did not record which thinking level {car} sent to this model.",
+    "no-route": "The bench did not record which thinking level {car} sent by default.",
     "no-car": "The car's default applies when an entry sets no thinking level.",
+    "car": "{car} sends its own default thinking level, {setting}, when an entry sets none.",
+    "route": "{car} sends no thinking level for this model, so {host}'s default applies: {setting}.",
 }
 FULL_SETTINGS = {
     "adaptive, medium": "adaptive thinking at medium effort",
@@ -334,11 +337,11 @@ def map_tip(car: str | None = None, route: str | None = None) -> str:
     if car is None:
         template = DEFAULT_TIPS["no-car"]
     elif setting is None:
-        template = DEFAULT_TIPS["no-evidence"]
+        template = DEFAULT_TIPS["no-route" if route is None else "no-evidence"]
     elif setting[0] is None:
         template = DEFAULT_TIPS["no-default"]
     else:
-        template = DEFAULT_TIPS[(car, setting[1])]
+        template = DEFAULT_TIPS.get((car, setting[1]), DEFAULT_TIPS[setting[1]])
     level = setting[0] if setting else None
     return template.format(
         car=car_name(car or ""),
@@ -347,11 +350,12 @@ def map_tip(car: str | None = None, route: str | None = None) -> str:
     )
 
 
-def map_info(note: str, *, hidden: bool = False) -> str:
+def map_info(note: str, *, context: str = "", hidden: bool = False) -> str:
     """A keyboard reachable info button and its native, viewport bounded popover."""
+    label = "About this engine map" + (f" for {context}" if context else "")
     return (
         f'<span class="map-info"{" hidden" if hidden else ""}>'
-        '<button type="button" class="map-info-button" aria-label="About this engine map" '
+        f'<button type="button" class="map-info-button" aria-label="{esc(label)}" '
         f'aria-expanded="false">{glyphs.icon("info")}</button>'
         f'<span class="map-tip" popover="auto">{esc(note)}</span></span>'
     )
@@ -375,7 +379,14 @@ def car_tag(car: str) -> str:
 def map_tag(engine_map: str, car: str | None = None, route: str | None = None) -> str:
     """The engine map's label in bold behind its engine-map glyph."""
     label = tag(map_glyph(engine_map), map_label(engine_map, car, route))
-    return label + (map_info(map_tip(car, route)) if engine_map == "default" else "")
+    context = car_name(car) if car else ""
+    if route:
+        context += f" on {model_name(route)} via {host_name(route)}"
+    return label + (
+        map_info(map_tip(car, route), context=context.strip())
+        if engine_map == "default"
+        else ""
+    )
 
 
 def driver_tag(route: str, name: str | None = None) -> str:
@@ -520,6 +531,23 @@ CSS = """
 
 #: The sideways-scroll cue: fade the edge out once a strip reaches its end.
 SCRIPT = """(function () {
+  function finePointer() {
+    return window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  }
+  function showMapTip(button) {
+    var note = button.nextElementSibling;
+    note.showPopover({ source: button });
+    if (!finePointer()) return;
+    // Touching edges let the pointer reach the tip without crossing a dismissal gap.
+    var anchor = button.getBoundingClientRect();
+    var rect = note.getBoundingClientRect();
+    var top = anchor.bottom + rect.height <= innerHeight - 16
+      ? anchor.bottom : anchor.top - rect.height;
+    note.style.inset = 'auto';
+    note.style.margin = '0';
+    note.style.left = Math.max(16, Math.min(anchor.left, innerWidth - rect.width - 16)) + 'px';
+    note.style.top = Math.max(16, Math.min(top, innerHeight - rect.height - 16)) + 'px';
+  }
   document.addEventListener('click', function (event) {
     var button = event.target.closest('.map-info-button');
     if (!button) return;
@@ -529,7 +557,7 @@ SCRIPT = """(function () {
     var pinned = button.dataset.pinned === 'true';
     button.dataset.pinned = pinned ? 'false' : 'true';
     if (pinned) note.hidePopover();
-    else note.showPopover({ source: button });
+    else showMapTip(button);
   });
   document.addEventListener('toggle', function (event) {
     if (!event.target.matches('.map-tip')) return;
@@ -539,11 +567,14 @@ SCRIPT = """(function () {
   }, true);
   ['pointerover', 'pointerout'].forEach(function (kind) {
     document.addEventListener(kind, function (event) {
-      if (!window.matchMedia || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
-      var button = event.target.closest('.map-info-button');
-      if (!button || button.contains(event.relatedTarget)) return;
+      if (!finePointer()) return;
+      var info = event.target.closest('.map-info');
+      if (!info || info.contains(event.relatedTarget)) return;
+      var button = info.querySelector('.map-info-button');
       var note = button.nextElementSibling;
-      if (kind === 'pointerover') note.showPopover({ source: button });
+      if (kind === 'pointerover') {
+        if (!document.querySelector('.map-info-button[data-pinned="true"]')) showMapTip(button);
+      }
       else if (button.dataset.pinned !== 'true') note.hidePopover();
     });
   });
