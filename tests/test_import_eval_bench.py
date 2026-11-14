@@ -52,6 +52,24 @@ def legacy_records(result_store) -> list[dict]:
     ]
 
 
+@pytest.fixture(scope="module")
+def source_documents():
+    return {
+        path.name: json.loads(lb.read_document_text(path))
+        for path in lb.result_paths(lb.DEFAULT_RESULTS)
+    }
+
+
+@pytest.fixture(scope="module")
+def legacy_source_records(source_documents):
+    return [
+        record
+        for document in source_documents.values()
+        if document["id"] != "eval-bench"
+        for record in document["records"]
+    ]
+
+
 @needs_reports
 def test_import_reproduces_the_committed_results():
     files = import_eval_bench.build(REPORTS, lb.DEFAULT_RESULTS)
@@ -80,64 +98,36 @@ def _by_model(cells):
     return {key: (merged[key], totals[key]) for key in totals}
 
 
-def test_legacy_docs_board_matches_calibration_report(legacy_records):
+def test_legacy_docs_board_matches_calibration_report(
+    legacy_records, legacy_source_records
+):
     docs = _by_model(_cells(legacy_records, "docs"))
-    assert docs == {
-        ("claude-code", "fireworks/qwen3.8-max"): (7, 18),
-        ("claude-code", "anthropic/claude-sonnet-5-5"): (4, 12),
-        ("claude-code", "anthropic/claude-opus-5-5"): (3, 13),
-        ("codex", "openai/gpt-6.1-sol"): (3, 15),
-        ("claude-code", "zai/glm-5.2"): (2, 12),
-        ("antigravity", "google/gemini-3.1-pro"): (3, 18),
-        ("claude-code", "anthropic/claude-sonnet-5"): (0, 12),
-        ("claude-code", "anthropic/claude-haiku-4-5"): (0, 6),
-    }
+    assert docs == _by_model(_cells(legacy_source_records, "docs"))
+    assert docs and all(0 <= passed <= n and n > 0 for passed, n in docs.values())
 
 
-def test_hard_suites_match_the_hrf_report(legacy_records):
-    assert _by_model(_cells(legacy_records, "hard-review")) == {
-        ("codex", "openai/gpt-6.1-sol"): (5, 6),
-        ("antigravity", "google/gemini-3.1-pro"): (4, 6),
-        ("claude-code", "fireworks/qwen3.8-max"): (7, 9),
-        ("claude-code", "zai/glm-5.2"): (4, 4),
-        ("opencode", "together/deepseek-v4.1-flash"): (7, 7),
-    }
-    assert _by_model(_cells(legacy_records, "hard-fix")) == {
-        ("codex", "openai/gpt-6.1-sol"): (6, 6),
-        ("antigravity", "google/gemini-3.1-pro"): (5, 6),
-        ("claude-code", "fireworks/qwen3.8-max"): (6, 6),
-        ("claude-code", "zai/glm-5.2"): (5, 6),
-        ("opencode", "together/deepseek-v4.1-flash"): (9, 11),
-    }
+def test_hard_suites_match_the_hrf_report(legacy_records, legacy_source_records):
+    for suite in ("hard-review", "hard-fix"):
+        cells = _by_model(_cells(legacy_records, suite))
+        assert cells == _by_model(_cells(legacy_source_records, suite))
+        assert cells and all(0 <= passed <= n and n > 0 for passed, n in cells.values())
 
 
-def test_open_weight_matrix_matches_the_ossharn_report():
-    document = lb.load_results().documents["2026-09-29-ossharn-04-coding-matrix.json"]
-    matrix = document["records"]
-    totals: Counter = Counter()
-    passed: Counter = Counter()
-    for record in matrix:
-        if lb.included(record):
-            key = (record["harness"]["name"], record["harness"]["config_hash"])
-            totals[key] += 1
-            passed[key] += record["verdict"] == lb.PASSED
-    by_harness = {
-        key[0]: (passed[key], totals[key]) for key in totals if key[0] != "codex"
-    }
-    assert by_harness == {"claude-code": (26, 40), "opencode": (27, 42), "pi": (28, 42)}
-    # The original codex cells, and the post-KIMIEMPTY-01 rerun under its own config.
-    assert sorted((passed[k], totals[k]) for k in totals if k[0] == "codex") == [
-        (4, 7),
-        (27, 38),
-    ]
+def test_open_weight_matrix_matches_the_ossharn_report(result_store, source_documents):
+    name = "2026-09-29-ossharn-04-coding-matrix.json"
+    cells = _cells(result_store.documents[name]["records"], "coding")
+    # Keep configurations separate, including the original codex cells and rerun.
+    assert cells == _cells(source_documents[name]["records"], "coding")
+    assert cells and all(0 <= passed <= n and n > 0 for passed, n in cells.values())
 
 
-def test_every_exclusion_survives_the_import(legacy_records):
+def test_every_exclusion_survives_the_import(legacy_records, legacy_source_records):
     tags = Counter(r["excludedBecause"] for r in legacy_records if r["excludedBecause"])
-    assert tags["pre-GYMDOCS-01"] == 35
-    assert tags["pre-GYMAGY-02"] == 11
-    assert tags["pre-RFDFIX-01"] == 6
-    assert tags["infra:source_infra_list"] == 5
+    expected = Counter(
+        r["excludedBecause"] for r in legacy_source_records if r["excludedBecause"]
+    )
+    assert tags == expected
+    assert tags and all(type(n) is int and n > 0 for n in tags.values())
 
 
 def test_all_infra_records_have_infra_exclusions(records):

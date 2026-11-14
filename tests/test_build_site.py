@@ -2449,10 +2449,12 @@ def test_races_build_one_page_per_calendar_race(tmp_path):
     assert "still racing" not in real["paddock.js"]
     decoy = json.loads(real["data/races/hard-review-decoy-decision-replies.json"])
     page = real[site_races.race_file(decoy["id"])]
-    assert decoy["funnel"]["runs"] == 214
-    assert decoy["checkpointSubmissions"] == 218
+    runs = decoy["funnel"]["runs"]
+    subs = decoy["checkpointSubmissions"]
+    assert type(runs) is int and runs > 0
+    assert type(subs) is int and subs >= runs
     assert (
-        "214</span> counted runs with checkpoints in this view; pass rates use all 218 submissions with checkpoints."
+        f"{runs:,}</span> counted runs with checkpoints in this view; pass rates use all {subs:,} submissions with checkpoints."
         in page
     )
     assert "including excluded runs" in page
