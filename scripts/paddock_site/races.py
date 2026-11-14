@@ -434,8 +434,9 @@ def funnel_views(race: Mapping[str, Any]) -> list[dict[str, Any]]:
 def _stations(
     view: Mapping[str, Any],
     labels: Sequence[str],
-    rates: Sequence[Mapping[str, Any]],
+    rates: Sequence[Mapping[str, Any]] | None,
 ) -> str:
+    rates = rates or ()
     names = ["Lights out", *labels, "Checkered flag"]
     last = len(names) - 1
     selected = view["worst"] or last
@@ -453,7 +454,8 @@ def _stations(
             " is-worst" if k and k == view["worst"] else ""
         )
         checkpoint_rate = ""
-        if 0 < k < last:
+        has_rate = 0 < k < last and k <= len(rates)
+        if has_rate:
             rate = rates[k - 1]
             shown = f"{rate['rate']:.0%}" if rate["rate"] is not None else "n/a"
             checkpoint_rate = (
@@ -476,12 +478,20 @@ def _stations(
             f'<span class="rc-dot">{dot}</span>'
             f'<span class="rc-ribbon rc-ribbon-bottom{" is-blank" if k == last else ""}" style="width:{bottom}px"></span>'
             "</div>"
+            '<div class="rc-station-detail">'
             f'<button type="button" class="rc-station-card" aria-pressed="{"true" if k == selected else "false"}">'
             f'<span class="rc-station-name">{esc(name)}</span>'
             + checkpoint_rate
             + f'<span class="rc-station-stat">{esc(view["stats"][k])}</span>'
             + departures
-            + "</button></li>"
+            + "</button>"
+            + (
+                f'<a class="rc-checkpoint-link" href="#checkpoint-{k}">'
+                f"What checkpoint {k} checks</a>"
+                if has_rate
+                else ""
+            )
+            + "</div></li>"
         )
     return '<ol class="rc-stations">' + "".join(rows) + "</ol>"
 
@@ -514,6 +524,45 @@ def _off_map(race: Mapping[str, Any]) -> str:
         + ".</p>"
         if parts
         else ""
+    )
+
+
+def _checkpoint_guide(race: Mapping[str, Any]) -> str:
+    """Checkpoint copy and pooled submission rates, in the lap's numbering."""
+    checkpoints = race["checkpointRates"]
+    more = race["moreChecks"] or 0
+    if not checkpoints and not more:
+        return ""
+    rows = []
+    for number, checkpoint in enumerate(checkpoints or [], 1):
+        rate = checkpoint["rate"]
+        shown = f"{rate:.0%}" if rate is not None else "n/a"
+        rows.append(
+            f'<li class="rc-track-row" id="checkpoint-{number}">'
+            f'<span class="rc-track-number">{number}</span><div>'
+            f'<h3 class="rc-track-label">{esc(checkpoint["label"])}</h3>'
+            f'<p class="rc-track-status">{"optional" if checkpoint["optional"] else "required"}'
+            f" · {shown} pass · {checkpoint['n']:,} runs</p>"
+            + (
+                f'<p class="rc-copy">{esc(checkpoint["about"])}</p>'
+                if checkpoint.get("about")
+                else ""
+            )
+            + "</div></li>"
+        )
+    return (
+        '<section class="rc-section rc-track" id="track">'
+        + _kicker("track-map", "The track")
+        + '<h2 class="rc-h2">What each checkpoint checks</h2>'
+        + '<p class="rc-copy">Pass rates cover every submission that recorded each '
+        "checkpoint, across all entries and attempts.</p>"
+        + ('<ol class="rc-track-rows">' + "".join(rows) + "</ol>" if rows else "")
+        + (
+            f'<p class="rc-copy">{more} more checks the track card does not name</p>'
+            if more
+            else ""
+        )
+        + "</section>"
     )
 
 
@@ -899,6 +948,7 @@ def race_page(
         _header(race, calendar_size)
         + _about(race)
         + _lap(race)
+        + _checkpoint_guide(race)
         + _result(race)
         + '<section class="rc-section rc-split" id="briefing">'
         + _briefing(race, brief)
@@ -1069,12 +1119,23 @@ CSS = """
   cursor: pointer; text-align: left; font-family: var(--body); color: var(--ink);
 }
 .rc-station-card[aria-pressed="true"] { border-color: var(--blue); }
+.rc-station-detail { min-width: 0; padding-bottom: 8px; }
+.rc-station-detail .rc-station-card { width: 100%; box-sizing: border-box; }
+.rc-checkpoint-link { display: inline-block; padding: 6px 0; font-size: 14px; }
 .rc-station:has(.rc-station-card[aria-pressed="true"]) .rc-dot { background: var(--ink); color: var(--paper); }
 .rc-station-name { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
 .rc-checkpoint-rate { font-size: 14px; font-weight: 600; }
 .rc-through, .rc-out, .rc-off-map { font-size: 14px; color: var(--ink-2); }
 .rc-out .glyph, .rc-off-map .glyph { width: 16px; height: 16px; vertical-align: middle; margin-right: 4px; }
 .rc-station-stat { font-size: 14px; color: var(--ink-2); }
+
+.rc-track { max-width: 760px; }
+.rc-track-rows { list-style: none; padding: 0; margin: 24px 0 0; }
+.rc-track-row { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 14px; padding: 20px 0; border-top: 1px solid var(--rule); scroll-margin-top: 100px; overflow-wrap: anywhere; }
+.rc-track-number { font: italic 800 24px/1.4 var(--display); }
+.rc-track-label { margin: 0; font: 600 20px/1.3 var(--display); }
+.rc-track-status { margin: 6px 0 10px; font-size: 14px; color: var(--ink-2); }
+.rc-track-row .rc-copy { margin: 0; }
 
 .rc-result { display: flex; flex-direction: column; gap: 14px; max-width: 760px; }
 .rc-result .rc-h2, .rc-result .rc-copy { margin: 0; }
