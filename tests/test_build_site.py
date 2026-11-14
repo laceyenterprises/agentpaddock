@@ -2486,8 +2486,36 @@ def test_race_pages_hold_the_site_invariants(tmp_path):
     assert site_races.SCRIPT in script and script.startswith(layout.SCRIPT)
     assert "getAttribute('data-' + other + '-second')" in script
     assert "(other === 'lap' ? ' lap' : '')" not in script
-    assert str(site_races.PLAYBACK_MS) in pages["races/hard-review-alpha/index.html"]
-    assert site_races.PLAYBACK_MS == 1600
+    # Playback holds each station for its own reading time, carried in each view.
+    alpha = pages["races/hard-review-alpha/index.html"]
+    assert "data-playback-ms" not in alpha
+    for view in _attr_json(alpha, "funnel"):
+        assert len(view["ms"]) == len(view["stats"])
+        assert all(
+            site_races.STEP_MIN_MS <= ms <= site_races.STEP_MAX_MS for ms in view["ms"]
+        )
+
+
+def test_playback_holds_each_step_as_long_as_its_words_take_to_read():
+    step_ms = site_races.step_ms
+    # More words, more time; the card is glanced, so its words count for less.
+    short, long = "Ten runs clear it.", "Ten runs clear it. " * 4
+    assert step_ms(short) < step_ms(long)
+    assert step_ms("", "ten words " * 5) < step_ms("ten words " * 5)
+    # Every hold rounds to 100 ms and stays in a comfortable range.
+    assert step_ms("") == site_races.STEP_MIN_MS
+    assert step_ms("word " * 500) == site_races.STEP_MAX_MS
+    assert step_ms("word " * 20, "card " * 7) % 100 == 0
+    # The worst checkpoint says more, so it holds longer than a quiet one.
+    race = {
+        "funnel": {"all": [20, 20, 12, 12], "byCar": {}, "byDriver": {}},
+        "checkpoints": ["Find it", "Fix it"],
+        "moreChecks": 0,
+        "checkpointRates": None,
+    }
+    (view,) = site_races.funnel_views(race)
+    assert view["worst"] == 2 and view["ms"][2] > view["ms"][1]
+    assert len(view["ms"]) == 4
 
 
 def test_race_page_funnel_comes_from_the_data(tmp_path):
@@ -6429,8 +6457,9 @@ def test_shared_accessibility_and_motion_rules():
     assert ":focus-visible { outline: 3px solid var(--blue-ink)" in css
     assert "button, summary, select { min-height: 44px; min-width: 44px; }" in css
     assert "animation: none !important; transition: none !important;" in css
+    # Reduced motion skips playback: Play shows the finish at once, in view.
     assert (
-        "if (motion.matches) { step = last; selected = last; show(); return; }"
+        "if (motion.matches) { step = last; selected = last; show(); land(true); return; }"
         in site_races.SCRIPT
     )
     assert "motion.addEventListener('change', motionChanged)" in site_races.SCRIPT
@@ -6650,6 +6679,100 @@ def test_browser_panel_startup_and_motion_changes(acceptance_sites, tmp_path, sc
                     page.locator(".rc-station-card").last.get_attribute("aria-pressed")
                     == "true"
                 )
+            assert not errors, errors
+            context.close()
+        finally:
+            browser.close()
+
+
+def test_browser_playback_follows_the_running_step_on_a_phone(
+    committed_pages, tmp_path
+):
+    executable = os.environ.get("PADDOCK_BROWSER_EXECUTABLE")
+    if not executable:
+        pytest.skip("Local Chromium pass requires PADDOCK_BROWSER_EXECUTABLE")
+    browser_api = pytest.importorskip("playwright.sync_api")
+    files, _ = committed_pages
+    for name, content in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content.encode() if isinstance(content, str) else content)
+    # A race whose lap has at least three checkpoints, so the page has to move.
+    race = next(
+        name
+        for name, page in sorted(files.items())
+        if name.startswith("races/")
+        and isinstance(page, str)
+        and page.count('class="rc-station ') >= 5
+    )
+    state = """() => {
+      const stations = [...document.querySelectorAll('.rc-station')];
+      const k = stations.findIndex(
+        s => s.querySelector('.rc-station-card').getAttribute('aria-pressed') === 'true');
+      const box = stations[k].getBoundingClientRect();
+      const nav = document.querySelector('.nav').getBoundingClientRect().bottom;
+      const panel = document.querySelector('[data-lap-panel]');
+      return {
+        k, y: scrollY, top: box.top - nav, bottom: box.bottom, room: innerHeight - nav,
+        docked: panel.previousElementSibling === stations[k].querySelector('.rc-station-card'),
+        home: panel.parentNode.classList.contains('rc-lap-copy'),
+        label: document.querySelector('[data-lap-play]').textContent,
+      };
+    }"""
+    with browser_api.sync_playwright() as api:
+        browser = api.chromium.launch(executable_path=executable)
+        try:
+            context = browser.new_context(
+                viewport={"width": 390, "height": 664},
+                is_mobile=True,
+                has_touch=True,
+                reduced_motion="no-preference",
+            )
+            context.route("https://**", lambda route: route.abort())
+            page = context.new_page()
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.clock.install()
+            page.goto((tmp_path / race).as_uri())
+            # Paused, the fake clock moves only when the test says so.
+            page.clock.pause_at(page.evaluate("Date.now()") + 1000)
+            ms = page.locator("[data-funnel]").evaluate(
+                "lap => JSON.parse(lap.dataset.funnel)[0].ms"
+            )
+            play = page.locator("[data-lap-play]")
+            play.scroll_into_view_if_needed()
+            assert page.evaluate(state)["home"]
+            play.click()
+            page.wait_for_timeout(900)
+            # The race starts on screen, its words under the running station.
+            for k in range(3):
+                now = page.evaluate(state)
+                assert now["k"] == k and now["docked"], now
+                assert now["top"] >= 0 and now["bottom"] <= 664, now
+                assert now["label"] == "Racing…"
+                page.clock.run_for(ms[k])
+                page.wait_for_timeout(900)
+            # A reader who scrolls takes the page back; the race runs on below.
+            page.mouse.wheel(0, -300)
+            page.wait_for_timeout(400)
+            held = page.evaluate(state)
+            page.clock.run_for(ms[3])
+            page.wait_for_timeout(900)
+            after = page.evaluate(state)
+            assert after["k"] == held["k"] + 1 and after["docked"]
+            assert abs(after["y"] - held["y"]) < 2
+            # A tap on a station stops the race there.
+            page.locator(".rc-station-card").nth(1).click()
+            stopped = page.evaluate(state)
+            assert stopped["k"] == 1 and stopped["docked"]
+            assert stopped["label"] == "Play the race"
+            page.clock.run_for(max(ms))
+            assert page.evaluate(state)["k"] == 1
+            # Another view puts the explanation back by the controls.
+            car = page.locator('[role="radio"][data-mode="car"]')
+            if car.count():
+                car.click()
+                assert page.evaluate(state)["home"]
             assert not errors, errors
             context.close()
         finally:

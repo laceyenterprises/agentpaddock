@@ -208,7 +208,10 @@ each race's briefing prompt.
 - **A race page**: the header roundel, the avg pass rate with its 95% range,
   the difficulty band; the lap funnel (All runs, By car, By driver for drivers
   with five or more runs recording checks) with its worst checkpoint called
-  out and playback at 1.6 s per checkpoint; the classification of each
+  out and playback: the page follows the running station to the middle of the
+  screen, its explanation under its card, and holds each station as long as its
+  words take to read (2.5 to 8 s); a reader who scrolls takes the page back and
+  a tap on a station stops the race there; the classification of each
   entry's first run (lap or fuel order, top 10 then all) and where the rest
   retired; the briefing; the staged files and the sealed circuit.
 - **Short names** are plain words with acronyms spelled out, from the
