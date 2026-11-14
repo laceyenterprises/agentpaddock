@@ -5225,10 +5225,38 @@ console.log(JSON.stringify({states, bindings: [...bindings]}));
     assert {(n // 2, n) for n in learn.SIZES if n % 2 == 0} <= seen
 
 
+def test_home_hero_reads_race_then_the_lights_then_the_button():
+    hero = site_home.hero()
+    lights = hero.split('<div class="home-lights" data-lights>', 1)[1]
+    order = re.findall(r'class="(home-go|home-lights-art|home-start)"', lights)
+    assert order == ["home-go", "home-lights-art", "home-start"]
+    rules = _css_rules(site_home.CSS)
+    column = rules[".home-lights"]
+    # One centred column: no second track, no side-by-side placement.
+    assert "display: grid" in column and "justify-items: center" in column
+    assert "grid-template-columns" not in column
+    assert "grid-auto-flow" not in column
+    for selector in (".home-go", ".home-lights-art", ".home-start"):
+        assert "grid-column" not in rules[selector], selector
+        assert "grid-row" not in rules[selector], selector
+    # Nothing in the column clips the "Race!" pop.
+    for selector in (".home-hero", ".home-lights", ".home-go"):
+        assert "overflow" not in rules[selector], selector
+        assert "contain" not in rules[selector], selector
+
+
 def test_home_lights_reserve_controls_and_keep_the_foot_at_the_padding_edge():
-    art = re.search(r"\.home-lights-art \{([^}]+)", site_home.CSS)[1]
-    assert "margin-bottom: -" not in art
-    assert "grid-row: 2" in art
+    rules = _css_rules(site_home.CSS)
+    for selector in (".home-lights", ".home-lights-art", ".home-go", ".home-start"):
+        assert not re.search(r"margin[\w-]*:[^;]*-\d", rules[selector]), selector
+    # One gap sits above and below the stand; "Race!" adds no margin of its own.
+    assert re.search(r"(?:^|;)\s*gap: 18px", rules[".home-lights"])
+    assert "margin: 0;" in rules[".home-go"]
+    # The art's viewport runs from the housing's top edge to the stand's foot.
+    assert 'viewBox="0 3 24 19.5"' in site_home.hero()
+    assert "aspect-ratio: 24 / 19.5" in rules[".home-lights-art"]
+    # The button is the last item, so its reserved slot meets the card's padding.
+    assert site_home.hero().endswith("Run it again</button></div></section>")
     for selector, expected in (
         (
             ".home-go[hidden]",
