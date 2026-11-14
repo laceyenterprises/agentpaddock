@@ -40,14 +40,15 @@ CLASSIFICATION_FIRST = 10
 #: The By driver view lists drivers with at least this many runs recording checks.
 DRIVER_MIN_RUNS = 5
 #: Playback holds each step long enough to read it: a base for the page to scroll
-#: and the eye to land, then time per word of the step's explanation (about 250
-#: words a minute) and per word of its station card, which is glanced at rather
-#: than read, rounded to 100 ms and kept between the floor and the ceiling.
-STEP_BASE_MS = 1000
-READ_MS_PER_WORD = 240
-GLANCE_MS_PER_WORD = 90
-STEP_MIN_MS = 2500
-STEP_MAX_MS = 8000
+#: and the eye to land, then time per word of the step's explanation (about 375
+#: words a minute, a skim of short explanations) and per word of its station card,
+#: which is glanced at rather than read, rounded to 100 ms and kept between the
+#: floor and the ceiling.
+STEP_BASE_MS = 700
+READ_MS_PER_WORD = 160
+GLANCE_MS_PER_WORD = 60
+STEP_MIN_MS = 1700
+STEP_MAX_MS = 5300
 #: The funnel ribbon's full width, in pixels, for every run through a station.
 RIBBON_PX = 46
 #: Red marks an avg pass rate under this share on a card.

@@ -1018,16 +1018,17 @@ def _script() -> str:
   if (!samples.length || !layers.length) return;
   var template = layers[0].cloneNode(true);
   var ticks = samples, at = 0;
+  var TICK_FIRST_MS = 3500;
   var TICK_FADE_MS = 600;
   function tickDwell(t) {
-    return Math.min(10000, 6500 + Math.max(0, (t.who + t.what).length - 60) * 30);
+    return Math.min(6000, 4500 + Math.max(0, (t.who + t.what).length - 60) * 20);
   }
   function activate(layer, active) {
     layer.classList.toggle('is-active', active);
     layer.setAttribute('aria-hidden', active ? 'false' : 'true');
     layer.toggleAttribute('inert', !active);
   }
-  var timer = null, started = 0, remaining = tickDwell(ticks[0]);
+  var timer = null, started = 0, remaining = TICK_FIRST_MS;
   var hovering = false, focused = false;
   var onScreen = !window.IntersectionObserver;
   function paused() {
@@ -1066,7 +1067,7 @@ def _script() -> str:
     while (stack.firstChild) stack.removeChild(stack.firstChild);
     each(layers, function (layer) { stack.appendChild(layer); });
     clearTimeout(timer); timer = null;
-    remaining = tickDwell(ticks[0]);
+    remaining = TICK_FIRST_MS;
     syncTicker();
   }
   document.addEventListener('visibilitychange', syncTicker);
