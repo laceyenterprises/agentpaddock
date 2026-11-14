@@ -82,6 +82,15 @@ this identity, preserving per-call denial evidence when a control retains the
 raw ID. Missing IDs never match, and step-name and action checks still apply.
 Older snapshots with full IDs remain supported.
 
+Read-evidence command normalization unwraps shell and environment prefixes and
+Python invocations of `boundary_steer.py`. Common Python runtime flags without
+arguments (for example `-u`, `-B`, and `-I`) may precede the script. The wrapper's
+`--policy`, `--shell`, and `--command` options consume their own values, in
+separate or `--option=value` form; repeated command options use the last value.
+An explicitly empty command produces no segments. Missing values, unknown
+options, and unsupported interpreter modes or flags retain the original
+invocation. This is static parsing; the original tool-call arguments are kept.
+
 ### Antigravity snapshot vocabulary and coverage
 
 `BENCH_TOOLCALLS.calls` entries have `ordinal`, `name`, `arguments` and

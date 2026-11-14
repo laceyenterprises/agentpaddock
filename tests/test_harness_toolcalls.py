@@ -555,9 +555,10 @@ def test_normalized_commands_preserves_raw_and_quoted_non_commands():
 
 
 @pytest.mark.parametrize("python", ["python", "python3", "/opt/tools/python3.14", "pypy3"])
-def test_normalized_commands_unwraps_boundary_steer(python):
+@pytest.mark.parametrize("flags", ["", "-u", "-B", "-I -u", "-Bu", "--"])
+def test_normalized_commands_unwraps_boundary_steer(python, flags):
     wrapper = (
-        f"{python} /opt/tools/cwp_dispatch/boundary_steer.py "
+        f"{python} {flags} /opt/tools/cwp_dispatch/boundary_steer.py "
         '--policy /tmp/worker-walk-policy.json --shell "$0" '
         "--command 'cat change.diff && nl -ba retention.py'"
     )
@@ -575,6 +576,43 @@ def test_normalized_commands_normalizes_boundary_steer_body_recursively():
         "nl -ba retention.py",
         "head -80",
     ]
+
+
+@pytest.mark.parametrize(
+    "options,expected",
+    [
+        ("--shell bash --command 'cat foo' --policy policy.json", ["cat foo"]),
+        ("--policy=--command --shell=bash --command='cat foo'", ["cat foo"]),
+        ("--shell=--command --command 'cat foo'", ["cat foo"]),
+        ("--command 'cat ignored' --command 'cat foo'", ["cat foo"]),
+        ("--command ''", []),
+        ("--command=", []),
+    ],
+)
+def test_normalized_commands_parses_boundary_steer_option_values(options, expected):
+    raw = "python3 boundary_steer.py " + options
+    call = {"arguments": {"command": raw}}
+    assert h.normalized_commands(call) == expected
+    assert call["arguments"]["command"] == raw
+
+
+@pytest.mark.parametrize(
+    "prefix,options",
+    [
+        ("python3", "--shell --command --command 'cat foo'"),
+        ("python3", "--policy --command 'cat foo'"),
+        ("python3", "--command --shell bash"),
+        ("python3", "--command 'cat foo' --shell"),
+        ("python3", "--command 'cat foo' --unknown value"),
+        ("python3 -c", "--command 'cat foo'"),
+        ("python3 -m", "--command 'cat foo'"),
+        ("python3 other.py", "--command 'cat foo'"),
+        ("python3 -W", "--command 'cat foo'"),
+    ],
+)
+def test_normalized_commands_retains_ambiguous_boundary_steer_invocations(prefix, options):
+    raw = f"{prefix} boundary_steer.py {options}"
+    assert h.normalized_commands({"arguments": {"command": raw}}) == [raw]
 
 
 @pytest.mark.parametrize(
