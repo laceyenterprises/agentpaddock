@@ -87,9 +87,10 @@ Board scale (1600 × 900): eyebrow 13, body 17 to 19, card title 22 to 30, board
 
 ## Glyphs
 
-[`glyphs/paddock-glyphs.svg`](glyphs/paddock-glyphs.svg) holds 44 line glyphs, drawn in code by Lacey Enterprises:
+[`glyphs/paddock-glyphs.svg`](glyphs/paddock-glyphs.svg) holds 53 line glyphs, drawn in code by Lacey Enterprises:
 the cast (driver, car, entry, engine map and its five settings), grip and coaching (tires, team radio, briefing),
-flags, the race and its results, rules and fairness, fuel, running the bench, and four drawn new.
+flags, the race and its results, rules and fairness, fuel, running the bench, and the board's own marks. Every word
+in [the vocabulary](vocabulary.md) has one; livery shows its five colours instead, because it names a car.
 
 - **Grammar:** a 24 px grid, 2 px strokes in `currentColor`, butt caps, mitred joins, at most one accent.
 - **Accent:** the accent stroke or fill reads `--pdk-accent`, which is Lacey blue. Flags read `--pdk-green`,

@@ -37,6 +37,20 @@ def droplet(cx, fill=None):
     return f'<path d="{d}" {fill}/>' if fill else f'<path d="{d}"/>'
 
 
+def drop(cx, top, s=1.0, attr=""):
+    """The fuel droplet at scale s, its tip at (cx, top). At s=1 it is droplet()'s shape."""
+    d = (f"M{cx} {top}c{.6 * s:.2f} {2.1 * s:.2f} {3 * s:.2f} {4.1 * s:.2f} {3 * s:.2f} {7.3 * s:.2f}"
+         f"a{3 * s:.2f} {3 * s:.2f} 0 0 1-{6 * s:.2f} 0c0-{3.2 * s:.2f} {2.4 * s:.2f}-{5.2 * s:.2f} {3 * s:.2f}-{7.3 * s:.2f}z")
+    return f'<path d="{d}" {attr}/>' if attr else f'<path d="{d}"/>'
+
+
+def share_arc(cx, cy, r, share):
+    """An arc clockwise from twelve o'clock covering `share` of the circle."""
+    a = math.radians(-90 + 360 * share)
+    large = 1 if share > 0.5 else 0
+    return f"M{cx} {cy - r}A{r} {r} 0 {large} 1 {cx + r * math.cos(a):.2f} {cy + r * math.sin(a):.2f}"
+
+
 FLAG_BOX = "M5 4h14.5v9H5z"
 FLAG_POLE = '<path d="M5 21.5V3"/>'
 
@@ -160,6 +174,12 @@ GLYPHS = [
      f'<path d="M8 7.5h1.5M12 7.5h4" {A}/>'),
     ("podium", "usage", "race", "Podium: the top three",
      f'<rect x="9" y="7.5" width="6" height="13.5" {AF}/><path d="M3 21v-8.5h6v-5h6v8h6V21z"/>'),
+    # The calendar's header is solid; its body is dashed: the race has no date on it yet.
+    ("exhibition", None, "race", "Exhibition: a community race not yet on the calendar, left out of the standings",
+     '<path d="M3 10.5V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3.5H3zM8 2.5V6M16 2.5V6"/>'
+     '<path d="M3 13.5v2.5M3 19v.5a1.5 1.5 0 0 0 1.5 1.5h1M8.5 21h2.5M14 21h2.5M19.5 21a1.5 1.5 0 0 0 1.5-1.5V19'
+     'M21 16v-2.5"/>'
+     f'<rect x="10.5" y="13.5" width="3" height="3" {AF}/>'),
     # Rules and fairness
     ("rulebook", "knowledge-base", "rules", "Rulebook: the methodology",
      '<path d="M12 6.5C10 5 7 4.5 3 4.5v14c4 0 7 .5 9 2 2-1.5 5-2 9-2v-14c-4 0-7 .5-9 2zM12 6.5v14"/>'
@@ -182,6 +202,12 @@ GLYPHS = [
      f'<path d="M4 6.5h17.5" {A}/>'
      + "".join(f'<rect x="{2 + i * 4:.1f}" y="15.5" width="4" height="4" {INK}/>' for i in (0, 2, 4))
      + '<path d="M2 15.5h20M2 19.5h20"/>'),
+    ("track-card", None, "rules", "Track card: a race's public description and which checkpoints it shows",
+     '<rect x="3.5" y="2.5" width="17" height="19" rx="2"/><path d="M7 17.5h10"/>'
+     f'<path d="M7 12.5c2 0 1.8-5 4.6-5 2.6 0 2.4 3 5.4 1.6" {A}/>'),
+    ("checkpoint", None, "rules", "Checkpoint: one verifier check, shown by label, count or kept hidden",
+     '<path d="M12 21.5s-7-6.4-7-11.5a7 7 0 0 1 14 0c0 5.1-7 11.5-7 11.5z"/>'
+     f'<path d="M9 10.2l2 2 3.8-3.8" {A}/>'),
     # Fuel
     ("fuel-gauge", "budget", "fuel", "Fuel gauge: a spend cap",
      '<path d="M3.5 16a8.5 8.5 0 0 1 17 0M5.3 10.3l1.4 1M12 7.5v2.2M18.7 10.3l-1.4 1"/>'
@@ -193,8 +219,26 @@ GLYPHS = [
      f'<rect x="6.5" y="6" width="5" height="4.5" {AF}/>'),
     ("fuel", "tokens", "fuel", "Fuel: tokens",
      droplet(5) + droplet(12, AF) + droplet(19)),
+    # Input as a ring with its cached share in the accent, a colon, then output as a dot: 82k (81%) : 4k.
+    ("fuel-triad", None, "fuel", "The fuel triad: input (cached %) : output, per race passed",
+     f'<circle cx="8" cy="12" r="5.5"/><path d="{share_arc(8, 12, 5.5, 0.8)}" {A}/>'
+     f'<circle cx="15.5" cy="9.6" r="1.2" {INK}/><circle cx="15.5" cy="14.4" r="1.2" {INK}/>'
+     f'<circle cx="20" cy="12" r="2.3" {INK}/>'),
     ("slipstream", "prompt-cache", "fuel", "Slipstream: cached tokens, read at a fraction of the price",
      indy_car(s=0.62, ox=8.4, oy=3.0, helmet=INK) + f'<path d="M2 8.5h4.5M2 11.5h5M2 14.5h4" {A}/>'),
+    ("mileage", None, "fuel", "Mileage: races passed per $10, or per million tokens",
+     drop(6, 6.5) + f'<path d="M12 13.8h9M18 10.8l3 3-3 3" {A}/>'),
+    ("lean-rich", None, "fuel", "Lean, rich: the two ends of the fuel axis, less or more fuel per pass",
+     drop(6, 9.5, .6) + drop(16.5, 3.5, 1.15) + f'<path d="M3 20.5h18M5 18.5l-2 2 2 2M19 18.5l2 2-2 2" {A}/>'),
+    # The best-value frontier: dots on the line, one entry it beats off the line.
+    ("racing-line", None, "fuel", "Racing line: the entries nothing burning less fuel beats on pass rate",
+     f'<path d="M3 2.5v18.5h18.5"/><path d="M6.5 17.5C8.5 10.5 12.5 7.5 19.5 6.5" {A}/>'
+     f'<circle cx="6.5" cy="17.5" r="1.7" {INK}/><circle cx="11" cy="10.3" r="1.7" {INK}/>'
+     f'<circle cx="19.5" cy="6.5" r="1.7" {INK}/><circle cx="15.5" cy="15" r="1.7"/>'),
+    # Slipstream's car, dripping fuel where slipstream trails air.
+    ("guzzler", None, "fuel", "The guzzler: the entry that burns the most fuel per race passed",
+     indy_car(s=0.62, ox=8.4, oy=1.0, helmet=INK)
+     + drop(5, 12.5, .62, AF) + drop(10.5, 15, .62, AF) + drop(16, 12.5, .62, AF)),
     # Running it
     ("pit-lane", "priority-lane", "running", "Pit lane: run the bench yourself",
      '<path d="M3 3.5h18M3 20.5h18M8 20.5V18M13 20.5V18M18 20.5V18"/>'
@@ -208,6 +252,9 @@ GLYPHS = [
      f'<circle cx="16.5" cy="15.5" r="5"/><circle cx="16.5" cy="15.5" r="1.6" {INK}/><path d="M2 21.5h20"/>'
      '<path d="M3 10.5c1.2-1.3 2.4 1.3 3.6 0s2.4 1.3 3.6 0"/>'
      f'<path d="M2 15.5c1.2-1.3 2.4 1.3 3.6 0s2.4 1.3 3.6 0" {A}/>'),
+    # A drill tests the car, not the driver: the car in its garage bay, cockpit empty, on the bay's floor.
+    ("harness-drill", None, "running", "Harness drill: a standard test of the car in the garage, the same for every entry",
+     '<path d="M2.5 21.5V9.5L12 3.5l9.5 6v12"/>' + indy_car(s=0.66, ox=4.1, oy=7.2) + f'<path d="M5 21.5h14" {A}/>'),
     # New
     (
         "info",

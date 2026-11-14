@@ -5195,6 +5195,26 @@ def test_map_info_escapes_accessible_context():
     )
 
 
+def test_every_vocabulary_word_stands_beside_a_published_glyph():
+    vocab = (REPO / "design/vocabulary.md").read_text("utf-8")
+    rows = re.findall(
+        r'<tr><td width="56" align="center">(.*?)</td><td><b>(.*?)</b>', vocab
+    )
+    assert len(rows) > 40
+    for cell, word in rows:
+        # Livery names a car, so it shows the five livery colours instead of a glyph.
+        if word == "Livery":
+            assert 'src="guide/assets/livery-light.svg"' in cell
+            continue
+        ids = re.findall(r'src="guide/assets/glyphs/([a-z-]+)-light\.svg"', cell)
+        assert ids and set(ids) <= PUBLISHED_GLYPHS, word
+    # The docs carry a light and a dark tile for every published glyph.
+    tiles = REPO / "design/guide/assets/glyphs"
+    for glyph in PUBLISHED_GLYPHS:
+        for theme in ("light", "dark"):
+            assert (tiles / f"{glyph}-{theme}.svg").is_file(), (glyph, theme)
+
+
 def test_info_is_one_published_glyph():
     sprite = (REPO / "design/glyphs/paddock-glyphs.svg").read_text("utf-8")
     assert sprite.count('<symbol id="info" ') == 1
