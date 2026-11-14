@@ -38,6 +38,8 @@
   "fuel": {
     "costPerPass": 0.0038,
     "costSource": "published-rate",
+    "unpricedRuns": 0,
+    "unmeteredRuns": 0,
     "tokensPerPass": 5100.0
   },
   "medianLapSeconds": 80.0,

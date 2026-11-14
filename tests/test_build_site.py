@@ -2486,8 +2486,36 @@ def test_race_pages_hold_the_site_invariants(tmp_path):
     assert site_races.SCRIPT in script and script.startswith(layout.SCRIPT)
     assert "getAttribute('data-' + other + '-second')" in script
     assert "(other === 'lap' ? ' lap' : '')" not in script
-    assert str(site_races.PLAYBACK_MS) in pages["races/hard-review-alpha/index.html"]
-    assert site_races.PLAYBACK_MS == 1600
+    # Playback holds each station for its own reading time, carried in each view.
+    alpha = pages["races/hard-review-alpha/index.html"]
+    assert "data-playback-ms" not in alpha
+    for view in _attr_json(alpha, "funnel"):
+        assert len(view["ms"]) == len(view["stats"])
+        assert all(
+            site_races.STEP_MIN_MS <= ms <= site_races.STEP_MAX_MS for ms in view["ms"]
+        )
+
+
+def test_playback_holds_each_step_as_long_as_its_words_take_to_read():
+    step_ms = site_races.step_ms
+    # More words, more time; the card is glanced, so its words count for less.
+    short, long = "Ten runs clear it.", "Ten runs clear it. " * 4
+    assert step_ms(short) < step_ms(long)
+    assert step_ms("", "ten words " * 5) < step_ms("ten words " * 5)
+    # Every hold rounds to 100 ms and stays in a comfortable range.
+    assert step_ms("") == site_races.STEP_MIN_MS
+    assert step_ms("word " * 500) == site_races.STEP_MAX_MS
+    assert step_ms("word " * 20, "card " * 7) % 100 == 0
+    # The worst checkpoint says more, so it holds longer than a quiet one.
+    race = {
+        "funnel": {"all": [20, 20, 12, 12], "byCar": {}, "byDriver": {}},
+        "checkpoints": ["Find it", "Fix it"],
+        "moreChecks": 0,
+        "checkpointRates": None,
+    }
+    (view,) = site_races.funnel_views(race)
+    assert view["worst"] == 2 and view["ms"][2] > view["ms"][1]
+    assert len(view["ms"]) == 4
 
 
 def test_race_page_funnel_comes_from_the_data(tmp_path):
@@ -4895,6 +4923,26 @@ def test_garage_level_availability_comes_from_the_data(tmp_path):
     assert set(embedded["entries"]) == set(view["entries"])
 
 
+def test_every_driver_in_a_livery_car_wears_a_blue_visor(committed_pages):
+    # A car in its livery has an ink helmet; only a Lacey blue visor makes the
+    # driver read in it, on a dark board and in Pi's blue livery alike.
+    helmet = re.compile(
+        r'<circle cx="528" cy="112" r="25" fill="([^"]+)"(?:/>|></circle>)'
+        r'<rect x="532" y="101" width="24" height="12" rx="6" fill="([^"]+)"'
+    )
+    files, _ = committed_pages
+    drawn = [
+        (name, *match)
+        for name, page in files.items()
+        if name.endswith(".html") and isinstance(page, str)
+        for match in helmet.findall(page)
+    ]
+    assert drawn and {name for name, *_ in drawn} == {"garage/index.html"}
+    assert all(visor == "var(--blue)" for _, _, visor in drawn), drawn
+    mock = (REPO / "design/web/Garage.dc.html").read_text("utf-8")
+    assert helmet.findall(mock) == [("#111111", "{{acc}}")]
+
+
 def test_garage_offers_every_committed_driver_and_its_levels(committed_pages):
     files, site = committed_pages
     view = site_garage.model(site)
@@ -5298,8 +5346,15 @@ def test_built_engine_map_labels_have_only_default_tips(committed_pages):
             page,
             re.S,
         ):
+            # The separator dot that may lead the tag is not part of its label.
             label = html.unescape(
-                re.sub(r"<[^>]+>", "", match[0].split('<span class="map-info">')[0])
+                re.sub(
+                    r"<[^>]+>",
+                    "",
+                    match[0]
+                    .replace(site_views.DOT, "")
+                    .split('<span class="map-info">')[0],
+                )
             )
             assert not any(
                 word in label
@@ -5704,6 +5759,129 @@ def _check_pit_wall(files, site) -> None:
 def test_pit_wall_heatmap_totals_equal_standings(tmp_path, committed_pages):
     _check_pit_wall(*_data_pages(_site_tree(tmp_path)))
     _check_pit_wall(*committed_pages)
+
+
+def test_fuel_gap_says_why_there_is_no_bill():
+    gap, sentence = site_views.fuel_gap, site_views.fuel_gap_sentence
+    # Unmetered runs never recorded their tokens; unpriced ones have no price.
+    assert gap(7, 7, 50) == "7 runs unmetered" and gap(1, 1, 3) == "1 run unmetered"
+    assert gap(3, 1, 50) == "3 runs unpriced"
+    assert gap(0, 0, 0) == "no race passed" and gap(0, 0, 9) == ""
+    assert sentence(7, 7, 50, 54) == (
+        "7 of its 54 counted runs did not record their tokens, so there is no fuel bill."
+    )
+    assert sentence(3, 1, 50, 54).startswith("3 of its 54 counted runs have no per-token")
+    assert sentence(0, 0, 0, 54) == "It passed no race, so there is no fuel bill."
+
+
+def test_every_missing_fuel_bill_says_how_many_runs_lack_a_price(committed_pages):
+    files, site = committed_pages
+    standings = json.loads(files["data/standings.json"])
+    for entry in standings["entries"] + standings["partial"]:
+        # A bill exactly when every counted run is priced and some race passed.
+        unpriced, unmetered = entry["unpricedRuns"], entry["unmeteredRuns"]
+        assert 0 <= unmetered <= unpriced <= entry["n"], entry["id"]
+        assert (entry["costPerPass"] is None) == (unpriced > 0 or entry["k"] == 0)
+    wall = files["pit-wall/index.html"]
+    fuel = re.findall(r'<td class="pw-cell pw-fuel" data-usd="([^"]*)">(.*?)</td>', wall)
+    assert fuel and all(">–<" not in cell for _, cell in fuel)
+    for usd, cell in fuel:
+        if usd:
+            continue
+        # No bill: say so, say why in the cell, and the whole sentence on hover.
+        assert '<span class="pw-noprice" title="' in cell and ">no price<small>" in cell
+        assert re.search(r"<small>\d+ runs? (unmetered|unpriced)</small>", cell), cell
+        assert "so there is no fuel bill." in cell
+    # The timing tower says the same in its words.
+    tower = files["standings/index.html"]
+    assert "Not every run has a per-token price" not in tower
+    # Token backfills can leave every placed entry fully metered.
+    unmetered_explanation = (
+        "counted runs did not record their tokens, so there is no fuel bill."
+    )
+    assert (unmetered_explanation in tower) == any(
+        entry["unpricedRuns"] > 0
+        and entry["unmeteredRuns"] == entry["unpricedRuns"]
+        for entry in site.placed
+    )
+
+
+def test_entry_chips_and_pit_wall_meta_keep_words_and_dots_together(committed_pages):
+    files, site = committed_pages
+    entry = next(
+        name
+        for name in sorted(files)
+        if name.startswith("entries/")
+        and name.endswith(".html")
+        and name != "entries/index.html"
+    )
+    chips = _between(files[entry], '<nav class="en-chips"', "</nav>")
+    # The chip's words are one text run in one box, so "in" never splits.
+    for chip in re.findall(r"<a [^>]*>(.*?)</a>", chips):
+        assert chip.count('<span class="en-chip-who">') == 1
+        outside = re.sub(r'<span class="en-chip-who">.*</span>', "", chip)
+        assert " in " not in outside and "·" not in outside
+        assert site_views.DOT in chip
+    wall = files["pit-wall/index.html"]
+    metas = re.findall(r"<small>(.*?)</small></span></div></th>", wall, re.S)
+    assert metas
+    for meta in metas:
+        # Each dot leads its item: the map's rides in the tag, the rank's in a span.
+        assert meta.count(site_views.DOT) == 1
+        assert re.search(r'<span class="pw-place">·&nbsp;=?\d+(st|nd|rd|th)</span>$', meta)
+
+
+def test_browser_pit_wall_and_entry_chips_wrap_whole_at_phone_width(
+    committed_pages, tmp_path
+):
+    executable = os.environ.get("PADDOCK_BROWSER_EXECUTABLE")
+    if not executable:
+        pytest.skip("Local Chromium pass requires PADDOCK_BROWSER_EXECUTABLE")
+    browser_api = pytest.importorskip("playwright.sync_api")
+    files, _ = committed_pages
+    for name, content in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content.encode() if isinstance(content, str) else content)
+    entries = [
+        n
+        for n in sorted(files)
+        if n.startswith("entries/")
+        and n.endswith("/index.html")
+        and n != "entries/index.html"
+    ]
+    lines = r"""root => {
+      const tops = el => { const r = document.createRange(); r.selectNodeContents(el);
+        return new Set([...r.getClientRects()].map(x => Math.round(x.top))).size; };
+      const dotEnds = [...root.querySelectorAll('.ent-sep, .pw-place')].filter(sep => {
+        const next = sep.classList.contains('pw-place') ? sep : sep.nextElementSibling;
+        return Math.abs(sep.getBoundingClientRect().top - next.getBoundingClientRect().top) > 4;
+      }).length;
+      const words = [...root.querySelectorAll('.en-chip-who')].map(el => {
+        const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n, split = 0;
+        while ((n = w.nextNode())) { for (const word of n.textContent.split(/\s+/).filter(Boolean)) {
+          const i = n.textContent.indexOf(word); const r = document.createRange();
+          r.setStart(n, i); r.setEnd(n, i + word.length);
+          if (new Set([...r.getClientRects()].map(x => Math.round(x.top))).size > 1) split += 1; } }
+        return split; }).reduce((a, b) => a + b, 0);
+      return { dotEnds, splitRanks: [...root.querySelectorAll('.pw-place')].filter(el => tops(el) > 1).length,
+               splitWords: words };
+    }"""
+    with browser_api.sync_playwright() as api:
+        browser = api.chromium.launch(executable_path=executable)
+        try:
+            context = browser.new_context(
+                viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True
+            )
+            context.route("https://**", lambda route: route.abort())
+            page = context.new_page()
+            for name in ("pit-wall/index.html", *entries[:6]):
+                page.goto((tmp_path / name).as_uri())
+                got = page.locator("main").evaluate(lines)
+                assert got == {"dotEnds": 0, "splitRanks": 0, "splitWords": 0}, (name, got)
+            context.close()
+        finally:
+            browser.close()
 
 
 def _check_driver_pages(files, site) -> None:
@@ -6429,8 +6607,9 @@ def test_shared_accessibility_and_motion_rules():
     assert ":focus-visible { outline: 3px solid var(--blue-ink)" in css
     assert "button, summary, select { min-height: 44px; min-width: 44px; }" in css
     assert "animation: none !important; transition: none !important;" in css
+    # Reduced motion skips playback: Play shows the finish at once, in view.
     assert (
-        "if (motion.matches) { step = last; selected = last; show(); return; }"
+        "if (motion.matches) { step = last; selected = last; show(); land(true); return; }"
         in site_races.SCRIPT
     )
     assert "motion.addEventListener('change', motionChanged)" in site_races.SCRIPT
@@ -6650,6 +6829,100 @@ def test_browser_panel_startup_and_motion_changes(acceptance_sites, tmp_path, sc
                     page.locator(".rc-station-card").last.get_attribute("aria-pressed")
                     == "true"
                 )
+            assert not errors, errors
+            context.close()
+        finally:
+            browser.close()
+
+
+def test_browser_playback_follows_the_running_step_on_a_phone(
+    committed_pages, tmp_path
+):
+    executable = os.environ.get("PADDOCK_BROWSER_EXECUTABLE")
+    if not executable:
+        pytest.skip("Local Chromium pass requires PADDOCK_BROWSER_EXECUTABLE")
+    browser_api = pytest.importorskip("playwright.sync_api")
+    files, _ = committed_pages
+    for name, content in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content.encode() if isinstance(content, str) else content)
+    # A race whose lap has at least three checkpoints, so the page has to move.
+    race = next(
+        name
+        for name, page in sorted(files.items())
+        if name.startswith("races/")
+        and isinstance(page, str)
+        and page.count('class="rc-station ') >= 5
+    )
+    state = """() => {
+      const stations = [...document.querySelectorAll('.rc-station')];
+      const k = stations.findIndex(
+        s => s.querySelector('.rc-station-card').getAttribute('aria-pressed') === 'true');
+      const box = stations[k].getBoundingClientRect();
+      const nav = document.querySelector('.nav').getBoundingClientRect().bottom;
+      const panel = document.querySelector('[data-lap-panel]');
+      return {
+        k, y: scrollY, top: box.top - nav, bottom: box.bottom, room: innerHeight - nav,
+        docked: panel.previousElementSibling === stations[k].querySelector('.rc-station-card'),
+        home: panel.parentNode.classList.contains('rc-lap-copy'),
+        label: document.querySelector('[data-lap-play]').textContent,
+      };
+    }"""
+    with browser_api.sync_playwright() as api:
+        browser = api.chromium.launch(executable_path=executable)
+        try:
+            context = browser.new_context(
+                viewport={"width": 390, "height": 664},
+                is_mobile=True,
+                has_touch=True,
+                reduced_motion="no-preference",
+            )
+            context.route("https://**", lambda route: route.abort())
+            page = context.new_page()
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.clock.install()
+            page.goto((tmp_path / race).as_uri())
+            # Paused, the fake clock moves only when the test says so.
+            page.clock.pause_at(page.evaluate("Date.now()") + 1000)
+            ms = page.locator("[data-funnel]").evaluate(
+                "lap => JSON.parse(lap.dataset.funnel)[0].ms"
+            )
+            play = page.locator("[data-lap-play]")
+            play.scroll_into_view_if_needed()
+            assert page.evaluate(state)["home"]
+            play.click()
+            page.wait_for_timeout(900)
+            # The race starts on screen, its words under the running station.
+            for k in range(3):
+                now = page.evaluate(state)
+                assert now["k"] == k and now["docked"], now
+                assert now["top"] >= 0 and now["bottom"] <= 664, now
+                assert now["label"] == "Racing…"
+                page.clock.run_for(ms[k])
+                page.wait_for_timeout(900)
+            # A reader who scrolls takes the page back; the race runs on below.
+            page.mouse.wheel(0, -300)
+            page.wait_for_timeout(400)
+            held = page.evaluate(state)
+            page.clock.run_for(ms[3])
+            page.wait_for_timeout(900)
+            after = page.evaluate(state)
+            assert after["k"] == held["k"] + 1 and after["docked"]
+            assert abs(after["y"] - held["y"]) < 2
+            # A tap on a station stops the race there.
+            page.locator(".rc-station-card").nth(1).click()
+            stopped = page.evaluate(state)
+            assert stopped["k"] == 1 and stopped["docked"]
+            assert stopped["label"] == "Play the race"
+            page.clock.run_for(max(ms))
+            assert page.evaluate(state)["k"] == 1
+            # Another view puts the explanation back by the controls.
+            car = page.locator('[role="radio"][data-mode="car"]')
+            if car.count():
+                car.click()
+                assert page.evaluate(state)["home"]
             assert not errors, errors
             context.close()
         finally:

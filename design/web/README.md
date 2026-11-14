@@ -208,7 +208,10 @@ each race's briefing prompt.
 - **A race page**: the header roundel, the avg pass rate with its 95% range,
   the difficulty band; the lap funnel (All runs, By car, By driver for drivers
   with five or more runs recording checks) with its worst checkpoint called
-  out and playback at 1.6 s per checkpoint; the classification of each
+  out and playback: the page follows the running station to the middle of the
+  screen, its explanation under its card, and holds each station as long as its
+  words take to read (2.5 to 8 s); a reader who scrolls takes the page back and
+  a tap on a station stops the race there; the classification of each
   entry's first run (lap or fuel order, top 10 then all) and where the rest
   retired; the briefing; the staged files and the sealed circuit.
 - **Short names** are plain words with acronyms spelled out, from the
@@ -342,7 +345,12 @@ featured driver pages use the same collision-disambiguated slugs everywhere.
   `--viz-seq` ramp of `design/tokens.css`. The page script adds the car filter,
   the percent-or-count switch and column sort. Clicking the active column again
   reverses its order; a newly selected column starts best-first (fuel starts
-  cheapest-first). Missing values stay last in either direction.
+  cheapest-first). Missing values stay last in either direction. An entry with
+  no fuel bill says "no price" and why, from the standings' `unpricedRuns` and
+  `unmeteredRuns`: how many counted runs carry no price, and how many of those
+  never recorded their tokens ("7 runs unmetered"). The timing tower and the
+  entry page say the same. Each dot in an entry's line leads the item after it
+  (`views.DOT` rides in the engine-map tag), so no line ends on a dot.
 - **Drivers** (`drivers.py`): a driver with at least one placed entry, so a
   complete calendar, gets `/drivers/<driver-id>/`: best entry, car-by-car bars,
   wins and slips by challenge, and cheapest against best on fuel.

@@ -471,6 +471,9 @@ def _entry_rows(data: SiteData) -> tuple[list[dict], list[dict], dict[tuple, str
         if not season:
             continue
         summary = lb.summarize(season)
+        # A fuel bill needs every counted run priced; say how many are not, and
+        # how many of those never recorded their tokens.
+        unpriced = [r for r in season if lb.included(r) and _usd(r) is None]
         challenges: dict[str, list] = defaultdict(list)
         for record in season:
             challenges[record["suite"]].append(record)
@@ -478,6 +481,10 @@ def _entry_rows(data: SiteData) -> tuple[list[dict], list[dict], dict[tuple, str
             {
                 "key": key,
                 **summary,
+                "unpriced_runs": len(unpriced),
+                "unmetered_runs": sum(
+                    r["cost"].get("reason") == "tokens_not_measured" for r in unpriced
+                ),
                 "records": records,
                 "full": {race_key(record) for record in season} == calendar,
                 "trust": _lowest_trust(data.record_trust[r["run_id"]] for r in season),
@@ -511,6 +518,8 @@ def _standing(row: Mapping[str, Any], ids: Mapping[tuple, str]) -> dict[str, Any
         "tie": row["tie"],
         "costPerPass": cost["usd"],
         "costSource": cost["source"],
+        "unpricedRuns": row["unpriced_runs"],
+        "unmeteredRuns": row["unmetered_runs"],
         "tokensPerPass": row["tokens_per_pass"],
         "trust": row["trust"],
         "challenges": {
@@ -896,6 +905,8 @@ def entry(
         "fuel": {
             "costPerPass": standing["costPerPass"],
             "costSource": standing["costSource"],
+            "unpricedRuns": standing["unpricedRuns"],
+            "unmeteredRuns": standing["unmeteredRuns"],
             "tokensPerPass": standing["tokensPerPass"],
         },
         "medianLapSeconds": _median(record["wall_seconds"] for record in season),
