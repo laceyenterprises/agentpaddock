@@ -1323,8 +1323,8 @@ CSS = """
 .hr-ticks span:first-child { transform: none; }
 .hr-ticks span:last-child { transform: translateX(-100%); }
 .hr-says { font-size: 17px; line-height: 1.5; }
-.steps { display: grid; gap: 12px; }
-.steps h3 { font: 600 18px/1.3 var(--body); }
+.learn .steps { display: grid; gap: 12px; }
+.learn .steps h3 { font: 600 18px/1.3 var(--body); }
 .step-list { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 10px; font-size: 16px; line-height: 1.5; }
 .step-list li { counter-increment: step; position: relative; padding-left: 40px; min-width: 0; }
 .step-list li::before { content: counter(step); position: absolute; left: 0; top: 0; font: 700 18px/1.5 var(--display); color: var(--blue); }

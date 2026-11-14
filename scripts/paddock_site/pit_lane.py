@@ -219,8 +219,9 @@ def body(route: Route, root: Path = REPO_ROOT) -> str:
     up = layout.up(route.file)
     pager = "".join(
         f'<button type="button" class="chip" aria-controls="step-{k}" '
-        f'aria-label="Step {k}">{k}</button>'
-        for k in range(1, len(STEPS) + 1)
+        f'aria-label="Step {k}: {esc(step.title)}">{k}'
+        f'<span class="pager-title"> · {esc(step.title)}</span></button>'
+        for k, step in enumerate(STEPS, start=1)
     )
     steps = "".join(_step(k, step, root) for k, step in enumerate(STEPS, start=1))
     return (
