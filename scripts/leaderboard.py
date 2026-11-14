@@ -1172,10 +1172,20 @@ def validate_track(
     seen = set()
     for checkpoint in checkpoints:
         if not _keys(
-            "track.checkpoint", checkpoint, {"check", "label", "disclose"}, errors
+            "track.checkpoint",
+            checkpoint,
+            {"check", "label", "disclose"}
+            | (
+                {"about"} & checkpoint.keys()
+                if isinstance(checkpoint, Mapping)
+                else set()
+            ),
+            errors,
         ):
             continue
         check = checkpoint["check"]
+        if "about" in checkpoint and not _text(checkpoint["about"]):
+            errors.append("track: checkpoint about must be nonempty public text")
         if (
             not _text(check)
             or not _text(checkpoint["label"])
