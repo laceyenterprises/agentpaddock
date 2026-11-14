@@ -87,6 +87,8 @@ Python invocations of `boundary_steer.py`. Common Python runtime flags without
 arguments (for example `-u`, `-B`, and `-I`) may precede the script. The wrapper's
 `--policy`, `--shell`, and `--command` options consume their own values, in
 separate or `--option=value` form; repeated command options use the last value.
+Use `--command=...` when the value starts with a dash, matching the wrapper’s
+option parsing.
 An explicitly empty command produces no segments. Missing values, unknown
 options, and unsupported interpreter modes or flags retain the original
 invocation. This is static parsing; the original tool-call arguments are kept.
