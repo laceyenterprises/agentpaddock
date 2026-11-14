@@ -875,6 +875,7 @@ def _script() -> str:
   var motion = typeof window.matchMedia === 'function'
     ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
   var reduce = motion.matches;
+  var start = null, go = null;
   function motionChanged() {
     reduce = motion.matches;
     if (lights && reduce) finishLights();
@@ -932,8 +933,8 @@ def _script() -> str:
   if (lights) {
     var art = lights.querySelector('[data-art]');
     var lamps = lights.querySelectorAll('.lamp');
-    var start = lights.querySelector('[data-start]');
-    var go = lights.querySelector('[data-go]');
+    start = lights.querySelector('[data-start]');
+    go = lights.querySelector('[data-go]');
     var lightsTimer = null, counting = false, hasRun = false;
     var light = function (n) {
       each(lamps, function (lamp, i) { lamp.classList.toggle('on', i < n); });

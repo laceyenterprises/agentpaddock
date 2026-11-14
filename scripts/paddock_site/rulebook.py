@@ -222,7 +222,7 @@ def rules(races: int = 0) -> list[Rule]:
     ]
 
 
-def _rule(rule: Rule, current: str) -> str:
+def _rule(rule: Rule) -> str:
     return (
         f'<li data-group="{esc(rule.group)}"><details class="rule">'
         f"<summary>{glyphs.icon(rule.glyph)}"
@@ -254,7 +254,7 @@ def body(route: Route, data: Mapping[str, Any]) -> str:
             counts,
         )
         + '<ol class="rules">'
-        + "".join(_rule(rule, route.file) for rule in listed)
+        + "".join(_rule(rule) for rule in listed)
         + "</ol></section>"
         '<section class="link-cards">'
         + kit.link_card(

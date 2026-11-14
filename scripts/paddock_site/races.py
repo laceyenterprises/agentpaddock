@@ -912,6 +912,7 @@ def _header(race: Mapping[str, Any], calendar_size: int) -> str:
             f"<span><b>Difficulty not rated</b><br>fewer than {lb.DIFFICULTY_MIN_RUNS} counted runs</span>"
         )
     label = challenge_label(race["challenge"])
+    lede = race["title"].removeprefix(race["shortName"] + ": ").strip()
     return (
         f'<p class="rc-back"><a href="../index.html">All {plural(calendar_size, "race")}</a></p>'
         '<section class="rc-head">'
@@ -920,11 +921,7 @@ def _header(race: Mapping[str, Any], calendar_size: int) -> str:
         + roundel(race["challenge"], size="xl", labelled=True)
         + f'<span class="rc-type-text">{esc(label)}<br>version {race["version"]}</span></div>'
         f"<h1>{esc(race['shortName'])}</h1>"
-        + (
-            f'<p class="lede">{esc(race["title"].removeprefix(race["shortName"] + ": "))}</p>'
-            if race["title"]
-            else ""
-        )
+        + (f'<p class="lede">{esc(lede)}</p>' if lede else "")
         + (f'<p class="rc-pitch">{esc(race["pitch"])}</p>' if race["pitch"] else "")
         + "</div>"
         '<div class="rc-head-stats">'

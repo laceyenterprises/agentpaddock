@@ -2465,6 +2465,31 @@ def test_races_build_one_page_per_calendar_race(tmp_path):
     )
 
 
+@pytest.mark.parametrize(
+    ("title", "lede"),
+    [
+        ("", ""),
+        ("Alpha circuit: ", ""),
+        ("Alpha circuit:   ", ""),
+        ("   ", ""),
+        ("Alpha circuit:  Read & review  ", "Read &amp; review"),
+        ("Synthetic review race", "Synthetic review race"),
+    ],
+)
+def test_race_header_omits_empty_subtitles(title, lede):
+    race = json.loads(
+        (
+            Path(__file__).parent / "fixtures/site-data/races/hard-review-alpha.json"
+        ).read_text(encoding="utf-8")
+    )
+    race["title"] = title
+    header = site_races._header(race, 2)
+    if lede:
+        assert f'<p class="lede">{lede}</p>' in header
+    else:
+        assert 'class="lede"' not in header
+
+
 def test_race_pages_hold_the_site_invariants(tmp_path):
     _, files = _race_site(tmp_path)
     pages = {
@@ -7435,6 +7460,7 @@ for (const mode of ['observer', 'fallback', 'reduced']) {
   };
   vm.runInNewContext(script, {window, IntersectionObserver: window.IntersectionObserver,
     root: {querySelector() {return lights;}}, reduce: mode === 'reduced',
+    start: null, go: null,
     each: (items, fn) => items.forEach(fn),
     setInterval(fn, delay) {interval = fn; ms = delay; return 1;},
     clearInterval() {interval = null;}});
