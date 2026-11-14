@@ -119,7 +119,7 @@ WORDING: dict[str, Wording] = {
         "Slipstream", "Cached tokens, read at a fraction of the price"
     ),
     "fuel-triad": Wording(
-        "Fuel triad", "Input (cached %) : output, the tokens behind each race passed"
+        "The fuel triad", "Input (cached %) : output, the tokens behind each race passed"
     ),
     "mileage": Wording(
         "Mileage", "Races passed per $10, or per million tokens", "", "Home"

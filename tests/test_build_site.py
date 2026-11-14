@@ -5224,22 +5224,41 @@ def test_every_vocabulary_word_stands_beside_a_published_glyph():
             assert (tiles / f"{glyph}-{theme}.svg").is_file(), (glyph, theme)
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def glyph_source():
     return runpy.run_path(str(REPO / "design/glyphs/paddock_glyphs.py"))
 
 
-@pytest.mark.parametrize("share", [-0.1, 0, 1, 1.1])
-def test_share_arc_handles_empty_and_full_shares(glyph_source, share):
+@pytest.mark.parametrize(
+    "share,expected_large_arc,endpoint",
+    [
+        (-0.1, None, None),
+        (0, None, None),
+        (0.25, "0", ["13.50", "12.00"]),
+        (0.5, "0", ["8.00", "17.50"]),
+        (0.75, "1", ["2.50", "12.00"]),
+        (1, None, None),
+        (1.1, None, None),
+    ],
+)
+def test_share_arc_handles_empty_full_and_fractional_shares(
+    glyph_source, share, expected_large_arc, endpoint
+):
     path = glyph_source["share_arc"](8, 12, 5.5, share)
     if share <= 0:
         assert path == ""
-    else:
+    elif share >= 1:
         # A full circle needs two distinct semicircles, returning to its start.
         points = re.findall(r"-?\d+(?:\.\d+)?", path)
         assert path.count("A") == 2
         assert points[:2] == points[-2:] == ["8.00", "6.50"]
         assert points[7:9] == ["8.00", "17.50"]
+    else:
+        points = re.findall(r"-?\d+(?:\.\d+)?", path)
+        assert path.count("A") == 1
+        assert points[:2] == ["8.00", "6.50"]
+        assert points[2:7] == ["5.5", "5.5", "0", expected_large_arc, "1"]
+        assert points[7:9] == endpoint
 
 
 def test_fuel_triad_arcs_partition_the_input_ring(glyph_source):
