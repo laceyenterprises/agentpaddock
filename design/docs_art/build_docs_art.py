@@ -5,6 +5,10 @@ Every picture is drawn from the published glyph set (design/glyphs/paddock_glyph
 (design/tokens.json); nothing here draws a new icon. Each illustration is written twice, once per theme, so the
 docs can embed both with <picture>. Wording comes from design/vocabulary.md.
 
+Besides the pictures, banners and page tiles, it writes one glyph tile per glyph to assets/glyphs/<id>-<theme>.svg,
+drawn like the site's glyph box, so a Markdown table can set the glyph next to its word, and a livery swatch
+(assets/livery-<theme>.svg) from the five car tokens.
+
     python3 design/docs_art/build_docs_art.py      # writes design/guide/assets/
 """
 from __future__ import annotations
@@ -228,6 +232,8 @@ PAGES = {
     "the-gym": ("fence", "Under the hood", "The gym behind the races.", "The out-of-band idea, scheduled runs and locks."),
     "batteries": ("fuel-gauge", "Batteries", "Efficiency batteries and reports.", "Model efficiency, matrix reports and the fix audit."),
     "design": ("setup-sheet", "Design", "How Agent Paddock looks and talks.", "Colour, type, glyphs, pictures and words."),
+    "vocabulary": ("briefing", "The paddock dictionary", "Racing words, agent meanings.",
+                   "Every word the paddock uses, with the glyph you will see next to it."),
 }
 
 
@@ -251,8 +257,39 @@ def tile(key, theme):
             + glyph(gid, 30, 30, 60, theme) + "</svg>")
 
 
+# The site's glyph box (scripts/paddock_site/kit.py .glyph-box): a 56 px soft tile, radius 16, a 30 px glyph.
+BOX, BOX_R, BOX_GLYPH = 56, 16, 30
+
+
+def glyph_tile(gid, theme):
+    """One glyph in the site's glyph box, for a Markdown table cell."""
+    pad = (BOX - BOX_GLYPH) / 2
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{BOX}" height="{BOX}" viewBox="0 0 {BOX} {BOX}" '
+            f'role="img" aria-label="{html.escape(GLYPHS[gid][3])}">'
+            f'<rect x="0.75" y="0.75" width="{BOX - 1.5}" height="{BOX - 1.5}" rx="{BOX_R}" '
+            f'fill="{tok("soft", theme)}" stroke="{tok("rule", theme)}" stroke-width="1.5"/>'
+            + glyph(gid, pad, pad, BOX_GLYPH, theme) + "</svg>")
+
+
+#: The five liveries, in the order the vocabulary names the cars.
+LIVERY = ("car-cc", "car-codex", "car-opencode", "car-pi", "car-agy")
+
+
+def livery_tile(theme):
+    """The five livery colours as timing-tower bars, in the glyph box. It names cars; it encodes no value."""
+    bar_h, gap = 4, 3
+    top = (BOX - (len(LIVERY) * bar_h + (len(LIVERY) - 1) * gap)) / 2
+    bars = "".join(f'<rect x="13" y="{top + k * (bar_h + gap):.1f}" width="30" height="{bar_h}" rx="2" '
+                   f'fill="{tok(car, theme)}"/>' for k, car in enumerate(LIVERY))
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{BOX}" height="{BOX}" viewBox="0 0 {BOX} {BOX}" '
+            f'role="img" aria-label="Livery: one colour per car">'
+            f'<rect x="0.75" y="0.75" width="{BOX - 1.5}" height="{BOX - 1.5}" rx="{BOX_R}" '
+            f'fill="{tok("soft", theme)}" stroke="{tok("rule", theme)}" stroke-width="1.5"/>' + bars + "</svg>")
+
+
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / "glyphs").mkdir(exist_ok=True)
     n = 0
     for theme in ("light", "dark"):
         for name, fn in ART.items():
@@ -262,6 +299,11 @@ def main() -> int:
             (OUT / f"banner-{key}-{theme}.svg").write_text(banner(key, theme) + "\n", encoding="utf-8")
             (OUT / f"tile-{key}-{theme}.svg").write_text(tile(key, theme) + "\n", encoding="utf-8")
             n += 2
+        for gid in GLYPHS:
+            (OUT / "glyphs" / f"{gid}-{theme}.svg").write_text(glyph_tile(gid, theme) + "\n", encoding="utf-8")
+            n += 1
+        (OUT / f"livery-{theme}.svg").write_text(livery_tile(theme) + "\n", encoding="utf-8")
+        n += 1
     print(f"wrote {n} files to {OUT.relative_to(ROOT)}")
     return 0
 
