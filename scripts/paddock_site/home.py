@@ -1,7 +1,7 @@
 """The home page, ``/`` (PDW-04): ``design/web/Main.dc.html`` built for real.
 
 Top to bottom, as in the prototype: the lights-out hero, the live ticker, the
-photo finish, the "How to read these results" note, the learn-in-60-seconds
+photo finish, the results note, the learn-in-60-seconds
 tiles, the seven-challenge row, the hardest-race and fuel cards and the call to
 build an entry. The shared layout adds the header, the menu and the footer.
 
@@ -37,7 +37,7 @@ HEADLINE = "Which coding agent is better? Watch them race."
 LEDE = "Every model, in the harness it runs in, on the same real repository work, graded by stewards it never sees."
 SAMPLE_STAMP = "Sample runs"
 
-RESULTS_NOTE_TITLE = "How to read these results"
+RESULTS_NOTE_TITLE = views.RESULTS_NOTE_TITLE
 
 #: Ticker kinds -> (glyph id, flag name). An infrastructure rerun is the red
 #: flag; only a run that failed its checks is a DNF.
@@ -513,6 +513,24 @@ def learn(standings: Mapping[str, Any]) -> str:
     )
 
 
+def review_lesson(review: Mapping[str, Any], fix: Mapping[str, Any] | None) -> str:
+    """The lesson the Hard review detail teaches, read from the challenge rows.
+
+    Only when Hard review's honest range sits wholly below Hard fix's: where
+    the two overlap, the board names no winner, so the line is dropped.
+    """
+    if not fix or any(
+        row.get(key) is None for row in (review, fix) for key in ("rate", "lo", "hi")
+    ):
+        return ""
+    if not review["hi"] < fix["lo"]:
+        return ""
+    return (
+        f" Agents review worse than they fix: {pct(review['rate'])} here, "
+        f"{pct(fix['rate'])} on hard fixes."
+    )
+
+
 def challenges(races: Mapping[str, Any]) -> str:
     summary = {row["challenge"]: row for row in races.get("challenges", [])}
     types = list(glyphs.RACE_TYPES)
@@ -549,8 +567,8 @@ def challenges(races: Mapping[str, Any]) -> str:
                 f' <a href="{esc(races_url)}">'
                 f"{plural(row['races'], 'race')} on the calendar</a>."
             )
-            if race_type == hardest:
-                tail += " The hardest challenge."
+            if race_type == "hard-review" and race_type == hardest:
+                tail += review_lesson(row, summary.get("hard-fix"))
         else:
             title = label
             tail = (
@@ -610,7 +628,7 @@ def fuel_card(standings: Mapping[str, Any]) -> str:
         title = f"Same finish. {ratio_text(ratio)} the mileage."
         line = (
             f"{entry_html(cheap, names)} passes a race for {usd(cheap['costPerPass'])}. "
-            f"{entry_html(dear, names)}, tied on the finish, pays {usd(dear['costPerPass'])}."
+            f"{entry_html(dear, names)} pays {usd(dear['costPerPass'])}."
         )
     else:
         priced = [

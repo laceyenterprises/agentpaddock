@@ -224,14 +224,15 @@ def top_by_fuel(entries: Sequence[Mapping[str, Any]], top: int = TOP) -> int:
 
 
 def results_note(root: str, races: int) -> str:
-    """The "How to read these results" note (the optics note, operator 2026-11-03)."""
+    """The results note (the optics note, operator 2026-11-03)."""
     calendar = (
         f"a fixed calendar of {races} tasks" if races else "a fixed calendar of tasks"
     )
     return (
         '<section class="st-note" data-pdk="results-note">'
         + glyphs.icon("rulebook", "st-note-glyph")
-        + '<div class="st-note-body"><h2 class="st-note-title">How to read these results</h2>'
+        + '<div class="st-note-body"><h2 class="st-note-title">'
+        f"{views.RESULTS_NOTE_TITLE}</h2>"
         f"<p>{views.RESULTS_NOTE.format(calendar=calendar)}</p>"
         '<p class="st-note-links">'
         f'<a href="{root}contact/index.html">Independent and open source: about the paddock</a>'
@@ -324,7 +325,7 @@ def _explainer(root: str, entries: Sequence[Mapping[str, Any]], total: int) -> s
     return (
         '<section class="st-explainer st-pass-only st-ranges-only">'
         f'<h2 class="st-panel-head">{glyphs.icon("whisker", "st-panel-glyph")}'
-        "What an honest range is</h2>"
+        "When two honest ranges overlap, the board calls a tie.</h2>"
         f"<p>{total} races is a small sample. The dot is the score an entry got; "
         "the grey bar is where its true pass rate sits, with 95% confidence.</p>"
         f'<div class="st-example" role="img" aria-label="{esc(example)}">'
@@ -336,8 +337,7 @@ def _explainer(root: str, entries: Sequence[Mapping[str, Any]], total: int) -> s
         '<span class="st-example-labels">'
         f'<span style="left:{css_pct(lo)}">{pct(lead["lo"])}</span>'
         f'<span class="st-end" style="left:{css_pct(hi)}">{pct(lead["hi"])}</span>'
-        "</span></div><p><b>When two bars overlap, the board cannot tell those entries apart and calls a tie.</b>"
-        "</p>"
+        "</span></div>"
         f'<a class="st-more" href="{root}learn/index.html">How the range is worked out, '
         "step by step</a></section>"
     )
