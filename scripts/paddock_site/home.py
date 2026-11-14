@@ -349,8 +349,21 @@ def hero(go_line: str) -> str:
 
 
 def ticker(feed_url: str, samples: Sequence[Mapping[str, str]]) -> str:
-    first = samples[0]
-    glyph, flag_name = TICK_FLAGS[first["kind"]]
+    layers = []
+    for i, sample in enumerate(samples):
+        glyph, flag_name = TICK_FLAGS[sample["kind"]]
+        active = " is-active" if i == 0 else ""
+        state = 'aria-hidden="false"' if i == 0 else 'aria-hidden="true" inert'
+        layers.append(
+            f'<div class="home-tick{active}" data-tick {state}>'
+            f'<span class="home-tick-flag" data-flag>{glyphs.icon(glyph, "home-tick-glyph")}</span>'
+            '<span class="home-tick-text">'
+            f"<b data-who>{esc(sample['who'])}</b>"
+            f"<span data-what>{esc(sample['what'])}</span>"
+            f'<span class="home-tick-when" data-when>{esc(sample["when"])}</span></span>'
+            f'<span class="home-tick-name" data-flag-name>{esc(flag_name)}</span>'
+            "</div>"
+        )
     payload = json.dumps(list(samples), ensure_ascii=False, separators=(",", ":"))
     return (
         '<section class="home-ticker" data-ticker aria-label="On track now" '
@@ -358,14 +371,7 @@ def ticker(feed_url: str, samples: Sequence[Mapping[str, str]]) -> str:
         '<div class="home-ticker-head"><span class="live-dot" aria-hidden="true"></span>'
         '<span class="home-kicker">On track now</span>'
         f'<span class="home-ticker-stamp" data-stamp>{SAMPLE_STAMP}</span></div>'
-        '<div class="home-tick" data-tick>'
-        f'<span class="home-tick-flag" data-flag>{glyphs.icon(glyph, "home-tick-glyph")}</span>'
-        '<span class="home-tick-text">'
-        f"<b data-who>{esc(first['who'])}</b>"
-        f"<span data-what>{esc(first['what'])}</span>"
-        f'<span class="home-tick-when" data-when>{esc(first["when"])}</span></span>'
-        f'<span class="home-tick-name" data-flag-name>{esc(flag_name)}</span>'
-        "</div></section>"
+        '<div class="home-ticks" data-ticks>' + "".join(layers) + "</div></section>"
     )
 
 
@@ -733,7 +739,9 @@ CSS = """
 .live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--tower-lit); animation: home-pulse 1.8s infinite; flex: none; }
 .home-ticker[data-source="sample"] .live-dot { background: var(--muted); animation: none; }
 .home-ticker-stamp { margin-left: auto; font-size: 13px; color: var(--muted); text-align: right; }
-.home-tick { display: flex; align-items: center; gap: 16px; padding: 18px 20px; border-radius: 18px; background: var(--soft); min-height: 88px; }
+.home-ticks { display: grid; }
+.home-tick { grid-area: 1 / 1; opacity: 0; visibility: hidden; transition: opacity .6s var(--ease), visibility 0s linear .6s; display: flex; align-items: center; gap: 16px; padding: 18px 20px; border-radius: 18px; background: var(--soft); min-height: 88px; }
+.home-tick.is-active { opacity: 1; visibility: visible; transition-delay: 0s; }
 .home-tick-glyph { width: 34px; height: 34px; flex: none; color: var(--ink); display: block; }
 .home-tick-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .home-tick-text b { font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
@@ -858,7 +866,7 @@ CSS = """
 @media (prefers-reduced-motion: reduce) {
   .home .in, .home-go, .home-why p { animation: none; }
   .live-dot { animation: none; }
-  .home-card, .home-lights-art .lamp { transition: none; }
+  .home-card, .home-lights-art .lamp, .home-tick { transition: none; }
 }
 """
 
@@ -886,6 +894,7 @@ def _script() -> str:
   function motionChanged() {
     reduce = motion.matches;
     if (reduce && counting) finishLights();
+    if (syncTicker) syncTicker();
   }
   if (motion.addEventListener) motion.addEventListener('change', motionChanged);
   else if (motion.addListener) motion.addListener(motionChanged);
@@ -984,14 +993,9 @@ def _script() -> str:
         + aliases
         + """;
   var stamp = ticker.querySelector('[data-stamp]');
-  var tick = ticker.querySelector('[data-tick]');
-  var use = ticker.querySelector('[data-flag] use');
-  var fields = {
-    who: ticker.querySelector('[data-who]'),
-    what: ticker.querySelector('[data-what]'),
-    when: ticker.querySelector('[data-when]'),
-    name: ticker.querySelector('[data-flag-name]')
-  };
+  var stack = ticker.querySelector('[data-ticks]');
+  var layers = Array.prototype.slice.call(stack.querySelectorAll('[data-tick]'));
+  var template = layers[0].cloneNode(true);
   var text = function (value, max) { return typeof value === 'string' ? value.slice(0, max) : ''; };
   var kindOf = function (t) {
     // An infrastructure rerun is a red flag, never a DNF.
@@ -1014,28 +1018,77 @@ def _script() -> str:
   try { samples = clean(JSON.parse(ticker.getAttribute('data-samples') || '[]')); } catch (e) { samples = []; }
   if (!samples.length) return;
   var ticks = samples, at = 0;
-  var show = function (t) {
-    var flag = FLAGS[t.kind];
-    use.setAttribute('href', '#' + flag[0]);
-    fields.name.textContent = flag[1];
-    fields.who.textContent = t.who;
-    fields.what.textContent = t.what;
-    fields.when.textContent = t.when;
-    enter(tick);
-  };
+  var TICK_FADE_MS = 600;
+  function tickDwell(t) {
+    return Math.min(10000, 6500 + Math.max(0, (t.who + t.what).length - 60) * 30);
+  }
+  function activate(layer, active) {
+    layer.classList.toggle('is-active', active);
+    layer.setAttribute('aria-hidden', active ? 'false' : 'true');
+    layer.toggleAttribute('inert', !active);
+  }
+  var timer = null, started = 0, remaining = tickDwell(ticks[0]);
+  var hovering = false, focused = false;
+  var onScreen = !window.IntersectionObserver;
+  function paused() {
+    return reduce || document.hidden || hovering || focused || !onScreen || ticks.length < 2;
+  }
+  function syncTicker() {
+    if (timer !== null) {
+      remaining = Math.max(0, remaining - (performance.now() - started));
+      clearTimeout(timer);
+      timer = null;
+    }
+    if (paused()) return;
+    started = performance.now();
+    timer = setTimeout(function () {
+      timer = null;
+      activate(layers[at], false);
+      at = (at + 1) % ticks.length;
+      activate(layers[at], true);
+      // The fade is additional to the full reading time.
+      remaining = TICK_FADE_MS + tickDwell(ticks[at]);
+      syncTicker();
+    }, remaining);
+  }
+  function rebuild(list) {
+    ticks = list; at = 0;
+    layers = ticks.map(function (t, i) {
+      var layer = template.cloneNode(true), flag = FLAGS[t.kind];
+      layer.querySelector('[data-flag] use').setAttribute('href', '#' + flag[0]);
+      layer.querySelector('[data-flag-name]').textContent = flag[1];
+      layer.querySelector('[data-who]').textContent = t.who;
+      layer.querySelector('[data-what]').textContent = t.what;
+      layer.querySelector('[data-when]').textContent = t.when;
+      activate(layer, i === 0);
+      return layer;
+    });
+    stack.replaceChildren.apply(stack, layers);
+    clearTimeout(timer); timer = null;
+    remaining = tickDwell(ticks[0]);
+    syncTicker();
+  }
+  document.addEventListener('visibilitychange', syncTicker);
+  ticker.addEventListener('pointerenter', function () { hovering = true; syncTicker(); });
+  ticker.addEventListener('pointerleave', function () { hovering = false; syncTicker(); });
+  ticker.addEventListener('focusin', function () { focused = true; syncTicker(); });
+  ticker.addEventListener('focusout', function (event) {
+    focused = ticker.contains(event.relatedTarget); syncTicker();
+  });
+  if (window.IntersectionObserver) {
+    new IntersectionObserver(function (entries) {
+      onScreen = entries[0].isIntersecting; syncTicker();
+    }).observe(ticker);
+  }
+  syncTicker();
   var useSamples = function () {
     if (ticker.getAttribute('data-source') === 'sample') return;
     ticker.setAttribute('data-source', 'sample');
     stamp.textContent = '"""
         + SAMPLE_STAMP
         + """';
-    ticks = samples; at = 0; show(ticks[0]);
+    rebuild(samples);
   };
-  setInterval(function () {
-    if (reduce || document.hidden || ticks.length < 2) return;
-    at = (at + 1) % ticks.length;
-    show(ticks[at]);
-  }, 3200);
   var url = ticker.getAttribute('data-feed');
   var load = function () {
     if (!url || !window.fetch) return;
@@ -1051,7 +1104,7 @@ def _script() -> str:
         var updated = text(d.updated, 40);
         ticker.setAttribute('data-source', 'live');
         stamp.textContent = 'Live from the bench \\u00b7 ' + racing + (updated ? 'updated ' + updated : 'just now');
-        ticks = live; at = 0; show(ticks[0]);
+        rebuild(live);
       })
       .catch(function () { clearTimeout(timeout); useSamples(); });
   };
