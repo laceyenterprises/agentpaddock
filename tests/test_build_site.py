@@ -12,6 +12,7 @@ import json
 import os
 import posixpath
 import re
+import runpy
 import shutil
 import struct
 import subprocess
@@ -3669,6 +3670,11 @@ def test_every_dictionary_term_has_a_sprite_symbol_and_the_index_is_covered():
     pit_board = _between(main, 'id="term-pit-board">', "</li>")
     assert 'href="../contact/index.html"' in pit_board
     assert "Where you meet it: Contact and about" in pit_board
+    # The empty route path names Home; it must not become an empty href.
+    for glyph in ("mileage", "team-radio"):
+        card = _between(main, f'id="term-{glyph}">', "</li>")
+        assert 'href="../index.html"' in card, glyph
+        assert "Where you meet it: Home" in card, glyph
     # Search and group chips ride on the script; the content reads without it.
     assert 'type="search"' in main and 'data-chips="group"' in main
     assert "Race calendar" in main
@@ -5205,14 +5211,50 @@ def test_every_vocabulary_word_stands_beside_a_published_glyph():
         # Livery names a car, so it shows the five livery colours instead of a glyph.
         if word == "Livery":
             assert 'src="guide/assets/livery-light.svg"' in cell
+            assert 'srcset="guide/assets/livery-dark.svg"' in cell
             continue
         ids = re.findall(r'src="guide/assets/glyphs/([a-z-]+)-light\.svg"', cell)
         assert ids and set(ids) <= PUBLISHED_GLYPHS, word
+        dark_ids = re.findall(r'srcset="guide/assets/glyphs/([a-z-]+)-dark\.svg"', cell)
+        assert dark_ids == ids, word
     # The docs carry a light and a dark tile for every published glyph.
     tiles = REPO / "design/guide/assets/glyphs"
     for glyph in PUBLISHED_GLYPHS:
         for theme in ("light", "dark"):
             assert (tiles / f"{glyph}-{theme}.svg").is_file(), (glyph, theme)
+
+
+@pytest.fixture
+def glyph_source():
+    return runpy.run_path(str(REPO / "design/glyphs/paddock_glyphs.py"))
+
+
+@pytest.mark.parametrize("share", [-0.1, 0, 1, 1.1])
+def test_share_arc_handles_empty_and_full_shares(glyph_source, share):
+    path = glyph_source["share_arc"](8, 12, 5.5, share)
+    if share <= 0:
+        assert path == ""
+    else:
+        # A full circle needs two distinct semicircles, returning to its start.
+        points = re.findall(r"-?\d+(?:\.\d+)?", path)
+        assert path.count("A") == 2
+        assert points[:2] == points[-2:] == ["8.00", "6.50"]
+        assert points[7:9] == ["8.00", "17.50"]
+
+
+def test_fuel_triad_arcs_partition_the_input_ring(glyph_source):
+    body = next(g[4] for g in glyph_source["GLYPHS"] if g[0] == "fuel-triad")
+    paths = re.findall(r'<path d="([^"]+)"', body)
+    assert len(paths) == 2
+    remainder, cached = [
+        re.findall(r"-?\d+(?:\.\d+)?", path) for path in paths
+    ]
+    # Same circle, clockwise sweeps, opposite endpoints: no full-circle underlay.
+    assert remainder[2:7] == ["5.5", "5.5", "0", "0", "1"]
+    assert cached[2:7] == ["5.5", "5.5", "0", "1", "1"]
+    assert remainder[:2] == cached[-2:]
+    assert remainder[-2:] == cached[:2]
+    assert '<circle cx="8" cy="12"' not in body
 
 
 def test_info_is_one_published_glyph():

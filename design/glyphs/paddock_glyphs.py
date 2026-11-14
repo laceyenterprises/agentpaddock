@@ -44,11 +44,23 @@ def drop(cx, top, s=1.0, attr=""):
     return f'<path d="{d}" {attr}/>' if attr else f'<path d="{d}"/>'
 
 
-def share_arc(cx, cy, r, share):
-    """An arc clockwise from twelve o'clock covering `share` of the circle."""
-    a = math.radians(-90 + 360 * share)
+def share_arc(cx, cy, r, share, start=0.0):
+    """A clockwise arc; share and start are turns from twelve o'clock.
+
+    Non-positive shares are empty; shares of one turn or more draw a full circle.
+    """
+    if share <= 0:
+        return ""
+
+    def point(turn):
+        a = math.radians(-90 + 360 * turn)
+        return f"{cx + r * math.cos(a):.2f} {cy + r * math.sin(a):.2f}"
+
+    origin = point(start)
+    if share >= 1:
+        return f"M{origin}A{r} {r} 0 0 1 {point(start + 0.5)}A{r} {r} 0 0 1 {origin}"
     large = 1 if share > 0.5 else 0
-    return f"M{cx} {cy - r}A{r} {r} 0 {large} 1 {cx + r * math.cos(a):.2f} {cy + r * math.sin(a):.2f}"
+    return f"M{origin}A{r} {r} 0 {large} 1 {point(start + share)}"
 
 
 FLAG_BOX = "M5 4h14.5v9H5z"
@@ -221,7 +233,8 @@ GLYPHS = [
      droplet(5) + droplet(12, AF) + droplet(19)),
     # Input as a ring with its cached share in the accent, a colon, then output as a dot: 82k (81%) : 4k.
     ("fuel-triad", None, "fuel", "The fuel triad: input (cached %) : output, per race passed",
-     f'<circle cx="8" cy="12" r="5.5"/><path d="{share_arc(8, 12, 5.5, 0.8)}" {A}/>'
+     f'<path d="{share_arc(8, 12, 5.5, 0.2, start=0.8)}"/>'
+     f'<path d="{share_arc(8, 12, 5.5, 0.8)}" {A}/>'
      f'<circle cx="15.5" cy="9.6" r="1.2" {INK}/><circle cx="15.5" cy="14.4" r="1.2" {INK}/>'
      f'<circle cx="20" cy="12" r="2.3" {INK}/>'),
     ("slipstream", "prompt-cache", "fuel", "Slipstream: cached tokens, read at a fraction of the price",
@@ -234,7 +247,7 @@ GLYPHS = [
     ("racing-line", None, "fuel", "Racing line: the entries nothing burning less fuel beats on pass rate",
      f'<path d="M3 2.5v18.5h18.5"/><path d="M6.5 17.5C8.5 10.5 12.5 7.5 19.5 6.5" {A}/>'
      f'<circle cx="6.5" cy="17.5" r="1.7" {INK}/><circle cx="11" cy="10.3" r="1.7" {INK}/>'
-     f'<circle cx="19.5" cy="6.5" r="1.7" {INK}/><circle cx="15.5" cy="15" r="1.7"/>'),
+     f'<circle cx="19.5" cy="6.5" r="1.7" {INK}/><circle cx="15.5" cy="15" r="1.7" {INK}/>'),
     # Slipstream's car, dripping fuel where slipstream trails air.
     ("guzzler", None, "fuel", "The guzzler: the entry that burns the most fuel per race passed",
      indy_car(s=0.62, ox=8.4, oy=1.0, helmet=INK)
