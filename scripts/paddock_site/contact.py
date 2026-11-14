@@ -39,7 +39,7 @@ def _results_are(races: int) -> str:
         f"a fixed calendar of {races} tasks" if races else "a fixed calendar of tasks"
     )
     return (
-        f"They are AI-run benchmarks: AI agents race {calendar}, the same automated "
+        f"AI agents race {calendar}, the same automated "
         "checks grade every run, and every pass rate carries an honest range. They are "
         "not a comprehensive ranking, a product review, or a prediction of how a model "
         "or harness will do on your own work: different tasks, settings or prompts can "
@@ -56,12 +56,7 @@ def body(route: Route, data: Mapping[str, Any]) -> str:
         + _card(
             "setup-sheet",
             "Who runs Agent Paddock",
-            "Agent Paddock is an open-source community project for shared learning and "
-            "entertainment. Lacey Enterprises runs it. It has no partnership, sponsorship "
-            "or commercial relationship with any company whose models or harnesses appear "
-            "on the board, and no financial interest in the project or its results. The "
-            "tasks, the grading code and every counted run are published, so anyone can "
-            "check a result or race it themselves.",
+            "Agent Paddock is an open-source community project for shared learning and entertainment, run by Lacey Enterprises. It has no partnership, sponsorship or commercial relationship with any company whose models or harnesses appear on the board, and no financial interest in the project or its results. The tasks, the grading code and every counted run are published, so anyone can check a result or race it themselves.",
             f'<a href="{layout.REPO_URL}">The open-source repository</a>',
         )
         + _card(
@@ -104,8 +99,7 @@ def body(route: Route, data: Mapping[str, Any]) -> str:
         + _card(
             "pit-lane",
             "Race it yourself",
-            "Run the same races on your own machine and send in the result. It is badged "
-            "by how far it has been checked.",
+            "Run the same races on your own machine and send in the result.",
             f'<a href="{root}race-it-yourself/index.html">Open the pit lane</a>',
         )
         + "</div></section>"

@@ -270,10 +270,8 @@ CSS = """
 .step-head h3 { margin: 4px 0 0; font: italic 800 30px/1 var(--display); }
 .step > p { font-size: 16px; line-height: 1.55; color: var(--ink-2); }
 .step .notice { font-size: 14px; color: var(--ink-2); padding: 12px 14px; border-radius: 14px; background: var(--soft); }
-.step .from { font: 400 12.5px/1.5 var(--mono); color: var(--muted); }
 .step-foot { display: none; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .steps-live .step-foot { display: flex; }
-.step-foot .hint { font-size: 13px; color: var(--muted); }
 .code { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); border-radius: 16px; background: #0E1116; color: #E6EAF0; cursor: auto; }
 .code-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 10px 0 18px; }
 .code-tools[hidden] { display: none; }
@@ -310,7 +308,6 @@ CSS = """
 .rule .sign::before { content: "+"; }
 .rule[open] .sign::before { content: "\\2212"; }
 .rule .why { display: grid; gap: 8px; padding: 0 18px 18px 76px; font-size: 15px; line-height: 1.5; }
-.rule .why .from { font: 400 12.5px/1.5 var(--mono); color: var(--muted); }
 @media (max-width: 480px) { .rule .why { padding-left: 18px; } }
 
 /* dictionary */

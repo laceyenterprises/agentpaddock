@@ -18,6 +18,13 @@ from typing import Any, Iterable, Mapping
 
 from . import glyphs
 
+#: Shared wording for the home and standings results note.
+RESULTS_NOTE = (
+    "AI agents race {calendar}, and the same automated checks grade every run. "
+    "It is a narrow measurement, not a comprehensive ranking: other tasks or "
+    "settings can give a different order."
+)
+
 #: The six engine maps the garage offers, in ladder order.
 LEVELS = ("default", "low", "medium", "high", "xhigh", "max")
 
@@ -100,11 +107,11 @@ DEFAULT_TIPS = {
     (
         "codex",
         "fireworks/qwen3.8-max",
-    ): "Codex 0.159 sends its default thinking level, medium, when an entry sets none. 22 earlier runs on Codex 0.124 sent none, so Fireworks' default, xhigh, applied to those.",
+    ): "Codex 0.159 sends its default, medium, when an entry sets none; 22 earlier runs on Codex 0.124 sent none and got Fireworks' default, xhigh.",
     (
         "codex",
         "zai/glm-5.2",
-    ): "Codex 0.159 sends its default thinking level, medium, when an entry sets none. 42 earlier runs on Codex 0.124 sent none, so Z.ai's default, dynamic thinking at max effort, applied to those.",
+    ): "Codex 0.159 sends its default, medium, when an entry sets none; 42 earlier runs on Codex 0.124 sent none and got Z.ai's default, dynamic thinking at max effort.",
     (
         "codex",
         "car",
