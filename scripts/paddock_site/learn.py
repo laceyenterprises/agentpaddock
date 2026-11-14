@@ -784,7 +784,7 @@ def range_pictures(k: int, n: int) -> str:
             if low != high
             else ""
         )
-        if arrow is not None:
+        if arrow is not None and abs(arrow - dot) >= 1e-9:
             marks += (
                 f'<span class="rp-arrow" style="left:{position(min(arrow, dot))};'
                 f'width:{width(abs(arrow - dot))}" data-direction="'
@@ -798,7 +798,7 @@ def range_pictures(k: int, n: int) -> str:
     def picture(title: str, rows: str, caption: str) -> str:
         return (
             f'<figure class="range-picture"><h4>{title}</h4>{rows}'
-            f'<div class="rp-axis" aria-hidden="true"><span>{axis_low * 100:.0f}%</span><span>{(axis_low + 1) * 50:.0f}%</span><span>100%</span></div>'
+            f'<div class="rp-axis" aria-hidden="true"><span style="left:0%">{axis_low * 100:.0f}%</span><span style="left:50%">{(axis_low + 1) * 50:.0f}%</span><span style="left:100%">100%</span></div>'
             f"<figcaption>{caption}</figcaption></figure>"
         )
 
@@ -821,15 +821,21 @@ def range_pictures(k: int, n: int) -> str:
         other_lo,
         other_hi,
     )
+    first, last = intervals[0], intervals[-1]
+    width_ratio = (first[3] - first[2]) / (last[3] - last[2])
     return (
         f'<p class="rp-scale-note">Shared scale: {axis_low * 100:.0f}–100%'
         + (" (zoomed)." if axis_low else ".")
         + "</p>"
-        + picture("Two moves, one picture", moves, "Few races, a bigger nudge.")
+        + picture(
+            "Two moves, one picture",
+            moves,
+            f"Nudge toward 50%: {abs(centre - k / n) * 100:.1f} points.",
+        )
         + picture(
             "More races, narrower range",
             sizes,
-            "Four times the races, about half the width.",
+            f"{first[0]} to {last[0]} races: {width_ratio:.1f}× narrower range.",
         )
         + picture("Honest at the edges", edges, "A perfect score still gets a range.")
         + picture(
@@ -1286,12 +1292,12 @@ SCRIPT = r"""(function () {
     function width(value) {return pct(value / (1 - axisLow));}
     function row(label, low, high, dot, arrow) {
       var marks = low !== high ? '<span class="rp-bar" style="left:' + position(low) + ';width:' + width(high - low) + '"></span>' : '';
-      if (arrow !== undefined) marks += '<span class="rp-arrow" style="left:' + position(Math.min(arrow, dot)) + ';width:' + width(Math.abs(arrow - dot)) + '" data-direction="' + (dot < arrow ? 'left' : 'right') + '"></span>';
+      if (arrow !== undefined && Math.abs(arrow - dot) >= 1e-9) marks += '<span class="rp-arrow" style="left:' + position(Math.min(arrow, dot)) + ';width:' + width(Math.abs(arrow - dot)) + '" data-direction="' + (dot < arrow ? 'left' : 'right') + '"></span>';
       if (dot !== undefined) marks += '<span class="rp-dot" style="left:' + position(dot) + '"></span>';
       return '<div class="rp-row"><p>' + label + '</p><div class="rp-track" aria-hidden="true">' + marks + '</div></div>';
     }
     function picture(title, rows, caption) {
-      return '<figure class="range-picture"><h4>' + title + '</h4>' + rows + '<div class="rp-axis" aria-hidden="true"><span>' + (axisLow * 100).toFixed(0) + '%</span><span>' + ((axisLow + 1) * 50).toFixed(0) + '%</span><span>100%</span></div><figcaption>' + caption + '</figcaption></figure>';
+      return '<figure class="range-picture"><h4>' + title + '</h4>' + rows + '<div class="rp-axis" aria-hidden="true"><span style="left:0%">' + (axisLow * 100).toFixed(0) + '%</span><span style="left:50%">' + ((axisLow + 1) * 50).toFixed(0) + '%</span><span style="left:100%">100%</span></div><figcaption>' + caption + '</figcaption></figure>';
     }
     var moves = row('The score: ' + k + ' of ' + n + ' = ' + pct(k / n), k / n, k / n, k / n);
     moves += row('Nudged toward 50%: ' + pct(centre), centre, centre, centre, k / n);
@@ -1304,9 +1310,11 @@ SCRIPT = r"""(function () {
     edges += row('Honest: ' + n + '/' + n + ', ' + pct(perfect) + ' to 100%', perfect, 1);
     var ties = row('A: ' + pct(lo) + ' to ' + pct(hi), lo, hi);
     ties += row('B (illustration): ' + pct(otherLo) + ' to ' + pct(otherHi) + ' — tie', otherLo, otherHi);
+    var first = intervals[0], last = intervals[intervals.length - 1];
+    var widthRatio = (first[3] - first[2]) / (last[3] - last[2]);
     return '<p class="rp-scale-note">Shared scale: ' + (axisLow * 100).toFixed(0) + '–100%' + (axisLow ? ' (zoomed).' : '.') + '</p>'
-      + picture('Two moves, one picture', moves, 'Few races, a bigger nudge.')
-      + picture('More races, narrower range', sizes, 'Four times the races, about half the width.')
+      + picture('Two moves, one picture', moves, 'Nudge toward 50%: ' + (Math.abs(centre - k / n) * 100).toFixed(1) + ' points.')
+      + picture('More races, narrower range', sizes, first[0] + ' to ' + last[0] + ' races: ' + widthRatio.toFixed(1) + '× narrower range.')
       + picture('Honest at the edges', edges, 'A perfect score still gets a range.')
       + picture('Overlap means a tie', ties, 'When two ranges overlap, the board calls a tie.');
   }
@@ -1590,7 +1598,10 @@ CSS = """
 .rp-arrow { position: absolute; top: 1px; height: 2px; background: var(--blue); min-width: 1px; }
 .rp-arrow::after { content: ""; position: absolute; top: -3px; width: 6px; height: 6px; border-left: 2px solid var(--blue); border-bottom: 2px solid var(--blue); transform: rotate(45deg); }
 .rp-arrow[data-direction="right"]::after { right: 0; transform: rotate(225deg); }
-.rp-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); white-space: nowrap; margin-bottom: 12px; }
+.rp-axis { position: relative; height: 16px; margin: 0 6px 12px; font-size: 11px; color: var(--muted); }
+.rp-axis span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+.rp-axis span:first-child { transform: none; }
+.rp-axis span:last-child { transform: translateX(-100%); }
 @media (min-width: 700px) { .range-pictures { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .formula {
   margin: 10px 0 !important; padding: 16px; border-radius: 14px; background: var(--tower); color: var(--tower-fg);

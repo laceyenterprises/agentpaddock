@@ -4854,6 +4854,9 @@ def test_range_pictures_have_live_numeric_alternatives_and_optional_formula():
             assert picture.count('<figure class="range-picture">') == 4
             assert f"The score: {k} of {n} = {k / n * 100:.1f}%" in picture
             assert f"Nudged toward 50%: {(low + high) * 50:.1f}%" in picture
+            nudge = abs((low + high) / 2 - k / n)
+            assert f"Nudge toward 50%: {nudge * 100:.1f} points." in picture
+            assert picture.count('class="rp-arrow"') == int(nudge >= 1e-9)
             assert (
                 f"±{(high - low) * 50:.1f} points: {low * 100:.1f}% to {high * 100:.1f}%"
                 in picture
@@ -4865,6 +4868,15 @@ def test_range_pictures_have_live_numeric_alternatives_and_optional_formula():
                 passes = int(k / n * count + 0.5)
                 a, b = lb.wilson(passes, count)
                 assert f"{passes}/{count}: {(b - a) * 100:.1f} points" in picture
+            first, last = (
+                lb.wilson(int(k / n * count + 0.5), count)
+                for count in (learn.SIZES[0], learn.SIZES[-1])
+            )
+            ratio = (first[1] - first[0]) / (last[1] - last[0])
+            assert (
+                f"{learn.SIZES[0]} to {learn.SIZES[-1]} races: "
+                f"{ratio:.1f}× narrower range." in picture
+            )
             assert "B (illustration):" in picture and "— tie" in picture
             assert 'class="rp-track" aria-hidden="true"' in picture
     page = learn.ranges_html(learn.view(_drivers())["ranges"])
@@ -4875,6 +4887,14 @@ def test_range_pictures_have_live_numeric_alternatives_and_optional_formula():
     assert re.search(r"\.hr-ticks span \{[^}]*white-space: nowrap", learn.CSS)
     assert ".hr-ticks span:first-child { transform: none; }" in learn.CSS
     assert ".hr-ticks span:last-child { transform: translateX(-100%); }" in learn.CSS
+    assert re.search(r"\.rp-axis \{[^}]*margin: 0 6px 12px", learn.CSS)
+    assert re.search(r"\.rp-axis span \{[^}]*position: absolute", learn.CSS)
+    assert re.search(r"\.rp-axis span \{[^}]*transform: translateX\(-50%\)", learn.CSS)
+    assert re.search(r"\.rp-axis span:first-child \{[^}]*transform: none", learn.CSS)
+    assert re.search(
+        r"\.rp-axis span:last-child \{[^}]*transform: translateX\(-100%\)", learn.CSS
+    )
+    assert re.findall(r'<span style="left:(\d+)%">', picture) == ["0", "50", "100"] * 4
 
 
 def test_range_pictures_update_with_passes_and_run_count_in_node():
@@ -4892,9 +4912,9 @@ const nodes = {}, chips = input.ranges.sizes.map((_, i) => ({
   getAttribute() { return String(i); },
   addEventListener(_, fn) {this.click = fn;}
 }));
-const states = [];
+const states = [], bindings = new Set();
 let context = {ranges: input.ranges, size: input.ranges.start, passes: input.ranges.k,
-  pct: x => (x * 100).toFixed(1) + '%', bind() {}, press() {},
+  pct: x => (x * 100).toFixed(1) + '%', bind(key) {bindings.add(key);}, press() {},
   all() {return chips;}, byId(id) {return nodes[id] ||= {style: {},
     addEventListener(_, fn) {this.click = fn;}};}};
 vm.createContext(context);
@@ -4910,7 +4930,7 @@ for (const chip of chips) {
   record();
   while (!nodes['hr-more'].disabled) {nodes['hr-more'].click(); record();}
 }
-console.log(JSON.stringify(states));
+console.log(JSON.stringify({states, bindings: [...bindings]}));
 """
     ranges = learn.view(_drivers())["ranges"]
     result = subprocess.run(
@@ -4920,21 +4940,36 @@ console.log(JSON.stringify(states));
         check=True,
         timeout=10,
     )
-    for state in json.loads(result.stdout):
+    output = json.loads(result.stdout)
+    targets = set(re.findall(r'data-bind="([^"]+)"', learn.ranges_html(ranges)))
+    assert set(output["bindings"]) <= targets
+    assert {"hr-k", "hr-range"} <= set(output["bindings"])
+    seen = set()
+    for state in output["states"]:
         assert state["picture"] == learn.range_pictures(state["k"], state["n"])
+        seen.add((state["k"], state["n"]))
+        if state["k"] * 2 == state["n"]:
+            assert 'class="rp-arrow"' not in state["picture"]
+    assert {(n // 2, n) for n in learn.SIZES if n % 2 == 0} <= seen
 
 
 def test_home_lights_reserve_controls_and_keep_the_foot_at_the_padding_edge():
     art = re.search(r"\.home-lights-art \{([^}]+)", site_home.CSS)[1]
     assert "margin-bottom: -" not in art
     assert "grid-row: 2" in art
-    assert (
-        ".home-go[hidden] { display: flex; visibility: hidden; animation: none; }"
-        in site_home.CSS
-    )
-    assert (
-        ".home-start[hidden] { display: block; visibility: hidden; }" in site_home.CSS
-    )
+    for selector, expected in (
+        (
+            ".home-go[hidden]",
+            {"display": "flex", "visibility": "hidden", "animation": "none"},
+        ),
+        (".home-start[hidden]", {"display": "block", "visibility": "hidden"}),
+    ):
+        block = re.search(re.escape(selector) + r"\s*\{([^}]+)", site_home.CSS)[1]
+        declarations = {
+            name: value.strip()
+            for name, value in re.findall(r"([\w-]+)\s*:\s*([^;]+)", block)
+        }
+        assert declarations.items() >= expected.items()
     assert 'data-go aria-live="polite" hidden' in site_home.hero()
     assert "data-start hidden" in site_home.hero()
 
