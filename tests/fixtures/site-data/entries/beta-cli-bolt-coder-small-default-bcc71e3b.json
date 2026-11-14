@@ -38,6 +38,8 @@
   "fuel": {
     "costPerPass": 0.0108,
     "costSource": "provider-invoice-reconciled",
+    "unpricedRuns": 0,
+    "unmeteredRuns": 0,
     "tokensPerPass": 10200.0
   },
   "medianLapSeconds": 120.5,

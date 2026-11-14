@@ -5326,8 +5326,15 @@ def test_built_engine_map_labels_have_only_default_tips(committed_pages):
             page,
             re.S,
         ):
+            # The separator dot that may lead the tag is not part of its label.
             label = html.unescape(
-                re.sub(r"<[^>]+>", "", match[0].split('<span class="map-info">')[0])
+                re.sub(
+                    r"<[^>]+>",
+                    "",
+                    match[0]
+                    .replace(site_views.DOT, "")
+                    .split('<span class="map-info">')[0],
+                )
             )
             assert not any(
                 word in label
@@ -5732,6 +5739,121 @@ def _check_pit_wall(files, site) -> None:
 def test_pit_wall_heatmap_totals_equal_standings(tmp_path, committed_pages):
     _check_pit_wall(*_data_pages(_site_tree(tmp_path)))
     _check_pit_wall(*committed_pages)
+
+
+def test_fuel_gap_says_why_there_is_no_bill():
+    gap, sentence = site_views.fuel_gap, site_views.fuel_gap_sentence
+    # Unmetered runs never recorded their tokens; unpriced ones have no price.
+    assert gap(7, 7, 50) == "7 runs unmetered" and gap(1, 1, 3) == "1 run unmetered"
+    assert gap(3, 1, 50) == "3 runs unpriced"
+    assert gap(0, 0, 0) == "no race passed" and gap(0, 0, 9) == ""
+    assert sentence(7, 7, 50, 54) == (
+        "7 of its 54 counted runs did not record their tokens, so there is no fuel bill."
+    )
+    assert sentence(3, 1, 50, 54).startswith("3 of its 54 counted runs have no per-token")
+    assert sentence(0, 0, 0, 54) == "It passed no race, so there is no fuel bill."
+
+
+def test_every_missing_fuel_bill_says_how_many_runs_lack_a_price(committed_pages):
+    files, site = committed_pages
+    standings = json.loads(files["data/standings.json"])
+    for entry in standings["entries"] + standings["partial"]:
+        # A bill exactly when every counted run is priced and some race passed.
+        unpriced, unmetered = entry["unpricedRuns"], entry["unmeteredRuns"]
+        assert 0 <= unmetered <= unpriced <= entry["n"], entry["id"]
+        assert (entry["costPerPass"] is None) == (unpriced > 0 or entry["k"] == 0)
+    wall = files["pit-wall/index.html"]
+    fuel = re.findall(r'<td class="pw-cell pw-fuel" data-usd="([^"]*)">(.*?)</td>', wall)
+    assert fuel and all(">–<" not in cell for _, cell in fuel)
+    for usd, cell in fuel:
+        if usd:
+            continue
+        # No bill: say so, say why in the cell, and the whole sentence on hover.
+        assert '<span class="pw-noprice" title="' in cell and ">no price<small>" in cell
+        assert re.search(r"<small>\d+ runs? (unmetered|unpriced)</small>", cell), cell
+        assert "so there is no fuel bill." in cell
+    # The timing tower says the same in its words.
+    tower = files["standings/index.html"]
+    assert "Not every run has a per-token price" not in tower
+    assert "counted runs did not record their tokens, so there is no fuel bill." in tower
+
+
+def test_entry_chips_and_pit_wall_meta_keep_words_and_dots_together(committed_pages):
+    files, site = committed_pages
+    entry = next(
+        name
+        for name in sorted(files)
+        if name.startswith("entries/")
+        and name.endswith(".html")
+        and name != "entries/index.html"
+    )
+    chips = _between(files[entry], '<nav class="en-chips"', "</nav>")
+    # The chip's words are one text run in one box, so "in" never splits.
+    for chip in re.findall(r"<a [^>]*>(.*?)</a>", chips):
+        assert chip.count('<span class="en-chip-who">') == 1
+        outside = re.sub(r'<span class="en-chip-who">.*</span>', "", chip)
+        assert " in " not in outside and "·" not in outside
+        assert site_views.DOT in chip
+    wall = files["pit-wall/index.html"]
+    metas = re.findall(r"<small>(.*?)</small></span></div></th>", wall, re.S)
+    assert metas
+    for meta in metas:
+        # Each dot leads its item: the map's rides in the tag, the rank's in a span.
+        assert meta.count(site_views.DOT) == 1
+        assert re.search(r'<span class="pw-place">·&nbsp;=?\d+(st|nd|rd|th)</span>$', meta)
+
+
+def test_browser_pit_wall_and_entry_chips_wrap_whole_at_phone_width(
+    committed_pages, tmp_path
+):
+    executable = os.environ.get("PADDOCK_BROWSER_EXECUTABLE")
+    if not executable:
+        pytest.skip("Local Chromium pass requires PADDOCK_BROWSER_EXECUTABLE")
+    browser_api = pytest.importorskip("playwright.sync_api")
+    files, _ = committed_pages
+    for name, content in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content.encode() if isinstance(content, str) else content)
+    entries = [
+        n
+        for n in sorted(files)
+        if n.startswith("entries/")
+        and n.endswith("/index.html")
+        and n != "entries/index.html"
+    ]
+    lines = r"""root => {
+      const tops = el => { const r = document.createRange(); r.selectNodeContents(el);
+        return new Set([...r.getClientRects()].map(x => Math.round(x.top))).size; };
+      const dotEnds = [...root.querySelectorAll('.ent-sep, .pw-place')].filter(sep => {
+        const next = sep.classList.contains('pw-place') ? sep : sep.nextElementSibling;
+        return Math.abs(sep.getBoundingClientRect().top - next.getBoundingClientRect().top) > 4;
+      }).length;
+      const words = [...root.querySelectorAll('.en-chip-who')].map(el => {
+        const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n, split = 0;
+        while ((n = w.nextNode())) { for (const word of n.textContent.split(/\s+/).filter(Boolean)) {
+          const i = n.textContent.indexOf(word); const r = document.createRange();
+          r.setStart(n, i); r.setEnd(n, i + word.length);
+          if (new Set([...r.getClientRects()].map(x => Math.round(x.top))).size > 1) split += 1; } }
+        return split; }).reduce((a, b) => a + b, 0);
+      return { dotEnds, splitRanks: [...root.querySelectorAll('.pw-place')].filter(el => tops(el) > 1).length,
+               splitWords: words };
+    }"""
+    with browser_api.sync_playwright() as api:
+        browser = api.chromium.launch(executable_path=executable)
+        try:
+            context = browser.new_context(
+                viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True
+            )
+            context.route("https://**", lambda route: route.abort())
+            page = context.new_page()
+            for name in ("pit-wall/index.html", *entries[:6]):
+                page.goto((tmp_path / name).as_uri())
+                got = page.locator("main").evaluate(lines)
+                assert got == {"dotEnds": 0, "splitRanks": 0, "splitWords": 0}, (name, got)
+            context.close()
+        finally:
+            browser.close()
 
 
 def _check_driver_pages(files, site) -> None:

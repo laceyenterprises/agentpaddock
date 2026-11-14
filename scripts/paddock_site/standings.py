@@ -434,7 +434,10 @@ def _row(
     foot = f"{row['k']} of {row['n']} races passed" + (
         f" · {bill} per race passed."
         if row["costPerPass"] is not None
-        else ". Not every run has a per-token price, so there is no fuel bill."
+        else ". "
+        + views.fuel_gap_sentence(
+            row.get("unpricedRuns", 0), row.get("unmeteredRuns", 0), row["k"], row["n"]
+        )
     )
     return (
         f'<li class="st-item" data-entry="{esc(row["id"])}" data-pass-rank="{index}" '
@@ -558,9 +561,9 @@ def _chips(
         chips.append(
             f'<a href="{root}entries/{esc(row["id"])}/index.html"{current}>'
             f'<span class="st-livery" style="--c:{livery(row["car"])}" aria-hidden="true">'
-            f"</span>{views.driver_tag(row['driver'], shown.get(row['driver']))} in "
-            f"{views.car_tag(row['car'])} · "
-            f"{views.map_tag(row['map'], row['car'], row['driver'])}{setup_note(row, clash)}</a>"
+            f'</span><span class="en-chip-who">{views.driver_tag(row["driver"], shown.get(row["driver"]))} in '
+            f"{views.car_tag(row['car'])} "
+            f"{views.map_tag(row['map'], row['car'], row['driver'], views.DOT)}{setup_note(row, clash)}</span></a>"
         )
     if not chips:
         return ""
@@ -647,7 +650,19 @@ def _hero(entry: Mapping[str, Any], name: str | None = None) -> str:
         "</div></div>"
         '<div class="en-tiles">'
         + place
-        + _tile("fuel-bill", "Fuel bill", usd(fuel), "per race passed")
+        + _tile(
+            "fuel-bill",
+            "Fuel bill",
+            usd(fuel),
+            "per race passed"
+            if fuel is not None
+            else views.fuel_gap(
+                entry["fuel"].get("unpricedRuns", 0),
+                entry["fuel"].get("unmeteredRuns", 0),
+                totals["k"],
+            )
+            or "no fuel bill",
+        )
         + _tile(
             "lap-time",
             "Median lap",
@@ -1149,6 +1164,8 @@ CSS = """
 }
 .en-chips a .st-livery { flex: none; }
 .en-chips a .st-livery { width: 5px; height: 20px; }
+/* The chip's words are one text run, so they wrap between words, never inside one. */
+.en-chips a .en-chip-who { min-width: 0; overflow-wrap: normal; }
 .en-chips a[aria-current="page"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
 .en-hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 20px; }
 .en-card {

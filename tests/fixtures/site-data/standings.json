@@ -31,6 +31,8 @@
       "tie": true,
       "costPerPass": 0.0038,
       "costSource": "published-rate",
+      "unpricedRuns": 0,
+      "unmeteredRuns": 0,
       "tokensPerPass": 5100.0,
       "trust": "paddock-run",
       "challenges": {
@@ -59,6 +61,8 @@
       "tie": true,
       "costPerPass": 0.0038,
       "costSource": "published-rate",
+      "unpricedRuns": 0,
+      "unmeteredRuns": 0,
       "tokensPerPass": 5100.0,
       "trust": "paddock-run",
       "challenges": {
@@ -87,6 +91,8 @@
       "tie": false,
       "costPerPass": 0.0108,
       "costSource": "provider-invoice-reconciled",
+      "unpricedRuns": 0,
+      "unmeteredRuns": 0,
       "tokensPerPass": 10200.0,
       "trust": "paddock-run",
       "challenges": {
@@ -115,6 +121,8 @@
       "tie": false,
       "costPerPass": null,
       "costSource": "unknown",
+      "unpricedRuns": 0,
+      "unmeteredRuns": 0,
       "tokensPerPass": null,
       "trust": "paddock-run",
       "challenges": {
@@ -145,6 +153,8 @@
       "tie": false,
       "costPerPass": null,
       "costSource": "unknown",
+      "unpricedRuns": 1,
+      "unmeteredRuns": 0,
       "tokensPerPass": null,
       "trust": "paddock-run",
       "challenges": {

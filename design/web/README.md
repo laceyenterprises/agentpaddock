@@ -345,7 +345,12 @@ featured driver pages use the same collision-disambiguated slugs everywhere.
   `--viz-seq` ramp of `design/tokens.css`. The page script adds the car filter,
   the percent-or-count switch and column sort. Clicking the active column again
   reverses its order; a newly selected column starts best-first (fuel starts
-  cheapest-first). Missing values stay last in either direction.
+  cheapest-first). Missing values stay last in either direction. An entry with
+  no fuel bill says "no price" and why, from the standings' `unpricedRuns` and
+  `unmeteredRuns`: how many counted runs carry no price, and how many of those
+  never recorded their tokens ("7 runs unmetered"). The timing tower and the
+  entry page say the same. Each dot in an entry's line leads the item after it
+  (`views.DOT` rides in the engine-map tag), so no line ends on a dot.
 - **Drivers** (`drivers.py`): a driver with at least one placed entry, so a
   complete calendar, gets `/drivers/<driver-id>/`: best entry, car-by-car bars,
   wins and slips by challenge, and cheapest against best on fuel.

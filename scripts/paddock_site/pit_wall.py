@@ -64,6 +64,8 @@ def model(site: views.SiteData) -> dict[str, Any]:
                 "place": entry["place"],
                 "tie": entry["tie"],
                 "costPerPass": entry["costPerPass"],
+                "unpricedRuns": entry.get("unpricedRuns", 0),
+                "unmeteredRuns": entry.get("unmeteredRuns", 0),
                 "cells": cells,
             }
         )
@@ -98,12 +100,25 @@ def _row(row: Mapping[str, Any], index: int, root: str) -> str:
         '<th scope="row" class="pw-entry"><div class="pw-entry-in">'
         f'<span class="pw-livery" style="--c:{views.livery(row["car"])}" aria-hidden="true"></span>'
         f'<span class="pw-who"><a href="{root}{esc(row["driverPage"])}">{views.driver_tag(row["driver"], row["driverName"])}</a>'
-        f"<small>{views.car_tag(row['car'])} · {views.map_tag(row['map'], row['car'], row['driver'])}"
-        f" · {esc(views.place(row))}</small></span></div></th>"
+        # Each dot leads the item after it, so a line never ends on a dot and the
+        # rank never sits alone.
+        f"<small>{views.car_tag(row['car'])} {views.map_tag(row['map'], row['car'], row['driver'], views.DOT)}"
+        f' <span class="pw-place">·&nbsp;{esc(views.place(row))}</span></small></span></div></th>'
         + cells
         + _cell(row["k"], row["n"], total=True)
         + f'<td class="pw-cell pw-fuel" data-usd="{"" if cost is None else cost}">'
-        f"<span>{esc('–' if cost is None else views.usd(cost))}</span></td></tr>"
+        + (f"<span>{esc(views.usd(cost))}</span>" if cost is not None else _no_bill(row))
+        + "</td></tr>"
+    )
+
+
+def _no_bill(row: Mapping[str, Any]) -> str:
+    """No fuel bill, and why: how many counted runs carry no price."""
+    gap = (row["unpricedRuns"], row["unmeteredRuns"], row["k"])
+    why = views.fuel_gap(*gap)
+    return (
+        f'<span class="pw-noprice" title="{esc(views.fuel_gap_sentence(*gap, row["n"]))}">'
+        f"no price{f'<small>{esc(why)}</small>' if why else ''}</span>"
     )
 
 
@@ -282,6 +297,9 @@ th[aria-sort="ascending"] .pw-sort, th[aria-sort="descending"] .pw-sort { backgr
   min-height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-weight: 600; white-space: nowrap; padding: 0 6px;
 }
 .pw-fuel span, .pw-none { background: var(--soft); color: var(--ink); }
+.pw-fuel .pw-noprice { flex-direction: column; gap: 1px; line-height: 1.15; color: var(--ink-2); }
+.pw-noprice small { font-size: 11px; font-weight: 500; color: var(--muted); }
+.pw-place { white-space: nowrap; }
 .pw-total { box-shadow: inset 0 0 0 2px var(--paper); outline: 1.5px solid var(--ink); outline-offset: -1.5px; }
 .b1 { background: var(--viz-seq-1); color: var(--viz-seq-ink-light); }
 .b2 { background: var(--viz-seq-2); color: var(--viz-seq-ink-light); }
