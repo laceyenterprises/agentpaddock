@@ -2450,7 +2450,7 @@ def test_races_build_one_page_per_calendar_race(tmp_path):
     assert decoy["funnel"]["runs"] == 214
     assert decoy["checkpointSubmissions"] == 218
     assert (
-        "214 counted runs with checkpoints in this view; pass rates use all 218 submissions with checkpoints."
+        "214</span> counted runs with checkpoints in this view; pass rates use all 218 submissions with checkpoints."
         in page
     )
     assert "including excluded runs" in page
@@ -2543,13 +2543,15 @@ def test_race_page_funnel_comes_from_the_data(tmp_path):
     assert "Every run shown has finished." in page
 
 
-def test_race_lap_groups_runs_not_on_the_map_by_recorded_flag(tmp_path):
+@pytest.mark.parametrize("exclusion", ["infra:agent_error", "pre-FIXGRADE-01"])
+def test_race_lap_groups_runs_not_on_the_map_by_recorded_flag(tmp_path, exclusion):
     results = _site_tree(tmp_path)
     path = results / BENCH
     document = json.loads(path.read_text())
     rows = [r for r in document["records"] if r["task"] == "hard-review-alpha"]
     # A red flag stays red even with recorded checks.
     excluded = next(r for r in rows if r["excludedBecause"])
+    excluded.update(excludedBecause=exclusion, verdict="failed")
     excluded["checks"] = _checks()
     for row, verdict in zip(rows[:3], ["no_submission", "format_failed", "failed"]):
         row.pop("checks", None)
@@ -2564,20 +2566,22 @@ def test_race_lap_groups_runs_not_on_the_map_by_recorded_flag(tmp_path):
     assert race["offMap"] == {"red": 1, "nothing": 2, "checkered": 1, "dnf": 1}
     page = files[site_races.race_file(race["id"])]
     lights = page.split('data-station="0">', 1)[1].split("</li>", 1)[0]
-    assert "Not on the map:" in lights
-    assert '<use href="#flag-red"/></svg>1 run · red flag' in lights
-    assert "infrastructure fault, raced again; not counted in the standings" in lights
+    assert "Not on the map" not in lights
+    note = re.search(r'<p class="rc-off-map">.*?</p>', page).group()
+    assert "Not on the map (all entries in this race):" in note
+    assert '<use href="#flag-red"/></svg>1 run · red flag' in note
+    assert "excluded; not counted in the standings" in note
     assert (
         '<use href="#dnf"/></svg>2 runs · DNF, handed in nothing (counted in the standings)'
-        in lights
+        in note
     )
     assert (
         '<use href="#flag-checkered"/></svg>1 run · result without checkpoints (checkered; counted in the standings)'
-        in lights
+        in note
     )
     assert (
         '<use href="#dnf"/></svg>1 run · result without checkpoints (DNF; counted in the standings)'
-        in lights
+        in note
     )
     # Zero groups do not leave empty labels or glyphs behind.
     race["offMap"] = {"red": 0, "nothing": 0, "checkered": 1, "dnf": 0}
@@ -2685,7 +2689,7 @@ def test_race_page_companion_rates_count_each_checkpoint_independently(
         assert rate["label"] in page
         assert f"{rate['rate']:.0%} pass · {rate['n']} runs" in page
     assert (
-        "13 counted runs with checkpoints in this view; pass rates use all 14 submissions with checkpoints."
+        "13</span> counted runs with checkpoints in this view; pass rates use all 14 submissions with checkpoints."
         in page
     )
     assert path.read_bytes() == original
@@ -6028,7 +6032,8 @@ def test_acceptance_assertions_reject_regressions(acceptance_sites, fault):
 
 
 @pytest.mark.parametrize(
-    "scenario", ("native", "missing-match-media", "unpaired-panel")
+    "scenario",
+    ("native", "missing-match-media", "unpaired-panel", "missing-basis", "reworded-basis"),
 )
 def test_browser_panel_startup_and_motion_changes(acceptance_sites, tmp_path, scenario):
     executable = os.environ.get("PADDOCK_BROWSER_EXECUTABLE")
@@ -6042,6 +6047,13 @@ def test_browser_panel_startup_and_motion_changes(acceptance_sites, tmp_path, sc
             '<p data-panel="cast">Unpaired panel</p><a class="home-more"',
             1,
         )
+    for name, content in _html_pages(files).items():
+        if scenario == "missing-basis":
+            files[name] = re.sub(r'<p[^>]*data-lap-basis>.*?</p>', "", content)
+        elif scenario == "reworded-basis":
+            files[name] = content.replace(
+                " counted runs with checkpoints", " eligible runs with checkpoints"
+            )
     for name, content in files.items():
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -6100,6 +6112,24 @@ def test_browser_panel_startup_and_motion_changes(acceptance_sites, tmp_path, sc
             page.goto((tmp_path / race).as_uri())
             assert not errors, errors
             assert page.locator("[data-lap-controls]").is_visible()
+            note = page.locator(".rc-off-map")
+            original_note = note.inner_text() if note.count() else None
+            page.locator('[role="radio"][data-mode="car"]').click()
+            counts = page.locator("[data-funnel]").evaluate(
+                "lap => JSON.parse(lap.dataset.funnel).find(view => view.mode === 'car')"
+            )
+            assert (
+                page.locator(".rc-station-stat").first.inner_text() == counts["stats"][0]
+            )
+            if scenario != "missing-basis":
+                assert page.locator("[data-lap-basis-count]").inner_text() == str(
+                    counts["n"]
+                )
+            if scenario == "reworded-basis":
+                assert " eligible runs" in page.locator("[data-lap-basis]").inner_text()
+            if original_note is not None:
+                assert note.inner_text() == original_note
+                assert page.locator(".rc-station-card .rc-off-map").count() == 0
             play = page.locator("[data-lap-play]")
             play.click()
             assert play.inner_text() == "Racing…"

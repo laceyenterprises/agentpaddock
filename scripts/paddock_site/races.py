@@ -435,7 +435,6 @@ def _stations(
     view: Mapping[str, Any],
     labels: Sequence[str],
     rates: Sequence[Mapping[str, Any]],
-    off_map: str = "",
 ) -> str:
     names = ["Lights out", *labels, "Checkered flag"]
     last = len(names) - 1
@@ -468,7 +467,7 @@ def _stations(
             + glyphs.icon("dnf", label="DNF")
             + f"<span data-out-count>{view['out'][k]:,} out here</span></span>"
             if k
-            else off_map
+            else ""
         )
         rows.append(
             f'<li class="{classes}" data-station="{k}">'
@@ -493,7 +492,7 @@ def _off_map(race: Mapping[str, Any]) -> str:
             "red",
             "flag-red",
             "red flag",
-            "infrastructure fault, raced again; not counted in the standings",
+            "excluded; not counted in the standings",
         ),
         ("nothing", "dnf", "DNF, handed in nothing", "counted in the standings"),
         (
@@ -510,7 +509,9 @@ def _off_map(race: Mapping[str, Any]) -> str:
         if race["offMap"][key]
     ]
     return (
-        '<span class="rc-off-map">Not on the map: ' + "; ".join(parts) + ".</span>"
+        '<p class="rc-off-map">Not on the map (all entries in this race): '
+        + "; ".join(parts)
+        + ".</p>"
         if parts
         else ""
     )
@@ -586,10 +587,11 @@ def _lap(race: Mapping[str, Any]) -> str:
         "</div>" + worst + '<div class="rc-panel" data-lap-panel aria-live="polite">'
         f"<b>{esc(view['titles'][selected])}</b><span>{esc(view['bodies'][selected])}</span></div>"
         f'<p class="rc-caption" data-lap-caption>{esc(view["caption"])}</p>'
-        f'<p class="rc-caption" data-lap-basis>{view["n"]:,} counted runs with checkpoints in this view; '
+        f'<p class="rc-caption" data-lap-basis><span data-lap-basis-count>{view["n"]:,}</span> counted runs with checkpoints in this view; '
         f"pass rates use all {race['checkpointSubmissions']:,} submissions with checkpoints.</p>"
-        "</div>"
-        + _stations(view, labels, race["checkpointRates"], _off_map(race))
+        + _off_map(race)
+        + "</div>"
+        + _stations(view, labels, race["checkpointRates"])
         + "</section>"
     )
 
@@ -1243,7 +1245,7 @@ SCRIPT = """(function () {
     var panel = lap.querySelector('[data-lap-panel]');
     var caption = lap.querySelector('[data-lap-caption]');
     var basis = lap.querySelector('[data-lap-basis]');
-    var basisSuffix = basis.textContent.slice(basis.textContent.indexOf(' counted'));
+    var basisCount = basis ? basis.querySelector('[data-lap-basis-count]') : null;
     var worstLine = lap.querySelector('[data-lap-worst]');
     var play = lap.querySelector('[data-lap-play]');
     var view = views[0];
@@ -1275,7 +1277,7 @@ SCRIPT = """(function () {
       panel.querySelector('b').textContent = view.titles[selected];
       panel.querySelector('span').textContent = view.bodies[selected];
       caption.textContent = view.caption;
-      basis.textContent = view.n.toLocaleString('en-US') + basisSuffix;
+      if (basisCount) basisCount.textContent = view.n.toLocaleString('en-US');
       var name = view.worst ? stations[view.worst].querySelector('.rc-station-name').textContent : '';
       worstLine.innerHTML = '';
       if (view.worst) {

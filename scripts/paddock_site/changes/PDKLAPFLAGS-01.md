@@ -9,4 +9,9 @@ Race JSON adds `checkpointSubmissions`, the number of submissions with
 checkpoints at that version, and `offMap`. The latter counts trusted records
 excluded with a red flag, counted no-submission or format failures without
 checks, and counted results without checks split into checkered and DNF.
-Lights out shows nonzero groups and whether they count in the standings.
+The lap's explanatory note shows nonzero groups and whether they count in the
+standings. It covers all entries in the race, independently of the selected
+car or driver, and sits outside the interactive station cards. Red flags
+mean excluded results, including infrastructure and comparability exclusions.
+View changes update only the marked count in the lap's basis text, so the
+controls also work when that optional text is absent or reworded.
