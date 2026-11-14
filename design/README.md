@@ -1,4 +1,4 @@
-[Home](../README.md) · [How it works](guide/README.md) · [Races](guide/races.md) · [Hard races](guide/hard-races.md) · [Board](guide/board.md) · [Race it yourself](guide/race-it-yourself.md) · [Under the hood](guide/the-gym.md) · [Batteries](guide/batteries.md) · **Design**
+[Home](../README.md) · [How it works](guide/README.md) · [Races](guide/races.md) · [Hard races](guide/hard-races.md) · [Board](guide/board.md) · [Race it yourself](guide/race-it-yourself.md) · [Under the hood](guide/the-gym.md) · [Batteries](guide/batteries.md) · **Design** · [Vocabulary](vocabulary.md)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="guide/assets/banner-design-dark.svg">
@@ -96,6 +96,10 @@ flags, the race and its results, rules and fairness, fuel, running the bench, an
   `--pdk-red`, `--pdk-yellow` and `--pdk-black`.
 - **Sizes:** drawn for 24 px; legible at 16, 32 and 48.
 - **Use:** inline the sprite once, then `<svg width="24" height="24"><use href="#entry"/></svg>`.
+- **In Markdown:** GitHub cannot inline the sprite, so `build_docs_art.py` also writes every glyph as a tile drawn
+  like the site's glyph box: [`guide/assets/glyphs/<id>-light.svg`](guide/assets/glyphs/) and `-dark.svg`. Embed
+  both with `<picture>` at `width="40"`, in an HTML table cell with `width="56"`: a Markdown table squeezes the image
+  otherwise. [`vocabulary.md`](vocabulary.md) shows the pattern.
 - **Build:** `python3 design/glyphs/paddock_glyphs.py` writes the sprite and `index.json` (id, group, meaning);
   `python3 design/glyphs/build_sheet.py` writes the catalogue page [`glyphs/glyphs.html`](glyphs/glyphs.html).
 
@@ -156,4 +160,4 @@ values, and the site renders these views from the committed results documents.
 
 ---
 
-← [Batteries](guide/batteries.md) · [Home](../README.md)
+← [Batteries](guide/batteries.md) · [Vocabulary](vocabulary.md) →

@@ -1,4 +1,4 @@
-[Home](../../README.md) · [How it works](README.md) · [Races](races.md) · [Hard races](hard-races.md) · [Board](board.md) · [Race it yourself](race-it-yourself.md) · [Under the hood](the-gym.md) · **Batteries** · [Design](../README.md)
+[Home](../../README.md) · [How it works](README.md) · [Races](races.md) · [Hard races](hard-races.md) · [Board](board.md) · [Race it yourself](race-it-yourself.md) · [Under the hood](the-gym.md) · **Batteries** · [Design](../README.md) · [Vocabulary](../vocabulary.md)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/banner-batteries-dark.svg">

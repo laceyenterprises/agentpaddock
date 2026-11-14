@@ -1,3 +1,5 @@
+**Home** · [How it works](design/guide/README.md) · [Races](design/guide/races.md) · [Hard races](design/guide/hard-races.md) · [Board](design/guide/board.md) · [Race it yourself](design/guide/race-it-yourself.md) · [Under the hood](design/guide/the-gym.md) · [Batteries](design/guide/batteries.md) · [Design](design/README.md) · [Vocabulary](design/vocabulary.md)
+
 <p align="center"><img alt="Agent Paddock: an open leaderboard for coding agents. Model × harness on real repository tasks, graded by a checker the agent never sees." src="scripts/social-card.png" width="720"></p>
 
 # Agent Paddock
@@ -11,8 +13,6 @@ built only from the committed `results/` tree.
 > Independent and open source (MIT). Lacey Enterprises has no partnerships with, and no financial interest in, any
 > product on the board. Questions, result challenges and feedback: [hello@agentpaddock.ai](mailto:hello@agentpaddock.ai).
 
-**Home** · [How it works](design/guide/README.md) · [Races](design/guide/races.md) · [Hard races](design/guide/hard-races.md) · [Board](design/guide/board.md) · [Race it yourself](design/guide/race-it-yourself.md) · [Under the hood](design/guide/the-gym.md) · [Batteries](design/guide/batteries.md) · [Design](design/README.md)
-
 Grok standalone cells report **unavailable**: the runner uses Linux Docker,
 while only Grok 1.0.70 darwin-arm64 has an approved lifecycle artifact. The
 committed Grok tool lock declares a surface; it does not claim an executed cell
@@ -24,12 +24,17 @@ or a zero-cost result. A reviewed Linux artifact remains a follow-up.
 <tr>
 <td width="33%" valign="top"><a href="design/guide/README.md"><picture>  <source media="(prefers-color-scheme: dark)" srcset="design/guide/assets/tile-how-it-works-dark.svg">  <img width="72" alt="How it works" src="design/guide/assets/tile-how-it-works-light.svg"></picture></a><br><a href="design/guide/README.md"><b>How it works</b></a><br>The cast, a race, the flags and the board, in pictures.</td>
 <td width="33%" valign="top"><a href="design/guide/races.md"><picture>  <source media="(prefers-color-scheme: dark)" srcset="design/guide/assets/tile-races-dark.svg">  <img width="72" alt="The races" src="design/guide/assets/tile-races-light.svg"></picture></a><br><a href="design/guide/races.md"><b>The races</b></a><br>How a race is built and graded, and every corpus.</td>
-<td width="33%" valign="top"><a href="design/guide/board.md"><picture>  <source media="(prefers-color-scheme: dark)" srcset="design/guide/assets/tile-board-dark.svg">  <img width="72" alt="The board" src="design/guide/assets/tile-board-light.svg"></picture></a><br><a href="design/guide/board.md"><b>The board</b></a><br>How the standings are made, from committed results.</td>
+<td width="33%" valign="top"><a href="design/guide/hard-races.md"><picture>  <source media="(prefers-color-scheme: dark)" srcset="design/guide/assets/tile-hard-races-dark.svg">  <img width="72" alt="Hard races" src="design/guide/assets/tile-hard-races-light.svg"></picture></a><br><a href="design/guide/hard-races.md"><b>Hard races</b></a><br>Review and fix with decoys and several targets.</td>
 </tr>
 <tr>
+<td width="33%" valign="top"><a href="design/guide/board.md"><picture>  <source media="(prefers-color-scheme: dark)" srcset="design/guide/assets/tile-board-dark.svg">  <img width="72" alt="The board" src="design/guide/assets/tile-board-light.svg"></picture></a><br><a href="design/guide/board.md"><b>The board</b></a><br>How the standings are made, from committed results.</td>
 <td width="33%" valign="top"><a href="design/guide/race-it-yourself.md"><picture>  <source media="(prefers-color-scheme: dark)" srcset="design/guide/assets/tile-race-it-yourself-dark.svg">  <img width="72" alt="Race it yourself" src="design/guide/assets/tile-race-it-yourself-light.svg"></picture></a><br><a href="design/guide/race-it-yourself.md"><b>Race it yourself</b></a><br>Run the bench on your machine and send a run bundle.</td>
-<td width="33%" valign="top"><a href="design/guide/the-gym.md"><picture>  <source media="(prefers-color-scheme: dark)" srcset="design/guide/assets/tile-the-gym-dark.svg">  <img width="72" alt="Under the hood" src="design/guide/assets/tile-the-gym-light.svg"></picture></a><br><a href="design/guide/the-gym.md"><b>Under the hood</b></a><br>The gym, scheduled runs, locks and the batteries.</td>
-<td width="33%" valign="top"><a href="design/README.md"><picture>  <source media="(prefers-color-scheme: dark)" srcset="design/guide/assets/tile-design-dark.svg">  <img width="72" alt="Design" src="design/guide/assets/tile-design-light.svg"></picture></a><br><a href="design/README.md"><b>Design</b></a><br>Colour, type, the glyph set and the wording rules.</td>
+<td width="33%" valign="top"><a href="design/guide/the-gym.md"><picture>  <source media="(prefers-color-scheme: dark)" srcset="design/guide/assets/tile-the-gym-dark.svg">  <img width="72" alt="Under the hood" src="design/guide/assets/tile-the-gym-light.svg"></picture></a><br><a href="design/guide/the-gym.md"><b>Under the hood</b></a><br>The gym, scheduled runs, tool-surface locks and compression.</td>
+</tr>
+<tr>
+<td width="33%" valign="top"><a href="design/guide/batteries.md"><picture>  <source media="(prefers-color-scheme: dark)" srcset="design/guide/assets/tile-batteries-dark.svg">  <img width="72" alt="Batteries" src="design/guide/assets/tile-batteries-light.svg"></picture></a><br><a href="design/guide/batteries.md"><b>Batteries</b></a><br>Efficiency batteries, matrix reports and the fix audit.</td>
+<td width="33%" valign="top"><a href="design/README.md"><picture>  <source media="(prefers-color-scheme: dark)" srcset="design/guide/assets/tile-design-dark.svg">  <img width="72" alt="Design" src="design/guide/assets/tile-design-light.svg"></picture></a><br><a href="design/README.md"><b>Design</b></a><br>Colour, type, the glyph set and the pictures.</td>
+<td width="33%" valign="top"><a href="design/vocabulary.md"><picture>  <source media="(prefers-color-scheme: dark)" srcset="design/guide/assets/tile-vocabulary-dark.svg">  <img width="72" alt="Vocabulary" src="design/guide/assets/tile-vocabulary-light.svg"></picture></a><br><a href="design/vocabulary.md"><b>Vocabulary</b></a><br>Racing words, agent meanings, each with its glyph.</td>
 </tr>
 </table>
 
@@ -58,7 +63,8 @@ the CI budget and the publication rules every change follows.
 - [Race it yourself](design/guide/race-it-yourself.md): runners, host services, the layout and the tests.
 - [Under the hood](design/guide/the-gym.md): the gym, the out-of-band idea, scheduled runs, tool-surface locks, compression, and what the module promises.
 - [Batteries](design/guide/batteries.md): model efficiency batteries, matrix reports, interrupted runs and the fix audit.
-- [Design](design/README.md): the design system, the glyph set and the vocabulary.
+- [Design](design/README.md): the design system and the glyph set.
+- [Vocabulary](design/vocabulary.md): every racing word, what it means on the bench, and its glyph.
 - [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md): how to contribute, and the rules every change follows.
 
 ## State machines
