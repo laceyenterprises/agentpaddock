@@ -159,6 +159,14 @@
       "excludes": null,
       "summary": "Early gym versions did not record a task's version. Such runs are version 1 when they ran before the first version change (2026-10-10) or when the task never changed; the few that cannot be placed are not imported.",
       "boundary": "Results from the per-attempt export carry measured tokens and wall time; earlier imports keep null tokens."
+    },
+    {
+      "id": "PDKLEGACYTOKENS-01",
+      "date": "2026-11-14",
+      "kind": "pricing",
+      "excludes": null,
+      "summary": "The earliest documents' token counts are filled from the per-run export's measurements: the model proxy's spend log by per-run key, or the harness's own usage record. The earliest documents are priced at the 2026-10-25 table.",
+      "boundary": "No verdict, score, exclusion or place changes. Every rate shared with the 2026-10-10 table is unchanged, and runs nobody measured stay unmeasured."
     }
   ],
   "schema": "paddock-changelog/v1"

@@ -43,7 +43,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
-import json
 import re
 import struct
 import sys
@@ -54,7 +53,19 @@ from typing import Any, Callable, Mapping, Sequence
 import leaderboard as lb
 
 from paddock_site import data as site_data
-from paddock_site import community, contact, dictionary, garage, kit, layout, learn, pit_lane, pit_wall, placeholder, views
+from paddock_site import (
+    community,
+    contact,
+    dictionary,
+    garage,
+    kit,
+    layout,
+    learn,
+    pit_lane,
+    pit_wall,
+    placeholder,
+    views,
+)
 from paddock_site import drivers as site_drivers
 from paddock_site import races as race_pages
 from paddock_site import rulebook
@@ -957,8 +968,9 @@ defaults. Current runner code does not establish how an imported run executed.</
 <tbody>{configs}</tbody></table></div>
 <h3>Sources</h3>
 <p>The first results were imported from the eval bench that preceded Agent Paddock, keeping each
-source's exclusions. Those rows carry no token or wall-time measurements and no harness
-version, so their tokens and cost read "not measured" and "unknown". Published aggregates with
+source's exclusions. Their token counts come from the per-run export where the bench measured
+them; runs without measurements still read "not measured" and "unknown" for tokens and cost.
+Wall times and harness versions remain unrecorded. Published aggregates with
 no per-attempt rows are not imported: only rows can be recomputed.</p>
 <div class="scroll"><table><thead><tr><th>file</th><th>kind</th><th class="num">rows</th>
 <th>source</th></tr></thead><tbody>{sources}</tbody></table></div>
@@ -1090,6 +1102,7 @@ DATA_PAGES = {
 DATA_CSS = views.CSS + garage.CSS + pit_wall.CSS + site_drivers.CSS
 DATA_SCRIPT = views.SCRIPT + garage.SCRIPT + pit_wall.SCRIPT + site_drivers.SCRIPT
 
+
 #: Every page the site builds, in nav order. Today's board pages are built by
 #: the functions above; a page ticket adds its builder here (which also keeps
 #: its merge inside the pages workflow's ``scripts/build_site.py`` path filter).
@@ -1100,6 +1113,7 @@ def _site_page(module: Any) -> site_routes.Builder:
 
 def _from_data_page(path: str, page: Any) -> site_routes.Builder:
     """Adapt a data-page bundle to the registry's single-page interface."""
+
     def render(build: site_routes.Build) -> str:
         route = next(route for route in build.routes if route.path == path)
         return page(views.SiteData(build.data), route, build.routes)[route.file]
@@ -1157,7 +1171,9 @@ def build(
             files.update(DATA_PAGES[route.path](parsed_data, route, ROUTES))
         else:
             files[route.file] = (
-                route.builder(inputs) if route.builder else placeholder.page(route, ROUTES)
+                route.builder(inputs)
+                if route.builder
+                else placeholder.page(route, ROUTES)
             )
     # One page per calendar race (PDW-06) and per standings entry (PDW-07).
     files.update(race_pages.race_pages(site, ROUTES))
@@ -1165,9 +1181,19 @@ def build(
     files.update(
         {
             "paddock.css": layout.stylesheet(
-                STYLE + race_pages.CSS + standings_pages.CSS + kit.CSS + learn.CSS + DATA_CSS + home.CSS
+                STYLE
+                + race_pages.CSS
+                + standings_pages.CSS
+                + kit.CSS
+                + learn.CSS
+                + DATA_CSS
+                + home.CSS
             ),
-            SCRIPT_NAME: layout.SCRIPT + race_pages.SCRIPT + kit.SCRIPT + DATA_SCRIPT + home.SCRIPT,
+            SCRIPT_NAME: layout.SCRIPT
+            + race_pages.SCRIPT
+            + kit.SCRIPT
+            + DATA_SCRIPT
+            + home.SCRIPT,
             standings_pages.SCRIPT_NAME: standings_pages.SCRIPT,
             learn.SCRIPT_FILE: learn.SCRIPT,
             "favicon.svg": FAVICON,
