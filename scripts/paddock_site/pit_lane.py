@@ -4,9 +4,10 @@ Six steps from the README and CONTRIBUTING.md. Every command on the page is
 read at build time from the fenced code block it restates (:data:`COMMANDS`):
 clone and install from the README's quick start, the standalone config from
 the README's runner section (``design/guide/race-it-yourself.md``), and the
-``gym.cli run``, ``leaderboard.py from-run`` and validate commands from the
-run-bundle section of CONTRIBUTING.md. A moved or deleted block fails the
-build instead of shipping a stale command.
+``gym.cli run`` command from the run-bundle section of CONTRIBUTING.md. The
+conversion and validation commands are linked there instead of repeated on the
+page. A moved or deleted quoted block fails the build instead of shipping a
+stale command.
 
 Each code box has a copy button that falls back to "Select and copy". With the
 script, the steps show one at a time and a tap on the card advances, except
@@ -128,9 +129,8 @@ STEPS: tuple[Step, ...] = (
         "car",
         "Build your car",
         "Your car is a Docker image with your harness's command-line tool inside: Claude "
-        "Code, Codex, OpenCode or Pi. The runner never downloads one for you: it starts "
-        "the image with <code>--pull=never</code>, so the image must already be on your "
-        "machine.",
+        "Code, Codex, OpenCode or Pi. Build it first: the runner never pulls an image "
+        "(<code>--pull=never</code>).",
         (),
         "Antigravity is not in the standalone runner yet.",
         Command("design/guide/race-it-yourself.md", "## Runners (PDK-01)", 0),
@@ -156,21 +156,15 @@ STEPS: tuple[Step, ...] = (
     Step(
         "flag-checkered",
         "Hand in your results",
-        "Describe your car in <code>harness-config.json</code>, turn the run into one "
-        "results file, check it, then open a pull request that adds it. That pull request "
-        "is your run bundle: enough for anyone to reproduce the race. Two results with the "
-        "same car description pool on the board; any difference splits them. Never commit "
-        "the raw <code>run.json</code>: its grading reasons can reveal task answers.",
-        ("from-run", "validate"),
+        "Describe your car in <code>harness-config.json</code>, turn the run into one results file, check it, then open a pull request that adds it. That pull request is your run bundle: enough for anyone to reproduce the race. Never commit the raw <code>run.json</code>: its grading reasons can reveal task answers.",
+        (),
         "The standalone runner does not count tokens yet, so your fuel bill shows as "
         "unknown for now.",
     ),
     Step(
         "scrutineering",
         "Earn your badge",
-        "Every result shows how far it has been checked. The community board shows them "
-        "all. The main standings count only results that were reproduced or that Agent "
-        "Paddock ran itself.",
+        "Every result shows how far it has been checked; the main standings count only Reproduced and Paddock run.",
         (),
         "Soon: hand results in straight from the command line with a signing key.",
         Command("CONTRIBUTING.md", "## Trust levels", 0),
@@ -178,26 +172,18 @@ STEPS: tuple[Step, ...] = (
 )
 
 
-def _from(source: Command) -> str:
-    section = source.section.lstrip("#").strip()
-    return (
-        f'<p class="from">From <a href="{esc(source.href)}">'
-        f"{esc(source.document)} · {esc(section)}</a></p>"
-    )
-
-
 def _step(number: int, step: Step, root: Path) -> str:
     total = len(STEPS)
     boxes = ""
-    sources: dict[str, Command] = {}
     for name in step.commands:
         source = COMMANDS[name]
         boxes += kit.code_box(command(source, root), f"Step {number}: {step.title}")
-        sources.setdefault(source.href, source)
-    if step.source is not None:
-        sources.setdefault(step.source.href, step.source)
     extra = kit.ladder() if step.glyph == "scrutineering" else ""
-    hint = "Tap to start over" if number == total else "Tap the card for the next step"
+    if step.glyph == "flag-checkered":
+        extra = (
+            f'<p><a href="{layout.REPO_URL}/blob/main/CONTRIBUTING.md#submit-results-a-run-bundle">'
+            "Convert and check your run bundle</a></p>"
+        )
     button = "Start over" if number == total else "Next step"
     return (
         f'<li class="step" id="step-{number}" aria-label="Step {number} of {total}">'
@@ -208,8 +194,7 @@ def _step(number: int, step: Step, root: Path) -> str:
         + boxes
         + extra
         + f'<p class="notice"><b>Notice:</b> {esc(step.notice)}</p>'
-        + "".join(_from(source) for source in sources.values())
-        + f'<div class="step-foot"><span class="hint">{hint}</span>'
+        + '<div class="step-foot">'
         f'<button type="button" class="btn ghost sm next">{button}</button></div>'
         "</li>"
     )
@@ -237,8 +222,8 @@ def body(route: Route, root: Path = REPO_ROOT) -> str:
         '<section aria-labelledby="garage-title"><h2 id="garage-title">What you need in the garage.</h2>'
         '<div class="garage"><span>Python 3.11 or newer</span><span>Docker</span>'
         "<span>A harness in an image</span><span>Your own model key</span></div>"
-        f'<p class="aside">{glyphs.icon("fence")}<span>Paid races never run in the '
-        "repository's own checks. Your runs spend your tokens, nobody else's.</span></p>"
+        f'<p class="aside">{glyphs.icon("fence")}<span>Your runs spend your own tokens; '
+        "the repository's checks never run paid races.</span></p>"
         "</section>"
         '<section class="link-cards">'
         + kit.link_card(f"{up}races/index.html", "First", "Pick a race to start with")

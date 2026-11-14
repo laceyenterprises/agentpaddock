@@ -184,7 +184,9 @@ def model(site: views.SiteData) -> dict[str, Any]:
                     f"{views.map_label(best['map'], best['car'], driver)} ({best['k']} of {best['n']}). "
                     "The car changes the result more than people expect."
                     if best
-                    else f"{name} has no checked result yet; its runs wait on the community board."
+                    and len({e["car"] for e in site.placed if e["driver"] == driver})
+                    >= 2
+                    else ""
                 ),
             }
         )
@@ -342,20 +344,17 @@ def _result(view: Mapping[str, Any], pick: Sequence[str], root: str) -> str:
         f'<b data-slot="place">{esc(entry["place"] if entry else "")}</b>'
         f'<small data-slot="placeNote">{esc(entry["placeNote"] if entry else "")}</small></div></div>'
         f'<p class="gr-setups" data-slot="setups"{hidden(setups > 1)}>'
-        f"Raced in {setups} setups of this car; this is the best of them.</p>"
+        f"Raced in {setups} setups of this car; this is the best.</p>"
         f'<a class="btn ghost" data-slot="driverPage" href="{root}{esc(chosen["page"] or "")}"'
         f"{hidden(bool(chosen['page']))}>See this driver in every car</a></div>"
         f'<div class="gr-unverified" data-state="unverified"{hidden(bool(trust))}>'
         + glyphs.icon("flag-yellow")
-        + '<p><b>Raced, not yet checked.</b> This entry has a <span data-slot="trust">'
-        f"{esc(trust or '')}</span> result. It shows on the community board until it is "
-        f'checked. <a href="{root}{COMMUNITY}">See the community board</a></p></div>'
+        + "<p><b>Raced, not yet checked:</b> it shows on the community board until it is. "
+        f'<a href="{root}{COMMUNITY}">See the community board</a></p></div>'
         f'<div class="gr-unraced" data-state="unraced"{hidden(not entry and not trust)}>'
-        '<span class="gr-unraced-title">Nobody has raced this yet.</span>'
-        "<p>That is a gap on the grid. Race it from your own fork and it shows up here, "
-        "with a badge saying how far it has been checked.</p>"
+        '<span class="gr-unraced-title">Nobody has raced this yet.</span><p>Race it from your fork and it shows up here, badged by how far it has been checked.</p>'
         f'<a class="btn solid" href="{root}{RACE_IT_YOURSELF}">Race it yourself</a></div>'
-        f'<p class="gr-tip"><b>Did you know?</b> <span data-slot="tip">{esc(chosen["tip"])}</span></p>'
+        f'<p class="gr-tip"{hidden(bool(chosen["tip"]))}><b>Did you know?</b> <span data-slot="tip">{esc(chosen["tip"])}</span></p>'
         "</section>"
     )
 
@@ -364,10 +363,8 @@ def body(site: views.SiteData, current: str) -> str:
     view = model(site)
     root = layout.up(current)
     calendar = view["calendar"]
-    lede = "Put a driver in a car and set the engine map." + (
-        f" See how that entry really did across all {views.plural(calendar, 'race')}."
-        if calendar
-        else ""
+    lede = "Put a driver in a car, set the engine map, and see how it did" + (
+        f" across all {views.plural(calendar, 'race')}." if calendar else "."
     )
     hero = views.hero("entry", "Build an entry.", lede)
     if not view["live"]:
@@ -437,7 +434,7 @@ CSS = """
 .gr-title > span { color: var(--ink-2); }
 .gr-title .ent { color: var(--ink); }
 .gr-raced, .gr-unraced { display: grid; gap: 14px; }
-.gr-raced[hidden], .gr-unraced[hidden], .gr-unverified[hidden], .gr-setups[hidden], .gr-raced .btn[hidden] { display: none; }
+.gr-tip[hidden], .gr-raced[hidden], .gr-unraced[hidden], .gr-unverified[hidden], .gr-setups[hidden], .gr-raced .btn[hidden] { display: none; }
 .gr-score { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
 .gr-pct { font: 700 80px/.9 var(--display); font-variant-numeric: tabular-nums; }
 .gr-score > span:last-child { color: var(--ink-2); }
@@ -541,12 +538,12 @@ SCRIPT = """(function () {
       ['pct', 'passOf', 'usd', 'place', 'placeNote'].forEach(function (k) { slot(k).textContent = entry[k]; });
       var setups = slot('setups');
       setups.hidden = entry.setups < 2;
-      setups.textContent = 'Raced in ' + entry.setups + ' setups of this car; this is the best of them.';
+      setups.textContent = 'Raced in ' + entry.setups + ' setups of this car; this is the best.';
       var link = slot('driverPage');
       link.hidden = !d.page;
       if (d.page) link.setAttribute('href', data.root + d.page);
     }
-    if (trust) slot('trust').textContent = trust;
+    garage.querySelector('.gr-tip').hidden = !d.tip;
     var tips = [d.tip].concat(data.tips);
     slot('tip').textContent = tips[turns % tips.length];
     if (moved) {

@@ -232,10 +232,7 @@ def results_note(root: str, races: int) -> str:
         '<section class="st-note" data-pdk="results-note">'
         + glyphs.icon("rulebook", "st-note-glyph")
         + '<div class="st-note-body"><h2 class="st-note-title">How to read these results</h2>'
-        f"<p>These are AI-run benchmarks: AI agents race {calendar}, and the same "
-        "automated checks grade every run. The board shows how each entry did on these "
-        "races. It is not a comprehensive ranking, and different tasks or settings can "
-        "give a different order.</p>"
+        f"<p>{views.RESULTS_NOTE.format(calendar=calendar)}</p>"
         '<p class="st-note-links">'
         f'<a href="{root}contact/index.html">Independent and open source: about the paddock</a>'
         f'<a href="{root}rulebook/index.html">Read the method</a></p></div></section>'
@@ -296,12 +293,9 @@ def _scope(root: str, standings: Mapping[str, Any], races: Mapping[str, Any]) ->
     return (
         '<section class="st-scope">'
         f'<p class="st-scope-head">{glyphs.icon("race-calendar", "st-panel-glyph")}'
-        f"<span><b>These standings cover all {total} races</b>, every challenge on the "
-        "calendar, not one race.</span></p>"
-        f'<ul class="st-chips" aria-label="Races per challenge">{chips}</ul>'
-        f"<p>An entry's score is how many of the {total} it passed, counting its first "
-        f'run of each. For one race on its own, <a href="{root}races/index.html">pick it '
-        "from the calendar</a>: each race has its own result.</p></section>"
+        f"<span>An entry's score is how many of all {total} races it passed, "
+        "counting its first run of each.</span></p>"
+        f'<ul class="st-chips" aria-label="Races per challenge">{chips}</ul></section>'
     )
 
 
@@ -321,26 +315,18 @@ def _controls() -> str:
 
 def _explainer(root: str, entries: Sequence[Mapping[str, Any]], total: int) -> str:
     lead = entries[0]
-    leaders = [row for row in entries if row["place"] == 1]
     lo, hi = scale_pos(lead["lo"]), scale_pos(lead["hi"])
     dot = scale_pos(lead["rate"])
     example = (
         f"Example: {lead['k']} of {lead['n']} is {pct(lead['rate'])}, "
         f"honest range {pct(lead['lo'])} to {pct(lead['hi'])}"
     )
-    why = (
-        f" That is why the top {NUMBER_WORDS.get(len(leaders), len(leaders))} share first place."
-        if len(leaders) > 1
-        else ""
-    )
     return (
         '<section class="st-explainer st-pass-only st-ranges-only">'
         f'<h2 class="st-panel-head">{glyphs.icon("whisker", "st-panel-glyph")}'
         "What an honest range is</h2>"
-        f"<p>{total} races is a small sample. Run the calendar again and an entry that "
-        f"passed {lead['k']} might pass a few more or a few fewer. The grey bar is where "
-        "its true pass rate most likely sits: we are 95% sure it is inside. The dot is "
-        "the score it actually got.</p>"
+        f"<p>{total} races is a small sample. The dot is the score an entry got; "
+        "the grey bar is where its true pass rate sits, with 95% confidence.</p>"
         f'<div class="st-example" role="img" aria-label="{esc(example)}">'
         f'<span class="st-example-labels st-example-top"><span style="left:{css_pct(dot)}">'
         f"<b>{pct(lead['rate'])}</b></span></span>"
@@ -350,9 +336,8 @@ def _explainer(root: str, entries: Sequence[Mapping[str, Any]], total: int) -> s
         '<span class="st-example-labels">'
         f'<span style="left:{css_pct(lo)}">{pct(lead["lo"])}</span>'
         f'<span class="st-end" style="left:{css_pct(hi)}">{pct(lead["hi"])}</span>'
-        "</span></div>"
-        "<p><b>When two bars overlap, the board cannot tell those entries apart.</b>"
-        f"{why}</p>"
+        "</span></div><p><b>When two bars overlap, the board cannot tell those entries apart and calls a tie.</b>"
+        "</p>"
         f'<a class="st-more" href="{root}learn/index.html">How the range is worked out, '
         "step by step</a></section>"
     )
@@ -366,8 +351,8 @@ def _callouts(
     if len(leaders) > 1:
         count = NUMBER_WORDS.get(len(leaders), str(len(leaders)))
         verdict = (
-            f"<b>Photo finish.</b> The top {count} share {lead['k']} of {lead['n']}, "
-            "and their honest ranges overlap. The board calls it a tie."
+            f"<b>Photo finish:</b> the top {count} share {lead['k']} of {lead['n']}, "
+            "and their ranges overlap."
         )
     else:
         verdict = (
@@ -510,7 +495,7 @@ def board(root: str, standings: Mapping[str, Any], races: Mapping[str, Any]) -> 
             if partial
             else ""
         )
-        + ". First result per race, so a lucky rerun cannot lift a score. "
+        + ". "
         f'<a href="{root}pit-wall/index.html">Compare them all on the pit wall</a>, or '
         f'<a href="{root}drivers/index.html">follow one driver across every car</a>.</p>'
         "</div>"
@@ -524,7 +509,7 @@ def standings_body(
     total = standings["basis"]["calendarRaces"]
     hero = (
         '<section class="st-hero">'
-        + _eyebrow("timing-tower", "Standings · the full calendar")
+        + _eyebrow("timing-tower", "Standings")
         + "<h1>The timing tower.</h1>"
         '<p class="st-lede">Each entry is one driver in one car at one engine map. Tap a '
         "row to see where it wins and where it slips.</p></section>"
@@ -735,7 +720,7 @@ def season(entry: Mapping[str, Any], races: Mapping[str, Any]) -> str:
     missing = len(calendar) - len(mine)
     if fails:
         title = f"It dropped {plural(len(fails), 'race')}"
-        line = ", ".join(fails) + ". Tap any flag for its lap and fuel."
+        line = ", ".join(fails) + "."
     elif missing:
         title = (
             f"Passed all {plural(len(mine), 'race')} run"

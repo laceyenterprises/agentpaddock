@@ -107,7 +107,11 @@ def _row(row: Mapping[str, Any], index: int, root: str) -> str:
         + cells
         + _cell(row["k"], row["n"], total=True)
         + f'<td class="pw-cell pw-fuel" data-usd="{"" if cost is None else cost}">'
-        + (f"<span>{esc(views.usd(cost))}</span>" if cost is not None else _no_bill(row))
+        + (
+            f"<span>{esc(views.usd(cost))}</span>"
+            if cost is not None
+            else _no_bill(row)
+        )
         + "</td></tr>"
     )
 
@@ -222,7 +226,7 @@ def body(site: views.SiteData, current: str) -> str:
         )
     rows = "".join(_row(row, index, root) for index, row in enumerate(view["rows"]))
     partial = (
-        f" · {views.plural(view['partial'], 'more entry', 'more entries')} raced part "
+        f"; {views.plural(view['partial'], 'more entry', 'more entries')} raced part "
         f'of the calendar (<a href="{root}standings/index.html">standings</a>)'
         if view["partial"]
         else ""
@@ -240,8 +244,7 @@ def body(site: views.SiteData, current: str) -> str:
         + f"<tbody>{rows}</tbody></table></div></div>"
         '<p class="scroll-cue pw-cue">Scroll sideways for every challenge</p>'
         + _legend()
-        + f'<p class="footnote">Each entry\'s first counted result on each race · '
-        f"{views.plural(len(view['rows']), 'placed entry', 'placed entries')}{partial}. "
+        + f'<p class="footnote">Each entry\'s first counted result on each race{partial}. '
         "Fuel bill is dollars per race passed, failed runs included.</p></div>"
     )
 

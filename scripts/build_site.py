@@ -791,7 +791,7 @@ def changelog_page(results: lb.Results) -> str:
         )
         rows.append(
             f'<tr id="{esc(entry["id"])}"><td>{esc(entry["date"])}</td>'
-            f"<td><strong>{esc(entry['id'])}</strong><br>"
+            f"<td><strong>{esc('Task publication update' if re.fullmatch(r'PD[KW]-[0-9]+', entry['id']) else entry['id'])}</strong><br>"
             f'<span class="note">{esc(entry["kind"])}</span></td>'
             f"<td>{esc(entry['summary'])}</td><td>{esc(entry['boundary'])}</td>"
             f"<td>{excluded}</td></tr>"
@@ -975,10 +975,8 @@ no per-attempt rows are not imported: only rows can be recomputed.</p>
 <div class="scroll"><table><thead><tr><th>file</th><th>kind</th><th class="num">rows</th>
 <th>source</th></tr></thead><tbody>{sources}</tbody></table></div>
 <h3>Reproduce this site</h3>
-<pre><code>git clone {REPO_URL}
-cd agentpaddock
-python3 scripts/leaderboard.py validate
-python3 scripts/build_site.py</code></pre>
+<p><a href="{REPO_URL}/blob/main/design/guide/board.md">Build and view the site</a>
+using the repository's instructions.</p>
 <p>To submit results or a vendor correction, see
 <a href="{REPO_URL}/blob/main/CONTRIBUTING.md">CONTRIBUTING</a>.</p>
 """

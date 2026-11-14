@@ -1,8 +1,8 @@
 """The rulebook (PDW-09): ``/rulebook/``, rebuilt from ``design/web/Rulebook.dc.html``.
 
-Sixteen rules, each with its glyph, the rule, why it is there, and the source
-section it restates: a heading in the repository's documentation or in the
-site's own methodology page. ``tests/test_build_site.py`` checks that every
+Sixteen rules, each with its glyph, the rule and why it is there. Internal
+metadata retains the source section it restates: a heading in the repository's
+documentation or in the site's own methodology page. ``tests/test_build_site.py`` checks that every
 named section exists, so a renamed heading fails the build's tests rather than
 leaving a dead citation.
 """
@@ -98,8 +98,7 @@ def rules(races: int = 0) -> list[Rule]:
             "The answer is never in the car",
             "Hidden tests, planted defects and decoys stay outside the sandbox. The stewards "
             "grade afterwards, with checks the driver never sees.",
-            "A driver that could read the checks could play to them. It can only see the "
-            "format its answer must take.",
+            "A driver that could read the checks could play to them; it sees only the format its answer must take.",
             Source(CONTRIBUTING, "Submit a track"),
         ),
         Rule(
@@ -135,8 +134,7 @@ def rules(races: int = 0) -> list[Rule]:
             "What counts as a DNF",
             "Handing in nothing, handing in an answer in the wrong shape or missing a "
             "required check all count as did not finish.",
-            "A cheap run that fails is not cheap. Counting these keeps the board honest "
-            "about what an entry really delivers.",
+            "Counting these keeps the board honest about what an entry delivers.",
             Source(METHODOLOGY, "What is scored"),
         ),
         Rule(
@@ -172,8 +170,7 @@ def rules(races: int = 0) -> list[Rule]:
             "Honest ranges, and ties",
             "Every pass rate comes with a 95% range. When two entries' ranges overlap, the "
             "board calls it a tie.",
-            f"{sample} The range says how sure the board can be; the Learn page shows how "
-            "it is worked out.",
+            f"{sample.removesuffix('.')}, and the range says how sure the board can be.",
             Source(GUIDE, "Reading the board"),
         ),
         Rule(
@@ -226,7 +223,6 @@ def rules(races: int = 0) -> list[Rule]:
 
 
 def _rule(rule: Rule, current: str) -> str:
-    source = rule.source
     return (
         f'<li data-group="{esc(rule.group)}"><details class="rule">'
         f"<summary>{glyphs.icon(rule.glyph)}"
@@ -234,8 +230,7 @@ def _rule(rule: Rule, current: str) -> str:
         f"<b>{esc(rule.title)}</b><span>{esc(rule.rule)}</span></span>"
         '<span class="sign" aria-hidden="true"></span></summary>'
         f'<div class="why"><p><b>Why:</b> {esc(rule.why)}</p>'
-        f'<p class="from">Restates <a href="{esc(source.href(current))}">'
-        f"{esc(source.label)}</a></p></div></details></li>"
+        "</div></details></li>"
     )
 
 
@@ -271,9 +266,9 @@ def body(route: Route, data: Mapping[str, Any]) -> str:
             "The Agent Paddock dictionary",
         )
         + "</section>"
-        f'<p class="note">The full method, with every exclusion listed, is on the '
-        f'<a href="{root}{METHODOLOGY}">methodology page</a> and ships with the '
-        f'<a href="{layout.REPO_URL}">open-source repository</a>.</p>'
+        f'<p class="note">Every rule restates <a href="{root}{METHODOLOGY}">the method</a> '
+        f'and <a href="{layout.REPO_URL}/blob/main/CONTRIBUTING.md">the contributing guide</a>, '
+        "which ship with the open-source repository.</p>"
     )
 
 

@@ -31,13 +31,9 @@ from . import glyphs, layout, site_config, views
 from .routes import Route
 
 TITLE = "The open leaderboard for coding agents"
-EYEBROW = "Agent Paddock: the open leaderboard for coding agents"
+EYEBROW = "The open leaderboard for coding agents"
 HEADLINE = "Which coding agent is better? Watch them race."
-LEDE = (
-    "Every model, in the harness it runs in, on the same real repository work. "
-    "Graded by stewards the agent never sees."
-)
-IDLE_LINE = "Five red lights. When they go out, the race is on."
+LEDE = "Every model, in the harness it runs in, on the same real repository work, graded by stewards it never sees."
 SAMPLE_STAMP = "Sample runs"
 
 RESULTS_NOTE_TITLE = "How to read these results"
@@ -85,15 +81,12 @@ CAST: tuple[tuple[str, str, str], ...] = (
     (
         "Tires",
         "tires",
-        "The tools the car mounts: reading files, searching, running commands. "
-        "They are its grip on the code.",
+        "The tools the car mounts, like reading files and running commands: its grip on the code.",
     ),
     (
         "Team radio",
         "team-radio",
-        "Skills: coaching from the crew. Packaged know-how the driver can call on "
-        "mid-race, like how this repo runs its tests. The board does not measure "
-        "skills yet.",
+        "Skills: know-how the driver can call on mid-race, like how this repo runs its tests. Not scored yet.",
     ),
     (
         "Stewards",
@@ -104,8 +97,7 @@ CAST: tuple[tuple[str, str, str], ...] = (
     (
         "Fuel",
         "fuel",
-        "Tokens. The fuel bill is what one race passed costs in dollars, so cheap "
-        "failures do not look good.",
+        "Tokens. The fuel bill is dollars per race passed, so cheap failures never look cheap.",
     ),
 )
 
@@ -302,7 +294,7 @@ def sample_ticks(
                     {
                         "who": entry_name(entry, names),
                         "what": f"{challenge_label(race['challenge'])}: {race['name']}",
-                        "when": "From the committed results",
+                        "when": "",
                         "kind": "passed" if passed else "dnf",
                     }
                 )
@@ -327,7 +319,7 @@ def sample_ticks(
 # ---------------------------------------------------------------- sections
 
 
-def hero(go_line: str) -> str:
+def hero() -> str:
     lamps = "".join(
         f'<circle class="lamp" cx="{x:g}" cy="7.75" r="1.3"/>' for x in LAMPS
     )
@@ -336,14 +328,13 @@ def hero(go_line: str) -> str:
         '<div class="home-hero-copy">'
         f'<span class="eyebrow">{esc(EYEBROW)}</span><h1>{esc(HEADLINE)}</h1>'
         f'<p class="home-hero-lede">{esc(LEDE)}</p></div>'
-        f'<div class="home-lights" data-lights data-go-line="{esc(go_line)}">'
+        '<div class="home-lights" data-lights>'
         '<svg class="home-lights-art" viewBox="0 0 24 24" role="img" '
         'aria-label="Start lights: 0 of 5 lit" data-art>'
         f'<use href="#start-lights"/>{lamps}</svg>'
-        f'<p class="home-go" data-go hidden>{glyphs.icon("flag-green", "home-go-flag")}'
-        "LIGHTS OUT</p>"
-        f'<p class="home-hero-line" data-line aria-live="polite">{esc(IDLE_LINE)}</p>'
-        '<button type="button" class="home-start" data-start hidden>Lights out</button>'
+        f'<p class="home-go" data-go aria-live="polite" hidden>{glyphs.icon("flag-green", "home-go-flag")}'
+        "Race!</p>"
+        '<button type="button" class="home-start" data-start hidden>Run it again</button>'
         "</div></section>"
     )
 
@@ -411,9 +402,8 @@ def photo_finish(standings: Mapping[str, Any]) -> str:
             '<details class="home-why"><summary>'
             '<span class="why-closed">Why is it a tie?</span>'
             '<span class="why-open">Got it</span></summary>'
-            f"<p>With {plural(lead['n'], 'race')}, each result has an honest range: "
-            f"here {pct(low)} to {pct(high)}. The {count_word(len(front)).lower()} ranges "
-            "overlap, so the board calls it a tie instead of naming a winner.</p>"
+            f"<p>Their honest ranges ({pct(low)} to {pct(high)}) overlap, "
+            "so the board calls it a tie.</p>"
             "</details>"
         )
     else:
@@ -458,17 +448,14 @@ def results_note(calendar: int) -> str:
         '<section class="home-note" data-pdk="results-note" aria-labelledby="results-note">'
         f"{glyphs.icon('rulebook', 'home-note-glyph')}"
         f'<div><h2 class="home-note-title" id="results-note">{RESULTS_NOTE_TITLE}</h2>'
-        f"<p>These are AI-run benchmarks: AI agents race {races}, and the same "
-        "automated checks grade every run. The board shows how each entry did on these "
-        "races. It is not a comprehensive ranking, and different tasks or settings can "
-        "give a different order.</p>"
+        f"<p>{views.RESULTS_NOTE.format(calendar=races)}</p>"
         '<p class="home-note-links">'
         '<a href="contact/index.html">Independent and open source: about the paddock</a>'
         '<a href="rulebook/index.html">Read the method</a></p></div></section>'
     )
 
 
-def _grid_names(values: Sequence[str], joiner: str) -> str:
+def _grid_names(values: Sequence[str], joiner: str, limit: int = 3) -> str:
     seen: list[str] = []
     for value in values:
         if value not in seen:
@@ -477,7 +464,7 @@ def _grid_names(values: Sequence[str], joiner: str) -> str:
         return ""
     if len(seen) == 1:
         return f": {seen[0]}"
-    shown = seen[:5]
+    shown = seen[:limit]
     tail = " and the rest of the grid" if len(seen) > len(shown) else ""
     if tail:
         return ": " + ", ".join(shown) + tail
@@ -486,8 +473,16 @@ def _grid_names(values: Sequence[str], joiner: str) -> str:
 
 def cast(standings: Mapping[str, Any]) -> list[tuple[str, str, str]]:
     rows = list(standings.get("entries", [])) + list(standings.get("partial", []))
-    drivers = _grid_names([row["driver"] for row in rows], "and")
-    cars = _grid_names(sorted({row["car"] for row in rows}), "or")
+    names = driver_names(standings)
+    drivers = _grid_names(
+        [names[row["driver"]] for row in standings.get("entries", [])],
+        "and",
+    )
+    cars = _grid_names(
+        [views.car_name(car) for car in sorted({row["car"] for row in rows})],
+        "or",
+        limit=5,
+    )
     return [
         (term, glyph, body.format(drivers=drivers, cars=cars))
         for term, glyph, body in CAST
@@ -544,14 +539,14 @@ def challenges(races: Mapping[str, Any]) -> str:
             title = f"{label} · {pct(rate)} average pass rate"
             tail = f" {plural(row['races'], 'race')} on the calendar."
             if race_type == hardest:
-                tail += " The hardest challenge on the calendar."
+                tail += " The hardest challenge."
         else:
             title = label
             tail = " No race of this challenge is on the calendar yet."
         panels.append(
             '<div class="home-detail-panel" data-panel="challenge">'
             f'<b class="challenge-title">{esc(title)}</b>'
-            f"<p>{esc(label)}: {esc(CHALLENGE_COPY[race_type])}{esc(tail)}</p></div>"
+            f"<p>{esc(CHALLENGE_COPY[race_type])}{esc(tail)}</p></div>"
         )
         dots.append(
             f'<span class="swipe-dot{" on" if i == 0 else ""}" data-dot></span>'
@@ -636,16 +631,6 @@ def call_to_action() -> str:
     )
 
 
-def go_line(standings: Mapping[str, Any], calendar: int) -> str:
-    entered = len(standings.get("entries", [])) + len(standings.get("partial", []))
-    if entered and calendar:
-        return (
-            f"{plural(entered, 'entry', 'entries')} have raced the "
-            f"{plural(calendar, 'race')} on the calendar. Every run is graded the same way."
-        )
-    return "Every run is graded the same way, by stewards the agent never sees."
-
-
 def body(
     standings: Mapping[str, Any],
     races: Mapping[str, Any],
@@ -655,7 +640,7 @@ def body(
     calendar = len(calendar_races(races))
     return (
         '<div class="home" data-home>'
-        + hero(go_line(standings, calendar))
+        + hero()
         + ticker(
             config.get("live_feed_url", site_config.DEFAULT_LIVE_FEED_URL),
             sample_ticks(standings, entries),
@@ -725,7 +710,6 @@ CSS = """
 .home-go { display: flex; align-items: center; gap: 10px; font: italic 800 34px/1 var(--display); color: var(--tower-lit); animation: home-pop .5s var(--ease); }
 .home-go[hidden] { display: none; }
 .home-go-flag { width: 34px; height: 34px; color: var(--tower-fg); }
-.home-hero-line { min-height: 48px; font-size: 16px; line-height: 1.45; color: #D5DBE3; max-width: 320px; }
 .home-start {
   min-height: 52px; padding: 0 28px; border: 0; border-radius: 999px; background: var(--blue); color: #FFFFFF;
   font: 600 17px var(--body); cursor: pointer;
@@ -893,7 +877,8 @@ def _script() -> str:
   var reduce = motion.matches;
   function motionChanged() {
     reduce = motion.matches;
-    if (reduce && counting) finishLights();
+    if (lights && reduce) finishLights();
+    else if (start && go && !go.hidden) start.hidden = false;
     if (syncTicker) syncTicker();
   }
   if (motion.addEventListener) motion.addEventListener('change', motionChanged);
@@ -948,39 +933,51 @@ def _script() -> str:
     var art = lights.querySelector('[data-art]');
     var lamps = lights.querySelectorAll('.lamp');
     var start = lights.querySelector('[data-start]');
-    var line = lights.querySelector('[data-line]');
     var go = lights.querySelector('[data-go]');
-    var timer = null, counting = false;
+    var lightsTimer = null, counting = false, hasRun = false;
     var light = function (n) {
       each(lamps, function (lamp, i) { lamp.classList.toggle('on', i < n); });
       art.setAttribute('aria-label', 'Start lights: ' + n + ' of 5 lit');
     };
     function finishLights() {
-      clearInterval(timer);
+      clearInterval(lightsTimer);
       counting = false;
+      hasRun = true;
       light(0);
       art.setAttribute('aria-label', 'Start lights: all out');
       go.hidden = false;
-      line.textContent = lights.getAttribute('data-go-line');
       start.textContent = 'Run it again';
+      start.hidden = reduce;
     }
-    start.hidden = false;
-    start.addEventListener('click', function () {
+    function runLights() {
       if (counting) return;
       if (reduce) { finishLights(); return; }
       counting = true;
+      hasRun = true;
       go.hidden = true;
-      line.textContent = 'Hold it\\u2026';
-      start.textContent = 'Hold\\u2026';
+      start.hidden = true;
       var lit = 0;
       light(0);
-      clearInterval(timer);
-      timer = setInterval(function () {
+      clearInterval(lightsTimer);
+      lightsTimer = setInterval(function () {
         lit += 1;
         if (lit <= 5) { light(lit); return; }
         finishLights();
       }, 650);
-    });
+    }
+    start.addEventListener('click', runLights);
+    if (reduce) {
+      finishLights();
+    } else if (window.IntersectionObserver) {
+      var lightsObserver = new IntersectionObserver(function (entries) {
+        if (!entries.some(function (entry) { return entry.isIntersecting; })) return;
+        lightsObserver.disconnect();
+        if (!hasRun) runLights();
+      });
+      lightsObserver.observe(lights);
+    } else {
+      runLights();
+    }
   }
 
   // The live ticker: the feed when it answers, else the labelled sample runs.

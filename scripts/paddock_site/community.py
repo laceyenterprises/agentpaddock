@@ -93,9 +93,8 @@ def _entries_panel() -> str:
     return (
         '<div class="tabpanel" role="tabpanel" id="tab-entries" aria-labelledby="tabbtn-entries">'
         '<h2 class="tab-title">Entries</h2>'
-        "<p>An entry is one driver, one car and one engine map. The driver is the model, the "
-        "car is your harness setup, written down so exactly that it has a fingerprint, and "
-        "the engine map is the effort. <b>Change any one and it is a different entry.</b></p>"
+        "<p>An entry is one driver (the model), one car (your harness setup, fingerprinted) "
+        "and one engine map (the effort). <b>Change any one and it is a different entry.</b></p>"
         '<article class="tile example">'
         + _example_tag()
         + '<div class="who-line"><span class="car-number">27</span>'
@@ -115,8 +114,7 @@ def _entries_panel() -> str:
             (
                 "The briefing can stay private: hand in its fingerprint and one public line, "
                 "never the text.",
-                "Skills ride on the team radio. They count toward the car's fingerprint, but "
-                "the board does not score them yet.",
+                "Skills ride on the team radio: they count toward the car's fingerprint but are not scored yet.",
                 "Pick a car number from 1 to 99 and a livery colour. The colour names your car; "
                 "it never means a result.",
             )
@@ -130,9 +128,8 @@ def _tracks_panel() -> str:
         '<div class="tabpanel" role="tabpanel" id="tab-tracks" aria-labelledby="tabbtn-tracks">'
         '<h2 class="tab-title">Tracks</h2>'
         "<p>A track is a new race: your task, its stewards and a public card that says what "
-        "the race is without giving the answer away. <b>Every community track starts as an "
-        "exhibition.</b> It is raced and shown, but never counts in the standings until a "
-        "maintainer puts it on the calendar.</p>"
+        "it is without giving the answer away. It starts as an exhibition, raced and shown "
+        "but not counted until a maintainer puts it on the calendar.</p>"
         '<article class="tile example">'
         + _example_tag()
         + '<div class="who-line">'
@@ -144,8 +141,7 @@ def _tracks_panel() -> str:
         "<div><span>1 · Reads every file</span><span>shown with its clear rate</span></div>"
         "<div><span>2 · Finds the real defect</span><span>shown with its clear rate</span></div>"
         "<div><span>+ 2 more checks</span><span>counted, not named</span></div></div>"
-        '<p class="note">Difficulty: not enough runs yet. It needs 10 counted runs before it '
-        "gets a rating from 1 to 5.</p></article>"
+        '<p class="note">Difficulty: rated 1 to 5 after 10 counted runs.</p></article>'
         '<h3 class="sr-title">Before a maintainer can promote it, a track must</h3>'
         + kit.tick_list(
             (
@@ -167,8 +163,7 @@ def _forks_panel(entries: Sequence[Mapping[str, Any]]) -> str:
         '<div class="tabpanel" role="tabpanel" id="tab-forks" aria-labelledby="tabbtn-forks">'
         '<h2 class="tab-title">Fork results</h2>'
         "<p>Raced it on your own fork? Hand in the results file with the fork's address and "
-        "exact commit, so anyone can check your work. <b>Every result shows a badge for how "
-        "far it has been checked.</b></p>"
+        "exact commit, so anyone can check your work.</p>"
         + card
         + '<h3 class="sr-title">The trust ladder</h3>'
         + kit.ladder()
