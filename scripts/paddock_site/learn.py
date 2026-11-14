@@ -402,9 +402,14 @@ ENGINE_MAP_QUESTION = "Does thinking harder help?"
 
 def clearly_helped(ladder: Mapping[str, Any]) -> bool:
     """Whether the top level on the dial clearly beats the bottom one: its
-    honest range starts above where the bottom level's ends."""
+    honest range starts above where the bottom level's ends.
+
+    Fewer than two dial levels cannot establish an improvement.
+    """
     dial = dial_of(ladder)
-    levels = list(dial)
+    levels = [level for level in LEVELS if level in dial]
+    if len(levels) < 2:
+        return False
     return dial[levels[-1]]["lo"] > dial[levels[0]]["hi"]
 
 

@@ -4915,6 +4915,27 @@ def test_engine_map_notes_are_written_from_the_numbers():
     assert "no price on record" in note and "times as much" not in note
 
 
+@pytest.mark.parametrize("levels", [[], ["default"], ["low"], ["default", "low"]])
+def test_clearly_helped_requires_two_dial_levels(levels):
+    ladder = {"levels": [_rung(level, 5, 9, 0.01) for level in levels]}
+    assert learn.clearly_helped(ladder) is False
+
+
+@pytest.mark.parametrize(
+    "order",
+    [
+        ("low", "medium", "max", "default"),
+        ("default", "max", "medium", "low"),
+        ("medium", "low", "default", "max"),
+    ],
+)
+@pytest.mark.parametrize("bottom,top,helped", [(2, 9, True), (9, 2, False), (5, 6, False)])
+def test_clearly_helped_compares_canonical_endpoints(order, bottom, top, helped):
+    passes = {"low": bottom, "medium": 0, "max": top, "default": 9}
+    ladder = {"levels": [_rung(level, passes[level], 9, 0.01) for level in order]}
+    assert learn.clearly_helped(ladder) is helped
+
+
 def test_engine_map_heading_counts_drivers_the_dial_shows_clearly_helped(tmp_path):
     drivers = _drivers()
     low, high = _rung("low", 2, 9, 0.01), _rung("high", 9, 9, 0.02)
