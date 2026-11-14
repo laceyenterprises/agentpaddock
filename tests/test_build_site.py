@@ -4073,6 +4073,197 @@ console.log(JSON.stringify({rejected: rejected, aliases: aliases, reruns: reruns
     )
 
 
+@pytest.mark.parametrize("samples", [[], [{"kind": "passed", "who": "Driver", "what": "Run"}]])
+def test_home_ticker_without_layers_exits_cleanly(samples):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required to execute the ticker JavaScript")
+    script = (
+        """
+var ticker = {
+  querySelector: function () { return {querySelectorAll: function () { return []; }}; },
+  getAttribute: function () { return JSON.stringify("""
+        + json.dumps(samples)
+        + """); }
+};
+var root = {
+  querySelectorAll: function () { return []; },
+  querySelector: function (selector) { return selector === '[data-ticker]' ? ticker : null; }
+};
+var document = {querySelector: function () { return root; }};
+var window = {};
+"""
+        + site_home.SCRIPT
+    )
+    subprocess.run(
+        [node, "-e", script], capture_output=True, text=True, check=True, timeout=10
+    )
+
+
+def test_home_ticker_rebuilds_live_layers_without_replace_children():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required to execute the ticker JavaScript")
+    rebuild = site_home.SCRIPT.split("  function rebuild(list) {", 1)[1].split(
+        "  document.addEventListener", 1
+    )[0]
+    script = (
+        """
+const assert = require('node:assert/strict');
+var old = {}, children = [old], layers = [], ticks = [], at = 1;
+var stack = {
+  get firstChild() { return children[0]; },
+  removeChild: function (child) { assert.equal(child, children.shift()); },
+  appendChild: function (child) { children.push(child); }
+};
+var FLAGS = {passed: ['flag-checkered', 'CHECKERED'], dnf: ['dnf', 'DNF']};
+var template = {cloneNode: function () {
+  var fields = {};
+  return {fields: fields, querySelector: function (selector) {
+    return fields[selector] = {setAttribute: function (key, value) { this[key] = value; }};
+  }};
+}};
+var activate = function (layer, active) { layer.active = active; };
+var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
+var timer = 42, cleared, remaining = 0, synced = 0;
+var clearTimeout = function (id) { cleared = id; };
+var tickDwell = function () { return 6500; };
+var syncTicker = function () { synced += 1; };
+function rebuild(list) {
+"""
+        + rebuild
+        + """
+var live = [
+  {kind: 'passed', who: 'Driver', what: 'Run', when: 'Now'},
+  {kind: 'dnf', who: 'Other', what: 'Failed run', when: 'Earlier'}
+];
+rebuild(live);
+assert.equal(at, 0);
+assert.equal(children.length, 2);
+assert.ok(!children.includes(old));
+children.forEach(function (layer, i) {
+  assert.equal(layer.active, i === 0);
+  assert.equal(layer.fields['[data-flag] use'].href, '#' + FLAGS[live[i].kind][0]);
+  assert.equal(layer.fields['[data-flag-name]'].textContent, FLAGS[live[i].kind][1]);
+  ['who', 'what', 'when'].forEach(function (field) {
+    assert.equal(layer.fields['[data-' + field + ']'].textContent, live[i][field]);
+  });
+});
+assert.equal(cleared, 42);
+assert.equal(timer, null);
+assert.equal(remaining, 6500);
+assert.equal(synced, 1);
+rebuild(live.slice(0, 1));
+assert.equal(children.length, 1);
+assert.equal(children[0].active, true);
+"""
+    )
+    subprocess.run(
+        [node, "-e", script], capture_output=True, text=True, check=True, timeout=10
+    )
+
+
+def test_home_ticker_stacks_and_crossfades_without_motion():
+    css = site_home.CSS
+    assert ".home-ticks { display: grid; }" in css
+    tick = css.split(".home-tick {", 1)[1].split("}", 1)[0]
+    assert "grid-area: 1 / 1" in tick
+    assert "opacity: 0" in tick and "visibility: hidden" in tick
+    assert "transition: opacity .6s var(--ease), visibility 0s linear .6s" in tick
+    assert "transform" not in tick and "animation" not in tick
+    reduced = css.split("@media (prefers-reduced-motion: reduce)", 1)[1]
+    assert ".home-tick { transition: none; }" in reduced
+    assert "enter(tick)" not in site_home.SCRIPT
+
+
+def test_home_ticker_dwell_gives_longer_text_more_reading_time():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required to execute the ticker JavaScript")
+    dwell = site_home.SCRIPT.split("  function tickDwell(t) {", 1)[1].split(
+        "  function activate", 1
+    )[0]
+    result = subprocess.run(
+        [
+            node,
+            "-e",
+            "function tickDwell(t) {"
+            + dwell
+            + """
+console.log(JSON.stringify([0, 60, 61, 100, 1000].map(function (n) {
+  return tickDwell({who: 'x'.repeat(Math.floor(n / 2)), what: 'y'.repeat(Math.ceil(n / 2))});
+})));
+""",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=10,
+    )
+    assert json.loads(result.stdout) == [6500, 6500, 6530, 7700, 10000]
+
+
+def test_home_ticker_pauses_and_resumes_the_remaining_reading_time():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required to execute the ticker JavaScript")
+    timer = site_home.SCRIPT.split("  var ticks = samples, at = 0;", 1)[1].split(
+        "  function rebuild", 1
+    )[0]
+    script = (
+        """
+const assert = require('node:assert/strict');
+var now = 0, jobs = new Map(), next = 0;
+var performance = {now: () => now};
+var setTimeout = (fn, delay) => { jobs.set(++next, {fn, due: now + delay}); return next; };
+var clearTimeout = id => jobs.delete(id);
+function advance(ms) {
+  now += ms;
+  for (const [id, job] of jobs) if (job.due <= now) { jobs.delete(id); job.fn(); }
+}
+var reduce = false, document = {hidden: false}, window = {};
+var samples = [{who: 'Driver', what: 'Run'}, {who: 'Other', what: 'Run'}];
+var layers = samples.map(() => ({
+  classList: {toggle: function (_, active) { this.active = active; }},
+  setAttribute: function (key, value) { this[key] = value; },
+  toggleAttribute: function (key, value) { this[key] = value; }
+}));
+var ticks = samples, at = 0;
+"""
+        + timer
+        + """
+syncTicker();
+advance(6499); assert.equal(at, 0);
+advance(1); assert.equal(at, 1);
+assert.equal(layers[0]['aria-hidden'], 'true');
+assert.equal(layers[0].inert, true);
+assert.equal(layers[1]['aria-hidden'], 'false');
+assert.equal(layers[1].inert, false);
+// The incoming run gets its full dwell after the fade.
+advance(7099); assert.equal(at, 1);
+advance(1); assert.equal(at, 0);
+for (const reason of ['hovering', 'focused', 'hidden', 'offscreen', 'reduce']) {
+  advance(1000);
+  const before = at;
+  function pause(value) {
+    if (reason === 'hovering') hovering = value;
+    if (reason === 'focused') focused = value;
+    if (reason === 'hidden') document.hidden = value;
+    if (reason === 'offscreen') onScreen = !value;
+    if (reason === 'reduce') reduce = value;
+    syncTicker();
+  }
+  pause(true); advance(30000); assert.equal(at, before);
+  pause(false); advance(6099); assert.equal(at, before);
+  advance(1); assert.equal(at, (before + 1) % ticks.length);
+}
+"""
+    )
+    subprocess.run(
+        [node, "-e", script], capture_output=True, text=True, check=True, timeout=10
+    )
+
+
 def test_home_ticker_reads_the_configured_feed_and_falls_back_to_labelled_samples(
     tmp_path,
 ):
@@ -4097,6 +4288,14 @@ def test_home_ticker_reads_the_configured_feed_and_falls_back_to_labelled_sample
     assert all(t["who"] in names for t in samples if t["kind"] != "rerun")
     # The first sample is drawn on the page without JavaScript.
     assert html.escape(samples[0]["who"]) in ticker
+    layers = re.findall(r'<div class="home-tick[^"]*" data-tick ([^>]*)>', ticker)
+    assert len(layers) == len(samples)
+    assert layers[0] == 'aria-hidden="false"'
+    assert all(state == 'aria-hidden="true" inert' for state in layers[1:])
+    assert ticker.count('class="home-tick is-active"') == 1
+    for sample in samples:
+        assert html.escape(sample["who"]) in ticker
+        assert html.escape(sample["what"]) in ticker
     # An infrastructure rerun is the red flag, never DNF.
     assert site_home.TICK_FLAGS["rerun"] == ("flag-red", "RED · RERUN")
     for word in ("rerun", "red", "infra", "infrastructure"):
@@ -6613,9 +6812,8 @@ def test_shared_accessibility_and_motion_rules():
         in site_races.SCRIPT
     )
     assert "motion.addEventListener('change', motionChanged)" in site_races.SCRIPT
-    assert (
-        "if (reduce || document.hidden || ticks.length < 2) return;" in site_home.SCRIPT
-    )
+    assert "return reduce || document.hidden || hovering || focused" in site_home.SCRIPT
+    assert "if (paused()) return;" in site_home.SCRIPT
     assert "if (reduce) { finishLights(); return; }" in site_home.SCRIPT
     assert (
         ".dv-pick { display: grid; grid-template-columns: minmax(0, 1fr);"
