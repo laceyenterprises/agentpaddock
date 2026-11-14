@@ -130,6 +130,11 @@
     "meaning": "Podium: the top three"
   },
   {
+    "id": "exhibition",
+    "group": "race",
+    "meaning": "Exhibition: a community race not yet on the calendar, left out of the standings"
+  },
+  {
     "id": "rulebook",
     "group": "rules",
     "meaning": "Rulebook: the methodology"
@@ -160,6 +165,16 @@
     "meaning": "Track limits: the CPU, memory and time caps"
   },
   {
+    "id": "track-card",
+    "group": "rules",
+    "meaning": "Track card: a race's public description and which checkpoints it shows"
+  },
+  {
+    "id": "checkpoint",
+    "group": "rules",
+    "meaning": "Checkpoint: one verifier check, shown by label, count or kept hidden"
+  },
+  {
     "id": "fuel-gauge",
     "group": "fuel",
     "meaning": "Fuel gauge: a spend cap"
@@ -175,9 +190,34 @@
     "meaning": "Fuel: tokens"
   },
   {
+    "id": "fuel-triad",
+    "group": "fuel",
+    "meaning": "The fuel triad: input (cached %) : output, per race passed"
+  },
+  {
     "id": "slipstream",
     "group": "fuel",
     "meaning": "Slipstream: cached tokens, read at a fraction of the price"
+  },
+  {
+    "id": "mileage",
+    "group": "fuel",
+    "meaning": "Mileage: races passed per $10, or per million tokens"
+  },
+  {
+    "id": "lean-rich",
+    "group": "fuel",
+    "meaning": "Lean, rich: the two ends of the fuel axis, less or more fuel per pass"
+  },
+  {
+    "id": "racing-line",
+    "group": "fuel",
+    "meaning": "Racing line: the entries nothing burning less fuel beats on pass rate"
+  },
+  {
+    "id": "guzzler",
+    "group": "fuel",
+    "meaning": "The guzzler: the entry that burns the most fuel per race passed"
   },
   {
     "id": "pit-lane",
@@ -193,6 +233,11 @@
     "id": "shakedown",
     "group": "running",
     "meaning": "Shakedown: the bench doubles as the fleet's smoke test"
+  },
+  {
+    "id": "harness-drill",
+    "group": "running",
+    "meaning": "Harness drill: a standard test of the car in the garage, the same for every entry"
   },
   {
     "id": "info",

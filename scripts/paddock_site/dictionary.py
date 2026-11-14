@@ -91,6 +91,11 @@ WORDING: dict[str, Wording] = {
     "photo-finish": Wording("Photo finish", "A statistical tie", "standings/"),
     "timing-tower": Wording("Timing tower", "The standings", "standings/"),
     "podium": Wording("Podium", "The top three"),
+    "exhibition": Wording(
+        "Exhibition",
+        "A community race that is raced and shown, but not yet counted in the standings",
+        "community/",
+    ),
     "rulebook": Wording("Rulebook", "The methodology", "rulebook/"),
     "setup-sheet": Wording(
         "Setup sheet", "The car's exact configuration; its fingerprint names the entry"
@@ -101,18 +106,41 @@ WORDING: dict[str, Wording] = {
     ),
     "stewards": Wording("Stewards", "The grader that rules on every finish", "learn/"),
     "track-limits": Wording("Track limits", "The CPU, memory and time caps"),
+    "track-card": Wording(
+        "Track card", "A race's public description, and which of its checks it shows", "races/"
+    ),
+    "checkpoint": Wording(
+        "Checkpoint", "One check the stewards run, shown by name, by count or kept hidden", "races/"
+    ),
     "fuel-gauge": Wording("Fuel gauge", "A spend cap"),
     "fuel-bill": Wording("Fuel bill", "Dollars per pass"),
     "fuel": Wording("Fuel", "Tokens"),
     "slipstream": Wording(
         "Slipstream", "Cached tokens, read at a fraction of the price"
     ),
+    "fuel-triad": Wording(
+        "The fuel triad", "Input (cached %) : output, the tokens behind each race passed"
+    ),
+    "mileage": Wording(
+        "Mileage", "Races passed per $10, or per million tokens", "", "Home"
+    ),
+    "lean-rich": Wording(
+        "Lean, rich", "Less fuel per pass, more fuel per pass: the two ends of the fuel axis"
+    ),
+    "racing-line": Wording(
+        "Racing line",
+        "The best-value entries: nothing burning less fuel beats them on pass rate",
+    ),
+    "guzzler": Wording("The guzzler", "The entry that burns the most fuel per race passed"),
     "pit-lane": Wording("Pit lane", "Run the bench yourself", "race-it-yourself/"),
     "pit-wall": Wording(
         "Pit wall", "Every entry against every challenge, side by side", "pit-wall/"
     ),
     "shakedown": Wording(
         "Shakedown", "A first test lap that checks a new car works before it races"
+    ),
+    "harness-drill": Wording(
+        "Harness drill", "A standard test of the car in the garage, the same for every entry"
     ),
     "start-lights": Wording("Lights out", "A run starts"),
     "trophy": Wording("Trophy", "A challenge winner"),

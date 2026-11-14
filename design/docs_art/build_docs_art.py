@@ -204,8 +204,10 @@ def glyph_sheet(theme):
         ids = [g[0] for g in pg.GLYPHS if g[2] == key and not g[0].startswith("engine-map-")]
         if ids:
             rows.append((label, ids))
-    W, label_w, th, gap = 1320, 150, 112, 10
+    label_w, th, gap = 150, 112, 10
     n = max(len(ids) for _, ids in rows)
+    # Wide enough that the longest row keeps 124 px tiles, so every id fits under its glyph.
+    W = max(1320, 96 + label_w + n * 124 + gap * (n - 1))
     tw = (W - 96 - label_w - gap * (n - 1)) / n
     out = []
     y = 150
