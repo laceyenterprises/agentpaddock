@@ -3174,7 +3174,7 @@ from paddock_site import rulebook as site_rulebook  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 CODE_BOX = re.compile(
-    r'<div class="code"><pre[^>]*><code>(.*?)</code></pre>', re.DOTALL
+    r'<div class="code">.*?<pre[^>]*><code>(.*?)</code></pre>', re.DOTALL
 )
 
 
@@ -3231,6 +3231,35 @@ def test_pit_lane_commands_equal_the_readme_and_contributing_text():
     assert "Select and copy" in script and "execCommand('copy')" in script
     # A tap on the card advances, except inside a code box.
     assert "closest('.code, a, button, summary')" in script
+
+
+def test_pit_lane_pager_labels_follow_the_step_headings():
+    page = build_site.build(FIXTURE)["race-it-yourself/index.html"]
+    chips = _between(page, '<div class="pager"', "</div>")
+    headings = re.findall(r"<h3>(.*?)</h3>", _main(page))
+    assert len(headings) == 6
+    for number, title in enumerate(headings, start=1):
+        assert f'aria-label="Step {number}: {title}"' in chips
+        assert f'>{number}<span class="pager-title"> · {title}</span></button>' in chips
+
+
+def test_pit_lane_styles_keep_chips_compact_and_copy_above_code():
+    css = build_site.build(FIXTURE)["paddock.css"]
+    pager = _between(css, ".steps-live .pager {", "}")
+    assert "display: flex" in pager and "flex-wrap: wrap" in pager
+    assert "grid-template-columns" not in pager
+    chip = _between(css, "\n.pager .chip {", "}")
+    assert "text-overflow: ellipsis" in chip
+    assert ".pager-title { display: none;" in css
+    assert ".pager-title { display: inline; }" in css
+    current = _between(css, '.pager .chip[aria-current="step"] {', "}")
+    assert "color: var(--paper)" in current
+    copy = _between(css, ".copy {", "}")
+    assert "bottom:" not in copy and "position: absolute" not in copy
+    pre = _between(css, ".code pre {", "}")
+    assert "padding: 18px;" in pre and "overflow-x: auto" in pre
+    assert "\n.steps h3 {" not in css
+    assert ".step-head h3 {" in css
 
 
 def test_pit_lane_refuses_a_missing_source_block(tmp_path):

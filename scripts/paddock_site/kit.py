@@ -249,9 +249,15 @@ CSS = """
 
 /* race it yourself: six steps */
 .pager { display: none; gap: 8px; margin-bottom: 16px; }
-.steps-live .pager { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
-.pager .chip { padding: 0; font: italic 800 20px/1 var(--display); }
+.steps-live .pager { display: flex; flex-wrap: wrap; }
+.pager .chip { min-width: 0; max-width: 100%; padding: 0 12px; text-align: center; overflow: hidden; text-overflow: ellipsis; }
+.pager-title { display: none; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+@media (min-width: 720px) {
+  .pager .chip { padding: 0 16px; }
+  .pager-title { display: inline; }
+}
 .pager .chip.done { background: var(--blue-soft); border-color: var(--blue-soft); }
+.pager .chip[aria-current="step"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
 .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
 .step { display: flex; flex-direction: column; gap: 14px; padding: 22px 20px; border-radius: 24px; border: 1.5px solid var(--rule); background: var(--paper); min-width: 0; }
 .steps-live .step { cursor: pointer; animation: step-in .35s var(--ease); }
@@ -268,16 +274,18 @@ CSS = """
 .step-foot { display: none; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .steps-live .step-foot { display: flex; }
 .step-foot .hint { font-size: 13px; color: var(--muted); }
-.code { position: relative; border-radius: 16px; background: #0E1116; color: #E6EAF0; cursor: auto; }
-.code pre { margin: 0; padding: 18px 18px 64px; background: transparent; border-radius: 16px; font: 400 13px/1.6 var(--mono); white-space: pre; overflow-x: auto; color: inherit; }
+.code { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); border-radius: 16px; background: #0E1116; color: #E6EAF0; cursor: auto; }
+.code-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 10px 0 18px; }
+.code-tools[hidden] { display: none; }
+.code pre { grid-area: 2 / 1; min-width: 0; margin: 0; padding: 18px; background: transparent; border-radius: 16px; font: 400 13px/1.6 var(--mono); white-space: pre; overflow-x: auto; color: inherit; }
 .code.more::after {
-  content: ""; position: absolute; top: 0; right: 0; bottom: 64px; width: 48px; pointer-events: none;
-  border-top-right-radius: 16px; background: linear-gradient(90deg, transparent, #0E1116);
+  content: ""; grid-area: 2 / 1; justify-self: end; width: 48px; pointer-events: none;
+  border-bottom-right-radius: 16px; background: linear-gradient(90deg, transparent, #0E1116);
 }
-.code-hint { display: none; position: absolute; left: 18px; bottom: 22px; font: 400 12px/1 var(--mono); color: #8B94A3; }
+.code-hint { display: none; font: 400 12px/1 var(--mono); color: #8B94A3; }
 .code.more .code-hint { display: block; }
 .copy {
-  position: absolute; right: 10px; bottom: 10px; min-height: 44px; padding: 0 16px; border-radius: 12px;
+  margin-left: auto; min-height: 44px; padding: 0 16px; border-radius: 12px;
   border: 1px solid #2A313C; background: #1A1F27; color: #F2F4F7; font: 600 14px/1 var(--body); cursor: pointer;
 }
 .copy[hidden] { display: none; }
@@ -440,6 +448,7 @@ SCRIPT = r"""
       } catch (error) { fallback(); }
     });
     button.hidden = false;
+    button.parentElement.hidden = false;
   });
 
   // The step pager (race it yourself): one step at a time; a tap on the card
@@ -481,8 +490,9 @@ SCRIPT = r"""
 def code_box(code: str, label: str) -> str:
     """A code box with its copy button; the button shows once the script runs."""
     return (
-        f'<div class="code"><pre tabindex="0" aria-label="{esc(label)}"><code>{esc(code)}</code></pre>'
+        '<div class="code"><div class="code-tools" hidden>'
         '<span class="code-hint" aria-hidden="true">Scroll sideways →</span>'
         '<button type="button" class="copy" hidden aria-label="Copy the code to the clipboard">'
         "Copy</button></div>"
+        f'<pre tabindex="0" aria-label="{esc(label)}"><code>{esc(code)}</code></pre></div>'
     )
