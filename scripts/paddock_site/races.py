@@ -1326,6 +1326,10 @@ SCRIPT = """(function () {
     function pickChip(chip) {
       check(chips, chip);
       state.challenge = chip.getAttribute('data-challenge');
+      var address = new URL(window.location.href);
+      if (state.challenge === 'all') address.searchParams.delete('challenge');
+      else address.searchParams.set('challenge', state.challenge);
+      window.history.replaceState(null, '', address.href);
       state.all = false;
       render();
     }
@@ -1344,6 +1348,12 @@ SCRIPT = """(function () {
     });
     controls.hidden = false;
     updateCue();
+    var challenge = new URL(window.location.href).searchParams.get('challenge');
+    var initial = chips.filter(function (chip) {
+      return chip.getAttribute('data-challenge') === challenge;
+    })[0] || chips[0];
+    check(chips, initial);
+    state.challenge = initial.getAttribute('data-challenge');
     render();
   }
 

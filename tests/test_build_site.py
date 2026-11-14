@@ -329,6 +329,8 @@ def _resolve(name: str, link: str) -> str:
     path = urlsplit(link).path
     if not path:
         return name
+    if path.endswith("/"):
+        path += "index.html"
     return posixpath.normpath(posixpath.join(posixpath.dirname(name), path))
 
 
@@ -3922,6 +3924,160 @@ def test_home_builds_from_the_site_data_fixtures(tmp_path):
         assert sample not in text, sample
     assert "Learn the paddock in 60 seconds." in main
     assert "Seven challenges. One is brutal." in main
+
+
+def test_home_challenges_link_to_their_filtered_calendar(tmp_path):
+    files = build_site.build(_site_tree(tmp_path))
+    main = _home(files)
+    rows = {
+        row["challenge"]: row
+        for row in json.loads(files["data/races.json"])["challenges"]
+    }
+    tiles = re.findall(r'<button[^>]*class="challenge-card"[^>]*>', main)
+    panels = re.findall(
+        r'<div class="home-detail-panel" data-panel="challenge">(.*?)</div>', main
+    )
+    assert len(tiles) == len(panels) == len(site_glyphs.RACE_TYPES)
+    for slug, tile, panel in zip(site_glyphs.RACE_TYPES, tiles, panels):
+        address = f"races/?challenge={slug}"
+        assert f'data-challenge="{slug}"' in tile
+        assert f'data-races-url="{address}"' in tile
+        if slug in rows:
+            count = rows[slug]["races"]
+            words = f"{count} {'race' if count == 1 else 'races'} on the calendar"
+        else:
+            words = "No race of this challenge is on the calendar yet"
+        assert f'<a href="{address}">{words}</a>' in panel
+
+
+def test_home_challenge_picker_navigates_only_when_already_selected():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required to execute the home JavaScript")
+    picker = site_home.SCRIPT.split("  function picker(", 1)[1].split(
+        "  // The challenge row:", 1
+    )[0]
+    script = (
+        """
+const assert = require('node:assert/strict');
+function button(selected, slug) {
+  return {
+    attrs: {'aria-pressed': String(selected), 'data-races-url': 'races/?challenge=' + slug},
+    getAttribute(key) { return this.attrs[key]; },
+    setAttribute(key, value) { this.attrs[key] = value; },
+    addEventListener(event, callback) { this[event] = callback; }
+  };
+}
+var buttons = [button(true, 'hard-review'), button(false, 'docs')];
+var panels = [{}, {}], navigations = [];
+var root = {querySelectorAll(selector) {
+  if (selector.includes('"cast"')) return [];
+  return selector.includes('data-pick') ? buttons : panels;
+}};
+var window = {location: {assign(url) { navigations.push(url); }}};
+var each = (items, fn) => items.forEach(fn);
+var enter = () => {};
+function picker("""
+        + picker
+        + """
+assert.deepEqual(panels.map(p => p.hidden), [false, true]);
+buttons[0].click();
+assert.deepEqual(navigations, ['races/?challenge=hard-review']);
+navigations.length = 0;
+buttons[1].click();
+assert.deepEqual(navigations, []);
+assert.deepEqual(buttons.map(b => b.attrs['aria-pressed']), ['false', 'true']);
+assert.deepEqual(panels.map(p => p.hidden), [true, false]);
+buttons[1].click();
+assert.deepEqual(navigations, ['races/?challenge=docs']);
+"""
+    )
+    subprocess.run(
+        [node, "-e", script], capture_output=True, text=True, check=True, timeout=10
+    )
+
+
+@pytest.mark.parametrize("challenge", ["hard-review", "docs", "unknown", None])
+def test_races_script_reads_and_updates_the_challenge_address(challenge):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required to execute the races JavaScript")
+    harness = """
+const assert = require('node:assert/strict');
+function element(attrs = {}) {
+  return {
+    attrs, hidden: false, events: {},
+    style: {removeProperty() {}, setProperty() {}},
+    getAttribute(key) { return this.attrs[key]; },
+    setAttribute(key, value) { this.attrs[key] = value; },
+    addEventListener(event, callback) { this.events[event] = callback; },
+    focus() { document.activeElement = this; }
+  };
+}
+var chips = ['all', 'hard-review', 'docs'].map(c => element({'data-challenge': c}));
+var sorts = ['hard', 'name'].map(s => element({'data-sort': s}));
+var group = element();
+group.querySelectorAll = () => chips;
+chips.forEach(c => c.parentNode = group);
+sorts.forEach(s => s.parentNode = element());
+var cards = ['docs', 'hard-review', 'hard-review', 'docs'].map((c, i) =>
+  element({'data-challenge': c, 'data-rate': String(i), 'data-name': String(4 - i)}));
+var grid = element({'data-first': '2'});
+grid.querySelectorAll = () => cards;
+grid.appendChild = () => {};
+var scroll = element();
+scroll.parentNode = element();
+var controls = element();
+controls.querySelectorAll = s => s === '[data-challenge]' ? chips : sorts;
+controls.querySelector = () => scroll;
+var more = element();
+var document = {querySelector(s) {
+  return {'[data-races-grid]': grid, '[data-races-controls]': controls,
+    '[data-races-more]': more}[s] || null;
+}};
+var address = new URL('https://example.com/races/?keep=yes#calendar');
+var challenge = JSON.parse(process.argv[1]);
+if (challenge !== null) address.searchParams.set('challenge', challenge);
+var replacements = [];
+var window = {
+  location: {href: address.href},
+  history: {replaceState(state, title, url) {
+    replacements.push(url);
+    window.location.href = url;
+  }},
+  addEventListener() {}
+};
+var getComputedStyle = () => ({getPropertyValue: () => '1'});
+"""
+    assertions = """
+var expected = ['docs', 'hard-review'].includes(challenge) ? challenge : 'all';
+assert.equal(chips.find(c => c.attrs['aria-checked'] === 'true').attrs['data-challenge'], expected);
+assert.equal(cards.filter(c => !c.hidden).length, 2);
+assert.ok(cards.filter(c => !c.hidden).every(c =>
+  expected === 'all' || c.attrs['data-challenge'] === expected));
+assert.equal(replacements.length, 0);
+chips[2].events.click();
+assert.equal(new URL(window.location.href).searchParams.get('challenge'), 'docs');
+assert.equal(new URL(window.location.href).searchParams.get('keep'), 'yes');
+assert.equal(new URL(window.location.href).hash, '#calendar');
+assert.ok(cards.filter(c => !c.hidden).every(c => c.attrs['data-challenge'] === 'docs'));
+document.activeElement = chips[2];
+group.events.keydown({key: 'ArrowRight', preventDefault() {}});
+assert.equal(chips[0].attrs['aria-checked'], 'true');
+assert.equal(new URL(window.location.href).searchParams.has('challenge'), false);
+assert.equal(cards.filter(c => !c.hidden).length, 2);
+more.events.click();
+assert.equal(cards.filter(c => !c.hidden).length, cards.length);
+sorts[1].events.click();
+assert.equal(cards.filter(c => !c.hidden).length, cards.length);
+"""
+    subprocess.run(
+        [node, "-e", harness + site_races.SCRIPT + assertions, json.dumps(challenge)],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=10,
+    )
 
 
 def test_home_fuel_card_compares_a_shared_finish(tmp_path):
