@@ -47,8 +47,11 @@ ANY_ROUTE = "*"
 #: applied. A level of ``None``, or a pair missing here, is "setting not
 #: recorded": the site claims no setting it has no evidence for.
 DEFAULT_SETTINGS: dict[tuple[str, str], tuple[str | None, str]] = {
-    # Codex, from the run's own session record (turn context): it sends
-    # reasoning_effort "medium" on these routes.
+    # Codex, from the runs' own session records (turn context effort): these
+    # routes sent medium in every recorded run, except the two version splits
+    # below. On fireworks/qwen3.8-max, Codex CLI 0.159.1 (Oct 11 onward) sent
+    # medium in 101 runs; 0.124.0 (Oct 3 and Oct 6) sent none in 22 runs.
+    # On zai/glm-5.2, the same versions sent medium in 90 runs and none in 42.
     **{
         ("codex", route): ("medium", "car")
         for route in (
@@ -56,18 +59,20 @@ DEFAULT_SETTINGS: dict[tuple[str, str], tuple[str | None, str]] = {
             "anthropic/claude-sonnet-5-5",
             "baseten/glm-5.3-flash",
             "fireworks/kimi-k3",
+            "fireworks/qwen3.8-max",
             "google/gemini-3.8-flash",
             "moonshot/kimi-k3",
             "together/deepseek-v4.1-flash",
+            "zai/glm-5.2",
         )
     },
-    # Codex, from the car's provider config: it sends none on these routes, so
+    # Codex, from the car's provider config: it sends none on this route, so
     # the route's documented default applies. openai/gpt-6.1-sol is absent:
     # what Codex sent there is not recorded.
-    **{
-        ("codex", route): (ROUTE_DEFAULTS[route], "route")
-        for route in ("fireworks/qwen3.8-max", "zai/glm-5.2", "openrouter/qwen3.8-27b")
-    },
+    ("codex", "openrouter/qwen3.8-27b"): (
+        ROUTE_DEFAULTS["openrouter/qwen3.8-27b"],
+        "route",
+    ),
     # OpenCode and Pi, from the car's provider config: they send none, so the
     # route's documented default applies.
     **{
@@ -90,8 +95,16 @@ DEFAULT_SETTINGS: dict[tuple[str, str], tuple[str | None, str]] = {
     # sends medium, on every route.
     ("hermes", ANY_ROUTE): ("medium", "car"),
 }
-#: Explanations for each evidenced car/case, filled with route and setting data.
+#: Pair overrides and car/case explanations, filled with route and setting data.
 DEFAULT_TIPS = {
+    (
+        "codex",
+        "fireworks/qwen3.8-max",
+    ): "Codex 0.159 sends its default thinking level, medium, when an entry sets none. 22 earlier runs on Codex 0.124 sent none, so Fireworks' default, xhigh, applied to those.",
+    (
+        "codex",
+        "zai/glm-5.2",
+    ): "Codex 0.159 sends its default thinking level, medium, when an entry sets none. 42 earlier runs on Codex 0.124 sent none, so Z.ai's default, dynamic thinking at max effort, applied to those.",
     (
         "codex",
         "car",
@@ -332,7 +345,7 @@ def map_label(engine_map: str, car: str | None = None, route: str | None = None)
 
 
 def map_tip(car: str | None = None, route: str | None = None) -> str:
-    """The evidence behind a default-map label, as one sentence."""
+    """The evidence behind a default-map label."""
     setting = default_setting(car, route) if car else None
     if car is None:
         template = DEFAULT_TIPS["no-car"]
@@ -341,7 +354,10 @@ def map_tip(car: str | None = None, route: str | None = None) -> str:
     elif setting[0] is None:
         template = DEFAULT_TIPS["no-default"]
     else:
-        template = DEFAULT_TIPS.get((car, setting[1]), DEFAULT_TIPS[setting[1]])
+        template = DEFAULT_TIPS.get(
+            (car, route),
+            DEFAULT_TIPS.get((car, setting[1]), DEFAULT_TIPS[setting[1]]),
+        )
     level = setting[0] if setting else None
     return template.format(
         car=car_name(car or ""),

@@ -4516,18 +4516,18 @@ def _best_line(page: str) -> str:
             "medium (Claude Code default)",
         ),
         ("hermes", "default", "openai/gpt-6.1-sol", "medium (Hermes default)"),
-        # The three routes Codex sends nothing on: the route's own default applies.
+        # These routes have a version split; most recorded runs sent medium.
         (
             "codex",
             "default",
             "fireworks/qwen3.8-max",
-            "xhigh (Fireworks default)",
+            "medium (Codex default)",
         ),
         (
             "codex",
             "default",
             "zai/glm-5.2",
-            "max (Z.ai default)",
+            "medium (Codex default)",
         ),
         ("codex", "default", "openrouter/qwen3.8-27b", "not recorded"),
         # OpenCode and Pi send nothing.
@@ -4625,12 +4625,12 @@ def test_engine_map_label_names_the_setting_that_ran(car, engine_map, route, lab
         (
             "codex",
             "zai/glm-5.2",
-            "Codex has no thinking-level default for this model, so it sends none and Z.ai's default applies: dynamic thinking at max effort.",
+            "Codex 0.159 sends its default thinking level, medium, when an entry sets none. 42 earlier runs on Codex 0.124 sent none, so Z.ai's default, dynamic thinking at max effort, applied to those.",
         ),
         (
             "codex",
             "fireworks/qwen3.8-max",
-            "Codex has no thinking-level default for this model, so it sends none and Fireworks's default applies: xhigh.",
+            "Codex 0.159 sends its default thinking level, medium, when an entry sets none. 22 earlier runs on Codex 0.124 sent none, so Fireworks' default, xhigh, applied to those.",
         ),
         (
             "codex",
