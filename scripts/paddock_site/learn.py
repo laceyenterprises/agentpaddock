@@ -336,7 +336,7 @@ def ladder_view(ladder: Mapping[str, Any], name: str, challenge: str) -> dict:
     race = challenge_label(challenge)
     missing = [level for level in LEVELS if level not in dial]
     off_dial = [rung["map"] for rung in ladder["levels"] if rung["map"] not in LEVELS]
-    caption = f"Every counted {race} run of {name} in {car} on the calendar."
+    caption = "Every counted run on the calendar."
     if missing:
         caption += f" Greyed out: {join(missing)}, which it has not raced on {race} in this car."
     if off_dial:
@@ -397,6 +397,33 @@ def pick_ladders(ladders: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]
     )
 
 
+ENGINE_MAP_QUESTION = "Does thinking harder help?"
+
+
+def clearly_helped(ladder: Mapping[str, Any]) -> bool:
+    """Whether the top level on the dial clearly beats the bottom one: its
+    honest range starts above where the bottom level's ends."""
+    dial = dial_of(ladder)
+    levels = list(dial)
+    return dial[levels[-1]]["lo"] > dial[levels[0]]["hi"]
+
+
+def engine_map_title(ladders: Sequence[Mapping[str, Any]]) -> str:
+    """The engine-map lab's heading: how many of the dial's drivers clearly pass
+    more at their highest level than at their lowest. Overlapping ranges are a
+    tie, never a win. With fewer than two drivers it stays a question."""
+    if len(ladders) < 2:
+        return ENGINE_MAP_QUESTION
+    helped = sum(clearly_helped(ladder) for ladder in ladders)
+    if helped == 0:
+        count = f"none of the {len(ladders)}"
+    elif helped == len(ladders):
+        count = f"all {len(ladders)}"
+    else:
+        count = f"{helped} of {len(ladders)}"
+    return f"Thinking harder clearly helps {count} drivers."
+
+
 def engine_map_lab(drivers: Mapping[str, Any]) -> dict:
     ladders = pick_ladders(drivers.get("ladders", []))
     names = driver_names([ladder["driver"] for ladder in ladders])
@@ -404,7 +431,7 @@ def engine_map_lab(drivers: Mapping[str, Any]) -> dict:
     views = [
         ladder_view(ladder, names[ladder["driver"]], challenge) for ladder in ladders
     ]
-    return {"ladders": views, "start": 0}
+    return {"ladders": views, "start": 0, "title": engine_map_title(ladders)}
 
 
 def shown_level(view: Mapping[str, Any], held: str | None) -> str:
@@ -708,7 +735,7 @@ def engine_map_html(lab: Mapping[str, Any]) -> str:
     ladders = lab["ladders"]
     head = (
         _eyebrow("Try it · the engine map", "engine-map")
-        + "<h2>Does thinking harder help?</h2>"
+        + f"<h2>{esc(lab.get('title', ENGINE_MAP_QUESTION))}</h2>"
     )
     if not ladders:
         return (

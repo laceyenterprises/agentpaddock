@@ -2005,9 +2005,9 @@ def test_standings_carries_the_results_note_after_the_hero(tmp_path):
         # Nothing but the hero comes before the note.
         assert "<section" not in main[main.index("</section>", hero) + 10 : note - 30]
         block = main[note : main.index("</section>", note)]
-        assert "How to read these results" in block
+        assert ">A narrow measurement, not a comprehensive ranking.</h2>" in block
         assert "the same automated checks grade every run" in block
-        assert "It is a narrow measurement, not a comprehensive ranking" in block
+        assert "Other tasks or settings can give a different order." in block
         assert '<use href="#rulebook"/>' in block
         links = _local_links("standings/index.html", block)
         assert links == {"contact/index.html", "rulebook/index.html"}
@@ -3952,20 +3952,75 @@ def test_home_builds_from_the_site_data_fixtures(tmp_path):
         )
         label = site_glyphs.RACE_TYPES[row["challenge"]][0]
         assert f"{label} · {site_home.pct(row['rate'])} average pass rate" in main
-    # The hardest challenge is preselected and named as such.
+    # The hardest challenge is preselected; its detail teaches the lesson
+    # its numbers show instead of restating the heading.
     pressed = re.findall(
         r'<button type="button" class="challenge-card" data-pick="challenge" '
         r'aria-pressed="true".*?<span class="challenge-name">([^<]+)</span>',
         main,
     )
     assert pressed == ["Hard review"]
-    assert "The hardest challenge." in main
+    assert "The hardest challenge." not in main
+    # This calendar has no Hard fix race to compare with, so no lesson.
+    assert "hard-fix" not in {row["challenge"] for row in races["challenges"]}
+    assert "Agents review worse than they fix" not in main
     # No prototype sample value reaches the page.
     text = " ".join(" ".join(Text(main).text).split())
     for sample in PROTOTYPE_SAMPLES:
         assert sample not in text, sample
     assert "Learn the paddock in 60 seconds." in main
     assert "Seven challenges. One is brutal." in main
+
+
+def _challenge_row(challenge: str, k: int, n: int) -> dict:
+    lo, hi = lb.wilson(k, n)
+    return {
+        "challenge": challenge,
+        "races": 3,
+        "n": n,
+        "k": k,
+        "rate": k / n,
+        "lo": lo,
+        "hi": hi,
+    }
+
+
+def _review_panel(rows: list[dict]) -> str:
+    main = site_home.challenges({"challenges": rows})
+    panels = re.findall(
+        r'<div class="home-detail-panel" data-panel="challenge">(.*?)</div>', main
+    )
+    return panels[list(site_glyphs.RACE_TYPES).index("hard-review")]
+
+
+def test_hard_review_lesson_follows_the_challenge_data():
+    review, fix = (
+        _challenge_row("hard-review", 60, 100),
+        _challenge_row("hard-fix", 90, 100),
+    )
+    coding = _challenge_row("coding", 80, 100)
+    panel = _review_panel([coding, fix, review])
+    assert (
+        f"Agents review worse than they fix: {site_home.pct(review['rate'])} here, "
+        f"{site_home.pct(fix['rate'])} on hard fixes." in panel
+    )
+    lesson = "Agents review worse than they fix"
+    # Hard review no longer below Hard fix: the line is dropped.
+    level = _challenge_row("hard-fix", 60, 100)
+    assert lesson not in _review_panel([coding, level, review])
+    # Below on the dot but the honest ranges overlap: no winner, no line.
+    close = _challenge_row("hard-fix", 66, 100)
+    assert close["rate"] > review["rate"] and close["lo"] <= review["hi"]
+    assert lesson not in _review_panel([coding, close, review])
+    # Another challenge is the lowest: Hard review is not the hardest, no line.
+    worst = _challenge_row("coding", 40, 100)
+    assert lesson not in _review_panel([worst, fix, review])
+    # No Hard fix row to compare against: no line.
+    assert lesson not in _review_panel([coding, review])
+    # Nothing restates the heading in any panel.
+    assert "The hardest challenge." not in site_home.challenges(
+        {"challenges": [coding, fix, review]}
+    )
 
 
 def test_home_challenges_link_to_their_filtered_calendar(tmp_path):
@@ -4170,10 +4225,7 @@ def test_home_fuel_card_compares_a_shared_finish(tmp_path):
     )
     assert '>not</span> <span class="map-tail">recorded<span class="map-info">' in card
     assert "Pi default" not in card
-    assert (
-        f"{driver('d/two')} in {pi} · {tag('high', 'pi')}, tied on the finish, pays $0.320."
-        in card
-    )
+    assert f"{driver('d/two')} in {pi} · {tag('high', 'pi')} pays $0.320." in card
     # Without two priced entries sharing a place, the card makes no comparison.
     alone = site_home.fuel_card({"entries": standings["entries"][1:]})
     assert "Same finish" not in alone and "The fuel bill." in alone
@@ -4655,13 +4707,17 @@ def test_home_results_note_follows_the_photo_finish(tmp_path):
     )
     note = _between(main, 'data-pdk="results-note"', "</section>")
     assert '<use href="#rulebook"/>' in note
-    assert site_home.RESULTS_NOTE_TITLE == "How to read these results"
-    assert ">How to read these results</h2>" in note
+    assert (
+        site_home.RESULTS_NOTE_TITLE
+        == "A narrow measurement, not a comprehensive ranking."
+    )
+    assert ">A narrow measurement, not a comprehensive ranking.</h2>" in note
     assert (
         "AI agents race a fixed calendar of 2 tasks, and the same automated checks grade every run. "
-        "It is a narrow measurement, not a comprehensive ranking: other tasks or settings "
-        "can give a different order." in note
+        "Other tasks or settings can give a different order." in note
     )
+    # The heading carries the point; the paragraph does not repeat it.
+    assert "comprehensive" not in _between(note, "<p>", "</p>")
     assert (
         '<a href="contact/index.html">Independent and open source: about the paddock</a>'
         in note
@@ -4857,6 +4913,41 @@ def test_engine_map_notes_are_written_from_the_numbers():
     bare = {"low": _rung("low", 4, 9, None), "high": _rung("high", 9, 10, None)}
     note = learn.level_note("low", bare, "high")
     assert "no price on record" in note and "times as much" not in note
+
+
+def test_engine_map_heading_counts_drivers_the_dial_shows_clearly_helped(tmp_path):
+    drivers = _drivers()
+    low, high = _rung("low", 2, 9, 0.01), _rung("high", 9, 9, 0.02)
+    flat = [_rung("low", 5, 9, 0.01), _rung("high", 6, 9, 0.02)]
+    assert high["lo"] > low["hi"] and flat[1]["lo"] <= flat[0]["hi"]
+    drivers["ladders"] = [
+        {"driver": "acme/coder-large", "car": "alpha-cli", "levels": [low, high]},
+        {"driver": "bolt/coder-small", "car": "beta-cli", "levels": flat},
+    ]
+    lab = learn.engine_map_lab(drivers)
+    assert lab["title"] == "Thinking harder clearly helps 1 of 2 drivers."
+    assert (
+        learn.engine_map_title(learn.pick_ladders(drivers["ladders"])) == lab["title"]
+    )
+    assert f"<h2>{lab['title']}</h2>" in learn.engine_map_html(lab)
+    # Overlapping ranges are a tie, never a win.
+    drivers["ladders"][0]["levels"] = flat
+    assert learn.engine_map_lab(drivers)["title"] == (
+        "Thinking harder clearly helps none of the 2 drivers."
+    )
+    drivers["ladders"][1]["levels"] = [low, high]
+    drivers["ladders"][0]["levels"] = [low, high]
+    assert learn.engine_map_lab(drivers)["title"] == (
+        "Thinking harder clearly helps all 2 drivers."
+    )
+    # One driver is no field: the heading stays a question.
+    drivers["ladders"] = drivers["ladders"][:1]
+    assert learn.engine_map_lab(drivers)["title"] == "Does thinking harder help?"
+    # The built page shows the count from its own drivers.json.
+    files = build_site.build(_site_tree(tmp_path))
+    built = json.loads(files["data/drivers.json"])
+    title = learn.engine_map_title(learn.pick_ladders(built.get("ladders", [])))
+    assert f"<h2>{html.escape(title, quote=True)}</h2>" in files["learn/index.html"]
 
 
 def test_the_level_on_screen_is_held_across_drivers():
@@ -5364,6 +5455,25 @@ def _data_pages(results: Path):
 @pytest.fixture(scope="module")
 def committed_pages():
     return _data_pages(lb.DEFAULT_RESULTS)
+
+
+def test_committed_hard_review_lesson_reads_the_challenge_data(committed_pages):
+    files, _site = committed_pages
+    rows = {
+        row["challenge"]: row
+        for row in json.loads(files["data/races.json"])["challenges"]
+    }
+    review, fix = rows["hard-review"], rows.get("hard-fix")
+    hardest = min(rows.values(), key=lambda row: row["rate"])
+    panel = _review_panel(list(rows.values()))
+    assert panel in files["index.html"]
+    if hardest is review and fix and review["hi"] < fix["lo"]:
+        assert (
+            f"Agents review worse than they fix: {site_home.pct(review['rate'])} here, "
+            f"{site_home.pct(fix['rate'])} on hard fixes." in panel
+        )
+    else:
+        assert "Agents review worse than they fix" not in panel
 
 
 @pytest.fixture

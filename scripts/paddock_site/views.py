@@ -19,10 +19,10 @@ from typing import Any, Iterable, Mapping
 from . import glyphs
 
 #: Shared wording for the home and standings results note.
+RESULTS_NOTE_TITLE = "A narrow measurement, not a comprehensive ranking."
 RESULTS_NOTE = (
     "AI agents race {calendar}, and the same automated checks grade every run. "
-    "It is a narrow measurement, not a comprehensive ranking: other tasks or "
-    "settings can give a different order."
+    "Other tasks or settings can give a different order."
 )
 
 #: The six engine maps the garage offers, in ladder order.
