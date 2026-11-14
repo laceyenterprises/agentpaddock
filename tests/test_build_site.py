@@ -4046,6 +4046,10 @@ def test_races_script_reads_and_updates_the_challenge_address(challenge):
         pytest.skip("Node.js is required to execute the races JavaScript")
     harness = """
 const assert = require('node:assert/strict');
+// NodeList-like query results have indexed items and forEach, but no filter.
+function nodeList(items) {
+  return Object.assign({length: items.length, forEach: items.forEach.bind(items)}, items);
+}
 function element(attrs = {}) {
   return {
     attrs, hidden: false, events: {},
@@ -4059,18 +4063,18 @@ function element(attrs = {}) {
 var chips = ['all', 'hard-review', 'docs'].map(c => element({'data-challenge': c}));
 var sorts = ['hard', 'name'].map(s => element({'data-sort': s}));
 var group = element();
-group.querySelectorAll = () => chips;
+group.querySelectorAll = () => nodeList(chips);
 chips.forEach(c => c.parentNode = group);
 sorts.forEach(s => s.parentNode = element());
 var cards = ['docs', 'hard-review', 'hard-review', 'docs'].map((c, i) =>
   element({'data-challenge': c, 'data-rate': String(i), 'data-name': String(4 - i)}));
 var grid = element({'data-first': '2'});
-grid.querySelectorAll = () => cards;
+grid.querySelectorAll = () => nodeList(cards);
 grid.appendChild = () => {};
 var scroll = element();
 scroll.parentNode = element();
 var controls = element();
-controls.querySelectorAll = s => s === '[data-challenge]' ? chips : sorts;
+controls.querySelectorAll = s => nodeList(s === '[data-challenge]' ? chips : sorts);
 controls.querySelector = () => scroll;
 var more = element();
 var document = {querySelector(s) {
