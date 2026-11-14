@@ -995,7 +995,6 @@ def _script() -> str:
   var stamp = ticker.querySelector('[data-stamp]');
   var stack = ticker.querySelector('[data-ticks]');
   var layers = Array.prototype.slice.call(stack.querySelectorAll('[data-tick]'));
-  var template = layers[0].cloneNode(true);
   var text = function (value, max) { return typeof value === 'string' ? value.slice(0, max) : ''; };
   var kindOf = function (t) {
     // An infrastructure rerun is a red flag, never a DNF.
@@ -1016,7 +1015,8 @@ def _script() -> str:
   };
   var samples = [];
   try { samples = clean(JSON.parse(ticker.getAttribute('data-samples') || '[]')); } catch (e) { samples = []; }
-  if (!samples.length) return;
+  if (!samples.length || !layers.length) return;
+  var template = layers[0].cloneNode(true);
   var ticks = samples, at = 0;
   var TICK_FADE_MS = 600;
   function tickDwell(t) {
@@ -1063,7 +1063,8 @@ def _script() -> str:
       activate(layer, i === 0);
       return layer;
     });
-    stack.replaceChildren.apply(stack, layers);
+    while (stack.firstChild) stack.removeChild(stack.firstChild);
+    each(layers, function (layer) { stack.appendChild(layer); });
     clearTimeout(timer); timer = null;
     remaining = tickDwell(ticks[0]);
     syncTicker();

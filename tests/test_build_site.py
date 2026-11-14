@@ -4073,6 +4073,96 @@ console.log(JSON.stringify({rejected: rejected, aliases: aliases, reruns: reruns
     )
 
 
+@pytest.mark.parametrize("samples", [[], [{"kind": "passed", "who": "Driver", "what": "Run"}]])
+def test_home_ticker_without_layers_exits_cleanly(samples):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required to execute the ticker JavaScript")
+    script = (
+        """
+var ticker = {
+  querySelector: function () { return {querySelectorAll: function () { return []; }}; },
+  getAttribute: function () { return JSON.stringify("""
+        + json.dumps(samples)
+        + """); }
+};
+var root = {
+  querySelectorAll: function () { return []; },
+  querySelector: function (selector) { return selector === '[data-ticker]' ? ticker : null; }
+};
+var document = {querySelector: function () { return root; }};
+var window = {};
+"""
+        + site_home.SCRIPT
+    )
+    subprocess.run(
+        [node, "-e", script], capture_output=True, text=True, check=True, timeout=10
+    )
+
+
+def test_home_ticker_rebuilds_live_layers_without_replace_children():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required to execute the ticker JavaScript")
+    rebuild = site_home.SCRIPT.split("  function rebuild(list) {", 1)[1].split(
+        "  document.addEventListener", 1
+    )[0]
+    script = (
+        """
+const assert = require('node:assert/strict');
+var old = {}, children = [old], layers = [], ticks = [], at = 1;
+var stack = {
+  get firstChild() { return children[0]; },
+  removeChild: function (child) { assert.equal(child, children.shift()); },
+  appendChild: function (child) { children.push(child); }
+};
+var FLAGS = {passed: ['flag-checkered', 'CHECKERED'], dnf: ['dnf', 'DNF']};
+var template = {cloneNode: function () {
+  var fields = {};
+  return {fields: fields, querySelector: function (selector) {
+    return fields[selector] = {setAttribute: function (key, value) { this[key] = value; }};
+  }};
+}};
+var activate = function (layer, active) { layer.active = active; };
+var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
+var timer = 42, cleared, remaining = 0, synced = 0;
+var clearTimeout = function (id) { cleared = id; };
+var tickDwell = function () { return 6500; };
+var syncTicker = function () { synced += 1; };
+function rebuild(list) {
+"""
+        + rebuild
+        + """
+var live = [
+  {kind: 'passed', who: 'Driver', what: 'Run', when: 'Now'},
+  {kind: 'dnf', who: 'Other', what: 'Failed run', when: 'Earlier'}
+];
+rebuild(live);
+assert.equal(at, 0);
+assert.equal(children.length, 2);
+assert.ok(!children.includes(old));
+children.forEach(function (layer, i) {
+  assert.equal(layer.active, i === 0);
+  assert.equal(layer.fields['[data-flag] use'].href, '#' + FLAGS[live[i].kind][0]);
+  assert.equal(layer.fields['[data-flag-name]'].textContent, FLAGS[live[i].kind][1]);
+  ['who', 'what', 'when'].forEach(function (field) {
+    assert.equal(layer.fields['[data-' + field + ']'].textContent, live[i][field]);
+  });
+});
+assert.equal(cleared, 42);
+assert.equal(timer, null);
+assert.equal(remaining, 6500);
+assert.equal(synced, 1);
+rebuild(live.slice(0, 1));
+assert.equal(children.length, 1);
+assert.equal(children[0].active, true);
+"""
+    )
+    subprocess.run(
+        [node, "-e", script], capture_output=True, text=True, check=True, timeout=10
+    )
+
+
 def test_home_ticker_stacks_and_crossfades_without_motion():
     css = site_home.CSS
     assert ".home-ticks { display: grid; }" in css
