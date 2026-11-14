@@ -36,12 +36,13 @@ RACE_IT_YOURSELF = "race-it-yourself/index.html"
 COMMUNITY = "community/index.html"
 
 #: The car in its livery, as drawn in the approved prototype; ``--c`` paints it.
+#: The helmet is ink and its visor Lacey blue, so the driver reads in any livery.
 CAR_ART = """<svg class="gr-art" viewBox="0 0 900 300" role="img" aria-label="{label}">
 <rect x="70" y="226" width="780" height="8" fill="var(--c)"/>
 <path d="M76 226 L84 156 L160 150 L190 170 L330 166 C360 152 388 140 410 133 C418 108 442 94 470 95 C484 96 492 106 494 120 L520 122 C542 122 556 136 568 154 L604 176 C684 190 780 206 856 222 L856 226 Z" fill="var(--c)"/>
 <rect x="36" y="64" width="14" height="120" rx="2" fill="var(--c)"/><rect x="36" y="64" width="128" height="16" rx="3" fill="var(--c)"/><rect x="44" y="88" width="112" height="10" rx="3" fill="var(--c)"/>
 <path d="M118 98 L132 152" stroke="var(--c)" stroke-width="8" fill="none"/>
-<circle cx="528" cy="112" r="25" fill="#111111"/><rect x="532" y="101" width="24" height="12" rx="6" fill="#FFFFFF"/>
+<circle cx="528" cy="112" r="25" fill="#111111"/><rect x="532" y="101" width="24" height="12" rx="6" fill="var(--blue)"/>
 <path d="M486 100 C504 80 560 82 580 150" stroke="#111111" stroke-width="9" stroke-linecap="round" fill="none"/>
 <rect x="790" y="228" width="100" height="14" rx="3" fill="var(--c)"/><rect x="876" y="204" width="12" height="38" rx="2" fill="var(--c)"/>
 <circle cx="196" cy="228" r="64" fill="#111111"/><circle cx="196" cy="228" r="40" fill="#3A3F47"/><circle cx="196" cy="228" r="12" fill="#F4F6F9"/>

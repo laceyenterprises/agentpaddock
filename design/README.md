@@ -114,6 +114,9 @@ in [the vocabulary](vocabulary.md) has one; livery shows its five colours instea
 - **The car is an Indy car:** a low open-wheel body with a single rear wing, drawn in ink, with Lacey blue on the
   helmet and the trim. It is a generic car: no real series, team, sponsor or maker likeness, and no mascots.
 - **The driver sits in the car.** An entry is one model in one harness, so the helmet is always inside the cockpit.
+- **The helmet always reads.** On an ink car the helmet itself is Lacey blue. On a car in its livery the helmet is
+  ink and its visor Lacey blue, so the driver stands out in every livery, Pi's blue included. A white or ink visor on
+  an ink helmet disappears on a dark board.
 - **Grounds:** light boards on `--soft`, dark boards on the tower ground. Track surfaces are ink; kerbs are white with
   a blue dashed trim.
 - **Callouts** are a mono eyebrow, a display title and one plain line. The leader line runs from the part it names

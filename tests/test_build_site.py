@@ -4923,6 +4923,26 @@ def test_garage_level_availability_comes_from_the_data(tmp_path):
     assert set(embedded["entries"]) == set(view["entries"])
 
 
+def test_every_driver_in_a_livery_car_wears_a_blue_visor(committed_pages):
+    # A car in its livery has an ink helmet; only a Lacey blue visor makes the
+    # driver read in it, on a dark board and in Pi's blue livery alike.
+    helmet = re.compile(
+        r'<circle cx="528" cy="112" r="25" fill="([^"]+)"(?:/>|></circle>)'
+        r'<rect x="532" y="101" width="24" height="12" rx="6" fill="([^"]+)"'
+    )
+    files, _ = committed_pages
+    drawn = [
+        (name, *match)
+        for name, page in files.items()
+        if name.endswith(".html") and isinstance(page, str)
+        for match in helmet.findall(page)
+    ]
+    assert drawn and {name for name, *_ in drawn} == {"garage/index.html"}
+    assert all(visor == "var(--blue)" for _, _, visor in drawn), drawn
+    mock = (REPO / "design/web/Garage.dc.html").read_text("utf-8")
+    assert helmet.findall(mock) == [("#111111", "{{acc}}")]
+
+
 def test_garage_offers_every_committed_driver_and_its_levels(committed_pages):
     files, site = committed_pages
     view = site_garage.model(site)
