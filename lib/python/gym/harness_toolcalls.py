@@ -181,11 +181,25 @@ def _normalize(command: str, depth: int = 0) -> list[str]:
         if body.startswith(("'", '"')) and words:
             body = words[0]
         return _normalize(body, depth + 1)
+    try:
+        words = shlex.split(command)
+    except ValueError:
+        return [command]
+    if (
+        len(words) >= 2
+        and re.fullmatch(r"(?:python|pypy)(?:\d+(?:\.\d+)*)?[tw]?", Path(words[0]).name)
+        and Path(words[1]).name == "boundary_steer.py"
+    ):
+        for i, word in enumerate(words[2:], start=2):
+            if word == "--command" and i + 1 < len(words):
+                return _normalize(words[i + 1], depth + 1)
+            if word.startswith("--command="):
+                return _normalize(word.removeprefix("--command="), depth + 1)
     return [command] if command else []
 
 
 def normalized_commands(call: dict[str, Any]) -> list[str]:
-    """Executed command segments with shell/env wrappers removed.
+    """Executed command segments with shell/env/boundary-steer wrappers removed.
 
     Shared by all verifier harnesses, including ledger calls. The original
     ``arguments`` are never changed; callers needing raw evidence keep them.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import sys
 from pathlib import Path
 
@@ -551,6 +552,43 @@ def test_normalized_commands_preserves_raw_and_quoted_non_commands():
     assert h.normalized_commands({"arguments": {"command": ["bash", "script.sh", "pytest"]}}) == [
         "bash script.sh pytest"
     ]
+
+
+@pytest.mark.parametrize("python", ["python", "python3", "/opt/tools/python3.14", "pypy3"])
+def test_normalized_commands_unwraps_boundary_steer(python):
+    wrapper = (
+        f"{python} /opt/tools/cwp_dispatch/boundary_steer.py "
+        '--policy /tmp/worker-walk-policy.json --shell "$0" '
+        "--command 'cat change.diff && nl -ba retention.py'"
+    )
+    raw = "/bin/zsh -lc " + shlex.quote(wrapper)
+    call = {"arguments": {"command": raw}}
+    assert h.normalized_commands(call) == ["cat change.diff", "nl -ba retention.py"]
+    assert call["arguments"]["command"] == raw
+
+
+def test_normalized_commands_normalizes_boundary_steer_body_recursively():
+    body = "env MODE=test bash -lc 'cat change.diff; nl -ba retention.py | head -80'"
+    raw = "python3 boundary_steer.py --command=" + shlex.quote(body)
+    assert h.normalized_commands({"arguments": {"command": raw}}) == [
+        "cat change.diff",
+        "nl -ba retention.py",
+        "head -80",
+    ]
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        'python3 /opt/tools/boundary_steer.py --policy /tmp/policy.json --shell "$0"',
+        "python3 boundary_steer.py --command",
+        "cat change.diff",
+        "python3 other.py --command 'cat change.diff'",
+        "echo boundary_steer.py --command 'cat change.diff'",
+    ],
+)
+def test_normalized_commands_keeps_commands_without_boundary_steer_body(raw):
+    assert h.normalized_commands({"arguments": {"command": raw}}) == [raw]
 
 
 @pytest.mark.parametrize(
