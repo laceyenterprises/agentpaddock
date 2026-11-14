@@ -26,9 +26,10 @@ import json
 import math
 from itertools import zip_longest
 from typing import Any, Mapping, Sequence
+from urllib.parse import urlencode
 
 from . import glyphs, layout, site_config, views
-from .routes import Route
+from .routes import ROUTES, Route
 
 TITLE = "The open leaderboard for coding agents"
 EYEBROW = "Agent Paddock: the open leaderboard for coding agents"
@@ -528,30 +529,43 @@ def challenges(races: Mapping[str, Any]) -> str:
     )
     selected = types.index(hardest) if hardest else 0
     cards, panels, dots = [], [], []
+    races_route = next(route for route in ROUTES if route.path == "races/")
     for i, race_type in enumerate(types):
         label = glyphs.RACE_TYPES[race_type][0]
         row = summary.get(race_type)
         rate = row["rate"] if row else None
         on = i == selected
+        races_url = (
+            layout.href(races_route.path, "")
+            + "?"
+            + urlencode({"challenge": race_type})
+        )
         cards.append(
             f'<button type="button" class="challenge-card" data-pick="challenge" '
-            f'aria-pressed="{"true" if on else "false"}" aria-controls="challenge-detail">'
+            f'aria-pressed="{"true" if on else "false"}" aria-controls="challenge-detail" '
+            f'data-challenge="{esc(race_type)}" data-races-url="{esc(races_url)}">'
             f"{glyphs.roundel(race_type, labelled=False, size='xl')}"
             f'<span class="challenge-name">{esc(label)}</span>'
             f'<span class="challenge-pct">{pct(rate)}</span></button>'
         )
         if row:
             title = f"{label} · {pct(rate)} average pass rate"
-            tail = f" {plural(row['races'], 'race')} on the calendar."
+            tail = (
+                f' <a href="{esc(races_url)}">'
+                f"{plural(row['races'], 'race')} on the calendar</a>."
+            )
             if race_type == hardest:
                 tail += " The hardest challenge on the calendar."
         else:
             title = label
-            tail = " No race of this challenge is on the calendar yet."
+            tail = (
+                f' <a href="{esc(races_url)}">'
+                "No race of this challenge is on the calendar yet</a>."
+            )
         panels.append(
             '<div class="home-detail-panel" data-panel="challenge">'
             f'<b class="challenge-title">{esc(title)}</b>'
-            f"<p>{esc(label)}: {esc(CHALLENGE_COPY[race_type])}{esc(tail)}</p></div>"
+            f"<p>{esc(label)}: {esc(CHALLENGE_COPY[race_type])}{tail}</p></div>"
         )
         dots.append(
             f'<span class="swipe-dot{" on" if i == 0 else ""}" data-dot></span>'
@@ -914,6 +928,10 @@ def _script() -> str:
     });
     each(buttons, function (button, i) {
       button.addEventListener('click', function () {
+        if (group === 'challenge' && button.getAttribute('aria-pressed') === 'true') {
+          window.location.assign(button.getAttribute('data-races-url'));
+          return;
+        }
         each(buttons, function (b, j) { b.setAttribute('aria-pressed', i === j ? 'true' : 'false'); });
         each(panels, function (p, j) { p.hidden = i !== j; if (i === j) enter(p); });
         if (onPick) onPick(i);
