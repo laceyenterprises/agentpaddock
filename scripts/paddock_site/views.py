@@ -377,9 +377,15 @@ def map_info(note: str, *, context: str = "", hidden: bool = False) -> str:
     )
 
 
-def tag(glyph: str, text: str, *, info: str = "") -> str:
+#: A separator dot for :func:`tag`'s ``lead``: it rides in the tag's first box, so a
+#: line never ends on a dot and the dot always leads the item it introduces.
+DOT = '<span class="ent-sep">·&nbsp;</span>'
+
+
+def tag(glyph: str, text: str, *, info: str = "", lead: str = "") -> str:
     """``text`` in bold behind ``glyph``. The glyph stays on the line of the first
-    word; the rest wraps like any text, so a narrow column never overflows."""
+    word; the rest wraps like any text, so a narrow column never overflows.
+    ``lead`` (markup, such as :data:`DOT`) rides in front of the glyph, on its line."""
     first, space, rest = text.partition(" ")
     if info:
         if space:
@@ -389,12 +395,12 @@ def tag(glyph: str, text: str, *, info: str = "") -> str:
             first = esc(first)
             return (
                 f'<b class="ent"><span class="ent-lead map-tail">'
-                f"{glyphs.icon(glyph)}{first}{info}</span></b>"
+                f"{lead}{glyphs.icon(glyph)}{first}{info}</span></b>"
             )
     else:
         rest = esc(rest)
     return (
-        f'<b class="ent"><span class="ent-lead">{glyphs.icon(glyph)}{esc(first)}</span>'
+        f'<b class="ent"><span class="ent-lead">{lead}{glyphs.icon(glyph)}{esc(first)}</span>'
         f"{space}{rest}</b>"
     )
 
@@ -404,7 +410,9 @@ def car_tag(car: str) -> str:
     return tag("car", car_name(car))
 
 
-def map_tag(engine_map: str, car: str | None = None, route: str | None = None) -> str:
+def map_tag(
+    engine_map: str, car: str | None = None, route: str | None = None, lead: str = ""
+) -> str:
     """The engine map's label in bold behind its engine-map glyph."""
     context = car_name(car) if car else ""
     if route:
@@ -415,6 +423,7 @@ def map_tag(engine_map: str, car: str | None = None, route: str | None = None) -
         info=map_info(map_tip(car, route), context=context.strip())
         if engine_map == "default"
         else "",
+        lead=lead,
     )
 
 
@@ -450,6 +459,34 @@ def ordinal(number: int) -> str:
         else {1: "st", 2: "nd", 3: "rd"}.get(number % 10, "th")
     )
     return f"{number}{suffix}"
+
+
+def fuel_gap(unpriced: int, unmetered: int, passed: int) -> str:
+    """Why there is no fuel bill, in a few words: ``7 runs unmetered``.
+
+    A bill needs every counted run priced. An unmetered run never recorded its
+    tokens, so no price can be put on it; an unpriced run has tokens but no
+    per-token price."""
+    if unpriced and unmetered == unpriced:
+        return f"{plural(unmetered, 'run')} unmetered"
+    if unpriced:
+        return f"{plural(unpriced, 'run')} unpriced"
+    if not passed:
+        return "no race passed"
+    return ""
+
+
+def fuel_gap_sentence(unpriced: int, unmetered: int, passed: int, runs: int) -> str:
+    """:func:`fuel_gap` as a sentence, ending with what it means for the bill."""
+    if unpriced and unmetered == unpriced:
+        why = f"{unmetered} of its {runs} counted runs did not record their tokens"
+    elif unpriced:
+        why = f"{unpriced} of its {runs} counted runs have no per-token price"
+    elif not passed:
+        why = "It passed no race"
+    else:
+        why = "Not every run has a per-token price"
+    return f"{why}, so there is no fuel bill."
 
 
 def place(entry: Mapping[str, Any]) -> str:
@@ -507,6 +544,7 @@ CSS = """
 /* an entry's car and engine map: bold, the glyph kept on the line of the first word */
 .ent { font-weight: 700; }
 .ent-lead { display: inline-block; max-width: 100%; }
+.ent-sep { font-weight: 400; }
 .ent svg.glyph { display: inline-block; width: 1.15em; height: 1.15em; margin-right: .2em; vertical-align: -.22em; }
 .map-info { display: inline; }
 .map-info[hidden] { display: none; }

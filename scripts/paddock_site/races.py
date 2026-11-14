@@ -5,8 +5,9 @@ challenge chips with counts and roundels, hardest first (by avg pass rate) or
 A to Z, the first 12 cards and then "Show all". ``/races/<race-id>/`` rebuilds
 ``design/web/Race.dc.html`` for every calendar race: the header roundel and
 stats, the lap funnel (All runs, By car, By driver; drivers with
-:data:`DRIVER_MIN_RUNS` or more runs) with playback at
-:data:`PLAYBACK_MS` per checkpoint, the classification of each entry's first
+:data:`DRIVER_MIN_RUNS` or more runs) with playback that follows the running
+step down the page and holds each step as long as its words take to read
+(:func:`step_ms`), the classification of each entry's first
 run (lap or fuel order, top 10 then all) and its retirements, the briefing as
 the track card's ``[briefing] show`` allows, and the track's staged files and
 sealed circuit from ``leaderboard.py track-facts``.
@@ -38,8 +39,15 @@ GRID_FIRST = 12
 CLASSIFICATION_FIRST = 10
 #: The By driver view lists drivers with at least this many runs recording checks.
 DRIVER_MIN_RUNS = 5
-#: Playback advances one checkpoint every this many milliseconds.
-PLAYBACK_MS = 1600
+#: Playback holds each step long enough to read it: a base for the page to scroll
+#: and the eye to land, then time per word of the step's explanation (about 250
+#: words a minute) and per word of its station card, which is glanced at rather
+#: than read, rounded to 100 ms and kept between the floor and the ceiling.
+STEP_BASE_MS = 1000
+READ_MS_PER_WORD = 240
+GLANCE_MS_PER_WORD = 90
+STEP_MIN_MS = 2500
+STEP_MAX_MS = 8000
 #: The funnel ribbon's full width, in pixels, for every run through a station.
 RIBBON_PX = 46
 #: Red marks an avg pass rate under this share on a card.
@@ -409,6 +417,45 @@ def _view(
     }
 
 
+def step_ms(read: str, glance: str = "") -> int:
+    """How long playback holds a step: ``read`` is read word by word, ``glance``
+    is taken in at a glance."""
+    ms = (
+        STEP_BASE_MS
+        + READ_MS_PER_WORD * len(read.split())
+        + GLANCE_MS_PER_WORD * len(glance.split())
+    )
+    return int(min(STEP_MAX_MS, max(STEP_MIN_MS, round(ms / 100) * 100)))
+
+
+def _rate_text(rate: Mapping[str, Any]) -> str:
+    shown = f"{rate['rate']:.0%}" if rate["rate"] is not None else "n/a"
+    optional = " · optional" if rate["optional"] else ""
+    return f"{shown} pass · {rate['n']:,} runs{optional}"
+
+
+def _step_times(
+    view: Mapping[str, Any],
+    labels: Sequence[str],
+    rates: Sequence[Mapping[str, Any]] | None,
+) -> list[int]:
+    """Playback's hold for each station: its explanation is read, its card glanced."""
+    rates = rates or ()
+    names = ["Lights out", *labels, "Checkered flag"]
+    last = len(names) - 1
+    times = []
+    for k, name in enumerate(names):
+        card = [name, view["stats"][k]]
+        if 0 < k < last:
+            card.append(f"{view['counts'][k]:,} through")
+            if k <= len(rates):
+                card.append(_rate_text(rates[k - 1]))
+        if k:
+            card.append(f"{view['out'][k]:,} out here")
+        times.append(step_ms(view["bodies"][k], " ".join(card)))
+    return times
+
+
 def funnel_views(race: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Every view the lap section can show: all runs, each car, and each driver
     with at least :data:`DRIVER_MIN_RUNS` runs recording checks."""
@@ -428,6 +475,8 @@ def funnel_views(race: Mapping[str, Any]) -> list[dict[str, Any]]:
             lap_views.append(
                 _view("driver", driver, counts, labels, more, names[driver])
             )
+    for view in lap_views:
+        view["ms"] = _step_times(view, labels, race["checkpointRates"])
     return lap_views
 
 
@@ -456,11 +505,8 @@ def _stations(
         checkpoint_rate = ""
         has_rate = 0 < k < last and k <= len(rates)
         if has_rate:
-            rate = rates[k - 1]
-            shown = f"{rate['rate']:.0%}" if rate["rate"] is not None else "n/a"
             checkpoint_rate = (
-                f'<span class="rc-checkpoint-rate">{shown} pass · {rate["n"]:,} runs'
-                + (" · optional" if rate["optional"] else "")
+                f'<span class="rc-checkpoint-rate">{esc(_rate_text(rates[k - 1]))}'
                 + "</span>"
                 + f'<span class="rc-through">{view["counts"][k]:,} through</span>'
             )
@@ -622,8 +668,7 @@ def _lap(race: Mapping[str, Any]) -> str:
         else '<p class="rc-worst" data-lap-worst>No checkpoint retires a run.</p>'
     )
     return (
-        f'<section class="rc-section rc-lap" id="lap" data-funnel="{_attr(lap_views)}" '
-        f'data-playback-ms="{PLAYBACK_MS}">'
+        f'<section class="rc-section rc-lap" id="lap" data-funnel="{_attr(lap_views)}">'
         '<div class="rc-lap-copy">'
         + head
         + '<p class="rc-copy">Every run shown has finished. The numbers and blue ribbon '
@@ -1099,6 +1144,12 @@ CSS = """
 .rc-panel { padding: 20px; border-radius: 18px; background: var(--soft); display: grid; gap: 6px; }
 .rc-panel b { font-size: 18px; }
 .rc-panel span { font-size: 16px; line-height: 1.5; color: var(--ink-2); }
+/* During playback the panel rides under the running station; the card already names it. */
+.rc-station-detail > .rc-panel { margin: 2px 0 10px; animation: rc-dock .35s var(--ease); }
+.rc-station-detail > .rc-panel b {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+@keyframes rc-dock { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 .rc-stations { list-style: none; margin: 0; padding: 0; }
 .rc-station { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 14px; align-items: stretch; }
 .rc-rail { display: flex; flex-direction: column; align-items: center; }
@@ -1298,7 +1349,6 @@ SCRIPT = """(function () {
   var lap = document.querySelector('[data-funnel]');
   if (lap) {
     var views = JSON.parse(lap.getAttribute('data-funnel'));
-    var ms = parseInt(lap.getAttribute('data-playback-ms'), 10) || 1600;
     var stations = all(lap, '.rc-station');
     var last = stations.length - 1;
     var modes = all(lap, '[data-mode]').filter(function (b) { return b.getAttribute('role') === 'radio'; });
@@ -1313,6 +1363,12 @@ SCRIPT = """(function () {
     var step = last;
     var selected = view.worst || last;
     var timer = null;
+    // Once the race plays, the explanation sits under the step it explains, and the
+    // page follows the running step until the reader scrolls for themselves.
+    var home = panel.parentNode;
+    var nav = document.querySelector('.nav');
+    var docked = false;
+    var following = false;
     var motion = typeof window.matchMedia === 'function'
       ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
     function motionChanged() {
@@ -1337,6 +1393,24 @@ SCRIPT = """(function () {
       });
       panel.querySelector('b').textContent = view.titles[selected];
       panel.querySelector('span').textContent = view.bodies[selected];
+      // Docked, the explanation follows its card, ahead of the checkpoint link, and the
+      // rail keeps the station's dot level with the card rather than the whole station.
+      var card = stations[selected].querySelector('.rc-station-card');
+      if (docked && panel.previousElementSibling !== card) {
+        card.parentNode.insertBefore(panel, card.nextSibling);
+      } else if (!docked && panel.parentNode !== home) {
+        home.insertBefore(panel, caption);
+      }
+      stations.forEach(function (station, k) {
+        var rib = station.querySelector('.rc-ribbon-top');
+        if (docked && k === selected) {
+          var face = station.querySelector('.rc-station-card').getBoundingClientRect();
+          var box = station.getBoundingClientRect();
+          rib.style.flex = '0 0 ' + Math.max(18, face.top - box.top + face.height / 2 - 20) + 'px';
+        } else {
+          rib.style.flex = '';
+        }
+      });
       caption.textContent = view.caption;
       if (basisCount) basisCount.textContent = view.n.toLocaleString('en-US');
       var name = view.worst ? stations[view.worst].querySelector('.rc-station-name').textContent : '';
@@ -1352,8 +1426,37 @@ SCRIPT = """(function () {
       }
       play.textContent = timer ? 'Racing\\u2026' : 'Play the race';
     }
-    function stop() { if (timer) { clearInterval(timer); timer = null; } }
-    function use(next) { stop(); view = next; step = last; selected = view.worst || last; show(); }
+    function stop() { if (timer) { clearTimeout(timer); timer = null; } }
+    function use(next) {
+      stop(); docked = false; view = next; step = last; selected = view.worst || last; show();
+    }
+    // Each step holds as long as its words take to read (races.step_ms).
+    function hold(k) { return (view.ms && view.ms[k]) || 4000; }
+    // Bring the running step to the middle of the room under the nav, or to its top
+    // when the step is taller than the room.
+    function land(instant) {
+      if (!following) return;
+      var top = nav ? Math.max(0, nav.getBoundingClientRect().bottom) : 0;
+      var box = stations[selected].getBoundingClientRect();
+      var room = window.innerHeight - top;
+      var y = window.pageYOffset + box.top - top - Math.max(12, (room - box.height) / 2);
+      window.scrollTo({ top: Math.max(0, y), behavior: instant ? 'auto' : 'smooth' });
+    }
+    function advance() {
+      step += 1; selected = step;
+      timer = step < last ? setTimeout(advance, hold(step)) : null;
+      show(); land(false);
+    }
+    // A reader who scrolls during the race takes the page back.
+    function reading(event) {
+      if (!timer) return;
+      if (event.type !== 'keydown' || /^(Arrow(Up|Down)|Page(Up|Down)|Home|End| )$/.test(event.key)) {
+        following = false;
+      }
+    }
+    ['wheel', 'touchstart', 'keydown'].forEach(function (type) {
+      window.addEventListener(type, reading, { passive: true });
+    });
     function pickMode(button) {
       check(modes, button);
       var mode = button.getAttribute('data-mode');
@@ -1378,19 +1481,16 @@ SCRIPT = """(function () {
     if (modes.length) arrows(modes[0].parentNode, pickMode);
     stations.forEach(function (station, k) {
       station.querySelector('.rc-station-card').addEventListener('click', function () {
-        selected = k; show();
+        stop(); selected = k; show();
       });
     });
     play.addEventListener('click', function () {
       stop();
-      if (motion.matches) { step = last; selected = last; show(); return; }
+      docked = true; following = true;
+      if (motion.matches) { step = last; selected = last; show(); land(true); return; }
       step = 0; selected = 0;
-      timer = setInterval(function () {
-        step += 1; selected = step;
-        if (step >= last) { stop(); }
-        show();
-      }, ms);
-      show();
+      timer = setTimeout(advance, hold(0));
+      show(); land(false);
     });
     var optionCue = cue(lap.querySelector('[data-lap-options]'));
     lap.querySelector('[data-lap-controls]').hidden = false;
