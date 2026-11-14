@@ -1,3 +1,5 @@
+import shlex
+
 import pytest
 from gym.review_checks import evaluate, CATEGORIES, result_schema_snippet, _read_arguments
 
@@ -174,6 +176,15 @@ def credited(*commands):
         for path in TARGETS
         if evaluate([], calls, clean_control=True, read_files=[path])[-1]["ok"]
     }
+
+
+@pytest.mark.parametrize("body", ["nl -ba src/store.py", "sed -n 1,80p src/store.py"])
+def test_read_evidence_credits_boundary_steer_command(body):
+    wrapper = (
+        "/opt/tools/python3 /opt/tools/cwp_dispatch/boundary_steer.py "
+        '--policy /tmp/worker-walk-policy.json --shell "$0" --command ' + shlex.quote(body)
+    )
+    assert credited("/bin/zsh -lc " + shlex.quote(wrapper)) == {"src/store.py"}
 
 
 @pytest.mark.parametrize(
