@@ -5795,7 +5795,15 @@ def test_every_missing_fuel_bill_says_how_many_runs_lack_a_price(committed_pages
     # The timing tower says the same in its words.
     tower = files["standings/index.html"]
     assert "Not every run has a per-token price" not in tower
-    assert "counted runs did not record their tokens, so there is no fuel bill." in tower
+    # Token backfills can leave every placed entry fully metered.
+    unmetered_explanation = (
+        "counted runs did not record their tokens, so there is no fuel bill."
+    )
+    assert (unmetered_explanation in tower) == any(
+        entry["unpricedRuns"] > 0
+        and entry["unmeteredRuns"] == entry["unpricedRuns"]
+        for entry in site.placed
+    )
 
 
 def test_entry_chips_and_pit_wall_meta_keep_words_and_dots_together(committed_pages):

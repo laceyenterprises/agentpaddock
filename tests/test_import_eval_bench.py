@@ -160,12 +160,65 @@ def test_all_records_reference_graded_task_versions(records):
         assert 1 <= record["task_version"] <= task["task_version"]
 
 
-def test_legacy_rows_are_version_one_and_unmeasured(legacy_records):
+def test_legacy_rows_keep_versions_and_price_measured_tokens(
+    result_store, legacy_records
+):
     for record in legacy_records:
         assert record["task_version"] == 1
-        assert record["tokens"] == {"input": None, "cache": None, "output": None}
-        assert record["cost"]["source"] == lb.UNKNOWN and record["cost"]["usd"] is None
+        table = result_store.price_tables[import_eval_bench.PRICE_TABLE]
+        tokens = record["tokens"]
+        measured = all(value is not None for value in tokens.values())
+        assert measured or all(value is None for value in tokens.values())
+        assert record["cost"] == lb.price_cost(
+            tokens, record["model"]["provider_id"], table
+        )
+        # The local model has a table placeholder with unknown rates, not a price.
+        entry = table.models.get(record["model"]["provider_id"])
+        has_price = entry is not None and entry["source"] in lb.PRICED_SOURCES
+        assert (record["cost"]["source"] in lb.PRICED_SOURCES) == (
+            measured and has_price
+        )
+        assert record["wall_seconds"] is None
+        assert record["harness"]["version"] is None
     assert {r["task"] for r in legacy_records} & SCRUBBED == SCRUBBED
+
+
+@needs_reports
+def test_legacy_tokens_match_first_registered_measurements(legacy_records):
+    measured = {}
+    for name, importer in import_eval_bench.SOURCES:
+        if importer is not import_eval_bench.import_eval_bench:
+            continue
+        text = (
+            gzip.open(REPORTS / name, "rt").read()
+            if str(name).endswith(".gz")
+            else (REPORTS / name).read_text()
+        )
+        for row in json.loads(text)["rows"]:
+            tokens = row["tokens"] or {}
+            counts = dict(
+                zip(
+                    ("input", "cache", "output"),
+                    (tokens.get(key) for key in ("freshInput", "cacheRead", "output")),
+                )
+            )
+            if all(value is not None for value in counts.values()):
+                measured.setdefault(row["runId"], counts)
+    for record in legacy_records:
+        assert record["tokens"] == measured.get(
+            record["run_id"], {"input": None, "cache": None, "output": None}
+        )
+
+
+def test_legacy_price_table_adds_models_without_changing_shared_rates(result_store):
+    old = result_store.price_tables["2026-10-10"].models
+    new = result_store.price_tables["2026-10-25"].models
+    assert "anthropic/claude-sonnet-5-5" not in old
+    assert "anthropic/claude-sonnet-5-5" in new
+    assert old.keys() <= new.keys()
+    for model in old.keys() & new.keys():
+        for rate in ("input", "cache", "output"):
+            assert old[model][rate] == new[model][rate], (model, rate)
 
 
 def test_eval_bench_rows_have_measured_tokens_and_valid_pricing(result_store):
@@ -316,6 +369,137 @@ def v2_import():
 
 def _v2_record(document, number):
     return next(r for r in document["records"] if r["run_id"] == _synthetic_id(number))
+
+
+@pytest.mark.parametrize(
+    "legacy_importer",
+    [
+        import_eval_bench.import_rfd,
+        import_eval_bench.import_hrf,
+        import_eval_bench.import_ossharn,
+        import_eval_bench.import_omt,
+    ],
+)
+def test_legacy_fill_uses_first_complete_export_and_only_changes_tokens_and_cost(
+    tmp_path, monkeypatch, legacy_importer
+):
+    reports, results = tmp_path / "reports", tmp_path / "results"
+    reports.mkdir()
+    shutil.copytree(lb.DEFAULT_RESULTS / "prices", results / "prices")
+    table = lb.load_results().price_tables[import_eval_bench.PRICE_TABLE]
+    rows = []
+    for number in range(1, 6):
+        rows.append(
+            {
+                "launchRequestId": _synthetic_id(number),
+                "lrq": _synthetic_id(number),
+                "lrq_id": _synthetic_id(number),
+                "suite": "review",
+                "category": "review",
+                "task": "review-clean-retention-plan",
+                "harness": "claude-code",
+                "cls": "claude-code",
+                "worker_class": "claude-code",
+                "model": "claude-sonnet-5-5",
+                "route": "claude-sonnet-5-5",
+                "phase": "synthetic",
+                "attempt": 1,
+                "verdict": "failed",
+                "score": 0.0,
+                "excludedBecause": "synthetic-exclusion",
+            }
+        )
+    legacy_path = reports / "legacy.json"
+    legacy_path.write_text(
+        json.dumps(
+            {
+                "rows": rows,
+                "runs": rows,
+                "suite": "review",
+                "reruns": [{"runs": rows[:1]}],
+            }
+        )
+    )
+    baseline = legacy_importer(legacy_path, table)
+    # A later export can supply a formerly absent measurement, but cannot replace one.
+    first = json.loads(V2_SAMPLE.read_text())
+    template = first["rows"][0]
+    first["rows"] = [
+        dict(template, runId=_synthetic_id(number), tokens=tokens)
+        for number, tokens in [
+            (1, {"freshInput": 1000, "cacheRead": 2000, "output": 300}),
+            (2, {"freshInput": 1000, "cacheRead": None, "output": 300}),
+            (3, None),
+            (4, {"freshInput": 0, "cacheRead": 0, "output": 0}),
+        ]
+    ]
+    later = dict(
+        first,
+        generatedAt="2026-11-01",
+        rows=[
+            dict(
+                template,
+                runId=_synthetic_id(number),
+                tokens={
+                    "freshInput": 9000,
+                    "cacheRead": 8000,
+                    "output": 7000,
+                },
+            )
+            for number in (1, 3)
+        ],
+    )
+    (reports / "first.json").write_text(json.dumps(first))
+    (reports / "later.json").write_text(json.dumps(later))
+    v2 = import_eval_bench.import_eval_bench
+    # Export registration order determines precedence even ahead of legacy sources.
+    monkeypatch.setattr(
+        import_eval_bench,
+        "SOURCES",
+        (
+            ("first.json", v2),
+            (legacy_path.name, legacy_importer),
+        ),
+    )
+    alone = import_eval_bench.build(reports, results)
+    monkeypatch.setattr(
+        import_eval_bench,
+        "SOURCES",
+        (
+            ("first.json", v2),
+            (legacy_path.name, legacy_importer),
+            ("later.json", v2),
+        ),
+    )
+    files = import_eval_bench.build(reports, results)
+    name = f"{baseline['date']}-{baseline['id']}.json"
+    document = json.loads(files[name])
+    expected = {
+        _synthetic_id(1): {"input": 1000, "cache": 2000, "output": 300},
+        _synthetic_id(2): {"input": None, "cache": None, "output": None},
+        _synthetic_id(3): {"input": 9000, "cache": 8000, "output": 7000},
+        _synthetic_id(4): {"input": 0, "cache": 0, "output": 0},
+        _synthetic_id(5): {"input": None, "cache": None, "output": None},
+    }
+    for before, after in zip(baseline["records"], document["records"], strict=True):
+        assert before["tokens"] == {"input": None, "cache": None, "output": None}
+        assert after["tokens"] == expected[after["run_id"]]
+        assert after["cost"] == lb.price_cost(
+            after["tokens"], after["model"]["provider_id"], table
+        )
+        assert {k: v for k, v in before.items() if k not in {"tokens", "cost"}} == {
+            k: v for k, v in after.items() if k not in {"tokens", "cost"}
+        }
+        if after["run_id"] == _synthetic_id(1):
+            earlier = json.loads(alone[name])["records"]
+            assert after == next(
+                r
+                for r in earlier
+                if r["run_id"] == after["run_id"] and r["harness"] == after["harness"]
+            )
+    assert {k: v for k, v in document.items() if k != "records"} == {
+        k: v for k, v in baseline.items() if k != "records"
+    }
 
 
 def test_per_attempt_tokens_wall_time_and_price(v2_import):
@@ -670,7 +854,7 @@ def test_registered_v2_source_builds_with_deduplication_and_current_prices(
     assert document["price_table"] == FIXTURE_PRICE_TABLE
     assert _v2_record(document, 1)["cost"]["usd"] == 0.0052
     legacy = json.loads(files["2026-10-06-rfd-calibration.json"])
-    assert legacy["price_table"] == "2026-10-10"
+    assert legacy["price_table"] == import_eval_bench.PRICE_TABLE
     assert (
         "skipped 2 already-published and 1 version-unrecorded rows"
         in capsys.readouterr().err

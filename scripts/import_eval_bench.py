@@ -16,11 +16,12 @@ Every comparability boundary is kept: a row a report excluded keeps its
 ``excludedBecause`` tag, infrastructure rows are tagged ``infra:<verdict>``,
 and every legacy row stays at task_version 1, the version it was graded at (the
 seven tasks PDK-03 scrubbed are at version 2 only from then on). The sources
-carry no token measurements or wall times, so those are null and every cost is
-``unknown``. The frontier coding and rca aggregates in the eval-bench report
+supply token counts from the per-run export where the bench measured them; runs
+without measurements keep null tokens and unknown cost. Wall times and harness
+versions remain unrecorded. The frontier coding and rca aggregates in the eval-bench report
 have no published per-attempt rows in these four sources, so they are not imported.
 The per-attempt eval-bench-evidence/v2 importer preserves recorded task versions,
-tokens and wall times; its source will be registered when the export is published.
+tokens and wall times from the registered exports.
 
     python3 scripts/import_eval_bench.py --reports DIR            # write results/
     python3 scripts/import_eval_bench.py --reports DIR --check    # fail if results/ differs
@@ -36,7 +37,9 @@ from typing import Any
 
 import leaderboard
 
-PRICE_TABLE = "2026-10-10"
+# 2026-10-10 lacks Claude Sonnet 5.5. Every rate shared with 2026-10-25
+# is identical, so using the later table changes no other price.
+PRICE_TABLE = "2026-10-25"
 EVAL_BENCH_PRICE_TABLE = "2026-10-25"
 #: Each published eval-bench export keeps the price table it was published with,
 #: so registering a later export at a newer table never re-renders an earlier
@@ -282,12 +285,19 @@ def unlaunched_id(source: str, row: dict[str, Any], *fields: str) -> str:
     return ":".join(["unlaunched", source, *(str(row[name]) for name in fields)])
 
 
-def import_rfd(path: Path, table: leaderboard.PriceTable) -> dict[str, Any]:
+def import_rfd(
+    path: Path,
+    table: leaderboard.PriceTable,
+    measured_tokens: dict[str, dict[str, int]] | None = None,
+) -> dict[str, Any]:
     builder = Builder(table)
+    measured_tokens = measured_tokens or {}
     for row in _load(path)["rows"]:
         fields = ("suite", "task", "harness", "model", "phase", "attempt")
+        run_id = row["launchRequestId"] or unlaunched_id("rfd", row, *fields)
         builder.add(
-            run_id=row["launchRequestId"] or unlaunched_id("rfd", row, *fields),
+            run_id=run_id,
+            tokens=measured_tokens.get(run_id),
             suite=row["suite"],
             task=row["task"],
             attempt=row["attempt"],
@@ -310,12 +320,19 @@ def import_rfd(path: Path, table: leaderboard.PriceTable) -> dict[str, Any]:
     )
 
 
-def import_hrf(path: Path, table: leaderboard.PriceTable) -> dict[str, Any]:
+def import_hrf(
+    path: Path,
+    table: leaderboard.PriceTable,
+    measured_tokens: dict[str, dict[str, int]] | None = None,
+) -> dict[str, Any]:
     builder = Builder(table)
+    measured_tokens = measured_tokens or {}
     for row in _load(path)["rows"]:
         fields = ("category", "task", "cls", "model", "phase", "attempt")
+        run_id = row["lrq"] or unlaunched_id("hrf", row, *fields)
         builder.add(
-            run_id=row["lrq"] or unlaunched_id("hrf", row, *fields),
+            run_id=run_id,
+            tokens=measured_tokens.get(run_id),
             suite=row["category"],
             task=row["task"],
             attempt=row["attempt"],
@@ -338,11 +355,17 @@ def import_hrf(path: Path, table: leaderboard.PriceTable) -> dict[str, Any]:
 
 
 def _matrix_rows(
-    builder: Builder, runs: list[dict[str, Any]], suite: str, **extra: str
+    builder: Builder,
+    runs: list[dict[str, Any]],
+    suite: str,
+    measured_tokens: dict[str, dict[str, int]] | None = None,
+    **extra: str,
 ) -> None:
+    measured_tokens = measured_tokens or {}
     for run in runs:
         builder.add(
             run_id=run["lrq_id"],
+            tokens=measured_tokens.get(run["lrq_id"]),
             suite=suite,
             task=run["task"],
             attempt=None,
@@ -354,14 +377,24 @@ def _matrix_rows(
         )
 
 
-def import_ossharn(path: Path, table: leaderboard.PriceTable) -> dict[str, Any]:
+def import_ossharn(
+    path: Path,
+    table: leaderboard.PriceTable,
+    measured_tokens: dict[str, dict[str, int]] | None = None,
+) -> dict[str, Any]:
     raw = _load(path)
     builder = Builder(table)
-    _matrix_rows(builder, raw["runs"], raw["suite"])
+    _matrix_rows(builder, raw["runs"], raw["suite"], measured_tokens)
     for rerun in raw["reruns"]:
         # The rerun ran behind the KIMIEMPTY-01 proxy fix: a different harness
         # configuration, so it is never pooled with the original cell.
-        _matrix_rows(builder, rerun["runs"], raw["suite"], proxy_fix="KIMIEMPTY-01")
+        _matrix_rows(
+            builder,
+            rerun["runs"],
+            raw["suite"],
+            measured_tokens,
+            proxy_fix="KIMIEMPTY-01",
+        )
     return builder.document(
         id="ossharn-04-coding-matrix",
         date="2026-09-29",
@@ -375,10 +408,14 @@ def import_ossharn(path: Path, table: leaderboard.PriceTable) -> dict[str, Any]:
     )
 
 
-def import_omt(path: Path, table: leaderboard.PriceTable) -> dict[str, Any]:
+def import_omt(
+    path: Path,
+    table: leaderboard.PriceTable,
+    measured_tokens: dict[str, dict[str, int]] | None = None,
+) -> dict[str, Any]:
     raw = _load(path)
     builder = Builder(table)
-    _matrix_rows(builder, raw["runs"], raw["suite"])
+    _matrix_rows(builder, raw["runs"], raw["suite"], measured_tokens)
     return builder.document(
         id="omt-08-local-coding",
         date="2026-09-30",
@@ -449,6 +486,27 @@ SOURCES = (
 )
 
 
+def legacy_token_measurements(reports: Path) -> dict[str, dict[str, int]]:
+    """Keep the first complete measurement per run in export registration order."""
+    measured: dict[str, dict[str, int]] = {}
+    for name, importer in SOURCES:
+        if importer is not import_eval_bench:
+            continue
+        raw = _load(reports / name)
+        if raw["schema"] != "eval-bench-evidence/v2":
+            raise SourceError("expected eval-bench-evidence/v2")
+        for row in raw["rows"]:
+            tokens = row["tokens"] or {}
+            counts = {
+                "input": tokens.get("freshInput"),
+                "cache": tokens.get("cacheRead"),
+                "output": tokens.get("output"),
+            }
+            if all(value is not None for value in counts.values()):
+                measured.setdefault(row["runId"], counts)
+    return measured
+
+
 def build(reports: Path, results: Path) -> dict[str, str]:
     """``{file name: text}`` for every imported document."""
     paths = leaderboard.result_paths(results)
@@ -458,10 +516,11 @@ def build(reports: Path, results: Path) -> dict[str, str]:
         return leaderboard.PriceTable(raw["date"], raw["models"], raw["note"])
 
     table = price_table(PRICE_TABLE)
+    measured_tokens = legacy_token_measurements(reports)
     documents = []
     for name, importer in SOURCES:
         if importer is not import_eval_bench:
-            documents.append(importer(reports / name, table))
+            documents.append(importer(reports / name, table, measured_tokens))
 
     # Import legacy sources first regardless of registration order. Exclude the
     # v2 output itself from published ids so --check and repeated builds are stable.
