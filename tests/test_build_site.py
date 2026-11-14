@@ -4127,7 +4127,7 @@ var activate = function (layer, active) { layer.active = active; };
 var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
 var timer = 42, cleared, remaining = 0, synced = 0;
 var clearTimeout = function (id) { cleared = id; };
-var tickDwell = function () { return 6500; };
+var TICK_FIRST_MS = 3500;
 var syncTicker = function () { synced += 1; };
 function rebuild(list) {
 """
@@ -4151,11 +4151,12 @@ children.forEach(function (layer, i) {
 });
 assert.equal(cleared, 42);
 assert.equal(timer, null);
-assert.equal(remaining, 6500);
+assert.equal(remaining, TICK_FIRST_MS);
 assert.equal(synced, 1);
 rebuild(live.slice(0, 1));
 assert.equal(children.length, 1);
 assert.equal(children[0].active, true);
+assert.equal(remaining, TICK_FIRST_MS);
 """
     )
     subprocess.run(
@@ -4180,18 +4181,20 @@ def test_home_ticker_dwell_gives_longer_text_more_reading_time():
     node = shutil.which("node")
     if not node:
         pytest.skip("Node.js is required to execute the ticker JavaScript")
-    dwell = site_home.SCRIPT.split("  function tickDwell(t) {", 1)[1].split(
+    dwell = site_home.SCRIPT.split("  var TICK_FIRST_MS", 1)[1].split(
         "  function activate", 1
     )[0]
     result = subprocess.run(
         [
             node,
             "-e",
-            "function tickDwell(t) {"
+            "var TICK_FIRST_MS"
             + dwell
             + """
 console.log(JSON.stringify([0, 60, 61, 100, 1000].map(function (n) {
-  return tickDwell({who: 'x'.repeat(Math.floor(n / 2)), what: 'y'.repeat(Math.ceil(n / 2))});
+  var hold = tickDwell({who: 'x'.repeat(Math.floor(n / 2)), what: 'y'.repeat(Math.ceil(n / 2))});
+  require('node:assert/strict').ok(TICK_FIRST_MS < hold);
+  return hold;
 })));
 """,
         ],
@@ -4200,7 +4203,9 @@ console.log(JSON.stringify([0, 60, 61, 100, 1000].map(function (n) {
         check=True,
         timeout=10,
     )
-    assert json.loads(result.stdout) == [6500, 6500, 6530, 7700, 10000]
+    holds = json.loads(result.stdout)
+    assert holds == [4500, 4500, 4520, 5300, 6000]
+    assert all(4500 <= hold <= 6000 for hold in holds)
 
 
 def test_home_ticker_pauses_and_resumes_the_remaining_reading_time():
@@ -4233,14 +4238,20 @@ var ticks = samples, at = 0;
         + timer
         + """
 syncTicker();
-advance(6499); assert.equal(at, 0);
+assert.ok(TICK_FIRST_MS < tickDwell(samples[0]));
+// Pausing the first hold preserves its remainder.
+advance(1000);
+hovering = true; syncTicker();
+advance(30000); assert.equal(at, 0);
+hovering = false; syncTicker();
+advance(2499); assert.equal(at, 0);
 advance(1); assert.equal(at, 1);
 assert.equal(layers[0]['aria-hidden'], 'true');
 assert.equal(layers[0].inert, true);
 assert.equal(layers[1]['aria-hidden'], 'false');
 assert.equal(layers[1].inert, false);
 // The incoming run gets its full dwell after the fade.
-advance(7099); assert.equal(at, 1);
+advance(5099); assert.equal(at, 1);
 advance(1); assert.equal(at, 0);
 for (const reason of ['hovering', 'focused', 'hidden', 'offscreen', 'reduce']) {
   advance(1000);
@@ -4254,7 +4265,7 @@ for (const reason of ['hovering', 'focused', 'hidden', 'offscreen', 'reduce']) {
     syncTicker();
   }
   pause(true); advance(30000); assert.equal(at, before);
-  pause(false); advance(6099); assert.equal(at, before);
+  pause(false); advance(4099); assert.equal(at, before);
   advance(1); assert.equal(at, (before + 1) % ticks.length);
 }
 """
