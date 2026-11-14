@@ -750,6 +750,102 @@ def engine_map_html(lab: Mapping[str, Any]) -> str:
     )
 
 
+def range_pictures(k: int, n: int) -> str:
+    """Draw the same Wilson bounds as the widget, with numeric text alternatives."""
+    lo, hi = lb.wilson(k, n)
+    centre, half = (lo + hi) / 2, (hi - lo) / 2
+
+    comparisons = [(count, int(k / n * count + 0.5)) for count in SIZES]
+    intervals = [
+        (count, passes, *lb.wilson(passes, count)) for count, passes in comparisons
+    ]
+    perfect = lb.wilson(n, n)[0]
+    # A second illustrative bar moves toward 50% by a quarter-width: always overlaps.
+    shift = (hi - lo) / 4 * (1 if centre < 0.5 else -1)
+    other_lo, other_hi = max(0, lo + shift), min(1, hi + shift)
+    minimum = min(lo, other_lo, perfect, *(entry[2] for entry in intervals))
+    axis_low = int(minimum * 10) / 10 if minimum >= 0.5 else 0
+
+    def position(value: float) -> str:
+        return percent((value - axis_low) / (1 - axis_low))
+
+    def width(value: float) -> str:
+        return percent(value / (1 - axis_low))
+
+    def row(
+        label: str,
+        low: float,
+        high: float,
+        dot: float | None = None,
+        arrow: float | None = None,
+    ) -> str:
+        marks = (
+            f'<span class="rp-bar" style="left:{position(low)};width:{width(high - low)}"></span>'
+            if low != high
+            else ""
+        )
+        if arrow is not None and abs(arrow - dot) >= 1e-9:
+            marks += (
+                f'<span class="rp-arrow" style="left:{position(min(arrow, dot))};'
+                f'width:{width(abs(arrow - dot))}" data-direction="'
+                + ("left" if dot < arrow else "right")
+                + '"></span>'
+            )
+        if dot is not None:
+            marks += f'<span class="rp-dot" style="left:{position(dot)}"></span>'
+        return f'<div class="rp-row"><p>{esc(label)}</p><div class="rp-track" aria-hidden="true">{marks}</div></div>'
+
+    def picture(title: str, rows: str, caption: str) -> str:
+        return (
+            f'<figure class="range-picture"><h4>{title}</h4>{rows}'
+            f'<div class="rp-axis" aria-hidden="true"><span style="left:0%">{axis_low * 100:.0f}%</span><span style="left:50%">{(axis_low + 1) * 50:.0f}%</span><span style="left:100%">100%</span></div>'
+            f"<figcaption>{caption}</figcaption></figure>"
+        )
+
+    moves = row(f"The score: {k} of {n} = {percent(k / n)}", k / n, k / n, k / n)
+    moves += row(f"Nudged toward 50%: {percent(centre)}", centre, centre, centre, k / n)
+    moves += row(
+        f"Widened by the evidence: ±{half * 100:.1f} points: {percent(lo)} to {percent(hi)}",
+        lo,
+        hi,
+        centre,
+    )
+    sizes = ""
+    for count, passes, low, high in intervals:
+        sizes += row(f"{passes}/{count}: {(high - low) * 100:.1f} points", low, high)
+    edges = row(f"Flat ±: {n}/{n}, 100% to 100% (certainty)", 1, 1, 1)
+    edges += row(f"Honest: {n}/{n}, {percent(perfect)} to 100%", perfect, 1)
+    ties = row(f"A: {percent(lo)} to {percent(hi)}", lo, hi)
+    ties += row(
+        f"B (illustration): {percent(other_lo)} to {percent(other_hi)} — tie",
+        other_lo,
+        other_hi,
+    )
+    first, last = intervals[0], intervals[-1]
+    width_ratio = (first[3] - first[2]) / (last[3] - last[2])
+    return (
+        f'<p class="rp-scale-note">Shared scale: {axis_low * 100:.0f}–100%'
+        + (" (zoomed)." if axis_low else ".")
+        + "</p>"
+        + picture(
+            "Two moves, one picture",
+            moves,
+            f"Nudge toward 50%: {abs(centre - k / n) * 100:.1f} points.",
+        )
+        + picture(
+            "More races, narrower range",
+            sizes,
+            f"{first[0]} to {last[0]} races: {width_ratio:.1f}× narrower range.",
+        )
+        + picture("Honest at the edges", edges, "A perfect score still gets a range.")
+        + picture(
+            "Overlap means a tie",
+            ties,
+            "When two ranges overlap, the board calls a tie.",
+        )
+    )
+
+
 def ranges_html(lab: Mapping[str, Any]) -> str:
     n = lab["sizes"][lab["start"]]
     words = range_view(lab["k"], n)
@@ -792,36 +888,26 @@ def ranges_html(lab: Mapping[str, Any]) -> str:
         + "</p></div>"
         '<div class="steps">'
         "<h3>How the range is worked out</h3>"
-        '<ol class="step-list">'
-        "<li>Start with the score: <b>p</b> = passes ÷ runs. Here, "
-        + _bind("hr-k", words["k"])
-        + " ÷ "
-        + _bind("hr-n", words["n"])
-        + " = "
+        '<div id="hr-pictures" class="range-pictures">'
+        + range_pictures(lab["k"], n)
+        + '</div><p class="lab-sub">Rule of thumb: 4× races, ½ width.</p>'
+        "<details><summary>The formula</summary>"
+        f"<p>95%: z={esc(lab['z'])}, p="
         + _bind("hr-p", words["p"])
-        + ".</li>"
-        f"<li>Decide how sure to be. We use 95%, which sets <b>z</b> = {esc(lab['z'])}.</li>"
-        "<li>Wilson's score interval pulls the centre a little toward 50% and sets the "
-        "width from <b>p</b> and the number of runs <b>n</b>:"
+        + ", n="
+        + _bind("hr-n", words["n"])
+        + ".</p>"
         '<pre class="formula">centre     = (p + z²/2n) ÷ (1 + z²/n)\n'
         "half-width = z × √(p(1 − p)/n + z²/4n²)\n"
         "             ÷ (1 + z²/n)\n"
         "range      = centre ± half-width</pre>"
-        "Here: centre = "
+        "<p>Centre "
         + _bind("hr-centre", words["centre"])
-        + ", half-width = "
+        + ", half-width "
         + _bind("hr-half", words["half"])
-        + ", so the range is "
-        + _bind("hr-range", words["range"])
-        + ".</li>"
-        "<li>Why Wilson and not a flat plus-or-minus? It never runs past 0% or 100%, "
-        "and it stays honest at the edges: a perfect "
-        + _bind("hr-n", words["n"])
-        + " of "
-        + _bind("hr-n", words["n"])
-        + " gives "
+        + ". Perfect: "
         + _bind("hr-perfect", words["perfect"])
-        + " to 100%, not a flat 100%, because a few more runs could still miss one.</li></ol><p class=\"lab-sub\">Rule of thumb: to halve the range, run about four times as many races. The board's one rule: <b>when two entries' ranges overlap, it calls them a tie.</b></p></div></section>"
+        + "–100%.</p></details></div></section>"
     )
 
 
@@ -1191,6 +1277,47 @@ SCRIPT = r"""(function () {
   var ranges = view.ranges;
   var size = ranges.start;
   var passes = ranges.k;
+  function rangePictures(k, n, bounds) {
+    var lo = bounds[0], hi = bounds[1], centre = (lo + hi) / 2, half = (hi - lo) / 2;
+    var intervals = ranges.sizes.map(function (count, index) {
+      var passes = Math.round(k / n * count);
+      return [count, passes].concat(ranges.table[index][passes]);
+    });
+    var perfect = ranges.table[size][n][0];
+    var shift = (hi - lo) / 4 * (centre < 0.5 ? 1 : -1);
+    var otherLo = Math.max(0, lo + shift), otherHi = Math.min(1, hi + shift);
+    var minimum = Math.min.apply(null, [lo, otherLo, perfect].concat(intervals.map(function (entry) {return entry[2];})));
+    var axisLow = minimum >= 0.5 ? Math.floor(minimum * 10) / 10 : 0;
+    function position(value) {return pct((value - axisLow) / (1 - axisLow));}
+    function width(value) {return pct(value / (1 - axisLow));}
+    function row(label, low, high, dot, arrow) {
+      var marks = low !== high ? '<span class="rp-bar" style="left:' + position(low) + ';width:' + width(high - low) + '"></span>' : '';
+      if (arrow !== undefined && Math.abs(arrow - dot) >= 1e-9) marks += '<span class="rp-arrow" style="left:' + position(Math.min(arrow, dot)) + ';width:' + width(Math.abs(arrow - dot)) + '" data-direction="' + (dot < arrow ? 'left' : 'right') + '"></span>';
+      if (dot !== undefined) marks += '<span class="rp-dot" style="left:' + position(dot) + '"></span>';
+      return '<div class="rp-row"><p>' + label + '</p><div class="rp-track" aria-hidden="true">' + marks + '</div></div>';
+    }
+    function picture(title, rows, caption) {
+      return '<figure class="range-picture"><h4>' + title + '</h4>' + rows + '<div class="rp-axis" aria-hidden="true"><span style="left:0%">' + (axisLow * 100).toFixed(0) + '%</span><span style="left:50%">' + ((axisLow + 1) * 50).toFixed(0) + '%</span><span style="left:100%">100%</span></div><figcaption>' + caption + '</figcaption></figure>';
+    }
+    var moves = row('The score: ' + k + ' of ' + n + ' = ' + pct(k / n), k / n, k / n, k / n);
+    moves += row('Nudged toward 50%: ' + pct(centre), centre, centre, centre, k / n);
+    moves += row('Widened by the evidence: ±' + (half * 100).toFixed(1) + ' points: ' + pct(lo) + ' to ' + pct(hi), lo, hi, centre);
+    var sizes = '';
+    intervals.forEach(function (entry) {
+      sizes += row(entry[1] + '/' + entry[0] + ': ' + ((entry[3] - entry[2]) * 100).toFixed(1) + ' points', entry[2], entry[3]);
+    });
+    var edges = row('Flat ±: ' + n + '/' + n + ', 100% to 100% (certainty)', 1, 1, 1);
+    edges += row('Honest: ' + n + '/' + n + ', ' + pct(perfect) + ' to 100%', perfect, 1);
+    var ties = row('A: ' + pct(lo) + ' to ' + pct(hi), lo, hi);
+    ties += row('B (illustration): ' + pct(otherLo) + ' to ' + pct(otherHi) + ' — tie', otherLo, otherHi);
+    var first = intervals[0], last = intervals[intervals.length - 1];
+    var widthRatio = (first[3] - first[2]) / (last[3] - last[2]);
+    return '<p class="rp-scale-note">Shared scale: ' + (axisLow * 100).toFixed(0) + '–100%' + (axisLow ? ' (zoomed).' : '.') + '</p>'
+      + picture('Two moves, one picture', moves, 'Nudge toward 50%: ' + (Math.abs(centre - k / n) * 100).toFixed(1) + ' points.')
+      + picture('More races, narrower range', sizes, first[0] + ' to ' + last[0] + ' races: ' + widthRatio.toFixed(1) + '× narrower range.')
+      + picture('Honest at the edges', edges, 'A perfect score still gets a range.')
+      + picture('Overlap means a tie', ties, 'When two ranges overlap, the board calls a tie.');
+  }
   function showRange() {
     var n = ranges.sizes[size];
     var bounds = ranges.table[size][passes];
@@ -1209,6 +1336,7 @@ SCRIPT = r"""(function () {
     byId('hr-range-bar').style.left = pct(lo);
     byId('hr-range-bar').style.width = pct(hi - lo);
     byId('hr-dot').style.left = pct(passes / n);
+    byId('hr-pictures').innerHTML = rangePictures(passes, n, bounds);
     byId('hr-less').disabled = passes === 0;
     byId('hr-more').disabled = passes === n;
   }
@@ -1451,15 +1579,30 @@ CSS = """
   background: var(--blue); border: 3px solid var(--paper); transition: left .5s ease;
 }
 .hr-ticks { position: relative; height: 16px; font-size: 11px; color: var(--muted); }
-.hr-ticks span { position: absolute; top: 0; transform: translateX(-50%); }
+.hr-ticks span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
 .hr-ticks span:first-child { transform: none; }
 .hr-ticks span:last-child { transform: translateX(-100%); }
 .hr-says { font-size: 17px; line-height: 1.5; }
 .learn .steps { display: grid; gap: 12px; }
 .learn .steps h3 { font: 600 18px/1.3 var(--body); }
-.step-list { margin: 0; padding: 0; list-style: none; counter-reset: step; display: grid; gap: 10px; font-size: 16px; line-height: 1.5; }
-.step-list li { counter-increment: step; position: relative; padding-left: 40px; min-width: 0; }
-.step-list li::before { content: counter(step); position: absolute; left: 0; top: 0; font: 700 18px/1.5 var(--display); color: var(--blue); }
+.range-pictures { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.rp-scale-note { grid-column: 1 / -1; font-size: 13px; color: var(--muted); }
+.range-picture { margin: 0; padding: 18px; border: 1px solid var(--rule); border-radius: 16px; min-width: 0; }
+.range-picture h4 { margin: 0 0 16px; font: 600 17px/1.3 var(--body); }
+.rp-row p, .range-picture figcaption { font-size: 14px; line-height: 1.4; margin: 0; }
+.rp-row + .rp-row { margin-top: 12px; }
+.rp-track { position: relative; height: 24px; margin: 0 6px; }
+.rp-track::before { content: ""; position: absolute; inset: 11px 0 auto; height: 2px; background: var(--rule); }
+.rp-bar { position: absolute; top: 8px; height: 8px; border-radius: 4px; background: var(--blue); }
+.rp-dot { position: absolute; top: 6px; width: 12px; height: 12px; transform: translateX(-50%); border-radius: 50%; background: var(--ink); }
+.rp-arrow { position: absolute; top: 1px; height: 2px; background: var(--blue); min-width: 1px; }
+.rp-arrow::after { content: ""; position: absolute; top: -3px; width: 6px; height: 6px; border-left: 2px solid var(--blue); border-bottom: 2px solid var(--blue); transform: rotate(45deg); }
+.rp-arrow[data-direction="right"]::after { right: 0; transform: rotate(225deg); }
+.rp-axis { position: relative; height: 16px; margin: 0 6px 12px; font-size: 11px; color: var(--muted); }
+.rp-axis span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+.rp-axis span:first-child { transform: none; }
+.rp-axis span:last-child { transform: translateX(-100%); }
+@media (min-width: 700px) { .range-pictures { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .formula {
   margin: 10px 0 !important; padding: 16px; border-radius: 14px; background: var(--tower); color: var(--tower-fg);
   font: 12px/1.7 var(--mono); white-space: pre-wrap;
