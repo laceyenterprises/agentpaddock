@@ -431,8 +431,11 @@ def funnel_views(race: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 
 def _stations(
-    view: Mapping[str, Any], labels: Sequence[str], rates: Sequence[Mapping[str, Any]]
+    view: Mapping[str, Any],
+    labels: Sequence[str],
+    rates: Sequence[Mapping[str, Any]] | None,
 ) -> str:
+    rates = rates or ()
     names = ["Lights out", *labels, "Checkered flag"]
     last = len(names) - 1
     selected = view["worst"] or last
@@ -450,7 +453,8 @@ def _stations(
             " is-worst" if k and k == view["worst"] else ""
         )
         checkpoint_rate = ""
-        if 0 < k < last:
+        has_rate = 0 < k < last and k <= len(rates)
+        if has_rate:
             rate = rates[k - 1]
             shown = f"{rate['rate']:.0%}" if rate["rate"] is not None else "n/a"
             checkpoint_rate = (
@@ -474,7 +478,7 @@ def _stations(
             + (
                 f'<a class="rc-checkpoint-link" href="#checkpoint-{k}">'
                 f"What checkpoint {k} checks</a>"
-                if 0 < k < last
+                if has_rate
                 else ""
             )
             + "</div></li>"

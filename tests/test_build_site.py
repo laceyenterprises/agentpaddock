@@ -2604,6 +2604,53 @@ def test_checkpoint_glossary_exact_names_win_over_families():
     assert not site_data.checkpoint_copy(glossary, "coding", "unlisted")
 
 
+@pytest.mark.parametrize("disclose", ["count", "hidden", None])
+def test_checkpoint_copy_stays_with_disclosed_checks(tmp_path, monkeypatch, disclose):
+    results = _site_tree(tmp_path)
+    glossary = tmp_path / "checkpoints.toml"
+    glossary.write_text(
+        '[checks.read_files]\nabout = "Read explanation."\n'
+        '[checks.verdict_right]\nabout = "Verdict explanation."\n'
+        '[checks.COUNT_CHECK_SENTINEL]\nabout = "Count explanation."\n'
+        '[checks.HIDDEN_CHECK_SENTINEL]\nabout = "Hidden explanation."\n'
+    )
+    monkeypatch.setattr(site_data, "CHECKPOINT_GLOSSARY", glossary)
+    card = results.parent / "tasks/hard-review-alpha/track.toml"
+    if disclose is None:
+        card.unlink()
+    else:
+        card.write_text(
+            card.read_text().replace('disclose = "count"', f'disclose = "{disclose}"')
+        )
+    race = _site_json(_site_files(results), "races/hard-review-alpha.json")
+    copy = {row["label"]: row.get("about") for row in race["checkpointRates"]}
+    assert copy["Read the code" if disclose else "Read files"] == "Read explanation."
+    assert (
+        copy["Right verdict" if disclose else "Verdict right"]
+        == "Verdict explanation."
+    )
+    assert not any("fact:" in row["label"] for row in race["checkpointRates"])
+
+
+@pytest.mark.parametrize("rate_count", [None, 0, 1, 2])
+def test_station_links_have_checkpoint_guide_targets(tmp_path, rate_count):
+    results = _site_tree(tmp_path)
+    race = _site_json(_site_files(results), "races/hard-review-alpha.json")
+    race["checkpointRates"] = (
+        race["checkpointRates"][:rate_count] if rate_count is not None else None
+    )
+    page = site_races._lap(race) + site_races._checkpoint_guide(race)
+    targets = re.findall(r'id="(checkpoint-\d+)"', page)
+    links = re.findall(r'href="#(checkpoint-\d+)"', page)
+    assert len(links) == (rate_count or 0)
+    assert links == targets
+    assert _texts(page, "rc-station-name") == [
+        "Lights out",
+        *race["checkpoints"],
+        "Checkered flag",
+    ]
+
+
 def test_public_checkpoint_copy_does_not_quote_grading_material():
     tasks = lb.MODULE_ROOT / "tasks"
     glossary = lb.read_toml(site_data.CHECKPOINT_GLOSSARY)

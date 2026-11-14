@@ -358,10 +358,11 @@ def model(results: lb.Results, tasks_dir: Path) -> SiteData:
     # card can override either field while borrowing the other from the glossary.
     for key, race in list(races.items()):
         checks = {}
-        for record in results.records:
-            if race_key(record) == key:
-                for check in record.get("checks", []):
-                    checks.setdefault(check["name"], check)
+        if not race.has_card:
+            for record in results.records:
+                if race_key(record) == key:
+                    for check in record.get("checks", []):
+                        checks.setdefault(check["name"], check)
         checkpoints = (
             race.checkpoints
             if race.has_card
