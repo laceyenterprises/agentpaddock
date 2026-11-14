@@ -47,6 +47,13 @@
       "optional": false
     }
   ],
+  "checkpointSubmissions": 14,
+  "offMap": {
+    "red": 1,
+    "nothing": 0,
+    "checkered": 1,
+    "dnf": 0
+  },
   "singleResult": false,
   "moreChecks": 3,
   "funnel": {

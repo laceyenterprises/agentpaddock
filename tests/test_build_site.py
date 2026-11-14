@@ -2443,6 +2443,17 @@ def test_races_build_one_page_per_calendar_race(tmp_path):
     assert real_calendar
     for race in real_calendar:
         assert site_races.race_file(race) in real
+        assert "still racing" not in real[site_races.race_file(race)]
+    assert "still racing" not in real["paddock.js"]
+    decoy = json.loads(real["data/races/hard-review-decoy-decision-replies.json"])
+    page = real[site_races.race_file(decoy["id"])]
+    assert decoy["funnel"]["runs"] == 214
+    assert decoy["checkpointSubmissions"] == 218
+    assert (
+        "214 counted runs with checkpoints in this view; pass rates use all 218 submissions with checkpoints."
+        in page
+    )
+    assert "including excluded runs" in page
 
 
 def test_race_pages_hold_the_site_invariants(tmp_path):
@@ -2455,6 +2466,7 @@ def test_race_pages_hold_the_site_invariants(tmp_path):
     assert len(pages) == 3
     published = set(re.findall(r'<symbol id="([^"]+)"', layout.sprite()))
     for name, page in pages.items():
+        assert "still racing" not in page, name
         assert page.count("<script") == 3 and "<style" not in page, name
         assert page.count("<h1>") == 1, name
         head = page.split("<head>", 1)[1].split("</head>", 1)[0]
@@ -2465,6 +2477,8 @@ def test_race_pages_hold_the_site_invariants(tmp_path):
                 target = _resolve(name, attrs["href"])
                 assert target in files, (name, target)
     script = files["paddock.js"]
+    assert "still racing" not in script
+    assert "+ ' through'" in script and "+ ' out here'" in script
     assert site_races.SCRIPT in script and script.startswith(layout.SCRIPT)
     assert "getAttribute('data-' + other + '-second')" in script
     assert "(other === 'lap' ? ' lap' : '')" not in script
@@ -2504,7 +2518,15 @@ def test_race_page_funnel_comes_from_the_data(tmp_path):
     assert stats[0] == f"{counts[0]} runs start"
     for k in range(1, len(race["checkpoints"]) + 1):
         before, after = counts[k - 1], counts[k]
-        assert stats[k] == f"{after / before:.0%} clear · {before - after} retire"
+        assert stats[k] == f"{after / before:.0%} clear"
+        station = page.split(f'data-station="{k}">', 1)[1].split("</li>", 1)[0]
+        assert f'<span class="rc-through">{after} through</span>' in station
+        assert '<use href="#dnf"/>' in station
+        assert f"<span data-out-count>{before - after} out here</span>" in station
+        assert everyone["bodies"][k] == (
+            f"{after} of the {before} runs that reached it clear it."
+            + (" Most runs that retire go out here." if k == everyone["worst"] else "")
+        )
     assert stats[-1] == f"{counts[-1]} of {counts[0]} finish"
     # The worst checkpoint is the one most runs retire at, called out in red.
     drops = [counts[k - 1] - counts[k] for k in range(1, len(race["checkpoints"]) + 1)]
@@ -2517,6 +2539,53 @@ def test_race_page_funnel_comes_from_the_data(tmp_path):
         data = funnel["byCar" if view["mode"] == "car" else "byDriver"][view["key"]]
         assert view["n"] == data[0]
         assert view["stats"][-1] == f"{data[-1]} of {data[0]} finish"
+        assert view["out"] == [0] + [data[k - 1] - data[k] for k in range(1, len(data))]
+    assert "Every run shown has finished." in page
+
+
+def test_race_lap_groups_runs_not_on_the_map_by_recorded_flag(tmp_path):
+    results = _site_tree(tmp_path)
+    path = results / BENCH
+    document = json.loads(path.read_text())
+    rows = [r for r in document["records"] if r["task"] == "hard-review-alpha"]
+    # A red flag stays red even with recorded checks.
+    excluded = next(r for r in rows if r["excludedBecause"])
+    excluded["checks"] = _checks()
+    for row, verdict in zip(rows[:3], ["no_submission", "format_failed", "failed"]):
+        row.pop("checks", None)
+        row["verdict"] = verdict
+    # An older version must not contribute to any group.
+    older = deepcopy(excluded)
+    older.update(run_id="synthetic-old-excluded", task_version=1)
+    document["records"].append(older)
+    lb.write_document(path, document)
+    files = build_site.build(results)
+    race = json.loads(files["data/races/hard-review-alpha.json"])
+    assert race["offMap"] == {"red": 1, "nothing": 2, "checkered": 1, "dnf": 1}
+    page = files[site_races.race_file(race["id"])]
+    lights = page.split('data-station="0">', 1)[1].split("</li>", 1)[0]
+    assert "Not on the map:" in lights
+    assert '<use href="#flag-red"/></svg>1 run · red flag' in lights
+    assert "infrastructure fault, raced again; not counted in the standings" in lights
+    assert (
+        '<use href="#dnf"/></svg>2 runs · DNF, handed in nothing (counted in the standings)'
+        in lights
+    )
+    assert (
+        '<use href="#flag-checkered"/></svg>1 run · result without checkpoints (checkered; counted in the standings)'
+        in lights
+    )
+    assert (
+        '<use href="#dnf"/></svg>1 run · result without checkpoints (DNF; counted in the standings)'
+        in lights
+    )
+    # Zero groups do not leave empty labels or glyphs behind.
+    race["offMap"] = {"red": 0, "nothing": 0, "checkered": 1, "dnf": 0}
+    line = site_races._off_map(race)
+    assert "red flag" not in line and "handed in nothing" not in line
+    assert "#dnf" not in line and "result without checkpoints" in line
+    race["offMap"]["checkered"] = 0
+    assert site_races._off_map(race) == ""
 
 
 def test_race_lap_chips_name_the_driver_and_car(tmp_path):
@@ -2615,7 +2684,10 @@ def test_race_page_companion_rates_count_each_checkpoint_independently(
     for rate in rates:
         assert rate["label"] in page
         assert f"{rate['rate']:.0%} pass · {rate['n']} runs" in page
-    assert "still racing" in page
+    assert (
+        "13 counted runs with checkpoints in this view; pass rates use all 14 submissions with checkpoints."
+        in page
+    )
     assert path.read_bytes() == original
     # The map works without a track card, with grading order and optional marks.
     (tmp_path / "tasks/hard-review-alpha/track.toml").unlink()

@@ -595,7 +595,7 @@ def _stations(race: Race) -> list[tuple[int, str]]:
 
 
 def _funnel(race: Race, runs: Sequence[Mapping[str, Any]]) -> list[int]:
-    """Runs still racing at the start, after each disclosed checkpoint, and at
+    """Finished runs through the start, each disclosed checkpoint, and
     the finish. A run retires at its first failed required checkpoint in card
     order; one that retires at an undisclosed checkpoint leaves at the next
     disclosed one. The finish counts runs that passed without retiring."""
@@ -723,6 +723,27 @@ def race(data: SiteData, race: Race, ids: Mapping[tuple, str]) -> dict[str, Any]
         for run in data.results.records
         if race_key(run) == race.key and run.get("checks")
     ]
+    # Excluded runs can carry checks too, but never enter the counted funnel.
+    records = [
+        run
+        for document in data.trusted.values()
+        for run in document["records"]
+        if race_key(run) == race.key
+    ]
+    off_map = {
+        "red": sum(bool(run["excludedBecause"]) for run in records),
+        "nothing": sum(
+            not run.get("checks")
+            and run["verdict"] in {"no_submission", "format_failed"}
+            for run in runs
+        ),
+        "checkered": sum(
+            not run.get("checks") and run["verdict"] == lb.PASSED for run in runs
+        ),
+        "dnf": sum(
+            not run.get("checks") and run["verdict"] == "failed" for run in runs
+        ),
+    }
     checkpoint_rates = []
     for index, label in _stations(race):
         name = race.checkpoints[index]["check"]
@@ -789,6 +810,8 @@ def race(data: SiteData, race: Race, ids: Mapping[tuple, str]) -> dict[str, Any]
         "difficulty": summary["difficulty"],
         "checkpoints": [label for _, label in _stations(race)] if checked else None,
         "checkpointRates": checkpoint_rates if checked else None,
+        "checkpointSubmissions": len(submissions),
+        "offMap": off_map,
         "singleResult": race.single_result,
         "moreChecks": summary["stages"]["moreChecks"] if summary["stages"] else None,
         "funnel": funnel,

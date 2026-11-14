@@ -31,6 +31,13 @@
   "difficulty": null,
   "checkpoints": null,
   "checkpointRates": null,
+  "checkpointSubmissions": 0,
+  "offMap": {
+    "red": 0,
+    "nothing": 0,
+    "checkered": 2,
+    "dnf": 1
+  },
   "singleResult": false,
   "moreChecks": null,
   "funnel": null,
