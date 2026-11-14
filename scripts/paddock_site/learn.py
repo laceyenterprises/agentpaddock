@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from typing import Any, Mapping, Sequence
 
 import leaderboard as lb
@@ -73,6 +74,35 @@ TRACK_PATH = (
 )
 SECTOR_POINTS = ((24, 118), (134, 42), (254, 108), (322, 34))
 
+
+def track_stops(path: str = TRACK_PATH, samples: int = 400) -> list[float]:
+    """Each sector mark's distance along the track, as a share of its length.
+
+    The track is a move and three cubic curves, one per stretch between marks,
+    so the marks are the curves' ends. ``learn.js`` drives the car along the
+    real curve between them when scrolling drives the lap.
+    """
+    numbers = [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", path)]
+    start, rest = numbers[:2], numbers[2:]
+    lengths, x0, y0 = [], start[0], start[1]
+    for k in range(0, len(rest), 6):
+        x1, y1, x2, y2, x3, y3 = rest[k : k + 6]
+        length, px, py = 0.0, x0, y0
+        for i in range(1, samples + 1):
+            t = i / samples
+            u = 1 - t
+            x = u**3 * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t**3 * x3
+            y = u**3 * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t**3 * y3
+            length += math.hypot(x - px, y - py)
+            px, py = x, y
+        lengths.append(length)
+        x0, y0 = x3, y3
+    total, run, stops = sum(lengths), 0.0, [0.0]
+    for length in lengths:
+        run += length
+        stops.append(round(run / total, 4))
+    return stops
+
 #: (title, glyph, what happens, what to notice). No numbers: a number on this
 #: page comes from the data.
 SECTORS = (
@@ -103,7 +133,8 @@ SECTORS = (
         "stewards",
         "Stewards check the answer against checks the driver never saw. Pass every "
         "required check and it takes the checkered flag.",
-        "Miss one required check and the run is a DNF. It still counts, against the entry.",
+        "Miss one required check and the run is a DNF. It is not thrown out: it counts "
+        "as a fail in the entry's avg pass rate.",
     ),
 )
 
@@ -120,7 +151,7 @@ FLAGS = (
         "dnf",
         "counted",
         "DNF, short for did not finish: it missed a check or handed in nothing. "
-        "It counts against the entry.",
+        "It counts as a fail in the entry's avg pass rate.",
     ),
     (
         "Red",
@@ -571,6 +602,8 @@ def view(drivers: Mapping[str, Any]) -> dict:
             "points": [list(point) for point in SECTOR_POINTS],
             "hint": "Tap the track, or a sector number",
             "lastHint": "Tap the track to start another lap",
+            "scrollHint": "Scroll to drive the lap",
+            "stops": track_stops(),
             "next": "Next sector",
             "last": "Another lap",
         },
@@ -980,6 +1013,8 @@ SCRIPT = r"""(function () {
   // ---- the sector stepper: the track advances, a number jumps, after 4 another lap
   var stepper = view.stepper;
   var sector = 0;
+  // While scrolling drives the lap (below), the scroll position is the one control.
+  var lap = null;
   function showSector(i) {
     sector = i;
     all('[data-sector-panel]').forEach(function (el) {
@@ -994,26 +1029,127 @@ SCRIPT = r"""(function () {
     byId('track-car').style.transform = 'translate(' + point[0] + 'px, ' + point[1] + 'px)';
     byId('track-done').setAttribute('stroke-dasharray', (sector + 1) * 25 + ' 100');
     var last = sector === stepper.points.length - 1;
-    byId('track-hint').textContent = last ? stepper.lastHint : stepper.hint;
+    byId('track-hint').textContent = lap ? stepper.scrollHint : last ? stepper.lastHint : stepper.hint;
     byId('sector-next').textContent = last ? stepper.last : stepper.next;
   }
   function nextSector() { showSector((sector + 1) % stepper.points.length); }
-  byId('track').addEventListener('click', function (event) {
+  // A tap or key on the stepper hands it back to taps, wherever the lap is.
+  function tapped(action) {
+    return function (event) { endLap(); action(event); };
+  }
+  byId('track').addEventListener('click', tapped(function (event) {
     var mark = event.target.closest && event.target.closest('[data-sector]');
     if (mark) showSector(Number(mark.getAttribute('data-sector')));
     else nextSector();
-  });
+  }));
   all('[data-sector]').forEach(function (mark) {
     mark.addEventListener('keydown', function (event) {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
+        endLap();
         showSector(Number(mark.getAttribute('data-sector')));
       }
     });
   });
-  byId('sector-next').addEventListener('click', nextSector);
-  byId('sector-back').addEventListener('click', function () { showSector(Math.max(0, sector - 1)); });
+  byId('sector-next').addEventListener('click', tapped(nextSector));
+  byId('sector-back').addEventListener('click', tapped(function () { showSector(Math.max(0, sector - 1)); }));
   showSector(0);
+
+  // ---- on a phone, the first scroll down the page drives the lap. The stepper
+  // pins under the nav, the car follows the track through the four sectors, then
+  // the stepper lets go and the page scrolls on. The run of scroll it used is
+  // removed without moving anything on screen, so it never pins again. It gives
+  // way to a wide screen, reduced motion, a link into the page, a page opened
+  // below the stepper, a screen too short to hold it and a tap.
+  var bed = root.querySelector('.track-bed');
+  function along(p) {
+    var stops = stepper.stops;
+    var x = p * (stops.length - 1);
+    var k = Math.min(stops.length - 2, Math.floor(x));
+    return stops[k] + (stops[k + 1] - stops[k]) * (x - k);
+  }
+  function drive(p) {
+    var s = Math.round(p * (stepper.points.length - 1));
+    if (s !== sector) showSector(s);
+    var share = along(p);
+    var point = bed.getPointAtLength(share * bed.getTotalLength());
+    byId('track-car').style.transform = 'translate(' + point.x + 'px, ' + point.y + 'px)';
+    byId('track-done').setAttribute('stroke-dasharray', share * 100 + ' 100');
+  }
+  function endLap() {
+    if (!lap) return;
+    var run = lap;
+    lap = null;
+    window.removeEventListener('scroll', run.scrolled);
+    window.removeEventListener('resize', run.resized);
+    var html = document.documentElement;
+    var before = run.section.getBoundingClientRect().top;
+    html.style.overflowAnchor = 'none';
+    html.style.scrollBehavior = 'auto';
+    run.section.classList.remove('scrolly');
+    run.spacer.parentNode.removeChild(run.spacer);
+    var shift = run.section.getBoundingClientRect().top - before;
+    if (shift) window.scrollBy(0, shift);
+    requestAnimationFrame(function () { html.style.overflowAnchor = ''; html.style.scrollBehavior = ''; });
+    showSector(sector);
+  }
+  function media(query) { return window.matchMedia ? window.matchMedia(query) : null; }
+  function changed(list, fn) {
+    if (!list) return;
+    if (list.addEventListener) list.addEventListener('change', fn);
+    else if (list.addListener) list.addListener(fn);
+  }
+  (function () {
+    var narrow = media('(max-width: 899px)');
+    var still = media('(prefers-reduced-motion: reduce)');
+    var section = root.querySelector('.stepper');
+    var nav = document.querySelector('.nav');
+    if (!narrow || !narrow.matches || (still && still.matches) || window.location.hash) return;
+    if (!section || !bed || !bed.getPointAtLength) return;
+    var top = nav ? nav.offsetHeight + (parseFloat(getComputedStyle(nav).top) || 0) : 0;
+    var start = section.getBoundingClientRect().top;
+    section.classList.add('scrolly');
+    var room = window.innerHeight - top;
+    var tall = section.getBoundingClientRect().height;
+    // Centred in the room under the nav; it must fit, and the page must open above it.
+    var pin = top + Math.max(8, Math.round((room - tall) / 2));
+    if (tall > room - 16 || start < pin) { section.classList.remove('scrolly'); return; }
+    // About half a screen of scroll per sector.
+    var length = 4 * Math.max(280, Math.round(window.innerHeight * 0.55));
+    var run = document.createElement('div');
+    run.className = 'stepper-run';
+    section.parentNode.insertBefore(run, section);
+    run.appendChild(section);
+    var spacer = document.createElement('div');
+    spacer.setAttribute('aria-hidden', 'true');
+    spacer.style.height = length + 'px';
+    run.appendChild(spacer);
+    section.style.setProperty('--pin', pin + 'px');
+    var width = window.innerWidth;
+    var ticking = false;
+    function update() {
+      ticking = false;
+      if (!lap) return;
+      var q = (pin - run.getBoundingClientRect().top) / length;
+      if (q >= 1) { drive(1); endLap(); return; }
+      // A tenth of the run at each end holds the first and last sector.
+      drive(Math.min(1, Math.max(0, (q - 0.1) / 0.8)));
+    }
+    lap = {
+      section: section,
+      spacer: spacer,
+      scrolled: function () {
+        if (!ticking) { ticking = true; requestAnimationFrame(update); }
+      },
+      resized: function () { if (window.innerWidth !== width) endLap(); }
+    };
+    showSector(0);
+    drive(0);
+    window.addEventListener('scroll', lap.scrolled, { passive: true });
+    window.addEventListener('resize', lap.resized);
+    changed(narrow, function () { if (!narrow.matches) endLap(); });
+    changed(still, function () { if (still.matches) endLap(); });
+  })();
 
   // ---- the engine-map lab: the level on screen is held across drivers
   var lab = view.engineMap;
@@ -1282,6 +1418,14 @@ CSS = """
 .sector > p { font-size: 18px; line-height: 1.55; }
 .sector .notice { padding: 14px 16px; border-radius: 14px; background: var(--blue-soft); font-size: 16px; line-height: 1.5; }
 .sector-actions { display: flex; gap: 10px; }
+/* Scrolling drives the lap (learn.js: phones, the first scroll down only). The stepper pins under the nav
+   while its run scrolls by. The four panels share one cell, so the pinned block keeps one height. */
+.stepper-run { min-width: 0; }
+.stepper.scrolly { position: sticky; top: var(--pin, 72px); z-index: 1; background: var(--paper); }
+.stepper.scrolly .track-car, .stepper.scrolly .track-done { transition: none; }
+.stepper.scrolly .sector { grid-area: 1 / 1; align-content: start; animation: none; transition: opacity .3s ease; }
+.stepper.scrolly .sector[hidden] { display: grid; visibility: hidden; opacity: 0; transition: none; }
+.stepper.scrolly .sector-actions { display: none; }
 @keyframes learn-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
   .sector, .track-car, .track-done, .rate-fill, .rate-range, .hr-range, .hr-dot, .car-bar-track span { animation: none; transition: none; }
