@@ -4604,6 +4604,140 @@ def test_the_sector_stepper_and_flags_spell_out_dnf_at_first_use():
         assert not re.search(r"\d", counted + body)
 
 
+def test_a_dnf_says_how_it_counts():
+    # "It still counts, against the entry" read as a riddle: say it is a fail.
+    plain = "counts as a fail in the entry's avg pass rate"
+    assert plain in learn.SECTORS[-1][3] and "still counts" not in learn.SECTORS[-1][3]
+    dnf = {name: body for name, _, _, body in learn.FLAGS}["DNF"]
+    assert dnf.endswith("It " + plain + ".")
+
+
+def test_scrolling_drives_the_lap_once_on_a_phone():
+    stops = learn.track_stops()
+    # One stop per sector mark, in order along the track, from start to finish.
+    assert len(stops) == len(learn.SECTOR_POINTS)
+    assert stops[0] == 0.0 and stops[-1] == 1.0 and stops == sorted(stops)
+    assert 0.3 < stops[1] < 0.4 and 0.7 < stops[2] < 0.8
+    view = learn.view(_drivers())["stepper"]
+    assert view["stops"] == stops and view["scrollHint"] == "Scroll to drive the lap"
+    script = learn.SCRIPT
+    # Phones only: below the width where the stepper goes two-column.
+    assert "media('(max-width: 899px)')" in script
+    assert "@media (min-width: 900px) {\n  .learn { gap: 88px; }\n  .stepper {" in learn.CSS
+    # It gives way to reduced motion, a link into the page, a tap and a short screen.
+    assert "(still && still.matches) || window.location.hash" in script
+    assert "return function (event) { endLap(); action(event); };" in script
+    assert "if (tall > room - 16 || start < pin)" in script
+    # The run of scroll goes once the lap ends, and the page does not move.
+    assert "run.spacer.parentNode.removeChild(run.spacer);" in script
+    assert "if (shift) window.scrollBy(0, shift);" in script
+    assert "html.style.overflowAnchor = 'none';" in script
+    css = learn.CSS
+    assert ".stepper.scrolly { position: sticky; top: var(--pin, 72px);" in css
+    assert ".stepper.scrolly .sector[hidden] { display: grid; visibility: hidden;" in css
+
+
+def test_browser_the_first_scroll_down_drives_the_lap_on_a_phone(
+    committed_pages, tmp_path
+):
+    executable = os.environ.get("PADDOCK_BROWSER_EXECUTABLE")
+    if not executable:
+        pytest.skip("Local Chromium pass requires PADDOCK_BROWSER_EXECUTABLE")
+    browser_api = pytest.importorskip("playwright.sync_api")
+    files, _ = committed_pages
+    for name, content in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content.encode() if isinstance(content, str) else content)
+    learn_page = (tmp_path / "learn/index.html").as_uri()
+    phone = {"viewport": {"width": 390, "height": 664}, "is_mobile": True, "has_touch": True}
+    state = """() => {
+      const s = document.querySelector('.stepper');
+      return {
+        scrolly: s.classList.contains('scrolly'),
+        top: s.getBoundingClientRect().top,
+        sector: [...document.querySelectorAll('[data-sector-panel]')].find(e => !e.hidden).dataset.sectorPanel,
+      };
+    }"""
+    with browser_api.sync_playwright() as api:
+        browser = api.chromium.launch(executable_path=executable)
+
+        def open_page(**options):
+            context = browser.new_context(**options)
+            context.route("https://**", lambda route: route.abort())
+            page = context.new_page()
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.goto(learn_page)
+            return context, page, errors
+
+        try:
+            context, page, errors = open_page(**phone, reduced_motion="no-preference")
+            first = page.evaluate(state)
+            assert first["scrolly"] and first["sector"] == "0"
+            assert page.locator(".sector-actions").is_hidden()
+            assert page.locator("#track-hint").inner_text() == "Scroll to drive the lap"
+            seen, pinned, release = ["0"], set(), None
+            for _ in range(80):
+                before = page.evaluate(state)
+                page.mouse.wheel(0, 80)
+                page.wait_for_timeout(50)
+                after = page.evaluate(state)
+                if after["sector"] != seen[-1]:
+                    seen.append(after["sector"])
+                if before["scrolly"] and after["scrolly"] and before["top"] == after["top"]:
+                    pinned.add(round(after["top"]))
+                if before["scrolly"] and not after["scrolly"]:
+                    release = before["top"] - after["top"]
+                    break
+            # Scrolling drives every sector in order while the stepper holds still.
+            assert seen == ["0", "1", "2", "3"]
+            assert len(pinned) == 1
+            # Letting go moves the stepper by the scroll alone, never by the run removed.
+            assert release is not None and 0 <= release <= 80
+            assert page.locator(".sector-actions").is_visible()
+            assert page.locator("#track-hint").inner_text() == "Tap the track to start another lap"
+            # The first scroll down only: back up and down again, it never pins.
+            page.mouse.wheel(0, -8000)
+            page.wait_for_timeout(100)
+            for _ in range(30):
+                page.mouse.wheel(0, 80)
+                page.wait_for_timeout(30)
+                assert not page.evaluate(state)["scrolly"]
+            assert not errors, errors
+            context.close()
+
+            # A tap mid-lap hands the stepper back to taps, right where it is.
+            context, page, errors = open_page(**phone, reduced_motion="no-preference")
+            for _ in range(10):
+                page.mouse.wheel(0, 80)
+                page.wait_for_timeout(50)
+            before = page.evaluate(state)
+            assert before["scrolly"]
+            page.locator("#track-hint").tap()
+            after = page.evaluate(state)
+            assert not after["scrolly"] and abs(after["top"] - before["top"]) < 1
+            assert int(after["sector"]) == (int(before["sector"]) + 1) % 4
+            assert not errors, errors
+            context.close()
+
+            # Reduced motion, a wide screen and a link into the page keep the tap stepper.
+            for options, hash_ in (
+                ({**phone, "reduced_motion": "reduce"}, ""),
+                ({"viewport": {"width": 1280, "height": 800}}, ""),
+                ({**phone, "reduced_motion": "no-preference"}, "#main-content"),
+            ):
+                context = browser.new_context(**options)
+                context.route("https://**", lambda route: route.abort())
+                page = context.new_page()
+                page.goto(learn_page + hash_)
+                assert not page.evaluate(state)["scrolly"], (options, hash_)
+                assert page.locator(".sector-actions").is_visible()
+                context.close()
+        finally:
+            browser.close()
+
+
 def test_learn_driver_chips_keep_two_providers_of_one_model_apart():
     names = learn.driver_names(["fireworks/kimi-k3", "moonshot/kimi-k3", "acme/coder"])
     assert names == {

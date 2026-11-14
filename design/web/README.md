@@ -56,8 +56,9 @@ part of the design contract:
 
 Every generated page has a keyboard skip link and visible focus. Learn renders
 all sector and flag explanations before JavaScript selects a panel. Reduced
-motion disables transitions, the start-light sequence, ticker rotation and lap
-playback; the controls still show the completed state.
+motion disables transitions, the start-light sequence, ticker rotation, lap
+playback and the scroll-driven lap on Learn; the controls still show the
+completed state.
 
 Default engine map info buttons name their car and driver for screen readers.
 On a fine pointer, hovering opens a tip beside its button; moving into the tip
@@ -288,7 +289,13 @@ what stays on screen (`show` tables). The page renders the first state of each
 lab, embeds the view as JSON and `learn/learn.js` only switches between states.
 
 - **Sector stepper.** Tapping the track drives the next sector, a sector number
-  jumps to it, and after sector 4 a tap starts another lap.
+  jumps to it, and after sector 4 a tap starts another lap. On a phone the first
+  scroll down the page drives the lap instead: the stepper pins under the nav,
+  the car follows the track through the four sectors, then the stepper lets go
+  and the page scrolls on. The scroll it used is removed without moving the
+  page, so it pins once per page view. A wide screen, reduced motion, a link
+  into the page, a page opened below the stepper or a screen too short to hold
+  it keeps the tap stepper, and a tap on the stepper hands it back.
 - **Engine map.** One chip per driver, on the car with the most levels on the
   dial (then the most runs). The dial always shows low, medium, high, xhigh and
   max; a level the driver has not raced in that car is greyed with the reason,
