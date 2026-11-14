@@ -40,7 +40,7 @@ CLASSIFICATION_FIRST = 10
 DRIVER_MIN_RUNS = 5
 #: Playback advances one checkpoint every this many milliseconds.
 PLAYBACK_MS = 1600
-#: The funnel ribbon's full width, in pixels, for every run still racing.
+#: The funnel ribbon's full width, in pixels, for every run through a station.
 RIBBON_PX = 46
 #: Red marks an avg pass rate under this share on a card.
 RED_UNDER = 0.5
@@ -357,14 +357,14 @@ def _view(
     for k, label in enumerate(labels, 1):
         before, after = counts[k - 1], counts[k]
         if before:
-            stats.append(f"{after / before:.0%} clear · {before - after:,} retire")
+            stats.append(f"{after / before:.0%} clear")
         else:
             stats.append("no one left")
         titles.append(f"Checkpoint {k} · {label}")
         text = (
-            f"{after:,} of the {plural(before, 'run')} still racing{who} clear it."
+            f"{after:,} of the {plural(before, 'run')}{who} that reached it clear it."
             if before
-            else f"No run{who} is still racing here."
+            else f"No run{who} reached this checkpoint."
         )
         if k == worst:
             text += f" Most runs{who} that retire go out here."
@@ -396,6 +396,7 @@ def _view(
         "name": name,
         "n": start,
         "counts": list(counts),
+        "out": [0, *[counts[k - 1] - counts[k] for k in range(1, len(counts))]],
         "widths": [
             round(RIBBON_PX * count / start, 1) if start else 0 for count in counts
         ],
@@ -461,8 +462,15 @@ def _stations(
                 f'<span class="rc-checkpoint-rate">{shown} pass · {rate["n"]:,} runs'
                 + (" · optional" if rate["optional"] else "")
                 + "</span>"
-                + f'<span class="rc-still-racing">{view["counts"][k]:,} still racing</span>'
+                + f'<span class="rc-through">{view["counts"][k]:,} through</span>'
             )
+        departures = (
+            '<span class="rc-out">'
+            + glyphs.icon("dnf", label="DNF")
+            + f"<span data-out-count>{view['out'][k]:,} out here</span></span>"
+            if k
+            else ""
+        )
         rows.append(
             f'<li class="{classes}" data-station="{k}">'
             '<div class="rc-rail" aria-hidden="true">'
@@ -474,7 +482,9 @@ def _stations(
             f'<button type="button" class="rc-station-card" aria-pressed="{"true" if k == selected else "false"}">'
             f'<span class="rc-station-name">{esc(name)}</span>'
             + checkpoint_rate
-            + f'<span class="rc-station-stat">{esc(view["stats"][k])}</span></button>'
+            + f'<span class="rc-station-stat">{esc(view["stats"][k])}</span>'
+            + departures
+            + "</button>"
             + (
                 f'<a class="rc-checkpoint-link" href="#checkpoint-{k}">'
                 f"What checkpoint {k} checks</a>"
@@ -484,6 +494,37 @@ def _stations(
             + "</div></li>"
         )
     return '<ol class="rc-stations">' + "".join(rows) + "</ol>"
+
+
+def _off_map(race: Mapping[str, Any]) -> str:
+    groups = (
+        (
+            "red",
+            "flag-red",
+            "red flag",
+            "excluded; not counted in the standings",
+        ),
+        ("nothing", "dnf", "DNF, handed in nothing", "counted in the standings"),
+        (
+            "checkered",
+            "flag-checkered",
+            "result without checkpoints",
+            "checkered; counted in the standings",
+        ),
+        ("dnf", "dnf", "result without checkpoints", "DNF; counted in the standings"),
+    )
+    parts = [
+        glyphs.icon(glyph) + f"{plural(race['offMap'][key], 'run')} · {label} ({note})"
+        for key, glyph, label, note in groups
+        if race["offMap"][key]
+    ]
+    return (
+        '<p class="rc-off-map">Not on the map (all entries in this race): '
+        + "; ".join(parts)
+        + ".</p>"
+        if parts
+        else ""
+    )
 
 
 def _checkpoint_guide(race: Mapping[str, Any]) -> str:
@@ -540,7 +581,9 @@ def _lap(race: Mapping[str, Any]) -> str:
                 if race.get("singleResult")
                 else "This race's runs do not record checkpoints, so it has no track map yet."
             )
-            + "</p></section>"
+            + "</p>"
+            + _off_map(race)
+            + "</section>"
         )
     labels = race["checkpoints"] or []
     lap_views = funnel_views(race)
@@ -583,9 +626,9 @@ def _lap(race: Mapping[str, Any]) -> str:
         f'data-playback-ms="{PLAYBACK_MS}">'
         '<div class="rc-lap-copy">'
         + head
-        + '<p class="rc-copy">Each pass rate counts every submission at this race version '
-        "that recorded that checkpoint, across all entries and attempts; "
-        "the second number and blue ribbon count runs still racing in the selected view.</p>"
+        + '<p class="rc-copy">Every run shown has finished. The numbers and blue ribbon '
+        "show where finished runs dropped out. Each pass rate counts every submission at "
+        "this race version that recorded that checkpoint, including excluded runs.</p>"
         '<div class="rc-lap-controls" data-lap-controls hidden>'
         f'<div class="rc-seg" role="radiogroup" aria-label="Show the lap for">{mode_buttons}</div>'
         f'<div class="rc-scroll"><div class="rc-hscroll" data-lap-options>{options}</div></div>'
@@ -593,7 +636,12 @@ def _lap(race: Mapping[str, Any]) -> str:
         "</div>" + worst + '<div class="rc-panel" data-lap-panel aria-live="polite">'
         f"<b>{esc(view['titles'][selected])}</b><span>{esc(view['bodies'][selected])}</span></div>"
         f'<p class="rc-caption" data-lap-caption>{esc(view["caption"])}</p>'
-        "</div>" + _stations(view, labels, race["checkpointRates"]) + "</section>"
+        f'<p class="rc-caption" data-lap-basis><span data-lap-basis-count>{view["n"]:,}</span> counted runs with checkpoints in this view; '
+        f"pass rates use all {race['checkpointSubmissions']:,} submissions with checkpoints.</p>"
+        + _off_map(race)
+        + "</div>"
+        + _stations(view, labels, race["checkpointRates"])
+        + "</section>"
     )
 
 
@@ -1077,7 +1125,8 @@ CSS = """
 .rc-station:has(.rc-station-card[aria-pressed="true"]) .rc-dot { background: var(--ink); color: var(--paper); }
 .rc-station-name { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
 .rc-checkpoint-rate { font-size: 14px; font-weight: 600; }
-.rc-still-racing { font-size: 14px; color: var(--ink-2); }
+.rc-through, .rc-out, .rc-off-map { font-size: 14px; color: var(--ink-2); }
+.rc-out .glyph, .rc-off-map .glyph { width: 16px; height: 16px; vertical-align: middle; margin-right: 4px; }
 .rc-station-stat { font-size: 14px; color: var(--ink-2); }
 
 .rc-track { max-width: 760px; }
@@ -1256,6 +1305,8 @@ SCRIPT = """(function () {
     var options = all(lap, '.rc-option');
     var panel = lap.querySelector('[data-lap-panel]');
     var caption = lap.querySelector('[data-lap-caption]');
+    var basis = lap.querySelector('[data-lap-basis]');
+    var basisCount = basis ? basis.querySelector('[data-lap-basis-count]') : null;
     var worstLine = lap.querySelector('[data-lap-worst]');
     var play = lap.querySelector('[data-lap-play]');
     var view = views[0];
@@ -1278,13 +1329,16 @@ SCRIPT = """(function () {
         station.classList.toggle('is-lit', k <= step);
         station.classList.toggle('is-worst', k > 0 && k === view.worst);
         station.querySelector('.rc-station-stat').textContent = view.stats[k];
-        var remaining = station.querySelector('.rc-still-racing');
-        if (remaining) remaining.textContent = view.counts[k].toLocaleString('en-US') + ' still racing';
+        var remaining = station.querySelector('.rc-through');
+        if (remaining) remaining.textContent = view.counts[k].toLocaleString('en-US') + ' through';
+        var out = station.querySelector('[data-out-count]');
+        if (out) out.textContent = view.out[k].toLocaleString('en-US') + ' out here';
         station.querySelector('.rc-station-card').setAttribute('aria-pressed', k === selected ? 'true' : 'false');
       });
       panel.querySelector('b').textContent = view.titles[selected];
       panel.querySelector('span').textContent = view.bodies[selected];
       caption.textContent = view.caption;
+      if (basisCount) basisCount.textContent = view.n.toLocaleString('en-US');
       var name = view.worst ? stations[view.worst].querySelector('.rc-station-name').textContent : '';
       worstLine.innerHTML = '';
       if (view.worst) {
