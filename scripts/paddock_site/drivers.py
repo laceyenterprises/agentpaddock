@@ -146,7 +146,7 @@ def slips_note(entry: Mapping[str, Any]) -> str:
     slips = [row["label"] for row in entry["byChallenge"] if row["k"] < row["n"]]
     if not slips:
         return "A clean sweep: it finishes every race in every challenge."
-    return f"It drops races in {esc(views.join_words(slips))}. Everything else it finishes."
+    return f"It drops races in {esc(views.join_words(slips))}."
 
 
 def _chips(drivers: Sequence[Mapping[str, Any]], current: str) -> str:
@@ -227,11 +227,7 @@ def driver_body(
     root = layout.up(current)
     calendar = len(site.calendar)
     rows, floor = _rows(driver)
-    floor_note = (
-        f" Bars start at {floor}% because the field is close at the top."
-        if floor
-        else ""
-    )
+    floor_note = f" Bars start at {floor}%, where the field is close." if floor else ""
     return (
         '<div class="dv" data-driver>'
         + _chips(drivers, current)
@@ -245,8 +241,8 @@ def driver_body(
         '<section class="dv-cars">'
         f'<span class="label">{glyphs.icon("car")}Car by car</span>'
         f"<h2>{esc(headline(driver['entries']))}</h2>"
-        f'<p class="dv-note">Same driver, same {views.plural(calendar, "race")}. '
-        f"Only the car and its engine map change.{floor_note}</p>"
+        f'<p class="dv-note">Same driver, same {views.plural(calendar, "race")}; '
+        f"only the car and engine map change.{floor_note}</p>"
         f'<div class="dv-rows" role="group" aria-label="Entries">{rows}</div>'
         '<p class="dv-hint">Tap an entry to see where it wins and where it slips.</p></section>'
         + _slips(driver)
@@ -266,8 +262,7 @@ def index_body(site: views.SiteData, drivers: Sequence[Mapping[str, Any]]) -> st
     hero = views.hero(
         "driver",
         "The drivers.",
-        "A driver is the model. Pick one to see how it does in every car it has "
-        "raced the whole calendar in.",
+        "A driver is the model. Pick one to see it in every car.",
     )
     if not site.live:
         return hero + views.caveat(

@@ -103,28 +103,26 @@ def track_stops(path: str = TRACK_PATH, samples: int = 400) -> list[float]:
         stops.append(round(run / total, 4))
     return stops
 
+
 #: (title, glyph, what happens, what to notice). No numbers: a number on this
 #: page comes from the data.
 SECTORS = (
     (
         "The briefing",
         "briefing",
-        "The driver gets its instructions: the task and the code to work on. "
-        "Every entry gets exactly the same briefing, word for word.",
-        "Every entry reads the same words. The answer is never in them.",
+        "The driver gets its instructions: the task and the code to work on.",
+        "Every entry reads the same words, and the answer is never in them.",
     ),
     (
         "On the track",
         "tires",
-        "The model drives its car. It reads files, runs commands and edits code "
-        "with the tools its harness mounts: its tires. Nobody helps it mid-race.",
+        "The model drives its car, reading files, running commands and editing code with the tools its harness mounts: its tires. Nobody helps it mid-race.",
         "Fuel burns the whole way: every token the model reads or writes goes on the bill.",
     ),
     (
         "The hand-in",
         "flag-checkered",
-        "It writes its answer to one file and stops. Whatever it handed in is all "
-        "the stewards will see.",
+        "It writes its answer to one file and stops; that file is all the stewards see.",
         "A run that hands in nothing is a DNF, short for did not finish, however "
         "close it got.",
     ),
@@ -133,8 +131,7 @@ SECTORS = (
         "stewards",
         "Stewards check the answer against checks the driver never saw. Pass every "
         "required check and it takes the checkered flag.",
-        "Miss one required check and the run is a DNF. It is not thrown out: it counts "
-        "as a fail in the entry's avg pass rate.",
+        "Miss one required check and the run is a DNF: it counts as a fail, not thrown out.",
     ),
 )
 
@@ -150,8 +147,7 @@ FLAGS = (
         "DNF",
         "dnf",
         "counted",
-        "DNF, short for did not finish: it missed a check or handed in nothing. "
-        "It counts as a fail in the entry's avg pass rate.",
+        "Did not finish: it missed a required check or handed in nothing. It counts as a fail.",
     ),
     (
         "Red",
@@ -170,7 +166,7 @@ FLAGS = (
         "Yellow",
         "flag-yellow",
         "not yet",
-        "An audit is pending. The result waits until it is checked.",
+        "Audit pending: the result waits until it is checked.",
     ),
     (
         "Green",
@@ -428,7 +424,7 @@ def bar_floor(rates: Sequence[float]) -> int:
 
 def floor_caption(floor: int, lowest: str) -> str:
     if floor == BAR_FLOOR:
-        return f"Bars start at {floor}%: the field is close, so the differences sit at the top."
+        return f"Bars start at {floor}%, where the field is close."
     if floor == 0:
         return "Bars start at 0%."
     return (
@@ -583,8 +579,7 @@ def ranges_lab(drivers: Mapping[str, Any]) -> dict:
         ),
         "source": (
             f"{headline(lead[1]['rate'])} is {names[lead[0]]} in {lead[1]['car']}: "
-            f"{lead[1]['k']} of {lead[1]['n']} races passed, the top avg pass rate "
-            "in the car lab below."
+            f"{lead[1]['k']} of {lead[1]['n']} races passed."
             if lead
             else ""
         ),
@@ -769,9 +764,7 @@ def ranges_html(lab: Mapping[str, Any]) -> str:
         '<section class="lab narrow" id="honest-ranges">'
         + _eyebrow("Try it · honest ranges", "whisker")
         + f"<h2>{esc(lab['title'])}</h2>"
-        '<p class="lab-sub">A pass rate is a measurement from a handful of races, so it '
-        "comes with a range: where the true rate most likely sits. Change the number "
-        "of runs and the passes, and watch the range move.</p>"
+        '<p class="lab-sub">A pass rate from a handful of races comes with a range: where the true rate most likely sits. Change the runs and passes to watch it move.</p>'
         + (f'<p class="lab-caption">{esc(lab["source"])}</p>' if lab["source"] else "")
         + f'<div class="chip-row wraps" id="hr-sizes" role="group" aria-label="Number of runs">{sizes}</div>'
         '<div class="panel">'
@@ -828,11 +821,7 @@ def ranges_html(lab: Mapping[str, Any]) -> str:
         + _bind("hr-n", words["n"])
         + " gives "
         + _bind("hr-perfect", words["perfect"])
-        + " to 100%, not a flat 100%, because a few more runs could still miss one.</li>"
-        "</ol>"
-        '<p class="lab-sub">Rule of thumb: to halve the range, run about four times as '
-        "many races. And the board's one rule: <b>when two entries' ranges overlap, it "
-        "calls them a tie.</b></p></div></section>"
+        + " to 100%, not a flat 100%, because a few more runs could still miss one.</li></ol><p class=\"lab-sub\">Rule of thumb: to halve the range, run about four times as many races. The board's one rule: <b>when two entries' ranges overlap, it calls them a tie.</b></p></div></section>"
     )
 
 
@@ -942,8 +931,7 @@ def body(drivers: Mapping[str, Any], current: str) -> str:
         '<div class="learn" id="learn">'
         '<div class="page-hero">'
         f'<span class="eyebrow">{layout.PRODUCT}</span><h1>How an agent runs a race.</h1>'
-        '<p class="lede">Four sectors, the same for every entry. Tap the track to drive '
-        "the next one.</p></div>"
+        '<p class="lede">Four sectors, the same for every entry.</p></div>'
         + stepper_html(state["stepper"])
         + engine_map_html(state["engineMap"])
         + ranges_html(state["ranges"])

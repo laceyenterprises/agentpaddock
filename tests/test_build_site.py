@@ -697,6 +697,7 @@ PRODUCT_NAME_ALLOWLIST = re.compile(
     r"|(?s:<pre\b[^>]*><code>.*?</code></pre>)"  # commands quoted verbatim (PDW-09)
     r"|<code>[^<]*</code>"  # inline code: paths and commands
     r"|Learn the paddock in 60 seconds\."
+    r"|main standings count only Reproduced and Paddock run\."
 )
 
 
@@ -750,9 +751,10 @@ def test_every_page_title_and_eyebrow_names_agent_paddock():
             assert re.search(r'<p class="st-eyebrow">.*?</p><h1>', files[name]), name
             continue
         if name == "index.html":
-            # Home's eyebrow names the product and what it is.
+            # Home's eyebrow says what the board is; the header names the product.
             assert re.search(
-                r'<span class="eyebrow">Agent Paddock: [^<]+</span><h1>', files[name]
+                '<span class="eyebrow">The open leaderboard for coding agents</span><h1>',
+                files[name],
             )
             continue
         assert '<span class="eyebrow">Agent Paddock</span><h1>' in files[name], name
@@ -2003,7 +2005,7 @@ def test_standings_carries_the_results_note_after_the_hero(tmp_path):
         block = main[note : main.index("</section>", note)]
         assert "How to read these results" in block
         assert "the same automated checks grade every run" in block
-        assert "It is not a comprehensive ranking" in block
+        assert "It is a narrow measurement, not a comprehensive ranking" in block
         assert '<use href="#rulebook"/>' in block
         links = _local_links("standings/index.html", block)
         assert links == {"contact/index.html", "rulebook/index.html"}
@@ -2036,7 +2038,7 @@ def test_standings_order_and_ties_equal_leaderboard(tmp_path):
             in markup
         )
     # The photo finish names the tie leaderboard.py found.
-    assert "<b>Photo finish.</b> The top two share" in page
+    assert "<b>Photo finish:</b> the top two share" in page
     # The rows ranked by fuel bill: cheapest per race passed first, no price last.
     standings = json.loads(build_site.build(results)["data/standings.json"])["entries"]
     fuel = standings_pages.fuel_ranks(standings)
@@ -2454,10 +2456,13 @@ def test_races_build_one_page_per_calendar_race(tmp_path):
     assert type(runs) is int and runs > 0
     assert type(subs) is int and subs >= runs
     assert (
-        f"{runs:,}</span> counted runs with checkpoints in this view; pass rates use all {subs:,} submissions with checkpoints."
+        f"From the <span data-lap-basis-count>{runs:,}</span> counted runs that recorded their checks."
         in page
     )
-    assert "including excluded runs" in page
+    assert (
+        "Pass rates cover every submission that recorded each checkpoint, across all entries and attempts."
+        in page
+    )
 
 
 def test_race_pages_hold_the_site_invariants(tmp_path):
@@ -2553,6 +2558,7 @@ def test_race_page_funnel_comes_from_the_data(tmp_path):
         assert stats[k] == f"{after / before:.0%} clear"
         station = page.split(f'data-station="{k}">', 1)[1].split("</li>", 1)[0]
         assert f'<span class="rc-through">{after} through</span>' in station
+        assert "rc-checkpoint-rate" not in station
         assert '<use href="#dnf"/>' in station
         assert f"<span data-out-count>{before - after} out here</span>" in station
         assert everyone["bodies"][k] == (
@@ -2572,7 +2578,7 @@ def test_race_page_funnel_comes_from_the_data(tmp_path):
         assert view["n"] == data[0]
         assert view["stats"][-1] == f"{data[-1]} of {data[0]} finish"
         assert view["out"] == [0] + [data[k - 1] - data[k] for k in range(1, len(data))]
-    assert "Every run shown has finished." in page
+    assert "The blue ribbon shows where runs drop out." in page
 
 
 @pytest.mark.parametrize("exclusion", ["infra:agent_error", "pre-FIXGRADE-01"])
@@ -2599,27 +2605,19 @@ def test_race_lap_groups_runs_not_on_the_map_by_recorded_flag(tmp_path, exclusio
     page = files[site_races.race_file(race["id"])]
     lights = page.split('data-station="0">', 1)[1].split("</li>", 1)[0]
     assert "Not on the map" not in lights
-    note = re.search(r'<p class="rc-off-map">.*?</p>', page).group()
-    assert "Not on the map (all entries in this race):" in note
-    assert '<use href="#flag-red"/></svg>1 run · red flag' in note
-    assert "excluded; not counted in the standings" in note
-    assert (
-        '<use href="#dnf"/></svg>2 runs · DNF, handed in nothing (counted in the standings)'
-        in note
-    )
-    assert (
-        '<use href="#flag-checkered"/></svg>1 run · result without checkpoints (checkered; counted in the standings)'
-        in note
-    )
-    assert (
-        '<use href="#dnf"/></svg>1 run · result without checkpoints (DNF; counted in the standings)'
-        in note
-    )
+    note = re.search(r'<p class="rc-caption" data-lap-basis>.*?</p>', page).group()
+    assert "Not shown: 1 red-flag run, left out" in note
+    assert "2 that handed in nothing, counted as DNFs" in note
+    assert "1 result without checkpoints, counted as checkered" in note
+    assert "1 result without checkpoints, counted as DNFs" in note
     # Zero groups do not leave empty labels or glyphs behind.
     race["offMap"] = {"red": 0, "nothing": 0, "checkered": 1, "dnf": 0}
     line = site_races._off_map(race)
     assert "red flag" not in line and "handed in nothing" not in line
-    assert "#dnf" not in line and "result without checkpoints" in line
+    assert (
+        "counted as DNFs" not in line
+        and "result without checkpoints, counted as checkered" in line
+    )
     race["offMap"]["checkered"] = 0
     assert site_races._off_map(race) == ""
 
@@ -3003,7 +3001,7 @@ def test_race_page_companion_rates_count_each_checkpoint_independently(
         assert rate["label"] in page
         assert f"{rate['rate']:.0%} pass · {rate['n']} runs" in page
     assert (
-        "13</span> counted runs with checkpoints in this view; pass rates use all 14 submissions with checkpoints."
+        "From the <span data-lap-basis-count>13</span> counted runs that recorded their checks."
         in page
     )
     assert path.read_bytes() == original
@@ -3011,7 +3009,7 @@ def test_race_page_companion_rates_count_each_checkpoint_independently(
     (tmp_path / "tasks/hard-review-alpha/track.toml").unlink()
     files = build_site.build(results)
     page = files["races/hard-review-alpha/index.html"]
-    assert "· optional" in page
+    assert "optional ·" in page
     race = json.loads(files["data/races/hard-review-alpha.json"])
     expected = [
         c["name"].replace("_", " ").capitalize()
@@ -3595,8 +3593,14 @@ def test_pit_lane_commands_equal_the_readme_and_contributing_text():
     contributing = (REPO / "CONTRIBUTING.md").read_text(encoding="utf-8")
     runners = (REPO / "design" / "guide" / "race-it-yourself.md").read_text("utf-8")
     # Clone and install, the standalone config, the run, from-run, validate.
-    assert len(boxes) == 5
-    install, config, run, from_run, validate = boxes
+    assert len(boxes) == 3
+    install, config, run = boxes
+    from_run = site_pit_lane.command(site_pit_lane.COMMANDS["from-run"])
+    validate = site_pit_lane.command(site_pit_lane.COMMANDS["validate"])
+    assert (
+        f'href="{layout.REPO_URL}/blob/main/CONTRIBUTING.md#submit-results-a-run-bundle">Convert and check your run bundle</a>'
+        in page
+    )
     assert install.startswith(
         "git clone https://github.com/laceyenterprises/agentpaddock"
     )
@@ -3660,7 +3664,7 @@ def test_pit_lane_refuses_a_missing_source_block(tmp_path):
     assert site_pit_lane.fenced_blocks(text, "## A") == ["one \\\n  two"]
 
 
-def test_pit_lane_citations_use_heading_anchors_and_are_unique_per_step():
+def test_pit_lane_keeps_source_anchors_internal_and_links_the_contributing_guide():
     page = build_site.build(FIXTURE)["race-it-yourself/index.html"]
     repo = "https://github.com/laceyenterprises/agentpaddock/blob/main/"
     expected = (
@@ -3674,9 +3678,16 @@ def test_pit_lane_citations_use_heading_anchors_and_are_unique_per_step():
     for number, target in enumerate(expected, start=1):
         step = _between(page, f'id="step-{number}"', '<div class="step-foot">')
         citations = re.findall(r'<p class="from">From <a href="([^"]+)">', step)
-        assert citations == [repo + target]
+        assert citations == []
+        source = site_pit_lane.STEPS[number - 1].source
+        if source is None:
+            source = site_pit_lane.COMMANDS[
+                (site_pit_lane.STEPS[number - 1].commands or ("from-run",))[0]
+            ]
+        assert source.href == repo + target
     results_step = _between(page, 'id="step-5"', "</li>")
-    assert len(CODE_BOX.findall(results_step)) == 2
+    assert not CODE_BOX.findall(results_step)
+    assert "#submit-results-a-run-bundle" in results_step
 
 
 def test_every_dictionary_term_has_a_sprite_symbol_and_the_index_is_covered():
@@ -3751,9 +3762,12 @@ def test_every_rule_restates_a_source_section_that_exists():
         assert source.section in headings, (rule.title, source)
     main = _main(build_site.build(FIXTURE)["rulebook/index.html"])
     assert main.count('<details class="rule">') == 16
-    assert main.count('<p class="from">Restates <a href=') == 16
+    assert 'class="from"' not in main
     assert "contributing-md" not in main
-    assert "CONTRIBUTING.md#submit-results-a-run-bundle" in main
+    assert (
+        f'href="{layout.REPO_URL}/blob/main/CONTRIBUTING.md">the contributing guide</a>'
+        in main
+    )
     assert 'href="../methodology.html"' in main
 
 
@@ -3766,7 +3780,7 @@ def test_contact_page_has_the_pit_board_the_mailto_and_the_challenge_subject():
     assert 'href="mailto:hello@agentpaddock.ai"' in main
     assert 'href="mailto:hello@agentpaddock.ai?subject=Result%20challenge"' in main
     assert 'href="https://github.com/laceyenterprises/agentpaddock/issues"' in main
-    assert "Lacey Enterprises runs it." in main
+    assert "run by Lacey Enterprises." in main
     for title in (
         "Ask about the program",
         "Challenge a result",
@@ -3834,7 +3848,10 @@ def test_explainer_page_numbers_come_from_the_site_data(tmp_path):
     races = json.loads(files["data/races.json"])["basis"]["calendarRaces"]
     assert races > 0
     assert f"a fixed calendar of {races} tasks" in files["contact/index.html"]
-    assert f"{races} races is a small sample." in files["rulebook/index.html"]
+    assert (
+        f"{races} races is a small sample, and the range says how sure the board can be."
+        in files["rulebook/index.html"]
+    )
     assert f"All {races} races, grouped by challenge" in files["dictionary/index.html"]
     assert site_contact.CHALLENGE_SUBJECT == "Result challenge"
 
@@ -3915,7 +3932,7 @@ def test_home_builds_from_the_site_data_fixtures(tmp_path):
         main,
     )
     assert pressed == ["Hard review"]
-    assert "The hardest challenge on the calendar." in main
+    assert "The hardest challenge." in main
     # No prototype sample value reaches the page.
     text = " ".join(" ".join(Text(main).text).split())
     for sample in PROTOTYPE_SAMPLES:
@@ -4073,7 +4090,9 @@ console.log(JSON.stringify({rejected: rejected, aliases: aliases, reruns: reruns
     )
 
 
-@pytest.mark.parametrize("samples", [[], [{"kind": "passed", "who": "Driver", "what": "Run"}]])
+@pytest.mark.parametrize(
+    "samples", [[], [{"kind": "passed", "who": "Driver", "what": "Run"}]]
+)
 def test_home_ticker_without_layers_exits_cleanly(samples):
     node = shutil.which("node")
     if not node:
@@ -4390,7 +4409,7 @@ def test_home_tiles_and_roundels_use_glyph_set_symbols_only(tmp_path):
     assert [re.search(r"<span>([^<]+)</span>", t)[1] for t in tiles] == [
         term for term, _glyph, _body in site_home.CAST
     ]
-    assert "The board does not measure skills yet." in main
+    assert "Not scored yet." in main
     row = _between(main, "data-challenge-row>", "</div>")
     roundels = re.findall(r'<svg class="roundel roundel-([a-z-]+)', row)
     assert roundels == list(site_glyphs.RACE_TYPES) and len(roundels) == 7
@@ -4454,9 +4473,8 @@ def test_home_results_note_follows_the_photo_finish(tmp_path):
     assert site_home.RESULTS_NOTE_TITLE == "How to read these results"
     assert ">How to read these results</h2>" in note
     assert (
-        "These are AI-run benchmarks: AI agents race a fixed calendar of 2 tasks, and the "
-        "same automated checks grade every run. The board shows how each entry did on "
-        "these races. It is not a comprehensive ranking, and different tasks or settings "
+        "AI agents race a fixed calendar of 2 tasks, and the same automated checks grade every run. "
+        "It is a narrow measurement, not a comprehensive ranking: other tasks or settings "
         "can give a different order." in note
     )
     assert (
@@ -4824,7 +4842,7 @@ def test_the_sector_stepper_and_flags_spell_out_dnf_at_first_use():
         "DNF, short for did not finish"
     )
     assert '<abbr title="did not finish">DNF</abbr>' in page
-    assert "DNF, short for did not finish: it missed a check" in page
+    assert "Did not finish: it missed a required check" in page
     # Four sectors, each with a jump target at least 44 px across.
     assert page.count('data-sector-panel="') == 4
     for panel, count in (("sector", 4), ("flag", 6)):
@@ -4852,10 +4870,11 @@ def test_the_sector_stepper_and_flags_spell_out_dnf_at_first_use():
 
 def test_a_dnf_says_how_it_counts():
     # "It still counts, against the entry" read as a riddle: say it is a fail.
-    plain = "counts as a fail in the entry's avg pass rate"
+    plain = "counts as a fail"
     assert plain in learn.SECTORS[-1][3] and "still counts" not in learn.SECTORS[-1][3]
     dnf = {name: body for name, _, _, body in learn.FLAGS}["DNF"]
     assert dnf.endswith("It " + plain + ".")
+    assert "not thrown out" in learn.SECTORS[-1][3]
 
 
 def test_scrolling_drives_the_lap_once_on_a_phone():
@@ -4869,7 +4888,10 @@ def test_scrolling_drives_the_lap_once_on_a_phone():
     script = learn.SCRIPT
     # Phones only: below the width where the stepper goes two-column.
     assert "media('(max-width: 899px)')" in script
-    assert "@media (min-width: 900px) {\n  .learn { gap: 88px; }\n  .stepper {" in learn.CSS
+    assert (
+        "@media (min-width: 900px) {\n  .learn { gap: 88px; }\n  .stepper {"
+        in learn.CSS
+    )
     # It gives way to reduced motion, a link into the page, a tap and a short screen.
     assert "(still && still.matches) || window.location.hash" in script
     assert "return function (event) { endLap(); action(event); };" in script
@@ -4880,7 +4902,9 @@ def test_scrolling_drives_the_lap_once_on_a_phone():
     assert "html.style.overflowAnchor = 'none';" in script
     css = learn.CSS
     assert ".stepper.scrolly { position: sticky; top: var(--pin, 72px);" in css
-    assert ".stepper.scrolly .sector[hidden] { display: grid; visibility: hidden;" in css
+    assert (
+        ".stepper.scrolly .sector[hidden] { display: grid; visibility: hidden;" in css
+    )
 
 
 def test_browser_the_first_scroll_down_drives_the_lap_on_a_phone(
@@ -4896,7 +4920,11 @@ def test_browser_the_first_scroll_down_drives_the_lap_on_a_phone(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content.encode() if isinstance(content, str) else content)
     learn_page = (tmp_path / "learn/index.html").as_uri()
-    phone = {"viewport": {"width": 390, "height": 664}, "is_mobile": True, "has_touch": True}
+    phone = {
+        "viewport": {"width": 390, "height": 664},
+        "is_mobile": True,
+        "has_touch": True,
+    }
     state = """() => {
       const s = document.querySelector('.stepper');
       return {
@@ -4931,7 +4959,11 @@ def test_browser_the_first_scroll_down_drives_the_lap_on_a_phone(
                 after = page.evaluate(state)
                 if after["sector"] != seen[-1]:
                     seen.append(after["sector"])
-                if before["scrolly"] and after["scrolly"] and before["top"] == after["top"]:
+                if (
+                    before["scrolly"]
+                    and after["scrolly"]
+                    and before["top"] == after["top"]
+                ):
                     pinned.add(round(after["top"]))
                 if before["scrolly"] and not after["scrolly"]:
                     release = before["top"] - after["top"]
@@ -4942,7 +4974,10 @@ def test_browser_the_first_scroll_down_drives_the_lap_on_a_phone(
             # Letting go moves the stepper by the scroll alone, never by the run removed.
             assert release is not None and 0 <= release <= 80
             assert page.locator(".sector-actions").is_visible()
-            assert page.locator("#track-hint").inner_text() == "Tap the track to start another lap"
+            assert (
+                page.locator("#track-hint").inner_text()
+                == "Tap the track to start another lap"
+            )
             # The first scroll down only: back up and down again, it never pins.
             page.mouse.wheel(0, -8000)
             page.wait_for_timeout(100)
@@ -5384,12 +5419,12 @@ def test_engine_map_label_names_the_setting_that_ran(car, engine_map, route, lab
         (
             "codex",
             "zai/glm-5.2",
-            "Codex 0.159 sends its default thinking level, medium, when an entry sets none. 42 earlier runs on Codex 0.124 sent none, so Z.ai's default, dynamic thinking at max effort, applied to those.",
+            "Codex 0.159 sends its default, medium, when an entry sets none; 42 earlier runs on Codex 0.124 sent none and got Z.ai's default, dynamic thinking at max effort.",
         ),
         (
             "codex",
             "fireworks/qwen3.8-max",
-            "Codex 0.159 sends its default thinking level, medium, when an entry sets none. 22 earlier runs on Codex 0.124 sent none, so Fireworks' default, xhigh, applied to those.",
+            "Codex 0.159 sends its default, medium, when an entry sets none; 22 earlier runs on Codex 0.124 sent none and got Fireworks' default, xhigh.",
         ),
         (
             "codex",
@@ -5525,9 +5560,7 @@ def test_fuel_triad_arcs_partition_the_input_ring(glyph_source):
     body = next(g[4] for g in glyph_source["GLYPHS"] if g[0] == "fuel-triad")
     paths = re.findall(r'<path d="([^"]+)"', body)
     assert len(paths) == 2
-    remainder, cached = [
-        re.findall(r"-?\d+(?:\.\d+)?", path) for path in paths
-    ]
+    remainder, cached = [re.findall(r"-?\d+(?:\.\d+)?", path) for path in paths]
     # Same circle, clockwise sweeps, opposite endpoints: no full-circle underlay.
     assert remainder[2:7] == ["5.5", "5.5", "0", "0", "1"]
     assert cached[2:7] == ["5.5", "5.5", "0", "1", "1"]
@@ -5980,7 +6013,9 @@ def test_fuel_gap_says_why_there_is_no_bill():
     assert sentence(7, 7, 50, 54) == (
         "7 of its 54 counted runs did not record their tokens, so there is no fuel bill."
     )
-    assert sentence(3, 1, 50, 54).startswith("3 of its 54 counted runs have no per-token")
+    assert sentence(3, 1, 50, 54).startswith(
+        "3 of its 54 counted runs have no per-token"
+    )
     assert sentence(0, 0, 0, 54) == "It passed no race, so there is no fuel bill."
 
 
@@ -5993,7 +6028,9 @@ def test_every_missing_fuel_bill_says_how_many_runs_lack_a_price(committed_pages
         assert 0 <= unmetered <= unpriced <= entry["n"], entry["id"]
         assert (entry["costPerPass"] is None) == (unpriced > 0 or entry["k"] == 0)
     wall = files["pit-wall/index.html"]
-    fuel = re.findall(r'<td class="pw-cell pw-fuel" data-usd="([^"]*)">(.*?)</td>', wall)
+    fuel = re.findall(
+        r'<td class="pw-cell pw-fuel" data-usd="([^"]*)">(.*?)</td>', wall
+    )
     assert fuel and all(">–<" not in cell for _, cell in fuel)
     for usd, cell in fuel:
         if usd:
@@ -6010,8 +6047,7 @@ def test_every_missing_fuel_bill_says_how_many_runs_lack_a_price(committed_pages
         "counted runs did not record their tokens, so there is no fuel bill."
     )
     assert (unmetered_explanation in tower) == any(
-        entry["unpricedRuns"] > 0
-        and entry["unmeteredRuns"] == entry["unpricedRuns"]
+        entry["unpricedRuns"] > 0 and entry["unmeteredRuns"] == entry["unpricedRuns"]
         for entry in site.placed
     )
 
@@ -6038,7 +6074,9 @@ def test_entry_chips_and_pit_wall_meta_keep_words_and_dots_together(committed_pa
     for meta in metas:
         # Each dot leads its item: the map's rides in the tag, the rank's in a span.
         assert meta.count(site_views.DOT) == 1
-        assert re.search(r'<span class="pw-place">·&nbsp;=?\d+(st|nd|rd|th)</span>$', meta)
+        assert re.search(
+            r'<span class="pw-place">·&nbsp;=?\d+(st|nd|rd|th)</span>$', meta
+        )
 
 
 def test_browser_pit_wall_and_entry_chips_wrap_whole_at_phone_width(
@@ -6088,7 +6126,10 @@ def test_browser_pit_wall_and_entry_chips_wrap_whole_at_phone_width(
             for name in ("pit-wall/index.html", *entries[:6]):
                 page.goto((tmp_path / name).as_uri())
                 got = page.locator("main").evaluate(lines)
-                assert got == {"dotEnds": 0, "splitRanks": 0, "splitWords": 0}, (name, got)
+                assert got == {"dotEnds": 0, "splitRanks": 0, "splitWords": 0}, (
+                    name,
+                    got,
+                )
             context.close()
         finally:
             browser.close()
@@ -6945,9 +6986,7 @@ def test_browser_panel_startup_and_motion_changes(acceptance_sites, tmp_path, sc
         if scenario == "missing-basis":
             files[name] = re.sub(r"<p[^>]*data-lap-basis>.*?</p>", "", content)
         elif scenario == "reworded-basis":
-            files[name] = content.replace(
-                " counted runs with checkpoints", " eligible runs with checkpoints"
-            )
+            files[name] = content.replace(" counted runs that", " eligible runs that")
     for name, content in files.items():
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -6975,29 +7014,31 @@ def test_browser_panel_startup_and_motion_changes(acceptance_sites, tmp_path, sc
             assert page.locator('[data-flag-panel="1"]').is_visible()
             assert page.locator("[data-flag-panel]:visible").count() == 1
 
-            page.goto((tmp_path / "index.html").as_uri())
+            page.goto((tmp_path / "index.html").as_uri(), wait_until="domcontentloaded")
             assert not errors, errors
             assert page.locator('[data-panel="cast"]:visible').count() == 1
             start = page.locator("[data-start]")
-            start.click()
-            assert start.inner_text() == "Hold…"
+            page.locator("[data-lights]").scroll_into_view_if_needed()
+            page.wait_for_function(
+                "document.querySelectorAll('.lamp.on').length > 0 || !document.querySelector('[data-go]').hidden",
+                timeout=20000,
+            )
+            if page.locator("[data-go]").is_visible():
+                start.click()
+            assert start.is_hidden()
             if scenario == "native":
                 # Changing the preference during the countdown completes it.
                 page.emulate_media(reduced_motion="reduce")
-                page.wait_for_function(
-                    "document.querySelector('[data-start]').textContent === 'Run it again'",
-                    timeout=1000,
-                )
-                assert page.locator("[data-go]").is_visible()
+                page.wait_for_function("!document.querySelector('[data-go]').hidden")
+                assert page.locator("[data-go]").inner_text() == "Race!"
                 assert (
                     page.locator("[data-art]").get_attribute("aria-label")
                     == "Start lights: all out"
                 )
-                start.click()
-                assert start.inner_text() == "Run it again"
+                assert start.is_hidden()
                 page.emulate_media(reduced_motion="no-preference")
                 start.click()
-                assert start.inner_text() == "Hold…"
+                assert start.is_hidden()
             assert not errors, errors
 
             race = next(
@@ -7006,8 +7047,10 @@ def test_browser_panel_startup_and_motion_changes(acceptance_sites, tmp_path, sc
             page.goto((tmp_path / race).as_uri())
             assert not errors, errors
             assert page.locator("[data-lap-controls]").is_visible()
-            note = page.locator(".rc-off-map")
-            original_note = note.inner_text() if note.count() else None
+            note = page.locator("[data-lap-basis]")
+            original_note = (
+                note.inner_text().split("Not shown:")[-1] if note.count() else None
+            )
             page.locator('[role="radio"][data-mode="car"]').click()
             counts = page.locator("[data-funnel]").evaluate(
                 "lap => JSON.parse(lap.dataset.funnel).find(view => view.mode === 'car')"
@@ -7023,7 +7066,7 @@ def test_browser_panel_startup_and_motion_changes(acceptance_sites, tmp_path, sc
             if scenario == "reworded-basis":
                 assert " eligible runs" in page.locator("[data-lap-basis]").inner_text()
             if original_note is not None:
-                assert note.inner_text() == original_note
+                assert note.inner_text().split("Not shown:")[-1] == original_note
                 assert page.locator(".rc-station-card .rc-off-map").count() == 0
             play = page.locator("[data-lap-play]")
             play.click()
@@ -7223,7 +7266,7 @@ def test_browser_widths_keyboard_and_no_script_reading(acceptance_sites, tmp_pat
                     page.keyboard.press("Escape")
                     assert menu.get_attribute("aria-expanded") == "false"
                     assert menu.evaluate("e => e === document.activeElement")
-                    page.locator("[data-start]").click()
+                    assert page.locator("[data-start]").is_hidden()
                     assert (
                         page.locator("[data-art]").get_attribute("aria-label")
                         == "Start lights: all out"
@@ -7355,3 +7398,218 @@ def test_browser_engine_map_tips(committed_pages, tmp_path, width, touch):
             assert not errors
         finally:
             browser.close()
+
+
+def test_home_lights_autoplay_once_and_respect_reduced_motion():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node is unavailable")
+    script = (
+        site_home._script()
+        .split("  // Lights out:", 1)[1]
+        .split("  // The live ticker:", 1)[0]
+    )
+    script = "// Lights out:" + script
+    harness = r"""
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const script = process.argv[1];
+for (const mode of ['observer', 'fallback', 'reduced']) {
+  let interval = null, ms = null, observer = null, observed = null, disconnected = 0;
+  const history = [];
+  const art = {setAttribute(key, value) {this[key] = value; history.push(value);}};
+  const lamps = Array.from({length: 5}, () => ({classList: {
+    toggle(key, on) {this.on = on;}
+  }}));
+  const start = {hidden: true, textContent: 'Run it again',
+    addEventListener(kind, fn) {this.click = fn;}};
+  const go = {hidden: true};
+  const lights = {querySelector(selector) {
+    return {'[data-art]': art, '[data-start]': start, '[data-go]': go}[selector];
+  }, querySelectorAll() {return lamps;}};
+  const window = {};
+  if (mode === 'observer') window.IntersectionObserver = function(fn) {
+    observer = fn;
+    this.observe = node => {observed = node;};
+    this.disconnect = () => {disconnected++;};
+  };
+  vm.runInNewContext(script, {window, IntersectionObserver: window.IntersectionObserver,
+    root: {querySelector() {return lights;}}, reduce: mode === 'reduced',
+    each: (items, fn) => items.forEach(fn),
+    setInterval(fn, delay) {interval = fn; ms = delay; return 1;},
+    clearInterval() {interval = null;}});
+  if (mode === 'reduced') {
+    assert.equal(interval, null);
+    assert.equal(go.hidden, false);
+    assert.equal(start.hidden, true);
+    assert.equal(art['aria-label'], 'Start lights: all out');
+    continue;
+  }
+  assert.equal(start.hidden, true);
+  assert.equal(go.hidden, true);
+  if (mode === 'observer') {
+    assert.equal(interval, null);
+    assert.equal(observed, lights);
+    observer([{isIntersecting: false}]);
+    assert.equal(interval, null);
+    observer([{isIntersecting: true}]);
+    assert.equal(disconnected, 1);
+  }
+  assert.equal(ms, 650);
+  for (let lit = 1; lit <= 5; lit++) {
+    interval();
+    assert.equal(lamps.filter(lamp => lamp.classList.on).length, lit);
+    assert.equal(art['aria-label'], 'Start lights: ' + lit + ' of 5 lit');
+  }
+  interval();
+  assert.equal(interval, null);
+  assert.equal(go.hidden, false);
+  assert.equal(start.hidden, false);
+  assert.equal(start.textContent, 'Run it again');
+  assert.equal(art['aria-label'], 'Start lights: all out');
+  if (observer) {
+    observer([{isIntersecting: true}]);
+    assert.equal(interval, null);
+  }
+  start.click();
+  assert.equal(go.hidden, true);
+  assert.equal(typeof interval, 'function');
+}
+"""
+    subprocess.run(
+        [node, "-e", harness, script],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=10,
+    )
+    hero = site_home.hero()
+    assert re.search(r'data-go aria-live="polite" hidden>.*?Race!</p>', hero)
+    assert "data-line" not in hero and "data-go-line" not in hero
+    assert "Five red lights" not in hero and "Hold it" not in site_home._script()
+    assert "text-transform" not in _css_rules(site_home.CSS)[".home-go"]
+
+
+def test_built_pages_keep_internal_pointers_out_of_reader_text(
+    acceptance_sites, committed_pages
+):
+    for files in (*acceptance_sites, committed_pages[0]):
+        for name, page in _html_pages(files).items():
+            text = " ".join(Text(page).text)
+            assert not re.search(
+                r"design/|track-facts|leaderboard\.py|PD[KW]-\d+", text
+            ), name
+
+
+def test_checkpoint_descriptions_are_one_sentence():
+    import tomllib
+
+    metadata = tomllib.loads((REPO / "results/meta/checkpoints.toml").read_text())
+    descriptions = []
+
+    def collect(table):
+        for key, value in table.items():
+            if key == "about":
+                descriptions.append(value)
+            elif isinstance(value, dict):
+                collect(value)
+
+    collect(metadata)
+    assert descriptions
+    for about in descriptions:
+        assert about.startswith("Passes when "), about
+        assert about.endswith(".") and len(re.findall(r"[.!?]", about)) == 1, about
+
+
+@pytest.mark.parametrize("reduced", [False, True])
+def test_browser_home_lights_start_on_view_and_finish_on_race(
+    committed_pages, tmp_path, reduced
+):
+    executable = os.environ.get("PADDOCK_BROWSER_EXECUTABLE")
+    if not executable:
+        pytest.skip("Local Chromium pass requires PADDOCK_BROWSER_EXECUTABLE")
+    browser_api = pytest.importorskip("playwright.sync_api")
+    for name, content in committed_pages[0].items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content.encode() if isinstance(content, str) else content)
+    with browser_api.sync_playwright() as api:
+        browser = api.chromium.launch(executable_path=executable)
+        try:
+            context = browser.new_context(
+                viewport={"width": 390, "height": 844},
+                reduced_motion="reduce" if reduced else "no-preference",
+            )
+            context.route("https://**", lambda route: route.abort())
+            page = context.new_page()
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.add_init_script("""
+                window.lampLabels = [];
+                new MutationObserver(records => records.forEach(record => {
+                    if (record.target.matches && record.target.matches('[data-art]'))
+                        window.lampLabels.push(record.target.getAttribute('aria-label'));
+                })).observe(document, {subtree: true, attributes: true, attributeFilter: ['aria-label']});
+            """)
+            page.goto((tmp_path / "index.html").as_uri(), wait_until="domcontentloaded")
+            if not reduced:
+                page.locator("[data-lights]").scroll_into_view_if_needed()
+                page.wait_for_function(
+                    "document.querySelectorAll('.lamp.on').length > 0"
+                )
+                assert page.locator("[data-start]").is_hidden()
+                # Ticker visibility changes must not cancel the lamps' interval.
+                page.locator("[data-ticker]").scroll_into_view_if_needed()
+                page.locator("[data-lights]").scroll_into_view_if_needed()
+            page.wait_for_function(
+                "document.querySelector('[data-art]').getAttribute('aria-label') === 'Start lights: all out'",
+                timeout=20000,
+            )
+            assert page.locator("[data-go]").inner_text() == "Race!"
+            assert page.locator("[data-go]").is_visible()
+            assert page.locator("[data-go]").get_attribute("aria-live") == "polite"
+            assert page.locator("[data-line]").count() == 0
+            assert page.locator("[data-start]").is_hidden() == reduced
+            if not reduced:
+                assert page.locator("[data-start]").inner_text() == "Run it again"
+                page.locator("footer").scroll_into_view_if_needed()
+                page.locator("[data-lights]").scroll_into_view_if_needed()
+                assert page.locator(".lamp.on").count() == 0
+                labels = page.evaluate("window.lampLabels")
+                for lit in range(1, 6):
+                    assert f"Start lights: {lit} of 5 lit" in labels
+                page.locator("[data-start]").click()
+                assert page.locator("[data-go]").is_hidden()
+            assert not errors, errors
+            context.close()
+        finally:
+            browser.close()
+
+
+def test_garage_comparison_requires_two_placed_cars_and_setup_note_requires_two_setups(
+    data_page_site,
+):
+    site = data_page_site
+    original = site.placed[0]
+    driver = original["driver"]
+    site.standings["entries"] = [original]
+    view = site_garage.model(site)
+    assert next(d for d in view["drivers"] if d["id"] == driver)["tip"] == ""
+    main = site_garage._result(view, view["start"], "../")
+    assert 'data-slot="setups" hidden' in main
+    assert 'class="gr-tip" hidden' in main
+
+    second_setup = deepcopy(original)
+    second_setup["id"] += "-other-setup"
+    site.standings["entries"].append(second_setup)
+    view = site_garage.model(site)
+    main = site_garage._result(view, view["start"], "../")
+    assert 'data-slot="setups">Raced in 2 setups of this car; this is the best.' in main
+    assert next(d for d in view["drivers"] if d["id"] == driver)["tip"] == ""
+
+    second_car = deepcopy(original)
+    second_car.update(id=original["id"] + "-other-car", car="synthetic-car")
+    site.standings["entries"].append(second_car)
+    view = site_garage.model(site)
+    tip = next(d for d in view["drivers"] if d["id"] == driver)["tip"]
+    assert f"does best in {site_views.car_name(original['car'])}" in tip
