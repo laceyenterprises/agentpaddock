@@ -203,15 +203,23 @@ def entry_name(entry: Mapping[str, Any], names: Mapping[str, str] | None = None)
     return f"{name} · {views.map_label(engine_map, car, route)}" if engine_map else name
 
 
-def entry_html(entry: Mapping[str, Any], names: Mapping[str, str] | None = None) -> str:
+def entry_html(
+    entry: Mapping[str, Any],
+    names: Mapping[str, str] | None = None,
+    *,
+    explain: bool = True,
+) -> str:
     """:func:`entry_name` as markup: the driver, the car and the engine map bold,
-    each behind its glyph."""
+    each behind its glyph. ``explain=False`` for words inside a link
+    (see :func:`views.map_tag`)."""
     identity = entry.get("identity", entry)
     route, car, engine_map = identity["driver"], identity["car"], identity.get("map")
     name = (
         f"{views.driver_tag(route, (names or {}).get(route))} in {views.car_tag(car)}"
     )
-    return f"{name} · {views.map_tag(engine_map, car, route)}" if engine_map else name
+    if not engine_map:
+        return name
+    return f"{name} · {views.map_tag(engine_map, car, route, explain=explain)}"
 
 
 def challenge_label(challenge: str) -> str:
@@ -423,7 +431,7 @@ def photo_finish(standings: Mapping[str, Any]) -> str:
         '<a class="home-leader" href="standings/index.html">'
         f"{_livery(row['car'])}"
         '<span class="home-leader-who">'
-        f'<span class="home-leader-name">{entry_html(row, names)}</span>'
+        f'<span class="home-leader-name">{entry_html(row, names, explain=False)}</span>'
         f'<span class="home-range" style="--lo:{at(row["lo"])};--hi:{at(row["hi"])};'
         f'--dot:{at(row["rate"])}" aria-hidden="true"><i></i><b></b><em></em></span>'
         f'<span class="sr-only">Honest range {pct(row["lo"])} to {pct(row["hi"])}</span>'
@@ -627,8 +635,9 @@ def fuel_card(standings: Mapping[str, Any]) -> str:
         ratio = dear["costPerPass"] / cheap["costPerPass"]
         title = f"Same finish. {ratio_text(ratio)} the mileage."
         line = (
-            f"{entry_html(cheap, names)} passes a race for {usd(cheap['costPerPass'])}. "
-            f"{entry_html(dear, names)} pays {usd(dear['costPerPass'])}."
+            f"{entry_html(cheap, names, explain=False)} passes a race for "
+            f"{usd(cheap['costPerPass'])}. "
+            f"{entry_html(dear, names, explain=False)} pays {usd(dear['costPerPass'])}."
         )
     else:
         priced = [
@@ -638,7 +647,8 @@ def fuel_card(standings: Mapping[str, Any]) -> str:
             best = priced[0]
             title = "The fuel bill."
             line = (
-                f"{entry_html(best, names)}, the best-placed priced entry, passes a race for "
+                f"{entry_html(best, names, explain=False)}, the best-placed priced entry, "
+                "passes a race for "
                 f"{usd(best['costPerPass'])}."
             )
         else:

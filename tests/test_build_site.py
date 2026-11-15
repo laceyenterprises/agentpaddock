@@ -4094,12 +4094,9 @@ assert.deepEqual(navigations, ['races/?challenge=docs']);
     )
 
 
-@pytest.mark.parametrize("challenge", ["hard-review", "docs", "unknown", None])
-def test_races_script_reads_and_updates_the_challenge_address(challenge):
-    node = shutil.which("node")
-    if not node:
-        pytest.skip("Node.js is required to execute the races JavaScript")
-    harness = """
+#: A minimal DOM for the races grid script: elements with attributes, events
+#: and a ``hidden`` property, and NodeList-like query results.
+_RACES_DOM = """
 const assert = require('node:assert/strict');
 // NodeList-like query results have indexed items and forEach, but no filter.
 function nodeList(items) {
@@ -4115,6 +4112,17 @@ function element(attrs = {}) {
     focus() { document.activeElement = this; }
   };
 }
+"""
+
+
+@pytest.mark.parametrize("challenge", ["hard-review", "docs", "unknown", None])
+def test_races_script_reads_and_updates_the_challenge_address(challenge):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required to execute the races JavaScript")
+    harness = (
+        _RACES_DOM
+        + """
 var chips = ['all', 'hard-review', 'docs'].map(c => element({'data-challenge': c}));
 var sorts = ['hard', 'name'].map(s => element({'data-sort': s}));
 var group = element();
@@ -4150,6 +4158,7 @@ var window = {
 };
 var getComputedStyle = () => ({getPropertyValue: () => '1'});
 """
+    )
     assertions = """
 var expected = ['docs', 'hard-review'].includes(challenge) ? challenge : 'all';
 assert.equal(chips.find(c => c.attrs['aria-checked'] === 'true').attrs['data-challenge'], expected);
@@ -4213,17 +4222,19 @@ def test_home_fuel_card_compares_a_shared_finish(tmp_path):
     card = site_home.fuel_card(standings)
     assert "Same finish. 8× the mileage." in card
     # Each entry names its driver, car and engine map in bold behind their
-    # glyphs; a default map with no recorded setting says so.
+    # glyphs; a default map with no recorded setting says so. The card is a
+    # link, so the map carries no info button: the standings it leads to explain it.
     pi, tag, driver = (
         site_views.car_tag("pi"),
         site_views.map_tag,
         site_views.driver_tag,
     )
     assert (
-        f"{driver('d/one')} in {pi} · {tag('default', 'pi', 'd/one')} passes a race for $0.040."
-        in card
+        f"{driver('d/one')} in {pi} · {tag('default', 'pi', 'd/one', explain=False)} "
+        "passes a race for $0.040." in card
     )
-    assert '>not</span> <span class="map-tail">recorded<span class="map-info">' in card
+    assert ">not</span> recorded</b>" in card
+    assert "map-info" not in card and "<button" not in card
     assert "Pi default" not in card
     assert f"{driver('d/two')} in {pi} · {tag('high', 'pi')} pays $0.320." in card
     # Without two priced entries sharing a place, the card makes no comparison.
@@ -6022,6 +6033,16 @@ def test_info_is_one_published_glyph():
     ]
 
 
+def _inside_control(page: str, at: int) -> bool:
+    """Whether offset ``at`` of ``page`` sits inside an open ``<a>`` or ``<button>``."""
+    before = page[:at]
+    return any(
+        before.rfind(f"<{tag} ") > before.rfind(f"</{tag}>")
+        or before.rfind(f"<{tag}>") > before.rfind(f"</{tag}>")
+        for tag in ("a", "button")
+    )
+
+
 def test_built_engine_map_labels_have_only_default_tips(committed_pages):
     files, _ = committed_pages
     count = 0
@@ -6053,7 +6074,9 @@ def test_built_engine_map_labels_have_only_default_tips(committed_pages):
                 or label.endswith(" default)")
             )
             has_tip = '<span class="map-info">' in match[0]
-            assert has_tip == default, (name, label)
+            # A control cannot hold another: inside a link or button the label
+            # stands without its info button.
+            assert has_tip == (default and not _inside_control(page, match.start()))
             count += default
     assert count > 100
 
@@ -6226,8 +6249,10 @@ def test_default_map_entries_name_the_setting_that_ran(data_page_site, monkeypat
         '<use href="#engine-map"/></svg>medium</span> (Codex '
         '<span class="map-tail">default)<span class="map-info">' in line
     )
-    # The car-by-car row names it the same way.
+    # The entry's wins-and-slips panel names it the same way, explained; the
+    # car-by-car row, a button, names it without the info button.
     assert page.count('medium</span> (Codex <span class="map-tail">default)') >= 2
+    assert "medium</span> (Codex default)</b> · " in page
     # The car sent nothing: the route's default, under the route's host.
     monkeypatch.setitem(settings, ("codex", best["driver"]), ("xhigh", "route"))
     host = site_views.host_name(best["driver"])
@@ -6641,6 +6666,369 @@ def test_every_driver_page_builds(tmp_path, committed_pages):
     _check_driver_pages(*committed_pages)
     files, site = committed_pages
     assert len([n for n in files if n.startswith("drivers/")]) > 2
+
+
+#: Elements HTML never closes, so a parser stack must not wait for them.
+_VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link"}
+_VOID |= {"meta", "source", "track", "wbr"}
+
+
+class _Nesting(HTMLParser):
+    """Each ``<a>`` or ``<button>`` opened inside another, with its ancestor."""
+
+    def __init__(self, page: str):
+        super().__init__()
+        self.stack: list[tuple[str, str]] = []
+        self.nested: list[tuple[str, str, str]] = []
+        self.feed(page)
+
+    def handle_starttag(self, tag, attrs):
+        if tag in _VOID:
+            return
+        cls = dict(attrs).get("class") or ""
+        if tag in ("a", "button"):
+            outer = [t for t in self.stack if t[0] in ("a", "button")]
+            if outer:
+                self.nested.append((outer[-1][0], outer[-1][1], f"{tag}.{cls}"))
+        self.stack.append((tag, cls))
+
+    def handle_endtag(self, tag):
+        for i in range(len(self.stack) - 1, -1, -1):
+            if self.stack[i][0] == tag:
+                del self.stack[i:]
+                break
+
+
+def test_no_built_page_puts_a_link_or_button_inside_another(committed_pages):
+    # A control cannot hold another: the parser closes an outer button at an
+    # inner one, and everything after falls out of the row.
+    builds = (committed_pages[0], build_site.build(FIXTURE))
+    walked = 0
+    for files in builds:
+        for name, page in files.items():
+            if not name.endswith(".html") or not isinstance(page, str):
+                continue
+            walked += 1
+            assert _Nesting(page).nested == [], name
+    assert walked > len(build_site.ROUTES)
+
+
+def _dv_rows(page: str) -> list[str]:
+    return re.findall(r'<button type="button" class="dv-row".*?</button>', page, re.S)
+
+
+def _skeleton(row: str) -> list[tuple[str, str]]:
+    """The row's elements, tag and class, with the words of each tag left out."""
+    words = re.sub(r'<b class="ent">.*?</b>', "<b></b>", row, flags=re.S)
+    return [(tag, attrs.get("class", "")) for tag, attrs in Elements(words).items]
+
+
+def test_driver_rows_lay_out_alike_and_keep_the_map_explanation(committed_pages):
+    files, site = committed_pages
+    explained = plain = 0
+    for driver in site_drivers.model(site):
+        page = files[driver["file"]]
+        rows = _dv_rows(page)
+        assert len(rows) == len(driver["entries"])
+        for index, (row, entry) in enumerate(zip(rows, driver["entries"])):
+            car, engine_map, route = entry["car"], entry["map"], entry["driver"]
+            # Glyph and car, then the engine map and fuel, then the bar; the
+            # percentage last: the same elements whether or not the map is explained.
+            assert _skeleton(row) == [
+                ("button", "dv-row"),
+                ("span", "dv-livery"),
+                ("span", "dv-row-main"),
+                ("span", "dv-row-who"),
+                ("b", ""),
+                ("span", "dv-row-map"),
+                ("b", ""),
+                ("span", "dv-bar"),
+                ("span", ""),
+                ("span", "dv-pct"),
+            ], (driver["file"], index)
+            assert site_views.car_tag(car) in row
+            label = site_views.map_tag(engine_map, car, route, explain=False)
+            assert f'<span class="dv-row-map">{label} · ' in row
+            assert "map-info" not in row
+            # The row controls its panel, whose title names the same entry
+            # with the map's explanation, reachable by keyboard and screen reader.
+            assert f'aria-controls="slips-{index}"' in row
+            panel = _between(
+                page, f'<div class="dv-slips" id="slips-{index}"', '<div class="dv-cat'
+            )
+            explain = site_views.map_tag(engine_map, car, route)
+            assert explain in panel
+            if engine_map == "default":
+                assert '<button type="button" class="map-info-button"' in explain
+                assert site_views.map_tip(car, route) in html.unescape(explain)
+                explained += 1
+            else:
+                plain += 1
+    assert explained and plain
+
+
+def test_driver_row_car_name_has_one_style(committed_pages):
+    files, site = committed_pages
+    rules = _css_rules(files["paddock.css"])
+    selectors = [s.strip() for group in rules for s in group.split(",")]
+    for driver in site_drivers.model(site):
+        for row, entry in zip(_dv_rows(files[driver["file"]]), driver["entries"]):
+            who = _between(
+                row, '<span class="dv-row-who">', '<span class="dv-row-map">'
+            )
+            # One bold element holds the whole name, glyph and words.
+            assert who == site_views.car_tag(entry["car"])
+            assert who.count("<b ") == 1
+    # No rule styles a word of the name apart: nothing in a row reaches a bare
+    # span or the name's first word, and the shared first-word rule sets no type.
+    rows = re.compile(r"\.dv-row(-main|-who)?(?![\w-])")
+    for selector in selectors:
+        *outer, last = re.split(r"[\s>+~]+", selector)
+        if outer and rows.search(outer[-1]):
+            assert last != "span" and "ent-lead" not in last, selector
+    lead = rules[".ent-lead"]
+    assert not re.search(r"\b(color|font[\w-]*)\s*:", lead), lead
+    quiet = rules[".dv-row-map"]
+    assert "color: var(--ink-2)" in quiet and "font-size: 14px" in quiet
+
+
+def test_standings_rank_column_fits_the_widest_rank(committed_pages, tmp_path):
+    for files in (committed_pages[0], _data_pages(_site_tree(tmp_path))[0]):
+        standings = json.loads(files["data/standings.json"])
+        entries = standings["entries"]
+        board = _between(files["standings/index.html"], '<div class="st-board"', ">")
+        labels = [standings_pages.place_label(r["place"], r["tie"]) for r in entries]
+        labels += [label for _, label in standings_pages.fuel_ranks(entries)]
+        assert f'style="--st-pos-ch:{max(map(len, labels))}"' in board
+        page = _between(files["entries/index.html"], '<div class="st-page', ">")
+        rows = entries + standings["partial"]
+        widest = max(
+            len(standings_pages.place_label(r["place"], r["tie"])) for r in rows
+        )
+        assert f'style="--st-pos-ch:{widest}"' in page
+    rules = _css_rules(committed_pages[0]["paddock.css"])
+    # The column is an auto track sized by the rank itself: never under its old
+    # 34px, wide enough for every character of the widest rank, on one line.
+    for selector in (".st-grid", ".en-list-row"):
+        assert "grid-template-columns: auto 6px minmax(0, 1fr) 76px" in rules[selector]
+    pos = "".join(body for s, body in rules.items() if s == ".st-pos")
+    assert "min-width: max(34px, calc(var(--st-pos-ch, 2) * 1ch))" in pos
+    assert "white-space: nowrap" in pos
+    # The scale's first cell is a rank cell too, so its ticks stay over the bars.
+    assert '<div class="st-scale st-grid' in committed_pages[0]["standings/index.html"]
+    assert re.search(
+        r'<div class="st-scale st-grid[^"]*"[^>]*><span class="st-pos"></span>',
+        committed_pages[0]["standings/index.html"],
+    )
+
+
+@pytest.mark.parametrize(
+    ("label", "source"),
+    [
+        (".st-tick", "standings"),
+        (".hr-ticks span", "learn"),
+        (".rp-axis span", "learn"),
+    ],
+)
+def test_scale_tick_labels_stay_on_one_line_inside_the_axis(label, source):
+    css = {"standings": standings_pages.CSS, "learn": learn.CSS}[source]
+    rules = _css_rules(css)
+    assert "white-space: nowrap" in rules[label]
+    assert "transform: translateX(-50%)" in rules[label]
+    assert "transform: none" in rules[f"{label}:first-child"]
+    assert "transform: translateX(-100%)" in rules[f"{label}:last-child"]
+
+
+def test_standings_scale_labels_give_way_at_its_ends_on_a_narrow_axis():
+    css = standings_pages.CSS
+    assert "container-type: inline-size" in _css_rules(css)[".st-ticks"]
+    for query, tick in (("220px", "nth-last-child(2)"), ("180px", "nth-child(2)")):
+        assert (
+            f"@container (max-width: {query}) {{ .st-tick:{tick} {{ color: transparent; }} }}"
+            in css
+        )
+    # The tick mark is drawn apart from the label's text, so it stays.
+    assert "background: var(--viz-interval)" in _css_rules(css)[".st-tick::after"]
+
+
+def _covers(selector: str, tag: str, attrs: dict) -> bool:
+    """Whether a one-compound ``selector`` matches an element of ``tag``/``attrs``."""
+    if re.search(r"[\s>+~]", selector):
+        return False
+    classes = set((attrs.get("class") or "").split())
+    head = re.match(r"[a-z][a-z0-9]*", selector)
+    if head and head[0] != tag:
+        return False
+    for kind, name in re.findall(r"([.\[])([\w-]+)", selector):
+        if kind == "." and name not in classes:
+            return False
+        if kind == "[" and name not in attrs:
+            return False
+    return not re.search(r":", selector)
+
+
+def test_the_hidden_attribute_always_hides(committed_pages):
+    css = committed_pages[0]["paddock.css"]
+    rules = _css_rules(css)
+    hiding = {
+        s.strip(): body
+        for group, body in rules.items()
+        for s in group.split(",")
+        if "[hidden]" in s
+    }
+    showing = {
+        s.strip(): body
+        for group, body in rules.items()
+        for s in group.split(",")
+        if "[hidden]" not in s and re.search(r"(^|;)\s*display:\s*(?!none)", body)
+    }
+    checked = 0
+    for files in (committed_pages[0], build_site.build(FIXTURE)):
+        for name, page in files.items():
+            if not name.endswith(".html") or not isinstance(page, str):
+                continue
+            for tag, attrs in Elements(page).items:
+                if "hidden" not in attrs:
+                    continue
+                if not any(_covers(s, tag, attrs) for s in showing):
+                    continue
+                checked += 1
+                # A class that sets a display has a [hidden] rule for it that
+                # hides, or keeps the space but shows nothing (the home hero).
+                assert any(
+                    _covers(s, tag, attrs)
+                    and re.search(r"display:\s*none|visibility:\s*hidden", body)
+                    for s, body in hiding.items()
+                ), (name, tag, attrs)
+    assert checked
+    # The races grid's "Show all" and a race's "Show all finishers" are buttons.
+    assert "display: none" in rules[".btn[hidden]"]
+    assert css.index(".btn[hidden]") > css.index(".btn {")
+    # PR 88's home hero controls still keep their space while hidden.
+    for keep in (".home-go[hidden]", ".home-start[hidden]"):
+        assert "visibility: hidden" in rules[keep]
+        assert not re.search(r"display:\s*none", rules[keep]), keep
+    assert not re.search(r"\[hidden\][^{]*\{[^}]*!important", css)
+
+
+def test_races_script_shows_all_only_while_cards_are_hidden():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is required to execute the races JavaScript")
+    # Synthetic calendar: one challenge fits the first screen, one does not.
+    harness = (
+        _RACES_DOM
+        + """
+var first = 12, few = 6, many = first + 1;
+var chips = ['all', 'few', 'many'].map(c => element({'data-challenge': c}));
+var sorts = ['hard', 'name'].map(s => element({'data-sort': s}));
+var group = element();
+group.querySelectorAll = () => nodeList(chips);
+chips.forEach(c => c.parentNode = group);
+sorts.forEach(s => s.parentNode = element());
+var kinds = Array(few).fill('few').concat(Array(many).fill('many'));
+var cards = kinds.map((c, i) =>
+  element({'data-challenge': c, 'data-rate': String(i), 'data-name': 'race ' + i}));
+var grid = element({'data-first': String(first)});
+grid.querySelectorAll = () => nodeList(cards);
+grid.appendChild = () => {};
+var scroll = element();
+scroll.parentNode = element();
+var controls = element();
+controls.querySelectorAll = s => nodeList(s === '[data-challenge]' ? chips : sorts);
+controls.querySelector = () => scroll;
+var more = element();
+var document = {querySelector(s) {
+  return {'[data-races-grid]': grid, '[data-races-controls]': controls,
+    '[data-races-more]': more}[s] || null;
+}};
+var window = {
+  location: {href: 'https://example.com/races/?challenge=few'},
+  history: {replaceState(state, title, url) { window.location.href = url; }},
+  addEventListener() {}
+};
+var getComputedStyle = () => ({getPropertyValue: () => '1'});
+"""
+    )
+    assertions = """
+var shown = () => cards.filter(c => !c.hidden).length;
+// Every card of a small challenge shows, so there is nothing to show all of.
+assert.equal(shown(), few);
+assert.equal(more.hidden, true);
+// A challenge over the first screen shows the first cards and the button.
+chips[2].events.click();
+assert.equal(shown(), first);
+assert.equal(more.hidden, false);
+assert.equal(more.textContent, 'Show all ' + many + ' races');
+more.events.click();
+assert.equal(shown(), many);
+assert.equal(more.hidden, false);
+assert.equal(more.textContent, 'Show fewer');
+more.events.click();
+assert.equal(shown(), first);
+assert.equal(more.textContent, 'Show all ' + many + ' races');
+// All: every challenge together is over the first screen again.
+chips[0].events.click();
+assert.equal(shown(), first);
+assert.equal(more.hidden, false);
+assert.equal(more.textContent, 'Show all ' + cards.length + ' races');
+chips[1].events.click();
+assert.equal(shown(), few);
+assert.equal(more.hidden, true);
+"""
+    subprocess.run(
+        [node, "-e", harness + site_races.SCRIPT + assertions],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=10,
+    )
+
+
+def test_browser_races_show_all_is_hidden_until_cards_are(committed_pages, tmp_path):
+    executable = os.environ.get("PADDOCK_BROWSER_EXECUTABLE")
+    if not executable:
+        pytest.skip("Local Chromium pass requires PADDOCK_BROWSER_EXECUTABLE")
+    browser_api = pytest.importorskip("playwright.sync_api")
+    files, _ = committed_pages
+    for name, content in files.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content.encode() if isinstance(content, str) else content)
+    races = json.loads(files["data/races.json"])
+    counts = {row["challenge"]: row["races"] for row in races["challenges"]}
+    first = site_races.GRID_FIRST
+    small = next(c for c, n in counts.items() if n <= first)
+    large = sum(counts.values()) > first  # every challenge together
+    grid = (tmp_path / "races/index.html").as_uri()
+    with browser_api.sync_playwright() as api:
+        browser = api.chromium.launch(executable_path=executable)
+        try:
+            page = browser.new_page(viewport={"width": 390, "height": 844})
+            page.route("https://**", lambda route: route.abort())
+            more = page.locator("[data-races-more]")
+            page.goto(f"{grid}?challenge={small}")
+            assert more.evaluate("e => getComputedStyle(e).display") == "none"
+            assert page.locator(".rc-card:visible").count() == counts[small]
+            page.goto(grid)
+            if large:
+                assert more.evaluate("e => getComputedStyle(e).display") != "none"
+                more.click()
+                assert (
+                    page.locator(".rc-card:visible").count()
+                    == page.locator(".rc-card").count()
+                )
+                assert more.inner_text() == "Show fewer"
+        finally:
+            browser.close()
+
+
+def test_pit_wall_sticky_entry_column_has_an_edge():
+    rules = _css_rules(site_pit_wall.CSS)
+    edge = rules[".pw-table th.pw-entry::after"]
+    assert "left: 100%" in edge and "border-left: 1px solid var(--rule)" in edge
+    assert "pointer-events: none" in edge
+    assert "background: var(--paper)" in rules[".pw-table th.pw-entry"]
 
 
 def test_data_pages_link_resolve_and_use_only_published_glyphs(committed_pages):

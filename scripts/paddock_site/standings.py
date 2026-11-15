@@ -125,9 +125,18 @@ def place_label(place: int | None, tie: bool) -> str:
     return f"={place}" if tie else str(place)
 
 
-def map_html(engine_map: str, car: str, route: str | None = None) -> str:
-    """``engine map <label>``, the label bold behind its engine-map glyph."""
-    return f"engine map {views.map_tag(engine_map, car, route)}"
+def map_html(
+    engine_map: str, car: str, route: str | None = None, *, explain: bool = True
+) -> str:
+    """``engine map <label>``, the label bold behind its engine-map glyph.
+    ``explain=False`` for a label inside a link (see :func:`views.map_tag`)."""
+    return f"engine map {views.map_tag(engine_map, car, route, explain=explain)}"
+
+
+def rank_width(labels: Sequence[str]) -> str:
+    """The ``--st-pos-ch`` declaration: the widest rank label in characters, so
+    the rank column fits ``=17`` or ``=123`` on one line (see ``.st-pos``)."""
+    return f"--st-pos-ch:{max((len(label) for label in labels), default=1)}"
 
 
 def plural(count: int, one: str, many: str = "") -> str:
@@ -385,7 +394,7 @@ def _scale() -> str:
     )
     return (
         '<div class="st-scale st-grid st-pass-only st-ranges-only" aria-hidden="true">'
-        f'<span></span><span></span><span class="st-ticks">{ticks}</span>'
+        f'<span class="st-pos"></span><span></span><span class="st-ticks">{ticks}</span>'
         '<span class="st-value-head">pass rate</span></div>'
     )
 
@@ -469,10 +478,14 @@ def board(root: str, standings: Mapping[str, Any], races: Mapping[str, Any]) -> 
         for i, row in enumerate(entries)
     )
     more = len(entries) > min(pass_top, TOP)
+    # Either ranking can be shown, so the rank column fits the wider of the two.
+    places = [place_label(row["place"], row["tie"]) for row in entries]
+    places += [label for _, label in fuel]
     partial = standings["partial"]
     return (
         '<div class="st-board" data-st-board data-rank="pass" data-ranges="on" '
-        f'data-top="{TOP}">'
+        f'data-top="{TOP}" '
+        f'style="{rank_width(places)}">'
         + _controls()
         + _explainer(root, entries, total)
         + _callouts(entries, shown)
@@ -548,7 +561,8 @@ def _chips(
             f'<span class="st-livery" style="--c:{livery(row["car"])}" aria-hidden="true">'
             f'</span><span class="en-chip-who">{views.driver_tag(row["driver"], shown.get(row["driver"]))} in '
             f"{views.car_tag(row['car'])} "
-            f"{views.map_tag(row['map'], row['car'], row['driver'], views.DOT)}{setup_note(row, clash)}</span></a>"
+            f"{views.map_tag(row['map'], row['car'], row['driver'], views.DOT, explain=False)}"
+            f"{setup_note(row, clash)}</span></a>"
         )
     if not chips:
         return ""
@@ -794,7 +808,7 @@ def _entry_link(
         f'<span class="st-pos">{place}</span>'
         f'<span class="st-livery" style="--c:{livery(row["car"])}" aria-hidden="true"></span>'
         f'<span class="st-who"><span class="st-name">{who(row, names)}</span>'
-        f'<span class="st-map"><span>{map_html(row["map"], row["car"], row["driver"])}'
+        f'<span class="st-map"><span>{map_html(row["map"], row["car"], row["driver"], explain=False)}'
         f"{setup_note(row, clash)}</span></span></span>"
         f'<span class="st-value num">{pct(row["rate"])}<small>{row["k"]}/{row["n"]}</small>'
         "</span></a></li>"
@@ -819,8 +833,12 @@ def entries_body(standings: Mapping[str, Any], root: str) -> str:
     partial = "".join(
         _entry_link(row, root, clash, shown) for row in standings["partial"]
     )
+    places = [
+        place_label(row["place"], row["tie"])
+        for row in standings["entries"] + standings["partial"]
+    ]
     return (
-        '<div class="st-page st-narrow">'
+        f'<div class="st-page st-narrow" style="{rank_width(places)}">'
         + hero
         + (
             '<section><h2 class="st-h2">Placed</h2>'
@@ -1071,18 +1089,22 @@ CSS = """
 
 /* the row grid: the scale above the rows uses the same columns, so its ticks
    sit over the row bars; the value column has a fixed width */
-.st-grid { display: grid; grid-template-columns: 34px 6px minmax(0, 1fr) 76px; gap: 12px; }
+.st-grid { display: grid; grid-template-columns: auto 6px minmax(0, 1fr) 76px; gap: 12px; }
 .st-scale { align-items: end; padding: 0 2px 6px; }
-.st-ticks { position: relative; height: 26px; }
+.st-ticks { position: relative; height: 26px; container-type: inline-size; }
 .st-tick {
   position: absolute; top: 0; transform: translateX(-50%); font-size: 11px; color: var(--muted);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .st-tick::after { content: ""; position: absolute; left: 50%; top: 18px; width: 1px; height: 6px; background: var(--viz-interval); }
 .st-tick:first-child { transform: none; }
 .st-tick:first-child::after { left: 0; }
 .st-tick:last-child { transform: translateX(-100%); }
 .st-tick:last-child::after { left: auto; right: 0; }
+/* end labels sit inside the axis, so on a narrow scale the label next to an end
+   would run into it: that label's text gives way and its tick mark stays */
+@container (max-width: 220px) { .st-tick:nth-last-child(2) { color: transparent; } }
+@container (max-width: 180px) { .st-tick:nth-child(2) { color: transparent; } }
 .st-value-head { text-align: right; font-size: 11px; line-height: 1.2; color: var(--muted); }
 
 .st-list, .en-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
@@ -1094,6 +1116,9 @@ CSS = """
 .st-row { align-items: center; padding: 14px 2px; min-height: 44px; }
 .st-row:hover { background: color-mix(in srgb, var(--soft) 60%, transparent); }
 .st-pos { font: italic 800 20px/1 "Saira", var(--display); font-variant-numeric: tabular-nums; }
+/* the rank column (an auto track) fits the page's widest rank on one line:
+   --st-pos-ch counts its characters, and 1ch is a digit in the rank's own font */
+.st-pos { min-width: max(34px, calc(var(--st-pos-ch, 2) * 1ch)); white-space: nowrap; }
 .st-board[data-rank="pass"] .st-pos.lead { color: var(--go-ink); }
 .st-livery { width: 6px; height: 40px; border-radius: 2px; background: var(--c); }
 .st-who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -1209,7 +1234,7 @@ CSS = """
 .en-next span { font: 500 12px/1.2 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 .en-next b { font: italic 800 32px/1 var(--display); }
 .en-list-row {
-  display: grid; grid-template-columns: 34px 6px minmax(0, 1fr) 76px; gap: 12px; align-items: center;
+  display: grid; grid-template-columns: auto 6px minmax(0, 1fr) 76px; gap: 12px; align-items: center;
   padding: 12px 2px; border-bottom: 1px solid var(--rule); color: var(--ink); text-decoration: none; min-height: 44px;
 }
 .en-list-row:hover { background: color-mix(in srgb, var(--soft) 60%, transparent); color: var(--ink); }
