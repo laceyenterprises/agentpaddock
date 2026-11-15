@@ -279,6 +279,12 @@ CSS = """
 .pw-table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 860px; font-size: 14px; font-variant-numeric: tabular-nums; }
 .pw-table thead th { background: var(--paper); border-bottom: 1px solid var(--rule); padding: 0; }
 .pw-table th.pw-entry { position: sticky; left: 0; z-index: 1; background: var(--paper); text-align: left; padding: 8px 14px; min-width: 200px; max-width: 240px; border-bottom: 1px solid var(--rule); }
+/* the sticky column's edge: a divider and a soft shadow, so cells scrolled
+   sideways visibly pass beneath it rather than end in a square cut */
+.pw-table th.pw-entry::after {
+  content: ""; position: absolute; top: 0; bottom: -1px; left: 100%; width: 10px; pointer-events: none;
+  border-left: 1px solid var(--rule); background: linear-gradient(to right, color-mix(in srgb, var(--ink) 14%, transparent), transparent);
+}
 .pw-table thead th.pw-entry { z-index: 2; font: 600 12px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
 .pw-sort {
   width: 100%; min-height: 56px; padding: 8px 6px; border: 0; background: transparent; color: var(--ink);

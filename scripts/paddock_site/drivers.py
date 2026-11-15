@@ -88,9 +88,12 @@ def model(site: views.SiteData) -> list[dict[str, Any]]:
     return out
 
 
-def _entry_words(entry: Mapping[str, Any]) -> str:
-    """The entry's car and engine map, tagged: bold, each behind its glyph."""
-    return views.entry_tags(entry["car"], entry["map"], entry.get("driver"))
+def _entry_words(entry: Mapping[str, Any], *, explain: bool = True) -> str:
+    """The entry's car and engine map, tagged: bold, each behind its glyph.
+    ``explain=False`` for words inside a link (see :func:`views.map_tag`)."""
+    return views.entry_tags(
+        entry["car"], entry["map"], entry.get("driver"), explain=explain
+    )
 
 
 def _fuel(value: float | None) -> str:
@@ -176,6 +179,9 @@ def _best(driver: Mapping[str, Any]) -> str:
 
 
 def _rows(driver: Mapping[str, Any]) -> tuple[str, int]:
+    """One button per entry. A button cannot hold another, so a default map's
+    info button is not in the row: the entry's "Where it wins and slips" panel
+    title, which the row controls, names the same map with its explanation."""
     entries = driver["entries"]
     floor = bar_floor(entries)
     out = []
@@ -187,7 +193,8 @@ def _rows(driver: Mapping[str, Any]) -> tuple[str, int]:
             f'<span class="dv-livery" style="--c:{views.livery(entry["car"])}" aria-hidden="true"></span>'
             '<span class="dv-row-main">'
             f'<span class="dv-row-who">{views.car_tag(entry["car"])}'
-            f"<span>{views.map_tag(entry['map'], entry['car'], entry['driver'])} · {_fuel(entry['costPerPass'])}</span></span>"
+            f'<span class="dv-row-map">{views.map_tag(entry["map"], entry["car"], entry["driver"], explain=False)}'
+            f" · {_fuel(entry['costPerPass'])}</span></span>"
             f'<span class="dv-bar"><span style="width:{width:.1f}%"></span></span></span>'
             f'<span class="dv-pct">{views.pct(entry["rate"])}</span></button>'
         )
@@ -280,7 +287,7 @@ def index_body(site: views.SiteData, drivers: Sequence[Mapping[str, Any]]) -> st
         f'<a class="dv-card" href="{layout.href(driver["file"], INDEX)}">'
         f"<b>{esc(driver['name'])}</b>"
         f'<span class="dv-card-num">{views.pct(driver["best"]["rate"])}</span>'
-        f"<span>best: {_entry_words(driver['best'])}</span>"
+        f"<span>best: {_entry_words(driver['best'], explain=False)}</span>"
         f'<span class="dv-card-meta">{esc(career(driver))}</span></a>'
         for driver in drivers
     )
@@ -353,7 +360,7 @@ CSS = """
 .dv-row-main { display: grid; gap: 6px; min-width: 0; }
 .dv-row-who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .dv-row-who .glyph { width: 20px; height: 20px; }
-.dv-row-who span { color: var(--ink-2); font-size: 14px; }
+.dv-row-map { color: var(--ink-2); font-size: 14px; }
 .dv-bar, .dv-cat-bar { display: block; height: 8px; border-radius: 3px; background: var(--soft); }
 .dv-bar span, .dv-cat-bar span { display: block; height: 100%; border-radius: 3px; background: var(--viz-other); transition: width .4s var(--ease); }
 .dv-row[aria-pressed="true"] .dv-bar span { background: var(--blue); }

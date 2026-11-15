@@ -146,6 +146,8 @@ h2.h2 { font: 700 clamp(30px, 4vw, 44px)/1.05 var(--display); letter-spacing: -.
   border-radius: 999px; font: 600 15px/1 var(--body); text-decoration: none; border: 1.5px solid var(--ink);
   transition: transform .12s var(--ease), background .2s var(--ease), color .2s var(--ease);
 }
+/* the hidden attribute must win over .btn's display (a "Show all" toggle stays hidden) */
+.btn[hidden] { display: none; }
 .btn:active { transform: translateY(1px); }
 .btn.solid { background: var(--ink); color: var(--paper); }
 .btn.solid:hover { background: var(--ink-2); border-color: var(--ink-2); color: var(--paper); }

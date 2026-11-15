@@ -418,9 +418,17 @@ def car_tag(car: str) -> str:
 
 
 def map_tag(
-    engine_map: str, car: str | None = None, route: str | None = None, lead: str = ""
+    engine_map: str,
+    car: str | None = None,
+    route: str | None = None,
+    lead: str = "",
+    *,
+    explain: bool = True,
 ) -> str:
-    """The engine map's label in bold behind its engine-map glyph."""
+    """The engine map's label in bold behind its engine-map glyph. A default map
+    carries its explanation's info button; ``explain=False`` leaves the button
+    out, for a label inside a link or button (a control cannot hold another),
+    so the explanation must be reachable from beside it or where it leads."""
     context = car_name(car) if car else ""
     if route:
         context += f" on {model_name(route)} via {host_name(route)}"
@@ -428,7 +436,7 @@ def map_tag(
         map_glyph(engine_map),
         map_label(engine_map, car, route),
         info=map_info(map_tip(car, route), context=context.strip())
-        if engine_map == "default"
+        if explain and engine_map == "default"
         else "",
         lead=lead,
     )
@@ -441,9 +449,15 @@ def driver_tag(route: str, name: str | None = None) -> str:
     return tag("driver", name or model_name(route))
 
 
-def entry_tags(car: str, engine_map: str, route: str | None = None) -> str:
-    """``car at engine map level``, both parts tagged: how a page names an entry."""
-    return f"{car_tag(car)} at engine map {map_tag(engine_map, car, route)}"
+def entry_tags(
+    car: str, engine_map: str, route: str | None = None, *, explain: bool = True
+) -> str:
+    """``car at engine map level``, both parts tagged: how a page names an entry.
+    ``explain`` as for :func:`map_tag`."""
+    return (
+        f"{car_tag(car)} at engine map "
+        f"{map_tag(engine_map, car, route, explain=explain)}"
+    )
 
 
 def map_glyph(engine_map: str) -> str:
