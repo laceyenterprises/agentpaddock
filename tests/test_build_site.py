@@ -4940,7 +4940,9 @@ def test_clearly_helped_requires_two_dial_levels(levels):
         ("medium", "low", "default", "max"),
     ],
 )
-@pytest.mark.parametrize("bottom,top,helped", [(2, 9, True), (9, 2, False), (5, 6, False)])
+@pytest.mark.parametrize(
+    "bottom,top,helped", [(2, 9, True), (9, 2, False), (5, 6, False)]
+)
 def test_clearly_helped_compares_canonical_endpoints(order, bottom, top, helped):
     passes = {"low": bottom, "medium": 0, "max": top, "default": 9}
     ladder = {"levels": [_rung(level, passes[level], 9, 0.01) for level in order]}
@@ -6799,13 +6801,13 @@ def test_standings_rank_column_fits_the_widest_rank(committed_pages, tmp_path):
         board = _between(files["standings/index.html"], '<div class="st-board"', ">")
         labels = [standings_pages.place_label(r["place"], r["tie"]) for r in entries]
         labels += [label for _, label in standings_pages.fuel_ranks(entries)]
-        assert f'style="--st-pos-ch:{max(map(len, labels))}"' in board
+        assert f'style="--st-pos-ch:{max(map(len, labels))};"' in board
         page = _between(files["entries/index.html"], '<div class="st-page', ">")
         rows = entries + standings["partial"]
         widest = max(
             len(standings_pages.place_label(r["place"], r["tie"])) for r in rows
         )
-        assert f'style="--st-pos-ch:{widest}"' in page
+        assert f'style="--st-pos-ch:{widest};"' in page
     rules = _css_rules(committed_pages[0]["paddock.css"])
     # The column is an auto track sized by the rank itself: never under its old
     # 34px, wide enough for every character of the widest rank, on one line.
@@ -6998,7 +7000,8 @@ def test_browser_races_show_all_is_hidden_until_cards_are(committed_pages, tmp_p
     races = json.loads(files["data/races.json"])
     counts = {row["challenge"]: row["races"] for row in races["challenges"]}
     first = site_races.GRID_FIRST
-    small = next(c for c, n in counts.items() if n <= first)
+    small = next((c for c, n in counts.items() if n <= first), None)
+    assert small is not None, f"No challenge with <= {first} races found"
     large = sum(counts.values()) > first  # every challenge together
     grid = (tmp_path / "races/index.html").as_uri()
     with browser_api.sync_playwright() as api:

@@ -136,7 +136,7 @@ def map_html(
 def rank_width(labels: Sequence[str]) -> str:
     """The ``--st-pos-ch`` declaration: the widest rank label in characters, so
     the rank column fits ``=17`` or ``=123`` on one line (see ``.st-pos``)."""
-    return f"--st-pos-ch:{max((len(label) for label in labels), default=1)}"
+    return f"--st-pos-ch:{max((len(label) for label in labels), default=1)};"
 
 
 def plural(count: int, one: str, many: str = "") -> str:
@@ -1115,10 +1115,9 @@ CSS = """
 .st-item summary::-webkit-details-marker { display: none; }
 .st-row { align-items: center; padding: 14px 2px; min-height: 44px; }
 .st-row:hover { background: color-mix(in srgb, var(--soft) 60%, transparent); }
-.st-pos { font: italic 800 20px/1 "Saira", var(--display); font-variant-numeric: tabular-nums; }
 /* the rank column (an auto track) fits the page's widest rank on one line:
    --st-pos-ch counts its characters, and 1ch is a digit in the rank's own font */
-.st-pos { min-width: max(34px, calc(var(--st-pos-ch, 2) * 1ch)); white-space: nowrap; }
+.st-pos { font: italic 800 20px/1 "Saira", var(--display); font-variant-numeric: tabular-nums; min-width: max(34px, calc(var(--st-pos-ch, 2) * 1ch)); white-space: nowrap; }
 .st-board[data-rank="pass"] .st-pos.lead { color: var(--go-ink); }
 .st-livery { width: 6px; height: 40px; border-radius: 2px; background: var(--c); }
 .st-who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
