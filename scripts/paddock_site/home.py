@@ -330,11 +330,11 @@ def hero() -> str:
         f'<span class="eyebrow">{esc(EYEBROW)}</span><h1>{esc(HEADLINE)}</h1>'
         f'<p class="home-hero-lede">{esc(LEDE)}</p></div>'
         '<div class="home-lights" data-lights>'
-        '<svg class="home-lights-art" viewBox="0 0 24 22.5" role="img" '
-        'aria-label="Start lights: 0 of 5 lit" data-art>'
-        f'<use href="#start-lights" width="24" height="24"/>{lamps}</svg>'
         f'<p class="home-go" data-go aria-live="polite" hidden>{glyphs.icon("flag-green", "home-go-flag")}'
         "Race!</p>"
+        '<svg class="home-lights-art" viewBox="0 3 24 19.5" role="img" '
+        'aria-label="Start lights: 0 of 5 lit" data-art>'
+        f'<use href="#start-lights" width="24" height="24"/>{lamps}</svg>'
         '<button type="button" class="home-start" data-start hidden>Run it again</button>'
         "</div></section>"
     )
@@ -735,15 +735,16 @@ CSS = """
 .home-hero .eyebrow { color: var(--tower-mute); font-weight: 500; letter-spacing: .14em; }
 .home-hero h1 { margin: 0; font: italic 800 clamp(44px, 11vw, 84px)/.92 var(--display); text-wrap: balance; }
 .home-hero-lede { font-size: 18px; line-height: 1.5; color: #B9C1CC; max-width: 460px; }
-.home-lights { display: grid; grid-template-columns: auto auto; align-items: center; justify-content: center; align-self: end; gap: 18px; text-align: center; }
-.home-lights-art { width: min(260px, 70vw); height: auto; aspect-ratio: 24 / 22.5; grid-column: 1 / -1; grid-row: 2; color: var(--tower-fg); --pdk-accent: var(--tower-rule); }
+/* one centred column: "Race!", the stand, the replay button. The art's viewBox ends at the housing's top edge and
+   the foot, so the single grid gap is the space above and below the stand; nothing clips the "Race!" pop. */
+.home-lights { display: grid; justify-items: center; align-self: end; gap: 18px; text-align: center; }
+.home-lights-art { width: min(260px, 70vw); height: auto; aspect-ratio: 24 / 19.5; color: var(--tower-fg); --pdk-accent: var(--tower-rule); }
 .home-lights-art .lamp { fill: transparent; transition: fill .15s; }
 .home-lights-art .lamp.on { fill: var(--red); }
-.home-go { grid-column: 1; grid-row: 1; display: flex; align-items: center; gap: 10px; font: italic 800 34px/1 var(--display); color: var(--tower-lit); animation: home-pop .5s var(--ease); }
+.home-go { margin: 0; display: flex; align-items: center; gap: 10px; font: italic 800 34px/1 var(--display); color: var(--tower-lit); animation: home-pop .5s var(--ease); }
 .home-go[hidden] { display: flex; visibility: hidden; animation: none; }
 .home-go-flag { width: 34px; height: 34px; color: var(--tower-fg); }
 .home-start {
-  grid-column: 2; grid-row: 1;
   min-height: 52px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--blue); color: #FFFFFF;
   font: 600 17px var(--body); cursor: pointer;
 }
