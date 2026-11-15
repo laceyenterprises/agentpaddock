@@ -20,6 +20,8 @@ from .routes import BAR, PANEL, SITE_URL, Route, nav_routes
 
 PRODUCT = "Agent Paddock"
 REPO_URL = "https://github.com/laceyenterprises/agentpaddock"
+#: The parent company's site; the footer and the contact page link back to it.
+LACEY_URL = "https://www.laceyenterprises.com"
 GTM_CONTAINER_ID = "GTM-P52SNL3D"
 #: The activation probe reads this marker to tell the PDW site from the old one.
 SITE_MARKER = '<meta name="paddock-site" content="pdw-1">'
@@ -425,7 +427,8 @@ def footer(
         f'Submit a run or a correction: <a href="{REPO_URL}/blob/main/CONTRIBUTING.md">'
         "CONTRIBUTING</a>.</p>"
         f"<p>{ANALYTICS_DISCLOSURE}</p>"
-        "<p>A Lacey Enterprises project · MIT licensed · © 2026 Lacey Enterprises LLC</p>"
+        f'<p>A <a href="{LACEY_URL}">Lacey Enterprises</a> project · MIT licensed · '
+        "© 2026 Lacey Enterprises LLC</p>"
         "</div></div></footer>"
     )
 

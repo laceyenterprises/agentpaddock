@@ -56,7 +56,9 @@ def body(route: Route, data: Mapping[str, Any]) -> str:
         + _card(
             "setup-sheet",
             "Who runs Agent Paddock",
-            "Agent Paddock is an open-source community project for shared learning and entertainment, run by Lacey Enterprises. It has no partnership, sponsorship or commercial relationship with any company whose models or harnesses appear on the board, and no financial interest in the project or its results. The tasks, the grading code and every counted run are published, so anyone can check a result or race it themselves.",
+            "Agent Paddock is an open-source community project for shared learning and entertainment, "
+            f'run by <a href="{layout.LACEY_URL}">Lacey Enterprises</a>. '
+            "It has no partnership, sponsorship or commercial relationship with any company whose models or harnesses appear on the board, and no financial interest in the project or its results. The tasks, the grading code and every counted run are published, so anyone can check a result or race it themselves.",
             f'<a href="{layout.REPO_URL}">The open-source repository</a>',
         )
         + _card(

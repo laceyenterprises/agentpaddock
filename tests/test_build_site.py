@@ -37,6 +37,8 @@ FIXTURE = Path(__file__).resolve().parent / "fixtures" / "leaderboard"
 RETIRED_REPOSITORY = (
     "laceyenterprises/paddock"  # publication-scan: allow(private-repo): absent
 )
+#: The one link back to the company, in every footer and on the contact page.
+LACEY_LINK = '<a href="https://www.laceyenterprises.com">Lacey Enterprises</a>'
 #: An href or src that is root-relative ("/x"); "//" and absolute URLs do not match.
 ROOT_RELATIVE = re.compile(r"""\b(?:href|src)\s*=\s*["']?/(?!/)""", re.IGNORECASE)
 ABSOLUTE_LINK = re.compile(
@@ -153,6 +155,28 @@ def test_tag_manager_external_link_allowance(url, allowed):
     assert _is_tag_manager_link(scheme, target) is allowed
 
 
+def _is_company_link(scheme: str, target: str) -> bool:
+    return scheme == "https:" and target == "www.laceyenterprises.com"
+
+
+@pytest.mark.parametrize(
+    ("url", "allowed"),
+    [
+        ("https://www.laceyenterprises.com", True),
+        ("http://www.laceyenterprises.com", False),
+        ("//www.laceyenterprises.com", False),
+        ("https://laceyenterprises.com", False),
+        ("https://www.laceyenterprises.com/careers", False),
+        ("https://www.laceyenterprises.com.example", False),
+        ("https://www.laceyenterprises.com@other.example", False),
+        ("https://www.example.com", False),
+    ],
+)
+def test_company_external_link_allowance(url, allowed):
+    scheme, target = ABSOLUTE_LINK.search(f'href="{url}"').groups()
+    assert _is_company_link(scheme, target) is allowed
+
+
 def test_built_html_links_only_relatively_and_to_the_public_names():
     for files in (build_site.build(FIXTURE), build_site.build(lb.DEFAULT_RESULTS)):
         for name, page in _text_files(files):
@@ -161,8 +185,10 @@ def test_built_html_links_only_relatively_and_to_the_public_names():
             assert not ROOT_RELATIVE.search(page), name
             for scheme, target in ABSOLUTE_LINK.findall(page):
                 assert scheme, f"{name}: protocol-relative link //{target}"
-                public_link = target == "agentpaddock.ai/" or target.startswith(
-                    "github.com/laceyenterprises/agentpaddock"
+                public_link = (
+                    target == "agentpaddock.ai/"
+                    or target.startswith("github.com/laceyenterprises/agentpaddock")
+                    or _is_company_link(scheme, target)
                 )
                 vendor_evidence = name == "methodology.html" and target.startswith(
                     (
@@ -189,6 +215,22 @@ def test_built_html_links_only_relatively_and_to_the_public_names():
             "https://github.com/laceyenterprises/agentpaddock"
             in files["methodology.html"]
         )
+
+
+def test_every_footer_and_the_contact_page_link_back_to_lacey_enterprises(tmp_path):
+    files = build_site.build(_site_tree(tmp_path))
+    for name, page in _html_pages(files).items():
+        footer = _between(page, '<footer class="footer">', "</footer>")
+        # Only the company name is linked: same tab, no target, no rel.
+        line = f"<p>A {LACEY_LINK} project · MIT licensed · © 2026 Lacey Enterprises LLC</p>"
+        assert footer.count(line) == 1, name
+        # The disclaimer still names the company without linking it.
+        assert layout.FOOTER_DISCLAIMER in footer, name
+        # No other link to the company: the footer's one, plus the contact page's.
+        expected = 2 if name == "contact/index.html" else 1
+        assert page.count("laceyenterprises.com") == expected, name
+    assert f"run by {LACEY_LINK}." in _main(files["contact/index.html"])
+    assert "<a" not in layout.FOOTER_DISCLAIMER
 
 
 def test_a_result_without_a_price_source_renders_cost_unknown():
@@ -3807,7 +3849,7 @@ def test_contact_page_has_the_pit_board_the_mailto_and_the_challenge_subject():
     assert 'href="mailto:hello@agentpaddock.ai"' in main
     assert 'href="mailto:hello@agentpaddock.ai?subject=Result%20challenge"' in main
     assert 'href="https://github.com/laceyenterprises/agentpaddock/issues"' in main
-    assert "run by Lacey Enterprises." in main
+    assert f"run by {LACEY_LINK}." in main
     for title in (
         "Ask about the program",
         "Challenge a result",
