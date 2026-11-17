@@ -14,12 +14,7 @@
         },
         {
           "name": "error",
-          "terminal": false,
-          "exitOwner": "Suite caller: _invalidate_level_mismatch",
-          "maxDurationSeconds": 180,
-          "overdueRecipient": "Agent Paddock maintainer",
-          "enforcement": "missing",
-          "deadEndEvidence": "lib/python/gym/suite.py:_invalidate_level_mismatch; raw grades may be reclassified before final consumption; no mandatory standalone grade lifetime"
+          "terminal": true
         },
         {
           "name": "failed",
@@ -200,13 +195,6 @@
           "from": "xfail_taint_shadow",
           "to": "[*]",
           "trigger": "end.xfail_taint_shadow",
-          "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
-        },
-        {
-          "id": "paddock.grade.level.error",
-          "from": "error",
-          "to": "agent_error",
-          "trigger": "level.error",
           "codeSource": "lib/python/gym/outcomes.py:OUTCOMES;lib/python/gym/taint.py:GATE_OUTCOMES;lib/python/gym/grader.py:_grade"
         },
         {
@@ -599,6 +587,7 @@
       "c.outcome == outcomes.INTEGRITY_HOLD",
       "cell.outcome != outcomes.AGENT_ERROR",
       "cell.outcome = outcomes.AGENT_ERROR",
+      "cell.outcome == outcomes.ERROR",
       "cell.outcome == outcomes.PASSED",
       "cell.terminal_status == 'provider_unavailable'",
       "cell.terminal_status in {TIMEOUT_TERMINAL_STATUS, 'provider_unavailable'}",

@@ -9,18 +9,56 @@ import pytest
 from conftest import FIXTURES_DIR, TASKS_DIR
 
 from gym import outcomes, taint
-from gym.grader import Trajectory
+from gym.grader import Cell, Trajectory
 from gym.schema import SUITES
 from gym.suite import (
     ALL_SUITE,
     SELECTABLE_SUITES,
     SuiteError,
+    _invalidate_level_mismatch,
     discover_tasks,
     in_scope_agents,
     run_suite,
 )
 
 MINI_SUITE = FIXTURES_DIR / "mini-suite"
+
+
+@pytest.mark.parametrize("resolved_level", [None, "low", "high"])
+def test_level_check_preserves_grading_error(resolved_level):
+    cell = Cell(
+        task_id="synthetic-task",
+        outcome=outcomes.ERROR,
+        reason="synthetic evidence read failed",
+        launch_request_id="lrq-synthetic",
+        resolved_reasoning_level=resolved_level,
+    )
+
+    _invalidate_level_mismatch(cell, "high")
+
+    assert cell.outcome == outcomes.ERROR
+    assert cell.reason == "synthetic evidence read failed"
+    assert cell.level_mismatch is (resolved_level == "low")
+
+
+@pytest.mark.parametrize("resolved_level", [None, "low"])
+@pytest.mark.parametrize("outcome", [outcomes.PASSED, outcomes.FAILED])
+def test_level_check_discards_measurement_at_unresolved_or_different_level(resolved_level, outcome):
+    cell = Cell(
+        task_id="synthetic-task",
+        outcome=outcome,
+        launch_request_id="lrq-synthetic",
+        resolved_reasoning_level=resolved_level,
+    )
+
+    _invalidate_level_mismatch(cell, "high")
+
+    assert cell.outcome == outcomes.AGENT_ERROR
+    assert cell.reason == (
+        "requested reasoning level 'high' but the ledger resolved "
+        f"{resolved_level!r}; {outcome} verdict discarded"
+    )
+    assert cell.level_mismatch is True
 
 
 class MappingSource:
