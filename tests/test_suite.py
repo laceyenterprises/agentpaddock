@@ -14,7 +14,9 @@ from gym.schema import SUITES
 from gym.suite import (
     ALL_SUITE,
     SELECTABLE_SUITES,
+    GradedCell,
     SuiteError,
+    SuiteResult,
     _invalidate_level_mismatch,
     discover_tasks,
     in_scope_agents,
@@ -25,13 +27,17 @@ MINI_SUITE = FIXTURES_DIR / "mini-suite"
 
 
 @pytest.mark.parametrize("resolved_level", [None, "low", "high"])
-def test_level_check_preserves_grading_error(resolved_level):
+@pytest.mark.parametrize("launch_request_id", [None, "lrq-synthetic"])
+@pytest.mark.parametrize("prior_mismatch", [False, True])
+def test_level_check_preserves_grading_error(resolved_level, launch_request_id, prior_mismatch):
     cell = Cell(
         task_id="synthetic-task",
         outcome=outcomes.ERROR,
         reason="synthetic evidence read failed",
-        launch_request_id="lrq-synthetic",
+        launch_request_id=launch_request_id,
+        reasoning_level="high",
         resolved_reasoning_level=resolved_level,
+        level_mismatch=prior_mismatch,
     )
 
     _invalidate_level_mismatch(cell, "high")
@@ -39,6 +45,18 @@ def test_level_check_preserves_grading_error(resolved_level):
     assert cell.outcome == outcomes.ERROR
     assert cell.reason == "synthetic evidence read failed"
     assert cell.level_mismatch is (resolved_level == "low")
+
+    result = SuiteResult(suite=ALL_SUITE, graded=[GradedCell(cell, asserted=None)])
+    summary = result.summary_dict()
+    assert summary["errors"] == 1
+    assert summary["passed"] == summary["failed"] == summary["level_unresolved"] == 0
+    assert summary["level_mismatches"] == int(resolved_level == "low")
+    for view in (cell.to_dict(), summary["cells"][0]):
+        assert view["verdict"] == outcomes.ERROR
+        assert view["reason"] == "synthetic evidence read failed"
+        assert view["reasoning_level"] == "high"
+        assert view.get("resolved_reasoning_level") == resolved_level
+        assert view["level_mismatch"] is (resolved_level == "low")
 
 
 @pytest.mark.parametrize("resolved_level", [None, "low"])

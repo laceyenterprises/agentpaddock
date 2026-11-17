@@ -171,7 +171,6 @@ stateDiagram-v2
 
 | Object | Non-terminal states | Proposed exit owner | Proposed maximum | Recipient | Enforcement |
 |---|---|---|---|---|---|
-| paddock.grade | `error` | Suite caller: _invalidate_level_mismatch | 180s | Agent Paddock maintainer | missing |
 | paddock.grade | `failed` | Suite caller: _invalidate_level_mismatch | 180s | Agent Paddock maintainer | missing |
 | paddock.grade | `format_failed` | Suite caller: _invalidate_level_mismatch | 180s | Agent Paddock maintainer | missing |
 | paddock.grade | `integrity_hold` | Suite caller: _invalidate_level_mismatch | 180s | Agent Paddock maintainer | missing |

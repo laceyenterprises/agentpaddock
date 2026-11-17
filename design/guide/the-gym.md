@@ -204,11 +204,17 @@ check`. Levels are `low`, `medium`, `high`, and `xhigh`; `max` normalizes to
 the model and before any skill digest. Its baseline slice and result directory
 are separate from the same model without a level. Omitting the flag preserves
 the existing keys, slices, paths, and dispatch arguments. Each cell reports the
-requested and ledger-resolved level. A dispatched cell whose resolved level
-differs from the request (clamped, `unsupported`, or unreadable) is flagged with
+requested and ledger-resolved level. Except for harness `error` cells, a
+dispatched cell whose resolved level differs from the request (clamped,
+`unsupported`, or unreadable) is flagged with
 `level_mismatch` and graded `agent_error`, so it is never stored as a verdict for
 the requested level: `baseline update` refuses the non-green suite, and the
-regression gate never counts it as a pass or a regression. A model id with an
+regression gate never counts it as a pass or a regression. A harness `error`
+keeps its outcome and original failure reason. Its `level_mismatch` flag is true
+only when a recorded resolved level differs from the request; an absent resolved
+level leaves the flag false, including when no launch request exists. Summaries
+count these cells as errors and count any level mismatch independently, with
+the requested and recorded resolved levels in separate fields. A model id with an
 `effort:` segment (for example `provider@effort:high`) is refused, since it would
 share keys with a leveled cohort. On the Postgres runtime the resolved level is
 read through the bounded read-only `psql` path, and only for a leveled run.
