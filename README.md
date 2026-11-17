@@ -112,7 +112,6 @@ stateDiagram-v2
     s_706173736564 --> [*]: paddock.grade.end.passed
     s_736b69707065645f6e6f5f7461696e745f67617465 --> [*]: paddock.grade.end.skipped_no_taint_gate
     s_786661696c5f7461696e745f736861646f77 --> [*]: paddock.grade.end.xfail_taint_shadow
-    s_6572726f72 --> s_6167656e745f6572726f72: paddock.grade.level.error
     s_6661696c6564 --> s_6167656e745f6572726f72: paddock.grade.level.failed
     s_666f726d61745f6661696c6564 --> s_6167656e745f6572726f72: paddock.grade.level.format_failed
     s_696e746567726974795f686f6c64 --> s_6167656e745f6572726f72: paddock.grade.level.integrity_hold
@@ -172,7 +171,6 @@ stateDiagram-v2
 
 | Object | Non-terminal states | Proposed exit owner | Proposed maximum | Recipient | Enforcement |
 |---|---|---|---|---|---|
-| paddock.grade | `error` | Suite caller: _invalidate_level_mismatch | 180s | Agent Paddock maintainer | missing |
 | paddock.grade | `failed` | Suite caller: _invalidate_level_mismatch | 180s | Agent Paddock maintainer | missing |
 | paddock.grade | `format_failed` | Suite caller: _invalidate_level_mismatch | 180s | Agent Paddock maintainer | missing |
 | paddock.grade | `integrity_hold` | Suite caller: _invalidate_level_mismatch | 180s | Agent Paddock maintainer | missing |

@@ -39,7 +39,9 @@ def audit(src):
     }
     result["paddock.grade"] += [
         ("level." + v, v, outcome["AGENT_ERROR"])
-        for v in sorted(values - {taint[k] for k in gate} - {outcome["AGENT_ERROR"]})
+        for v in sorted(
+            values - {taint[k] for k in gate} - {outcome["AGENT_ERROR"], outcome["ERROR"]}
+        )
     ]
     tree = ast.parse(src["endpoints.py"])
     written = {

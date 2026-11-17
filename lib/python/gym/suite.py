@@ -340,8 +340,15 @@ def _invalidate_level_mismatch(cell: Cell, reasoning_level: str | None) -> None:
     into ``agent_error``: baseline update refuses a non-green suite, and the
     regression gate never counts an ``agent_error`` as a pass or regression.
     Gate-skipped cells never dispatched, so they carry no level to compare.
+    An error verdict is not a measurement, so it keeps its own reason.
     """
     if reasoning_level is None or not outcomes.is_outcome(cell.outcome):
+        return
+    if cell.outcome == outcomes.ERROR:
+        cell.level_mismatch = (
+            cell.resolved_reasoning_level is not None
+            and cell.resolved_reasoning_level != reasoning_level
+        )
         return
     if not cell.launch_request_id and cell.resolved_reasoning_level is None:
         return
