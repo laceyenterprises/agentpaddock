@@ -197,6 +197,7 @@ def test_built_html_links_only_relatively_and_to_the_public_names():
                         "opencode.ai/docs/",
                         "www.antigravity.google/docs/",
                         "raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/",
+                        "hermes-agent.nousresearch.com/docs/",
                     )
                 )
                 font_link = scheme == "https:" and (

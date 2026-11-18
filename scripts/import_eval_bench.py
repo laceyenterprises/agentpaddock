@@ -40,12 +40,13 @@ import leaderboard
 # 2026-10-10 lacks Claude Sonnet 5.5. Every rate shared with 2026-10-25
 # is identical, so using the later table changes no other price.
 PRICE_TABLE = "2026-10-25"
-EVAL_BENCH_PRICE_TABLE = "2026-10-25"
+EVAL_BENCH_PRICE_TABLE = "2026-11-03"
 #: Each published eval-bench export keeps the price table it was published with,
 #: so registering a later export at a newer table never re-renders an earlier
 #: document. A source not listed here is priced at EVAL_BENCH_PRICE_TABLE.
 EVAL_BENCH_PRICE_TABLES: dict[str, str] = {
     "REPORT-eval-bench-2026-10-29.raw.json.gz": "2026-10-25",
+    "REPORT-eval-bench-2026-11-18.raw.json.gz": "2026-11-03",
 }
 #: The paddock bench runner; its documents are trusted by default (CONTRIBUTING.md).
 RUNNER = leaderboard.PADDOCK_BENCH_RUNNER
@@ -483,6 +484,7 @@ SOURCES = (
     ("REPORT-ossharn-04-gym-matrix-2026-09-29.raw.json", import_ossharn),
     ("REPORT-omt-08-local-80b-gym-rows-2026-09-30.raw.json", import_omt),
     ("REPORT-eval-bench-2026-10-29.raw.json.gz", import_eval_bench),
+    ("REPORT-eval-bench-2026-11-18.raw.json.gz", import_eval_bench),
 )
 
 

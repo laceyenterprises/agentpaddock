@@ -406,6 +406,109 @@
       ]
     },
     {
+      "date": "2026-11-12",
+      "harness": "hermes",
+      "notes": "Scope: all 61 imported records in 1 results document, covering 1 configuration hash. Vendor documentation consulted 2026-11-12 is a current baseline, not proof of historical CLI defaults. There is no standalone Hermes path; every record is historical fleet evidence. Pending: reasoning, transport and provenance fail; the remaining checks are not verifiable. Maintainer sign-off is empty.",
+      "status": "pending",
+      "sign_off": null,
+      "evidence": [
+        {
+          "id": "tools",
+          "status": "not-verifiable",
+          "notes": "Vendor toolsets are enabled per platform (hermes tools, --toolsets), and the vendor default enables more than the three tools the registry lock names (bash:safe, read, write). The lock is not a native tool inventory. The imported descriptor records no effective toolset, web access or plugin setting, so the native tool set of these runs cannot be established.",
+          "sources": [
+            "https://hermes-agent.nousresearch.com/docs/user-guide/cli",
+            "https://hermes-agent.nousresearch.com/docs/reference/cli-commands",
+            "locks/hermes.lock.json:4",
+            "scripts/import_eval_bench.py:57",
+            "harness_configs[sha256:c4a2b551011b6f3c21319f732fc57f2805c437e9a229415c1fc39732fff6b4b9]"
+          ]
+        },
+        {
+          "id": "permissions",
+          "status": "not-verifiable",
+          "notes": "Vendor approvals default to smart mode, where an auxiliary model judges flagged commands; one-shot sessions deny dangerous commands by default (single_query_mode), and container terminal backends skip the checks. There is no standalone Hermes path. Neither the effective approval mode, allowlist and terminal backend nor a container boundary is recorded for these runs, so equivalent unattended authority cannot be established.",
+          "sources": [
+            "https://hermes-agent.nousresearch.com/docs/user-guide/security",
+            "https://hermes-agent.nousresearch.com/docs/user-guide/configuration",
+            "lib/python/gym/harness_toolcalls.py:600",
+            "harness_configs[sha256:c4a2b551011b6f3c21319f732fc57f2805c437e9a229415c1fc39732fff6b4b9]"
+          ]
+        },
+        {
+          "id": "model",
+          "status": "not-verifiable",
+          "notes": "All 61 records carry the imported model label openrouter/qwen3.8-27b. The importer maps the worker class to a descriptor and the label to a provider id, not to native execution telemetry. No per-run native model event or resolved-model proof is committed, so CCMODEL-01 cannot be verified from the published record; no model mismatch is inferred.",
+          "sources": [
+            "https://hermes-agent.nousresearch.com/docs/user-guide/configuration",
+            "scripts/import_eval_bench.py:57",
+            "records[harness.name=hermes].model"
+          ]
+        },
+        {
+          "id": "reasoning",
+          "status": "fail",
+          "notes": "All 61 records have model.reasoning=null. Hermes takes agent.reasoning_effort (medium when unset) with per-model overrides, so the resolved level is unrecorded rather than evidence of the vendor default.",
+          "sources": [
+            "https://hermes-agent.nousresearch.com/docs/user-guide/configuration",
+            "records[harness.name=hermes].model.reasoning"
+          ]
+        },
+        {
+          "id": "prompt",
+          "status": "not-verifiable",
+          "notes": "The shared staging function builds one task prompt plus the same workspace guard for every harness. Hermes can add preloaded skills, memory and project context files to a session prompt. The imported records contain neither the delivered prompt or its hash nor the effective skills, memory or context settings, so prompt parity is not verifiable.",
+          "sources": [
+            "https://hermes-agent.nousresearch.com/docs/user-guide/cli",
+            "lib/python/gym/staging.py:107",
+            "harness_configs[sha256:c4a2b551011b6f3c21319f732fc57f2805c437e9a229415c1fc39732fff6b4b9]"
+          ]
+        },
+        {
+          "id": "limits",
+          "status": "not-verifiable",
+          "notes": "Vendor defaults are unlimited turns (agent.max_turns), a 180-second per-command terminal timeout and no run budget. There is no standalone Hermes path, and the imported descriptor omits the time, CPU, memory, turn and token limits of these fleet runs, so limit parity is not verifiable.",
+          "sources": [
+            "https://hermes-agent.nousresearch.com/docs/user-guide/configuration",
+            "harness_configs[sha256:c4a2b551011b6f3c21319f732fc57f2805c437e9a229415c1fc39732fff6b4b9]"
+          ]
+        },
+        {
+          "id": "telemetry",
+          "status": "not-verifiable",
+          "notes": "Hermes keeps its session in its own store, so the fleet adapter exports tool calls to a file before teardown; the importer's parser keeps call arguments uncapped and maps Hermes terminal calls to bash, and tests cover the export and a missing export. A call whose arguments are not a JSON object is recorded with empty arguments. The imported records contain no whole tool-call record or completeness proof, so OCEXPORT-01 compliance is not verifiable.",
+          "sources": [
+            "lib/python/gym/harness_toolcalls.py:17",
+            "lib/python/gym/harness_toolcalls.py:329",
+            "lib/python/gym/harness_toolcalls.py:347",
+            "harness_configs[sha256:c4a2b551011b6f3c21319f732fc57f2805c437e9a229415c1fc39732fff6b4b9]"
+          ]
+        },
+        {
+          "id": "transport",
+          "status": "fail",
+          "notes": "The imported configuration records model_transport=openai-compatible-proxy but no gateway version, effective rewrite rules or explicit no-rewriting statement. The required behavior is missing from the recorded configuration; a route type alone does not pass KIMIEMPTY-01.",
+          "sources": [
+            "https://hermes-agent.nousresearch.com/docs/user-guide/configuration",
+            "scripts/import_eval_bench.py:56",
+            "harness_configs[sha256:c4a2b551011b6f3c21319f732fc57f2805c437e9a229415c1fc39732fff6b4b9]"
+          ]
+        },
+        {
+          "id": "provenance",
+          "status": "fail",
+          "notes": "All 61 records have harness.version=null. Each record carries a config_hash with a matching descriptor, but the descriptor names only the harness, transport, runner and worker class, and the vendor's own version and configuration dump is not recorded. The CLI version requirement fails.",
+          "sources": [
+            "https://hermes-agent.nousresearch.com/docs/reference/cli-commands",
+            "scripts/import_eval_bench.py:57",
+            "harness_configs[sha256:c4a2b551011b6f3c21319f732fc57f2805c437e9a229415c1fc39732fff6b4b9]",
+            "records[harness.name=hermes].harness.version",
+            "records[harness.name=hermes].harness.config_hash"
+          ]
+        }
+      ]
+    },
+    {
       "date": "2026-10-20",
       "harness": "opencode",
       "notes": "Scope: all 78 imported records in 3 committed bundles, covering 1 configuration hash. Vendor documentation consulted 2026-10-20 is a current baseline, not proof of unknown historical CLI defaults. Pending: reasoning, telemetry, transport, provenance fail; remaining checks are not verifiable. Current standalone findings are identified separately from historical fleet evidence. Maintainer sign-off is empty.",
