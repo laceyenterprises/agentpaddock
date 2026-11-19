@@ -568,6 +568,113 @@ def test_normalized_commands_unwraps_boundary_steer(python, flags):
     assert call["arguments"]["command"] == raw
 
 
+def _output_limit_command(body, *, exec_prefix="exec ", steer_policy=""):
+    quoted_body = "'" + body.replace("'", r"'\''") + "'"
+    return (
+        f"{exec_prefix}'/opt/tools/python3' '/opt/tools/shell_output_limit.py' "
+        f'--bytes 4096 {steer_policy}--shell "$0" --command {quoted_body}'
+    )
+
+
+@pytest.mark.parametrize("exec_prefix", ["exec ", ""])
+@pytest.mark.parametrize("steer_policy", ["--steer-policy '/tmp/policy.json' ", ""])
+def test_normalized_commands_unwraps_shell_output_limit(exec_prefix, steer_policy):
+    raw = _output_limit_command(
+        "git log -p && pytest -v test.py && echo 'a; b'",
+        exec_prefix=exec_prefix,
+        steer_policy=steer_policy,
+    )
+    call = {"arguments": {"command": raw}}
+    assert h.normalized_commands(call) == [
+        "git log -p",
+        "pytest -v test.py",
+        "echo 'a; b'",
+    ]
+    assert call["arguments"]["command"] == raw
+
+
+def test_normalized_commands_parses_shell_output_limit_equals_options():
+    raw = (
+        "exec /opt/tools/pypy3 -Bu -- /opt/tools/shell_output_limit.py "
+        """--bytes=4096 --steer-policy='/tmp/policy.json' --shell="$0" --command='git log'"""
+    )
+    assert h.normalized_commands({"arguments": {"command": raw}}) == ["git log"]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "bash -lc 'git log'",
+        "python3 boundary_steer.py --policy /tmp/policy.json --command 'git log'",
+        _output_limit_command("git log"),
+    ],
+)
+def test_normalized_commands_unwraps_nested_shell_output_limit(body):
+    assert h.normalized_commands({"arguments": {"command": _output_limit_command(body)}}) == [
+        "git log"
+    ]
+
+
+@pytest.mark.parametrize(
+    "wrapper,options",
+    [
+        ("exec python3 shell_output_limit.py", "--command 'git log' --unknown value"),
+        ("exec python3 shell_output_limit.py", "--command 'git log' extra"),
+        ("exec python3 other.py", "--command 'git log'"),
+        ("exec python3 -m shell_output_limit.py", "--command 'git log'"),
+        ("exec python3 shell_output_limit.py", "--bytes 4096 --command"),
+        ("exec python3 shell_output_limit.py", "--command --shell bash"),
+        ("exec python3 shell_output_limit.py", "--bytes 4096"),
+    ],
+)
+def test_normalized_commands_retains_malformed_shell_output_limit(wrapper, options):
+    raw = f"{wrapper} {options}"
+    assert h.normalized_commands({"arguments": {"command": raw}}) == [raw]
+
+
+def test_coding_toc_verifier_reads_wrapped_opencode_commands():
+    from gym import grader, outcomes
+    from gym.schema import load_task
+
+    task = load_task(REPO_ROOT / "tasks" / "coding-toc-commands")
+
+    def grade(commands):
+        events = [
+            _line(
+                {
+                    "type": "tool_use",
+                    "part": {
+                        "type": "tool",
+                        "tool": "bash",
+                        "callID": str(i),
+                        "state": {
+                            "status": "completed",
+                            "input": {"command": _output_limit_command(command)},
+                        },
+                    },
+                }
+            )
+            for i, command in enumerate(commands)
+        ]
+        return grader.grade(
+            task,
+            grader.Trajectory(
+                terminal_status="succeeded",
+                submitted_result={
+                    "status": "fixed",
+                    "regressing_commit_subject": "greet: reuse the farewell banner string",
+                },
+                harness_calls=h.calls_from_opencode_json(events),
+            ),
+        )
+
+    commands = ["git log", "pytest", "pytest"]
+    assert grade(commands).outcome == outcomes.PASSED
+    result = grade([*commands, "printf '%s\\n' replacement > 'test.py'"])
+    assert result.outcome == outcomes.FAILED
+    assert result.reason == "agent edited test.py instead of fixing main.py"
+
+
 def test_normalized_commands_normalizes_boundary_steer_body_recursively():
     body = "env MODE=test bash -lc 'cat change.diff; nl -ba retention.py | head -80'"
     raw = "python3 boundary_steer.py --command=" + shlex.quote(body)

@@ -158,7 +158,7 @@ def _shell_segments(command: str) -> list[str]:
     return [part for part in parts if part]
 
 
-def _boundary_steer_body(words: list[str]) -> str | None:
+def _python_wrapper_body(words: list[str], script: str, options: set[str]) -> str | None:
     if not words or not re.fullmatch(
         r"(?:python|pypy)(?:\d+(?:\.\d+)*)?[tw]?", Path(words[0]).name
     ):
@@ -170,13 +170,13 @@ def _boundary_steer_body(words: list[str]) -> str | None:
         i += 1
     if i < len(words) and words[i] == "--":
         i += 1
-    if i >= len(words) or Path(words[i]).name != "boundary_steer.py":
+    if i >= len(words) or Path(words[i]).name != script:
         return None
     i += 1
     body = None
     while i < len(words):
         option, equals, value = words[i].partition("=")
-        if option not in {"--policy", "--shell", "--command"}:
+        if option not in options:
             return None
         if not equals:
             i += 1
@@ -187,6 +187,20 @@ def _boundary_steer_body(words: list[str]) -> str | None:
             body = value
         i += 1
     return body
+
+
+def _boundary_steer_body(words: list[str]) -> str | None:
+    return _python_wrapper_body(words, "boundary_steer.py", {"--policy", "--shell", "--command"})
+
+
+def _shell_output_limit_body(words: list[str]) -> str | None:
+    if words and words[0] == "exec":
+        words = words[1:]
+    return _python_wrapper_body(
+        words,
+        "shell_output_limit.py",
+        {"--bytes", "--steer-policy", "--shell", "--command"},
+    )
 
 
 def _normalize(command: str, depth: int = 0) -> list[str]:
@@ -218,11 +232,13 @@ def _normalize(command: str, depth: int = 0) -> list[str]:
         return [command]
     if (body := _boundary_steer_body(words)) is not None:
         return _normalize(body, depth + 1)
+    if (body := _shell_output_limit_body(words)) is not None:
+        return _normalize(body, depth + 1)
     return [command] if command else []
 
 
 def normalized_commands(call: dict[str, Any]) -> list[str]:
-    """Executed command segments with shell/env/boundary-steer wrappers removed.
+    """Executed commands with shell, env, boundary steer and output limit wrappers removed.
 
     Shared by all verifier harnesses, including ledger calls. The original
     ``arguments`` are never changed; callers needing raw evidence keep them.
