@@ -83,10 +83,13 @@ raw ID. Missing IDs never match, and step-name and action checks still apply.
 Older snapshots with full IDs remain supported.
 
 Read-evidence command normalization unwraps shell and environment prefixes and
-Python invocations of `boundary_steer.py`. Common Python runtime flags without
-arguments (for example `-u`, `-B`, and `-I`) may precede the script. The wrapper's
-`--policy`, `--shell`, and `--command` options consume their own values, in
-separate or `--option=value` form; repeated command options use the last value.
+Python invocations of `boundary_steer.py` and `shell_output_limit.py`. The latter
+also accepts an `exec` prefix. Common Python runtime flags without arguments
+(for example `-u`, `-B`, and `-I`) may precede the script. The boundary-steer
+wrapper accepts `--policy`, `--shell`, and `--command`; the output-limit wrapper
+accepts `--bytes`, `--steer-policy`, `--shell`, and `--command`. These options
+consume their own values, in separate or `--option=value` form; repeated command
+options use the last value. Command bodies are normalized recursively.
 Use `--command=...` when the value starts with a dash, matching the wrapper’s
 option parsing.
 An explicitly empty command produces no segments. Missing values, unknown
