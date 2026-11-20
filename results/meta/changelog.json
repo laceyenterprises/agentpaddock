@@ -175,6 +175,14 @@
       "excludes": null,
       "summary": "A run stopped by its harness's own time limit counts as a did-not-finish failure, not an infrastructure exclusion: Pi's reply window, which ends a run after the model proxy has continued an unanswered reply twice, and OpenCode's 30-minute adapter watchdog. A worker on that harness and model hits the same limit, and excluding these runs to re-run them kept only the runs that fit it. A stop caused by an infrastructure fault, or by a provider stall (the first byte arriving after minutes for a few tokens), stays excluded, and so does a run the proxy continued that then finished, because the continuation changed its prompt.",
       "boundary": "Applies to runs from 2026-11-02. Earlier time-limit stops were excluded and re-run, so those rows hold only runs that fit the limit."
+    },
+    {
+      "id": "GYMSHELLWRAP-01",
+      "date": "2026-11-19",
+      "kind": "grading",
+      "excludes": null,
+      "summary": "Command checks now read the command inside the shell output-limit wrapper. From 2026-10-28 OpenCode recorded each shell call as that wrapper, so checks that read executed commands (git log, pytest, writes to test.py, read evidence) missed OpenCode commands, and a run that did run them could be graded failed.",
+      "boundary": "Three OpenCode runs on openrouter/qwen3.8-27b in the 2026-11-18 results change from failed to passed, regraded from their recorded tool calls: one coding-toc-commands, one coding-toc-large-output and one hard-review-cross-file run. No other verdict, score, task version or price changes. Other harnesses record the model's own command and are unaffected."
     }
   ],
   "schema": "paddock-changelog/v1"
