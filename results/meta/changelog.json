@@ -183,6 +183,14 @@
       "excludes": null,
       "summary": "Command checks now read the command inside the shell output-limit wrapper. From 2026-10-28 OpenCode recorded each shell call as that wrapper, so checks that read executed commands (git log, pytest, writes to test.py, read evidence) missed OpenCode commands, and a run that did run them could be graded failed.",
       "boundary": "Three OpenCode runs on openrouter/qwen3.8-27b in the 2026-11-18 results change from failed to passed, regraded from their recorded tool calls: one coding-toc-commands, one coding-toc-large-output and one hard-review-cross-file run. No other verdict, score, task version or price changes. Other harnesses record the model's own command and are unaffected."
+    },
+    {
+      "id": "UNLAUNCHEDIDS-01",
+      "date": "2026-11-22",
+      "kind": "infrastructure",
+      "excludes": null,
+      "summary": "Rows that never launched (a dispatch the fleet refused, or a task its taint gate skipped) got a new id in each dated eval-bench export, so the 2026-11-18 results repeated 195 such rows already published with the 2026-10-29 results. A never-launched row now keeps the id it was first published under.",
+      "boundary": "195 never-launched rows are removed from the 2026-11-18 results. They were never scored, so no pass rate, score or rank changes; the total row count, that document's record count and each board's excluded-row count drop."
     }
   ],
   "schema": "paddock-changelog/v1"

@@ -47,6 +47,7 @@ EVAL_BENCH_PRICE_TABLE = "2026-11-03"
 EVAL_BENCH_PRICE_TABLES: dict[str, str] = {
     "REPORT-eval-bench-2026-10-29.raw.json.gz": "2026-10-25",
     "REPORT-eval-bench-2026-11-18.raw.json.gz": "2026-11-03",
+    "REPORT-eval-bench-2026-11-22.raw.json.gz": "2026-11-03",
 }
 #: The paddock bench runner; its documents are trusted by default (CONTRIBUTING.md).
 RUNNER = leaderboard.PADDOCK_BENCH_RUNNER
@@ -485,6 +486,7 @@ SOURCES = (
     ("REPORT-omt-08-local-80b-gym-rows-2026-09-30.raw.json", import_omt),
     ("REPORT-eval-bench-2026-10-29.raw.json.gz", import_eval_bench),
     ("REPORT-eval-bench-2026-11-18.raw.json.gz", import_eval_bench),
+    ("REPORT-eval-bench-2026-11-22.raw.json.gz", import_eval_bench),
 )
 
 
